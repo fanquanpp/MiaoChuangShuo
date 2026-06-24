@@ -31,6 +31,8 @@ export interface ProjectInfo {
   path: string;
   meta: ProjectMeta;
   word_count: number;
+  // 正文章节总数
+  chapter_count: number;
 }
 
 // 文件节点接口

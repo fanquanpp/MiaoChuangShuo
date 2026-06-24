@@ -95,7 +95,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
   };
 
   return (
-    <div className="w-80 min-w-[300px] border-r border-nf-border-light bg-nf-bg flex flex-col">
+    <div className="w-72 min-w-[260px] border-l border-nf-border-light bg-nf-bg flex flex-col">
       {/* 顶部: 标题与视图切换 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-nf-border-light">
         <h2 className="text-sm font-semibold text-nf-text">{dirName}</h2>

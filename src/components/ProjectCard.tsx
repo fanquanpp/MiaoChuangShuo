@@ -10,7 +10,7 @@
 // 3. 悬浮动画效果
 // 4. 点击触发打开项目
 
-import { Clock, BarChart3 } from "lucide-react";
+import { Clock, BarChart3, BookOpen } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import type { ProjectInfo } from "../lib/api";
 
@@ -20,7 +20,10 @@ export interface ProjectData {
   name: string;
   type: string;
   typeColor: string;
+  // 总字数(已格式化)
   words: string;
+  // 正文章节总数
+  chapters: number;
   updated: string;
   gradient: string;
 }
@@ -70,11 +73,15 @@ export default function ProjectCard({ project, projectInfo }: ProjectCardProps) 
 
         {/* 项目元数据底部栏 */}
         <div className="flex items-center justify-between text-xs text-nf-text-tertiary border-t border-nf-border-light pt-3 mt-4">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5" title="总字数">
             <BarChart3 className="w-3.5 h-3.5 text-nf-text-tertiary" />
             <span>{project.words}</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5" title="正文章节数">
+            <BookOpen className="w-3.5 h-3.5 text-nf-text-tertiary" />
+            <span>{project.chapters} 章</span>
+          </div>
+          <div className="flex items-center gap-1.5" title="最后更新">
             <Clock className="w-3.5 h-3.5 text-nf-text-tertiary" />
             <span>{project.updated}</span>
           </div>

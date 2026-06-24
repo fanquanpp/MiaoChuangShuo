@@ -166,6 +166,7 @@ export default function Launcher() {
       type: info.meta.type,
       typeColor: typeStyle.color,
       words: formatWordCount(info.word_count),
+      chapters: info.chapter_count,
       updated: formatTimeAgo(info.meta.updated_at),
       gradient: typeStyle.gradient,
     };

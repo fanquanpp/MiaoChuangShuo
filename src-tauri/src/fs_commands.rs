@@ -136,10 +136,12 @@ pub fn scan_projects(parent_path: String) -> Result<Vec<ProjectInfo>, String> {
         match read_project_meta(&path) {
             Ok(meta) => {
                 let word_count = count_project_words(&path);
+                let chapter_count = count_project_chapters(&path);
                 projects.push(ProjectInfo {
                     path: path.to_string_lossy().to_string(),
                     meta,
                     word_count,
+                    chapter_count,
                 });
             }
             Err(_) => continue,
@@ -160,6 +162,8 @@ pub struct ProjectInfo {
     pub meta: ProjectMeta,
     /// 项目总字数
     pub word_count: u64,
+    /// 正文章节总数(正文目录下的 .md/.txt 文件数)
+    pub chapter_count: u64,
 }
 
 /// 读取项目元数据
@@ -185,6 +189,37 @@ fn count_project_words(project_root: &Path) -> u64 {
     let mut total: u64 = 0;
     count_words_recursive(&content_dir, &mut total);
     total
+}
+
+/// 统计项目正文章节数
+/// 输入: project_root 项目根目录
+/// 输出: u64 章节总数
+/// 流程: 递归统计正文目录下的 .md/.txt 文件数量
+fn count_project_chapters(project_root: &Path) -> u64 {
+    let content_dir = project_root.join("正文");
+    if !content_dir.exists() {
+        return 0;
+    }
+    let mut total: u64 = 0;
+    count_chapters_recursive(&content_dir, &mut total);
+    total
+}
+
+/// 递归统计目录下的章节数
+/// 输入: dir 目录路径, total 累计章节数
+/// 输出: 无
+/// 流程: 遍历目录，对 .txt/.md 文件计数
+fn count_chapters_recursive(dir: &Path, total: &mut u64) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                count_chapters_recursive(&path, total);
+            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+                *total += 1;
+            }
+        }
+    }
 }
 
 /// 递归统计目录下文件字数
@@ -272,10 +307,12 @@ pub fn import_project(project_path: String) -> Result<ProjectInfo, String> {
     }
     let meta = read_project_meta(&path)?;
     let word_count = count_project_words(&path);
+    let chapter_count = count_project_chapters(&path);
     Ok(ProjectInfo {
         path: path.to_string_lossy().to_string(),
         meta,
         word_count,
+        chapter_count,
     })
 }
 

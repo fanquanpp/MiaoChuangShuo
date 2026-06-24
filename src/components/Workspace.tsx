@@ -1,14 +1,15 @@
 // 工作台主容器组件
 //
 // 功能概述：
-// NovelForge 的工作台界面，三栏布局: 左侧导航 + 中间文件列表 + 右侧内容区。
-// 根据当前分类切换右侧内容: 正文用 TipTap 编辑器,角色/世界观/名词用卡片管理,
+// NovelForge 的工作台界面，三栏布局: 左侧导航 + 中间内容区 + 右侧文件列表。
+// FileList 作为常驻右侧面板，显示当前分类的文件列表。
+// 根据当前分类切换中间内容: 正文用 TipTap 编辑器,角色/世界观/名词用卡片管理,
 // 时间线用专用时间线管理器。
 //
 // 模块职责：
 // 1. 加载项目目录树
-// 2. 渲染三栏布局
-// 3. 根据分类切换右侧面板
+// 2. 渲染三栏布局(左导航 + 中内容 + 右文件列表)
+// 3. 根据分类切换中间内容面板
 // 4. 管理新建文件对话框
 
 import { useEffect, useState } from "react";
@@ -26,8 +27,8 @@ import { X, FilePlus } from "lucide-react";
 // 输出: 渲染三栏工作台界面
 // 流程:
 //   1. 打开项目时加载目录树
-//   2. 渲染 Sidebar + 中间面板 + 右侧面板
-//   3. 根据分类切换右侧内容
+//   2. 渲染 Sidebar + 中间面板 + 右侧 FileList
+//   3. 根据分类切换中间内容
 export default function Workspace() {
   const {
     currentProject,
@@ -99,11 +100,11 @@ export default function Workspace() {
     return null;
   }
 
-  // 渲染右侧内容面板
+  // 渲染中间内容面板
   // 输入: 无
   // 输出: 根据分类返回对应组件
   // 流程: 时间线用专用组件,角色/世界观/名词用卡片管理,其他用编辑器
-  const renderRightPanel = () => {
+  const renderMiddlePanel = () => {
     if (activeCategory === "timeline") {
       return <TimelineManager />;
     }
@@ -120,21 +121,20 @@ export default function Workspace() {
     return <NovelEditor filePath={selectedFilePath} />;
   };
 
-  // 时间线分类不需要中间文件列表
+  // 时间线分类: 中间面板扩展到右侧(不显示 FileList)
+  // 其他分类: 右侧常驻 FileList
   const showFileList = activeCategory !== "timeline";
 
   return (
     <div className="h-screen w-screen flex bg-nf-bg overflow-hidden">
-      {/* 左侧: 导航栏 */}
+      {/* 左侧: 导航栏(缩窄) */}
       <Sidebar onCreateFile={() => setCreateDialogOpen(true)} />
 
-      {/* 中间: 文件列表(时间线分类隐藏) */}
-      {showFileList && (
-        <FileList onCreateFile={() => setCreateDialogOpen(true)} />
-      )}
+      {/* 中间: 内容面板 */}
+      <div className="flex-1 flex min-w-0">{renderMiddlePanel()}</div>
 
-      {/* 右侧: 内容面板 */}
-      {renderRightPanel()}
+      {/* 右侧: 文件列表(常驻,时间线分类隐藏) */}
+      {showFileList && <FileList onCreateFile={() => setCreateDialogOpen(true)} />}
 
       {/* 新建文件对话框 */}
       {createDialogOpen && (
