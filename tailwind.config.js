@@ -15,8 +15,8 @@ export default {
           secondary: 'var(--fandex-secondary)',
           tertiary: 'var(--fandex-tertiary)',
         },
-        // FANDEX 背景色系
-        bg: {
+        // FANDEX 背景色系 - 使用 nf-bg 避免与 Tailwind 内置 bg-* 冲突
+        'nf-bg': {
           DEFAULT: 'var(--fandex-bg)',
           card: 'var(--fandex-bg-card)',
           code: 'var(--fandex-bg-code)',
@@ -24,15 +24,15 @@ export default {
           sidebar: 'var(--fandex-bg-sidebar)',
           nav: 'var(--fandex-bg-nav)',
         },
-        // FANDEX 文字色系
-        text: {
+        // FANDEX 文字色系 - 使用 nf-text 避免与 Tailwind 内置 text-* 冲突
+        'nf-text': {
           DEFAULT: 'var(--fandex-text)',
           secondary: 'var(--fandex-text-secondary)',
           tertiary: 'var(--fandex-text-tertiary)',
           inverse: 'var(--fandex-text-inverse)',
         },
-        // FANDEX 边框色系
-        border: {
+        // FANDEX 边框色系 - 使用 nf-border 避免与 Tailwind 内置 border-* 冲突
+        'nf-border': {
           DEFAULT: 'var(--fandex-border)',
           light: 'var(--fandex-border-light)',
         },

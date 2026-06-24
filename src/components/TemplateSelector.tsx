@@ -28,7 +28,7 @@ const TEMPLATES: Template[] = [
 export default function TemplateSelector({ onSelect }: { onSelect?: (id: string) => void }) {
   return (
     <div className="space-y-2 mt-4 max-h-[60vh] overflow-y-auto pr-1">
-      <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider px-1 mb-2">
+      <div className="text-xs font-semibold text-nf-text-tertiary uppercase tracking-wider px-1 mb-2">
         选择创作题材架构
       </div>
       {TEMPLATES.map((tpl) => {
@@ -37,16 +37,16 @@ export default function TemplateSelector({ onSelect }: { onSelect?: (id: string)
           <div
             key={tpl.id}
             onClick={() => onSelect?.(tpl.id)}
-            className="flex items-start gap-3 p-3 rounded-xl bg-bg-card/60 border border-border-light hover:border-border hover:bg-bg-hover/40 transition-fast cursor-pointer group"
+            className="flex items-start gap-3 p-3 rounded-xl bg-nf-bg-card/60 border border-nf-border-light hover:border-nf-border hover:bg-nf-bg-hover/40 transition-fast cursor-pointer group"
           >
-            <div className={`p-2 rounded-lg bg-bg border border-border-light group-hover:border-border transition-fast mt-0.5 ${tpl.color}`}>
+            <div className={`p-2 rounded-lg bg-nf-bg border border-nf-border-light group-hover:border-nf-border transition-fast mt-0.5 ${tpl.color}`}>
               <IconComponent className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-text group-hover:text-fandex-primary transition-fast">
+              <div className="text-sm font-medium text-nf-text group-hover:text-fandex-primary transition-fast">
                 {tpl.name}
               </div>
-              <div className="text-xs text-text-tertiary line-clamp-2 mt-0.5 leading-relaxed">
+              <div className="text-xs text-nf-text-tertiary line-clamp-2 mt-0.5 leading-relaxed">
                 {tpl.desc}
               </div>
             </div>

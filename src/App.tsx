@@ -7,7 +7,7 @@ import Launcher from "./components/Launcher";
 // 流程: 包裹在 FANDEX 暗黑主题容器中渲染 Launcher 组件
 function App() {
   return (
-    <div className="antialiased text-text bg-bg min-h-screen">
+    <div className="antialiased text-nf-text bg-nf-bg min-h-screen">
       <Launcher />
     </div>
   );

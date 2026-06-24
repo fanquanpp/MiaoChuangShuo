@@ -18,7 +18,7 @@ export interface ProjectData {
 // 流程: 渲染渐变头部、类型标签、项目名称、字数与更新时间
 export default function ProjectCard({ project }: { project: ProjectData }) {
   return (
-    <div className="group bg-bg-card/40 border border-border-light hover:border-fandex-primary/30 rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-base transform hover:-translate-y-1 cursor-pointer flex flex-col justify-between min-h-[180px]">
+    <div className="group bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/30 rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-base transform hover:-translate-y-1 cursor-pointer flex flex-col justify-between min-h-[180px]">
       {/* 渐变头部区域 - FANDEX 品牌色渐变 */}
       <div className={`h-12 bg-gradient-to-r ${project.gradient} opacity-70 group-hover:opacity-90 transition-base relative`}>
         <div className="absolute -bottom-3.5 left-4">
@@ -30,18 +30,18 @@ export default function ProjectCard({ project }: { project: ProjectData }) {
 
       {/* 卡片主体 */}
       <div className="p-4 pt-6 flex-1 flex flex-col justify-between">
-        <h3 className="text-base font-semibold text-text group-hover:text-fandex-primary transition-fast tracking-tight line-clamp-1">
+        <h3 className="text-base font-semibold text-nf-text group-hover:text-fandex-primary transition-fast tracking-tight line-clamp-1">
           {project.name}
         </h3>
 
         {/* 项目元数据底部栏 */}
-        <div className="flex items-center justify-between text-xs text-text-tertiary border-t border-border-light pt-3 mt-4">
+        <div className="flex items-center justify-between text-xs text-nf-text-tertiary border-t border-nf-border-light pt-3 mt-4">
           <div className="flex items-center gap-1.5">
-            <BarChart3 className="w-3.5 h-3.5 text-text-tertiary" />
+            <BarChart3 className="w-3.5 h-3.5 text-nf-text-tertiary" />
             <span>{project.words}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-text-tertiary" />
+            <Clock className="w-3.5 h-3.5 text-nf-text-tertiary" />
             <span>{project.updated}</span>
           </div>
         </div>
