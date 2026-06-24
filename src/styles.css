@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========== FANDEX 设计令牌 - 暗色主题(默认) ========== */
+:root {
+  /* 品牌色 */
+  --fandex-primary: #6ea8fe;
+  --fandex-primary-hover: #93c0ff;
+  --fandex-secondary: #55efc4;
+  --fandex-tertiary: #f09070;
+
+  /* 背景色 */
+  --fandex-bg: #0d0d0d;
+  --fandex-bg-card: #181818;
+  --fandex-bg-code: #202020;
+  --fandex-bg-hover: #282828;
+  --fandex-bg-sidebar: #121212;
+  --fandex-bg-nav: rgba(13, 13, 13, 0.95);
+
+  /* 文字色 */
+  --fandex-text: #ebebeb;
+  --fandex-text-secondary: #b3b3b3;
+  --fandex-text-tertiary: #8a8a8a;
+  --fandex-text-inverse: #0d0d0d;
+
+  /* 边框色 */
+  --fandex-border: #525252;
+  --fandex-border-light: #383838;
+}
+
+/* ========== FANDEX 设计令牌 - 亮色主题 ========== */
+.light {
+  --fandex-primary: #3366cc;
+  --fandex-primary-hover: #264da8;
+  --fandex-secondary: #00b894;
+  --fandex-tertiary: #e05a2b;
+
+  --fandex-bg: #fafafa;
+  --fandex-bg-card: #eeeeee;
+  --fandex-bg-code: #e6e6e6;
+  --fandex-bg-hover: #dcdcdc;
+  --fandex-bg-sidebar: #f3f3f3;
+  --fandex-bg-nav: rgba(250, 250, 250, 0.95);
+
+  --fandex-text: #0d0d0d;
+  --fandex-text-secondary: #4d4d4d;
+  --fandex-text-tertiary: #808080;
+  --fandex-text-inverse: #ffffff;
+
+  --fandex-border: #2e2e2e;
+  --fandex-border-light: #c4c4c4;
+}
+
+/* 全局样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 自定义滚动条 - FANDEX 暗色主题 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--fandex-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fandex-text-tertiary);
+}
+
+/* 选中文本样式 */
+::selection {
+  background: rgba(110, 168, 254, 0.3);
+  color: #fff;
+}
