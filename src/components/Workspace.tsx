@@ -18,6 +18,8 @@ import FileList from "./FileList";
 import NovelEditor from "./NovelEditor";
 import CardManager from "./CardManager";
 import TimelineManager from "./TimelineManager";
+import WritingStats from "./WritingStats";
+import GlobalSearch from "./GlobalSearch";
 import { useAppStore, CATEGORY_DIRS, CATEGORY_NAMES } from "../lib/store";
 import { readProjectTree, createFile } from "../lib/api";
 import { X, FilePlus } from "lucide-react";
@@ -103,10 +105,16 @@ export default function Workspace() {
   // 渲染中间内容面板
   // 输入: 无
   // 输出: 根据分类返回对应组件
-  // 流程: 时间线用专用组件,角色/世界观/名词用卡片管理,其他用编辑器
+  // 流程: 时间线/统计/搜索用专用组件,角色/世界观/名词用卡片管理,其他用编辑器
   const renderMiddlePanel = () => {
     if (activeCategory === "timeline") {
       return <TimelineManager />;
+    }
+    if (activeCategory === "stats") {
+      return <WritingStats />;
+    }
+    if (activeCategory === "search") {
+      return <GlobalSearch />;
     }
     if (
       activeCategory === "characters" ||
@@ -121,9 +129,12 @@ export default function Workspace() {
     return <NovelEditor filePath={selectedFilePath} />;
   };
 
-  // 时间线分类: 中间面板扩展到右侧(不显示 FileList)
+  // 时间线/统计/搜索分类: 中间面板扩展到右侧(不显示 FileList)
   // 其他分类: 右侧常驻 FileList
-  const showFileList = activeCategory !== "timeline";
+  const showFileList =
+    activeCategory !== "timeline" &&
+    activeCategory !== "stats" &&
+    activeCategory !== "search";
 
   return (
     <div className="h-screen w-screen flex bg-nf-bg overflow-hidden">
@@ -136,19 +147,19 @@ export default function Workspace() {
       {/* 右侧: 文件列表(常驻,时间线分类隐藏) */}
       {showFileList && <FileList onCreateFile={() => setCreateDialogOpen(true)} />}
 
-      {/* 新建文件对话框 */}
+      {/* 新建文件对话框 - FANDEX 直角 */}
       {createDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-nf-bg-card border border-nf-border-light rounded-2xl shadow-lg overflow-hidden">
+          <div className="w-full max-w-md bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
             {/* 头部 */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-nf-border-light">
               <div className="flex items-center gap-2">
                 <FilePlus className="w-4 h-4 text-fandex-primary" />
-                <h3 className="text-sm font-semibold text-nf-text">新建文件</h3>
+                <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text">新建文件</h3>
               </div>
               <button
                 onClick={() => setCreateDialogOpen(false)}
-                className="p-1 rounded hover:bg-nf-bg-hover text-nf-text-tertiary transition-fast"
+                className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition-fast"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -168,7 +179,7 @@ export default function Workspace() {
                 }}
                 placeholder="输入文件名"
                 autoFocus
-                className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/50 transition-fast"
+                className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
               />
               <p className="text-xs text-nf-text-tertiary mt-2">
                 不输入扩展名将自动添加 .md
@@ -179,14 +190,14 @@ export default function Workspace() {
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
               <button
                 onClick={() => setCreateDialogOpen(false)}
-                className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text transition-fast"
+                className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition-fast"
               >
                 取消
               </button>
               <button
                 onClick={handleCreateFile}
                 disabled={!newFileName.trim() || creating}
-                className="px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover rounded-lg text-sm font-medium text-white transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creating ? "创建中..." : "创建"}
               </button>

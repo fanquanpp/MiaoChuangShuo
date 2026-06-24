@@ -24,7 +24,9 @@ export type SidebarCategory =
   | "timeline" // 时间线
   | "manuscript" // 正文
   | "outline" // 大纲
-  | "materials"; // 素材
+  | "materials" // 素材
+  | "stats" // 写作统计
+  | "search"; // 全局搜索
 
 // 分类中文名称映射
 export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
@@ -35,9 +37,11 @@ export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
   manuscript: "正文",
   outline: "大纲",
   materials: "素材",
+  stats: "统计",
+  search: "搜索",
 };
 
-// 分类对应的目录名
+// 分类对应的目录名(统计与搜索无对应目录,使用空字符串)
 export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
   characters: "角色",
   worldview: "世界观",
@@ -46,6 +50,8 @@ export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
   manuscript: "正文",
   outline: "大纲",
   materials: "素材",
+  stats: "",
+  search: "",
 };
 
 // 分类图标名(lucide-react)
@@ -57,6 +63,8 @@ export const CATEGORY_ICONS: Record<SidebarCategory, string> = {
   manuscript: "FileText",
   outline: "ListTree",
   materials: "FolderOpen",
+  stats: "BarChart3",
+  search: "Search",
 };
 
 // 应用状态接口

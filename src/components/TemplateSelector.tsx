@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Feather, Clapperboard, Swords } from "lucide-react";
+import { BookOpen, Feather, Clapperboard, Swords, Rocket, Eye, Heart } from "lucide-react";
 
 // 模板类型定义
 interface Template {
@@ -11,7 +11,7 @@ interface Template {
   barClass: string;
 }
 
-// 创作题材模板列表 - FANDEX 三色系
+// 创作题材模板列表 - FANDEX 三色系(8 种模板)
 const TEMPLATES: Template[] = [
   {
     id: "epic",
@@ -44,6 +44,38 @@ const TEMPLATES: Template[] = [
     desc: "台词智能排版，人名预设一键浮动呼出。",
     color: "text-fandex-primary",
     barClass: "fandex-bar-left",
+  },
+  {
+    id: "wuxia",
+    name: "武侠江湖",
+    icon: Swords,
+    desc: "门派势力体系、武学总纲、兵器谱排名。",
+    color: "text-fandex-tertiary",
+    barClass: "fandex-bar-left-tertiary",
+  },
+  {
+    id: "scifi",
+    name: "科幻未来",
+    icon: Rocket,
+    desc: "科技树、星际航路、文明等级分级体系。",
+    color: "text-fandex-secondary",
+    barClass: "fandex-bar-left-secondary",
+  },
+  {
+    id: "mystery",
+    name: "悬疑推理",
+    icon: Eye,
+    desc: "案件档案、线索追踪、诡计设计与推理链。",
+    color: "text-fandex-primary",
+    barClass: "fandex-bar-left",
+  },
+  {
+    id: "romance",
+    name: "言情都市",
+    icon: Heart,
+    desc: "情感脉络图、人物关系网、情感节点追踪。",
+    color: "text-fandex-tertiary",
+    barClass: "fandex-bar-left-tertiary",
   },
 ];
 

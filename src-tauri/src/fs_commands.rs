@@ -450,3 +450,303 @@ pub fn delete_path(path: String) -> Result<(), String> {
         fs::remove_file(&p).map_err(|e| format!("删除文件失败: {}", e))
     }
 }
+
+/// 搜索结果项结构
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SearchResult {
+    /// 文件相对路径
+    pub relative_path: String,
+    /// 文件名
+    pub file_name: String,
+    /// 匹配行号(从1开始)
+    pub line_number: u64,
+    /// 匹配行内容
+    pub line_content: String,
+    /// 匹配内容前 40 字符上下文
+    pub context_before: String,
+    /// 匹配内容后 40 字符上下文
+    pub context_after: String,
+}
+
+/// 全局搜索项目内文本内容
+/// 输入: project_path 项目路径, query 搜索关键词, case_sensitive 是否区分大小写
+/// 输出: Result<Vec<SearchResult>, String> 搜索结果列表
+/// 流程: 递归遍历项目内所有 .md/.txt 文件，逐行匹配关键词
+#[tauri::command]
+pub fn search_in_project(
+    project_path: String,
+    query: String,
+    case_sensitive: bool,
+) -> Result<Vec<SearchResult>, String> {
+    if query.trim().is_empty() {
+        return Ok(vec![]);
+    }
+    let root = PathBuf::from(&project_path);
+    if !root.exists() {
+        return Err("项目路径不存在".to_string());
+    }
+    let mut results = Vec::new();
+    let search_query = if case_sensitive {
+        query.clone()
+    } else {
+        query.to_lowercase()
+    };
+    search_recursive(&root, &root, &search_query, case_sensitive, &mut results);
+    // 限制最大结果数为 200 条，避免性能问题
+    results.truncate(200);
+    Ok(results)
+}
+
+/// 递归搜索目录下文件内容
+/// 输入: current 当前路径, root 项目根路径, query 搜索词, case_sensitive 区分大小写, results 结果集合
+/// 输出: 无
+/// 流程: 遍历目录，对 .txt/.md 文件逐行搜索匹配内容
+fn search_recursive(
+    current: &Path,
+    root: &Path,
+    query: &str,
+    case_sensitive: bool,
+    results: &mut Vec<SearchResult>,
+) {
+    if let Ok(entries) = fs::read_dir(current) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            // 跳过隐藏目录
+            if name.starts_with('.') {
+                continue;
+            }
+            if path.is_dir() {
+                search_recursive(&path, root, query, case_sensitive, results);
+            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+                search_in_file(&path, root, query, case_sensitive, results);
+            }
+        }
+    }
+}
+
+/// 在单个文件中搜索关键词
+/// 输入: file_path 文件路径, root 项目根路径, query 搜索词, case_sensitive 区分大小写, results 结果集合
+/// 输出: 无
+/// 流程: 逐行读取文件内容，匹配关键词并记录上下文
+fn search_in_file(
+    file_path: &Path,
+    root: &Path,
+    query: &str,
+    case_sensitive: bool,
+    results: &mut Vec<SearchResult>,
+) {
+    if let Ok(content) = fs::read_to_string(file_path) {
+        let relative_path = file_path
+            .strip_prefix(root)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let file_name = file_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        for (idx, line) in content.lines().enumerate() {
+            let line_to_check = if case_sensitive {
+                line.to_string()
+            } else {
+                line.to_lowercase()
+            };
+            if line_to_check.contains(query) {
+                // 提取匹配位置前后 40 字符作为上下文
+                let match_pos = line_to_check.find(query).unwrap_or(0);
+                let start = if match_pos > 40 { match_pos - 40 } else { 0 };
+                let end = (match_pos + query.len() + 40).min(line.len());
+                let context_before = line[start..match_pos].to_string();
+                let context_after = line[(match_pos + query.len()).min(line.len())..end].to_string();
+                results.push(SearchResult {
+                    relative_path: relative_path.clone(),
+                    file_name: file_name.clone(),
+                    line_number: (idx + 1) as u64,
+                    line_content: line.to_string(),
+                    context_before,
+                    context_after,
+                });
+            }
+        }
+    }
+}
+
+/// 写作统计信息结构
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WritingStats {
+    /// 总字数
+    pub total_words: u64,
+    /// 总章节数
+    pub total_chapters: u64,
+    /// 总文件数(含设定文件)
+    pub total_files: u64,
+    /// 正文字数
+    pub manuscript_words: u64,
+    /// 设定文件字数(角色/世界观/名词等)
+    pub setting_words: u64,
+    /// 大纲字数
+    pub outline_words: u64,
+    /// 各章节字数列表(文件名, 字数)
+    pub chapter_words: Vec<ChapterWordCount>,
+    /// 项目创建天数
+    pub days_since_creation: u64,
+}
+
+/// 章节字数统计项
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ChapterWordCount {
+    /// 文件名
+    pub file_name: String,
+    /// 相对路径
+    pub relative_path: String,
+    /// 字数
+    pub word_count: u64,
+}
+
+/// 获取项目写作统计信息
+/// 输入: project_path 项目路径
+/// 输出: Result<WritingStats, String> 统计信息
+/// 流程: 遍历项目各目录统计字数与文件数
+#[tauri::command]
+pub fn get_writing_stats(project_path: String) -> Result<WritingStats, String> {
+    let root = PathBuf::from(&project_path);
+    if !root.exists() {
+        return Err("项目路径不存在".to_string());
+    }
+
+    // 统计正文字数与章节列表
+    let manuscript_dir = root.join("正文");
+    let mut manuscript_words: u64 = 0;
+    let mut chapter_words: Vec<ChapterWordCount> = Vec::new();
+    if manuscript_dir.exists() {
+        collect_chapter_stats(&manuscript_dir, &root, &mut manuscript_words, &mut chapter_words);
+    }
+    // 按字数降序排序
+    chapter_words.sort_by(|a, b| b.word_count.cmp(&a.word_count));
+
+    // 统计设定文件字数(角色/世界观/名词/时间线)
+    let mut setting_words: u64 = 0;
+    for dir_name in &["角色", "世界观", "名词", "时间线"] {
+        let dir = root.join(dir_name);
+        if dir.exists() {
+            count_dir_words(&dir, &mut setting_words);
+        }
+    }
+
+    // 统计大纲字数
+    let mut outline_words: u64 = 0;
+    let outline_dir = root.join("大纲");
+    if outline_dir.exists() {
+        count_dir_words(&outline_dir, &mut outline_words);
+    }
+
+    // 统计总文件数
+    let mut total_files: u64 = 0;
+    count_files_recursive(&root, &mut total_files);
+
+    // 计算创建天数
+    let meta_path = root.join(".novelforge").join("project.json");
+    let days_since_creation = if let Ok(content) = fs::read_to_string(&meta_path) {
+        if let Ok(meta) = serde_json::from_str::<crate::project_template::ProjectMeta>(&content) {
+            if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&meta.created_at) {
+                let now = chrono::Local::now();
+                (now.signed_duration_since(created).num_days().max(0)) as u64
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    Ok(WritingStats {
+        total_words: manuscript_words + setting_words + outline_words,
+        total_chapters: chapter_words.len() as u64,
+        total_files,
+        manuscript_words,
+        setting_words,
+        outline_words,
+        chapter_words,
+        days_since_creation,
+    })
+}
+
+/// 递归收集章节字数统计
+/// 输入: dir 目录路径, root 项目根路径, total_words 累计字数, chapters 章节列表
+/// 输出: 无
+/// 流程: 遍历正文目录，统计每个 .md/.txt 文件的字数
+fn collect_chapter_stats(
+    dir: &Path,
+    root: &Path,
+    total_words: &mut u64,
+    chapters: &mut Vec<ChapterWordCount>,
+) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_chapter_stats(&path, root, total_words, chapters);
+            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    let words = count_chinese_and_words(&content);
+                    *total_words += words;
+                    let relative_path = path
+                        .strip_prefix(root)
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let file_name = path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    chapters.push(ChapterWordCount {
+                        file_name,
+                        relative_path,
+                        word_count: words,
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// 递归统计目录下文件字数
+/// 输入: dir 目录路径, total 累计字数
+/// 输出: 无
+/// 流程: 遍历目录，对 .txt/.md 文件统计字数
+fn count_dir_words(dir: &Path, total: &mut u64) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                count_dir_words(&path, total);
+            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    *total += count_chinese_and_words(&content);
+                }
+            }
+        }
+    }
+}
+
+/// 递归统计目录下文件数
+/// 输入: dir 目录路径, total 累计文件数
+/// 输出: 无
+/// 流程: 遍历目录，统计 .md/.txt 文件数量
+fn count_files_recursive(dir: &Path, total: &mut u64) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue;
+            }
+            if path.is_dir() {
+                count_files_recursive(&path, total);
+            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+                *total += 1;
+            }
+        }
+    }
+}

@@ -22,6 +22,8 @@ import {
   Plus,
   Sun,
   Moon,
+  BarChart3,
+  Search,
 } from "lucide-react";
 import {
   useAppStore,
@@ -39,10 +41,12 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   manuscript: FileText,
   outline: ListTree,
   materials: FolderOpen,
+  stats: BarChart3,
+  search: Search,
 };
 
-// 分类列表(按显示顺序)
-const CATEGORIES: SidebarCategory[] = [
+// 内容分类列表(按显示顺序)
+const CONTENT_CATEGORIES: SidebarCategory[] = [
   "manuscript",
   "characters",
   "worldview",
@@ -51,6 +55,9 @@ const CATEGORIES: SidebarCategory[] = [
   "outline",
   "materials",
 ];
+
+// 工具分类列表
+const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
 
 // 左侧导航栏属性接口
 interface SidebarProps {
@@ -93,7 +100,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         <div className="px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
           分类
         </div>
-        {CATEGORIES.map((cat) => {
+        {CONTENT_CATEGORIES.map((cat) => {
           const Icon = ICON_MAP[cat];
           const isActive = activeCategory === cat;
           return (
@@ -110,6 +117,34 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
               {/* FANDEX 左侧色条激活指示器 */}
               {isActive && (
                 <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-fandex-primary"></span>
+              )}
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">{CATEGORY_NAMES[cat]}</span>
+            </button>
+          );
+        })}
+
+        {/* 工具分组 */}
+        <div className="px-3 py-1 mt-3 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+          工具
+        </div>
+        {TOOL_CATEGORIES.map((cat) => {
+          const Icon = ICON_MAP[cat];
+          const isActive = activeCategory === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              title={CATEGORY_NAMES[cat]}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-fast relative ${
+                isActive
+                  ? "bg-fandex-tertiary/10 text-fandex-tertiary"
+                  : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+              }`}
+            >
+              {/* FANDEX 左侧色条激活指示器(工具类用 tertiary 色) */}
+              {isActive && (
+                <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-fandex-tertiary"></span>
               )}
               <Icon className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">{CATEGORY_NAMES[cat]}</span>

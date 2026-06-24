@@ -12,7 +12,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 // 项目类型枚举
-export type ProjectType = "epic" | "standard" | "essay" | "script";
+export type ProjectType = "epic" | "standard" | "essay" | "script" | "wuxia" | "scifi" | "mystery" | "romance";
 
 // 项目元数据接口
 export interface ProjectMeta {
@@ -66,6 +66,10 @@ export const PROJECT_TEMPLATES: TemplateInfo[] = [
   { id: "standard", name: "标准长篇", desc: "常规网文/大纲流架构，多卷轴深度目录" },
   { id: "essay", name: "散文随笔", desc: "侧重视觉留白，支持全自动双字首行缩进" },
   { id: "script", name: "舞台剧本", desc: "台词智能排版，人名预设一键浮动呼出" },
+  { id: "wuxia", name: "武侠江湖", desc: "门派势力体系、武学总纲、兵器谱排名" },
+  { id: "scifi", name: "科幻未来", desc: "科技树、星际航路、文明等级分级体系" },
+  { id: "mystery", name: "悬疑推理", desc: "案件档案、线索追踪、诡计设计与推理链" },
+  { id: "romance", name: "言情都市", desc: "情感脉络图、人物关系网、情感节点追踪" },
 ];
 
 // ===== API 封装函数 =====
@@ -155,4 +159,76 @@ export async function createFile(
 // 流程: 调用 Rust 后端 delete_path 命令
 export async function deletePath(path: string): Promise<void> {
   return invoke<void>("delete_path", { path });
+}
+
+// ===== 搜索与统计 API =====
+
+// 搜索结果项接口
+export interface SearchResult {
+  // 文件相对路径
+  relative_path: string;
+  // 文件名
+  file_name: string;
+  // 匹配行号(从1开始)
+  line_number: number;
+  // 匹配行内容
+  line_content: string;
+  // 匹配前上下文
+  context_before: string;
+  // 匹配后上下文
+  context_after: string;
+}
+
+// 章节字数统计项接口
+export interface ChapterWordCount {
+  // 文件名
+  file_name: string;
+  // 相对路径
+  relative_path: string;
+  // 字数
+  word_count: number;
+}
+
+// 写作统计信息接口
+export interface WritingStats {
+  // 总字数
+  total_words: number;
+  // 总章节数
+  total_chapters: number;
+  // 总文件数
+  total_files: number;
+  // 正文字数
+  manuscript_words: number;
+  // 设定文件字数
+  setting_words: number;
+  // 大纲字数
+  outline_words: number;
+  // 各章节字数列表
+  chapter_words: ChapterWordCount[];
+  // 项目创建天数
+  days_since_creation: number;
+}
+
+// 全局搜索项目内容
+// 输入: projectPath 项目路径, query 搜索词, caseSensitive 区分大小写
+// 输出: Promise<SearchResult[]> 搜索结果列表
+// 流程: 调用 Rust 后端 search_in_project 命令
+export async function searchInProject(
+  projectPath: string,
+  query: string,
+  caseSensitive: boolean
+): Promise<SearchResult[]> {
+  return invoke<SearchResult[]>("search_in_project", {
+    projectPath,
+    query,
+    caseSensitive,
+  });
+}
+
+// 获取项目写作统计
+// 输入: projectPath 项目路径
+// 输出: Promise<WritingStats> 统计信息
+// 流程: 调用 Rust 后端 get_writing_stats 命令
+export async function getWritingStats(projectPath: string): Promise<WritingStats> {
+  return invoke<WritingStats>("get_writing_stats", { projectPath });
 }
