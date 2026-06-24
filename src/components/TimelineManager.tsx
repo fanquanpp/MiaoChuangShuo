@@ -3,6 +3,7 @@
 // 功能概述：
 // 用于管理小说项目的时间线，支持线性时间线与分支多线并行。
 // 以可视化卡片形式展示事件节点，支持增删改查。
+// 采用 FANDEX 直角美学与三色品牌体系。
 //
 // 模块职责：
 // 1. 渲染时间线事件卡片(按时间排序)
@@ -13,7 +14,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Edit3, GitBranch, Clock, X } from "lucide-react";
 import { useAppStore } from "../lib/store";
-import { createFile, readFile, writeFile, deletePath, readProjectTree } from "../lib/api";
+import { readFile, writeFile, deletePath, readProjectTree } from "../lib/api";
 import type { FileNode } from "../lib/api";
 
 // 时间线事件接口
@@ -190,29 +191,31 @@ export default function TimelineManager() {
 
   return (
     <div className="flex-1 flex flex-col bg-nf-bg overflow-hidden">
-      {/* 顶部工具栏 */}
+      {/* 顶部工具栏 - FANDEX 直角 + 左侧色条标题 */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light">
-        <h2 className="text-lg font-semibold text-nf-text">时间线</h2>
+        <h2 className="fandex-bar-left text-lg font-semibold font-display text-nf-text">
+          时间线
+        </h2>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary/30 rounded-lg hover:bg-fandex-primary/10 transition-fast"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast"
         >
           <Plus className="w-4 h-4" />
           新建事件
         </button>
       </div>
 
-      {/* 分支筛选 */}
-      <div className="flex items-center gap-2 px-6 py-2 border-b border-nf-border-light bg-nf-bg-sidebar">
-        <GitBranch className="w-3.5 h-3.5 text-nf-text-tertiary" />
+      {/* 分支筛选 - FANDEX 直角标签 */}
+      <div className="flex items-center gap-1 px-6 py-2 border-b border-nf-border-light bg-nf-bg-sidebar">
+        <GitBranch className="w-3.5 h-3.5 text-nf-text-tertiary mr-1" />
         {["全部", ...branches].map((b) => (
           <button
             key={b}
             onClick={() => setActiveBranch(b)}
-            className={`px-2.5 py-0.5 text-xs rounded-full transition-fast ${
+            className={`px-2.5 py-0.5 text-xs transition-fast ${
               activeBranch === b
-                ? "bg-fandex-primary/20 text-fandex-primary"
-                : "text-nf-text-tertiary hover:text-nf-text"
+                ? "bg-fandex-primary/15 text-fandex-primary border border-fandex-primary/40"
+                : "text-nf-text-tertiary hover:text-nf-text border border-transparent"
             }`}
           >
             {b}
@@ -235,43 +238,45 @@ export default function TimelineManager() {
           </div>
         ) : (
           <div className="relative max-w-3xl mx-auto">
-            {/* 时间线竖线 */}
-            <div className="absolute left-4 top-0 bottom-0 w-px bg-nf-border-light" />
+            {/* 时间线竖线 - FANDEX 1px 主色渐变 */}
+            <div className="absolute left-4 top-0 bottom-0 w-px bg-gradient-to-b from-fandex-primary/60 via-nf-border-light to-transparent" />
 
-            {filteredEvents.map((event, idx) => (
+            {filteredEvents.map((event) => (
               <div
                 key={event.relativePath}
                 className="relative pl-12 pb-6 group"
               >
-                {/* 时间线节点 */}
-                <div className="absolute left-3 top-2 w-3 h-3 rounded-full bg-fandex-primary border-2 border-nf-bg z-10" />
+                {/* 时间线节点 - FANDEX 直角方块 */}
+                <div className="absolute left-[11px] top-2 w-[10px] h-[10px] bg-fandex-primary border-2 border-nf-bg z-10" />
 
-                {/* 事件卡片 */}
-                <div className="bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/30 rounded-lg p-4 transition-fast">
+                {/* 事件卡片 - FANDEX 直角 + 左侧色条 */}
+                <div className="fandex-bar-left bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/40 p-4 transition-fast">
                   <div className="flex items-start justify-between mb-2">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs text-fandex-primary font-medium">
+                        <span className="text-xs text-fandex-primary font-medium font-display">
                           {event.time}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-fandex-secondary/10 text-fandex-secondary">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-fandex-secondary/10 text-fandex-secondary border border-fandex-secondary/20">
                           {event.branch}
                         </span>
                       </div>
-                      <h3 className="text-sm font-semibold text-nf-text">
+                      <h3 className="text-sm font-semibold font-display text-nf-text">
                         {event.title}
                       </h3>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-fast">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-fast ml-2">
                       <button
                         onClick={() => handleEdit(event)}
-                        className="p-1 rounded text-nf-text-tertiary hover:text-fandex-primary transition-fast"
+                        className="p-1 text-nf-text-tertiary hover:text-fandex-primary transition-fast"
+                        title="编辑事件"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(event)}
-                        className="p-1 rounded text-nf-text-tertiary hover:text-red-400 transition-fast"
+                        className="p-1 text-nf-text-tertiary hover:text-red-400 transition-fast"
+                        title="删除事件"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -313,7 +318,7 @@ interface EventEditorProps {
   onSave: (event: TimelineEvent) => void;
 }
 
-// 事件编辑器对话框组件
+// 事件编辑器对话框组件 - FANDEX 直角风格
 // 输入: event 事件数据, branches 分支列表, onClose 关闭回调, onSave 保存回调
 // 输出: 渲染编辑对话框
 // 流程: 收集用户输入并触发保存
@@ -356,21 +361,22 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light rounded-2xl shadow-lg overflow-hidden">
-        {/* 头部 */}
+      <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
+        {/* 头部 - FANDEX 左侧色条标题 */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-nf-border-light">
-          <h3 className="text-sm font-semibold text-nf-text">
+          <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text">
             {event ? "编辑事件" : "新建事件"}
           </h3>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-nf-bg-hover text-nf-text-tertiary transition-fast"
+            className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition-fast"
+            title="关闭"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* 表单 */}
+        {/* 表单 - FANDEX 直角输入框 */}
         <div className="px-5 py-4 space-y-3">
           <div>
             <label className="block text-xs text-nf-text-secondary mb-1">
@@ -382,7 +388,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="输入事件标题"
               autoFocus
-              className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/50 transition-fast"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -395,7 +401,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 placeholder="如: 第一章 / 1000年"
-                className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/50 transition-fast"
+                className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
               />
             </div>
             <div>
@@ -405,7 +411,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
               <select
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
-                className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text focus:outline-none focus:border-fandex-primary/50 transition-fast"
+                className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text focus:outline-none focus:border-fandex-primary/60 transition-fast"
               >
                 {branches.map((b) => (
                   <option key={b} value={b}>
@@ -424,7 +430,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
               value={newBranch}
               onChange={(e) => setNewBranch(e.target.value)}
               placeholder="输入新分支名"
-              className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/50 transition-fast"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
             />
           </div>
           <div>
@@ -436,22 +442,22 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="详细描述事件内容"
               rows={4}
-              className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/50 transition-fast resize-none"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast resize-none"
             />
           </div>
         </div>
 
-        {/* 底部按钮 */}
+        {/* 底部按钮 - FANDEX 直角 */}
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text transition-fast"
+            className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition-fast"
           >
             取消
           </button>
           <button
             onClick={handleSave}
-            className="px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover rounded-lg text-sm font-medium text-white transition-fast"
+            className="px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition-fast"
           >
             保存
           </button>

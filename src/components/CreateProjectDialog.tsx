@@ -2,7 +2,7 @@
 //
 // 功能概述：
 // 模态对话框，用于收集新建小说项目所需的参数。
-// 支持项目名称、类型、作者、描述输入与保存位置选择。
+// 采用 FANDEX 美术风格：直角按钮、左侧色条标题、1px 边框。
 //
 // 模块职责：
 // 1. 收集用户输入的项目元数据
@@ -16,11 +16,8 @@ import { createProject, pickDirectory, PROJECT_TEMPLATES, type ProjectType } fro
 
 // 组件属性接口
 interface CreateProjectDialogProps {
-  // 默认选中的模板类型
   defaultType?: ProjectType;
-  // 关闭对话框回调
   onClose: () => void;
-  // 创建成功回调
   onSuccess: (projectPath: string) => void;
 }
 
@@ -45,10 +42,6 @@ export default function CreateProjectDialog({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
-  // 选择保存目录
-  // 输入: 无
-  // 输出: 无
-  // 流程: 调用 pickDirectory API 并更新状态
   const handlePickDir = async () => {
     try {
       const dir = await pickDirectory();
@@ -60,12 +53,7 @@ export default function CreateProjectDialog({
     }
   };
 
-  // 创建项目
-  // 输入: 无
-  // 输出: 无
-  // 流程: 校验输入后调用 createProject API
   const handleCreate = async () => {
-    // 输入校验
     if (!name.trim()) {
       setError("请输入项目名称");
       return;
@@ -95,13 +83,15 @@ export default function CreateProjectDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light rounded-2xl shadow-lg overflow-hidden">
-        {/* 头部 */}
+      <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
+        {/* 头部 - FANDEX 左侧色条标题 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light">
-          <h2 className="text-lg font-semibold text-nf-text">创建新项目</h2>
+          <h2 className="fandex-bar-left text-lg font-bold font-display text-nf-text">
+            创建新项目
+          </h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-nf-bg-hover text-nf-text-tertiary hover:text-nf-text transition-fast"
+            className="p-1.5 hover:bg-nf-bg-hover text-nf-text-tertiary hover:text-nf-text transition-fast"
           >
             <X className="w-5 h-5" />
           </button>
@@ -119,27 +109,27 @@ export default function CreateProjectDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="输入你的小说项目名称"
-              className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/50 transition-fast"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition-fast"
             />
           </div>
 
-          {/* 项目类型 */}
+          {/* 项目类型 - FANDEX 1px 网格 */}
           <div>
             <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
               创作题材
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1 bg-nf-border-light border border-nf-border-light">
               {PROJECT_TEMPLATES.map((tpl) => (
                 <button
                   key={tpl.id}
                   onClick={() => setType(tpl.id)}
-                  className={`p-3 rounded-lg border text-left transition-fast ${
+                  className={`p-3 text-left transition-fast bg-nf-bg ${
                     type === tpl.id
-                      ? "border-fandex-primary bg-fandex-primary/10"
-                      : "border-nf-border-light bg-nf-bg hover:border-nf-border"
+                      ? "bg-fandex-primary/10 border-fandex-primary"
+                      : "hover:bg-nf-bg-hover"
                   }`}
                 >
-                  <div className="text-sm font-medium text-nf-text">{tpl.name}</div>
+                  <div className="text-sm font-medium font-display text-nf-text">{tpl.name}</div>
                   <div className="text-xs text-nf-text-tertiary mt-0.5 line-clamp-2">
                     {tpl.desc}
                   </div>
@@ -158,7 +148,7 @@ export default function CreateProjectDialog({
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
               placeholder="输入作者名"
-              className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/50 transition-fast"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition-fast"
             />
           </div>
 
@@ -172,7 +162,7 @@ export default function CreateProjectDialog({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="简要描述你的小说项目"
               rows={3}
-              className="w-full bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/50 transition-fast resize-none"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition-fast resize-none"
             />
           </div>
 
@@ -181,18 +171,18 @@ export default function CreateProjectDialog({
             <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
               保存位置
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               <input
                 type="text"
                 value={parentPath}
                 onChange={(e) => setParentPath(e.target.value)}
                 placeholder="选择项目保存目录"
                 readOnly
-                className="flex-1 bg-nf-bg border border-nf-border-light rounded-lg px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition-fast"
+                className="flex-1 bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition-fast"
               />
               <button
                 onClick={handlePickDir}
-                className="px-3 py-2 bg-nf-bg-hover hover:bg-nf-border-light border border-nf-border-light rounded-lg text-sm text-nf-text flex items-center gap-1.5 transition-fast"
+                className="px-3 py-2 bg-nf-bg-hover hover:bg-nf-border-light border border-nf-border-light text-sm text-nf-text flex items-center gap-1.5 transition-fast"
               >
                 <FolderOpen className="w-4 h-4" />
                 浏览
@@ -200,26 +190,26 @@ export default function CreateProjectDialog({
             </div>
           </div>
 
-          {/* 错误提示 */}
+          {/* 错误提示 - FANDEX 提示块样式 */}
           {error && (
-            <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+            <div className="fandex-admonition fandex-admonition-danger text-sm text-red-400">
               {error}
             </div>
           )}
         </div>
 
-        {/* 底部按钮 */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-nf-border-light">
+        {/* 底部按钮 - FANDEX 直角 */}
+        <div className="flex justify-end gap-1 px-6 py-4 border-t border-nf-border-light">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text transition-fast"
+            className="px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition-fast"
           >
             取消
           </button>
           <button
             onClick={handleCreate}
             disabled={creating}
-            className="px-4 py-2 bg-fandex-primary hover:bg-fandex-primary-hover rounded-lg text-sm font-medium text-white flex items-center gap-1.5 transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse flex items-center gap-1.5 transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
             {creating ? "创建中..." : "创建项目"}

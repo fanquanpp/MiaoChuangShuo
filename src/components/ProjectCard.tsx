@@ -1,7 +1,8 @@
 // 项目卡片组件
 //
 // 功能概述：
-// 渲染单张项目卡片，展示项目名称、类型、字数、更新时间。
+// 渲染单张项目卡片，展示项目名称、类型、字数、章节数、更新时间。
+// 采用 FANDEX 美术风格：直角、1px 网格背景、左侧色条装饰。
 // 点击卡片打开项目进入工作台。
 //
 // 模块职责：
@@ -41,10 +42,6 @@ export interface ProjectCardProps {
 export default function ProjectCard({ project, projectInfo }: ProjectCardProps) {
   const { openProject } = useAppStore();
 
-  // 处理卡片点击
-  // 输入: 无
-  // 输出: 无
-  // 流程: 如果有 projectInfo 则打开项目
   const handleClick = () => {
     if (projectInfo) {
       openProject(projectInfo);
@@ -54,35 +51,35 @@ export default function ProjectCard({ project, projectInfo }: ProjectCardProps) 
   return (
     <div
       onClick={handleClick}
-      className="group bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/30 rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-base transform hover:-translate-y-1 cursor-pointer flex flex-col min-h-[168px]"
+      className="group bg-nf-bg hover:bg-nf-bg-hover border-r border-b border-nf-border-light hover:border-fandex-primary transition-fast cursor-pointer flex flex-col min-h-[168px] relative"
     >
-      {/* 渐变头部区域 */}
-      <div className={`h-10 bg-gradient-to-r ${project.gradient} opacity-70 group-hover:opacity-90 transition-base relative`}>
-        <div className="absolute -bottom-3 left-4">
-          <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${project.typeColor} shadow-sm backdrop-blur-md`}>
-            {project.type}
-          </span>
-        </div>
-      </div>
+      {/* 渐变头部区域 - FANDEX 直角 */}
+      <div className={`h-1 bg-gradient-to-r ${project.gradient}`}></div>
 
       {/* 卡片主体 */}
-      <div className="px-4 pt-5 pb-3 flex-1 flex flex-col">
-        <h3 className="text-base font-semibold text-nf-text group-hover:text-fandex-primary transition-fast tracking-tight line-clamp-1 mb-3">
+      <div className="px-4 pt-4 pb-3 flex-1 flex flex-col">
+        {/* 类型标签 - FANDEX 直角小标签 */}
+        <span className={`inline-block self-start text-[10px] font-medium px-1.5 py-0.5 mb-2 ${project.typeColor}`}>
+          {project.type}
+        </span>
+
+        {/* 项目名称 - FANDEX 左侧色条装饰 */}
+        <h3 className="fandex-bar-left text-base font-bold font-display text-nf-text group-hover:text-fandex-primary transition-fast tracking-tight line-clamp-1 mb-3">
           {project.name}
         </h3>
 
-        {/* 项目元数据底部栏 */}
+        {/* 项目元数据底部栏 - FANDEX 直角 */}
         <div className="mt-auto flex items-center justify-between text-xs text-nf-text-tertiary border-t border-nf-border-light pt-2.5">
           <div className="flex items-center gap-1" title="总字数">
-            <BarChart3 className="w-3 h-3 text-nf-text-tertiary" />
+            <BarChart3 className="w-3 h-3" />
             <span>{project.words}</span>
           </div>
           <div className="flex items-center gap-1" title="正文章节数">
-            <BookOpen className="w-3 h-3 text-nf-text-tertiary" />
+            <BookOpen className="w-3 h-3" />
             <span>{project.chapters} 章</span>
           </div>
           <div className="flex items-center gap-1" title="最后更新">
-            <Clock className="w-3 h-3 text-nf-text-tertiary" />
+            <Clock className="w-3 h-3" />
             <span>{project.updated}</span>
           </div>
         </div>

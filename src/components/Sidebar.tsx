@@ -1,9 +1,8 @@
 // 工作台左侧导航栏组件
 //
 // 功能概述：
-// 显示项目分类导航(角色/世界观/名词/时间线/正文/大纲/素材)，
-// 类似 VS Code 的资源管理器。点击分类切换中间内容。
-// 采用紧凑布局，宽度缩窄至 160px。
+// 显示项目分类导航(角色/世界观/名词/时间线/正文/大纲/素材)。
+// 采用 FANDEX 美术风格：左侧色条装饰、直角按钮、1px 边框。
 //
 // 模块职责：
 // 1. 渲染项目名称与返回按钮
@@ -55,7 +54,6 @@ const CATEGORIES: SidebarCategory[] = [
 
 // 左侧导航栏属性接口
 interface SidebarProps {
-  // 新建文件回调
   onCreateFile: () => void;
 }
 
@@ -73,7 +71,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
 
   return (
     <div className="w-40 min-w-[150px] border-r border-nf-border-light bg-nf-bg-sidebar flex flex-col">
-      {/* 顶部: 项目名称与返回 */}
+      {/* 顶部: 项目名称与返回 - FANDEX 左侧色条 */}
       <div className="px-3 py-3 border-b border-nf-border-light">
         <button
           onClick={closeProject}
@@ -82,7 +80,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
           <ChevronLeft className="w-3.5 h-3.5" />
           返回
         </button>
-        <h1 className="text-sm font-semibold text-nf-text truncate" title={currentProject?.meta.name}>
+        <h1 className="fandex-bar-left text-sm font-bold font-display text-nf-text truncate" title={currentProject?.meta.name}>
           {currentProject?.meta.name || "未命名项目"}
         </h1>
         <div className="text-[11px] text-nf-text-tertiary mt-0.5 truncate">
@@ -90,7 +88,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         </div>
       </div>
 
-      {/* 中间: 分类导航 */}
+      {/* 中间: 分类导航 - FANDEX 左侧色条激活态 */}
       <div className="flex-1 overflow-y-auto py-2">
         <div className="px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
           分类
@@ -103,12 +101,16 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
               key={cat}
               onClick={() => setActiveCategory(cat)}
               title={CATEGORY_NAMES[cat]}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-fast ${
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-fast relative ${
                 isActive
-                  ? "bg-fandex-primary/10 text-fandex-primary border-r-2 border-fandex-primary"
+                  ? "bg-fandex-primary/10 text-fandex-primary"
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
               }`}
             >
+              {/* FANDEX 左侧色条激活指示器 */}
+              {isActive && (
+                <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-fandex-primary"></span>
+              )}
               <Icon className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">{CATEGORY_NAMES[cat]}</span>
             </button>
@@ -116,12 +118,12 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         })}
       </div>
 
-      {/* 底部: 主题切换与新建文件按钮 */}
-      <div className="px-2 py-2 border-t border-nf-border-light space-y-1.5">
+      {/* 底部: 主题切换与新建文件按钮 - FANDEX 直角 */}
+      <div className="px-2 py-2 border-t border-nf-border-light space-y-1">
         <button
           onClick={toggleTheme}
           title={theme === "dark" ? "切换到亮色主题" : "切换到暗色主题"}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary/50 rounded-lg transition-fast"
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary hover:bg-nf-bg-hover transition-fast"
         >
           {theme === "dark" ? (
             <Sun className="w-3.5 h-3.5" />
@@ -132,7 +134,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         </button>
         <button
           onClick={onCreateFile}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/50 rounded-lg transition-fast"
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary hover:bg-nf-bg-hover transition-fast"
         >
           <Plus className="w-3.5 h-3.5" />
           新建文件

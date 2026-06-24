@@ -38,9 +38,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['"Noto Sans SC"', '"PingFang SC"', '"Microsoft YaHei"', 'sans-serif'],
-        serif: ['"SimSun"', '"Source Han Serif CN"', 'serif'],
-        code: ['"JetBrains Mono"', 'monospace'],
+        sans: ['var(--fandex-font-body)'],
+        display: ['var(--fandex-font-display)'],
+        code: ['var(--fandex-font-code)'],
       },
       spacing: {
         'xs': '4px',
@@ -55,10 +55,32 @@ export default {
         'fast': '120ms',
         'base': '220ms',
       },
+      transitionTimingFunction: {
+        'fandex': 'ease',
+      },
       boxShadow: {
-        'sm': '0 1px 2px rgba(0, 0, 0, 0.2)',
-        'md': '0 4px 6px rgba(0, 0, 0, 0.3)',
-        'lg': '0 10px 15px rgba(0, 0, 0, 0.4)',
+        'sm': 'var(--fandex-shadow-sm)',
+        'md': 'var(--fandex-shadow-md)',
+        'lg': 'var(--fandex-shadow-lg)',
+      },
+      borderRadius: {
+        // FANDEX 以直角为主，仅保留小圆角用于特殊场景
+        'none': '0',
+        'sm': '2px',
+        'DEFAULT': '3px',
+        'md': '4px',
+        'lg': '6px',
+        'xl': '8px',
+        '2xl': '12px',
+      },
+      maxWidth: {
+        'content': '720px',
+      },
+      height: {
+        'nav': 'var(--fandex-nav-height)',
+      },
+      width: {
+        'sidebar': 'var(--fandex-sidebar-width)',
       },
     },
   },

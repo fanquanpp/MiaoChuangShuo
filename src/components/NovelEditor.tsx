@@ -310,8 +310,8 @@ export default function NovelEditor({ filePath }: NovelEditorProps) {
       {/* 注入诗歌/歌词样式 */}
       <style dangerouslySetInnerHTML={{ __html: POETRY_STYLES }} />
 
-      {/* 工具栏 */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-nf-border-light bg-nf-bg-sidebar">
+      {/* 工具栏 - FANDEX 直角按钮 + 毛玻璃 */}
+      <div className="fandex-nav-blur flex items-center gap-1 px-4 py-2 border-b border-nf-border-light">
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleBold().run()}
           active={editor?.isActive("bold") || false}
@@ -371,7 +371,6 @@ export default function NovelEditor({ filePath }: NovelEditorProps) {
         {/* 诗歌排版按钮 */}
         <ToolbarButton
           onClick={() => {
-            // 触发诗歌样式快捷键
             const event = new KeyboardEvent("keydown", {
               key: "P",
               ctrlKey: true,
@@ -417,15 +416,14 @@ export default function NovelEditor({ filePath }: NovelEditorProps) {
           <Redo className="w-4 h-4" />
         </ToolbarButton>
 
-        {/* 右侧保存按钮与状态 */}
+        {/* 右侧保存按钮与状态 - FANDEX 直角 */}
         <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary">
           <span>{wordCount} 字</span>
           {dirty && <span className="text-fandex-tertiary">未保存</span>}
-          {/* TXT 导出按钮 */}
           <button
             onClick={handleExportTxt}
             title="导出为 TXT"
-            className="flex items-center gap-1 px-2 py-1 rounded text-fandex-secondary hover:bg-nf-bg-hover transition-fast"
+            className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition-fast"
           >
             <Download className="w-3.5 h-3.5" />
             TXT
@@ -433,7 +431,7 @@ export default function NovelEditor({ filePath }: NovelEditorProps) {
           <button
             onClick={handleSave}
             disabled={!dirty || saving}
-            className="flex items-center gap-1 px-2 py-1 rounded text-fandex-primary hover:bg-nf-bg-hover transition-fast disabled:opacity-30 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 px-2 py-1 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {saving ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -445,19 +443,19 @@ export default function NovelEditor({ filePath }: NovelEditorProps) {
         </div>
       </div>
 
-      {/* 剧本类型提示条 */}
+      {/* 剧本类型提示条 - FANDEX 提示块样式 */}
       {isScript && characters.length > 0 && (
-        <div className="px-4 py-1.5 bg-nf-bg-hover/30 border-b border-nf-border-light text-xs text-nf-text-tertiary flex items-center gap-2">
-          <span className="text-fandex-primary">剧本模式</span>
+        <div className="fandex-admonition fandex-admonition-note px-4 py-1.5 border-b border-nf-border-light text-xs text-nf-text-tertiary flex items-center gap-2">
+          <span className="text-fandex-primary font-medium">剧本模式</span>
           <span>·</span>
           <span>在空行按 Tab 键呼出角色名选择（共 {characters.length} 个角色）</span>
         </div>
       )}
 
-      {/* 散文类型提示条 */}
+      {/* 散文类型提示条 - FANDEX 提示块样式 */}
       {isEssay && (
-        <div className="px-4 py-1.5 bg-nf-bg-hover/30 border-b border-nf-border-light text-xs text-nf-text-tertiary flex items-center gap-2">
-          <span className="text-fandex-secondary">散文模式</span>
+        <div className="fandex-admonition fandex-admonition-tip px-4 py-1.5 border-b border-nf-border-light text-xs text-nf-text-tertiary flex items-center gap-2">
+          <span className="text-fandex-secondary font-medium">散文模式</span>
           <span>·</span>
           <span>已启用首行双字缩进</span>
         </div>
@@ -471,7 +469,7 @@ export default function NovelEditor({ filePath }: NovelEditorProps) {
   );
 }
 
-// 工具栏按钮组件
+// 工具栏按钮组件 - FANDEX 直角风格
 // 输入: onClick, active, title, children
 // 输出: 渲染按钮
 function ToolbarButton({
@@ -489,10 +487,10 @@ function ToolbarButton({
     <button
       onClick={onClick}
       title={title}
-      className={`p-1.5 rounded transition-fast ${
+      className={`p-1.5 transition-fast border ${
         active
-          ? "bg-fandex-primary/20 text-fandex-primary"
-          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
+          ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
+          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent"
       }`}
     >
       {children}

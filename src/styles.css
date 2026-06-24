@@ -27,6 +27,26 @@
   /* 边框色 */
   --fandex-border: #525252;
   --fandex-border-light: #383838;
+
+  /* 阴影 - 暗色加深保持层次感 */
+  --fandex-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --fandex-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --fandex-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+
+  /* 过渡动画 */
+  --fandex-transition-fast: 0.12s ease;
+  --fandex-transition-base: 0.22s ease;
+
+  /* 布局尺寸 */
+  --fandex-nav-height: 48px;
+  --fandex-sidebar-width: 260px;
+
+  /* 字体族 */
+  --fandex-font-display: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --fandex-font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
+  --fandex-font-code: 'JetBrains Mono', monospace;
+
+  color-scheme: dark;
 }
 
 /* ========== FANDEX 设计令牌 - 亮色主题 ========== */
@@ -50,25 +70,59 @@
 
   --fandex-border: #2e2e2e;
   --fandex-border-light: #c4c4c4;
+
+  --fandex-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --fandex-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --fandex-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+  color-scheme: light;
 }
 
-/* 全局样式重置 */
-* {
+/* ========== 全局样式重置 ========== */
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html, body, #root {
+html {
+  font-size: 16px;
+  overscroll-behavior: none;
+}
+
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   overflow: hidden;
 }
 
-/* 自定义滚动条 - FANDEX 暗色主题 */
+body {
+  font-family: var(--fandex-font-body);
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-wrap: break-word;
+  user-select: none;
+}
+
+/* 输入框/文本域/代码块放开选中 */
+input,
+textarea,
+code,
+pre,
+.ProseMirror {
+  user-select: text;
+}
+
+/* ========== 滚动条 - FANDEX 风格 ========== */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -76,57 +130,186 @@ html, body, #root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--fandex-border);
-  border-radius: 3px;
+  background: var(--fandex-border-light);
 }
 
 ::-webkit-scrollbar-thumb:hover {
+  background: var(--fandex-border);
+}
+
+/* 暗色模式滚动条加深 */
+:not(.light) ::-webkit-scrollbar-thumb {
+  background: var(--fandex-border);
+}
+
+:not(.light) ::-webkit-scrollbar-thumb:hover {
   background: var(--fandex-text-tertiary);
 }
 
-/* 选中文本样式 */
+/* ========== 文字选区 - FANDEX 主色 ========== */
 ::selection {
-  background: rgba(110, 168, 254, 0.3);
-  color: #fff;
+  background: var(--fandex-primary);
+  color: var(--fandex-text-inverse);
+}
+
+/* ========== 焦点可见性 ========== */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--fandex-primary);
+  outline-offset: 2px;
+}
+
+/* ========== 无障碍: 减少动画偏好 ========== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ========== FANDEX 直角按钮基础类 ========== */
+.fandex-btn {
+  border-radius: 0;
+  border: 1px solid var(--fandex-border-light);
+  background: transparent;
+  color: var(--fandex-text-secondary);
+  transition: all var(--fandex-transition-fast);
+  cursor: pointer;
+}
+
+.fandex-btn:hover {
+  background: var(--fandex-bg-hover);
+  color: var(--fandex-text);
+  border-color: var(--fandex-border);
+}
+
+.fandex-btn-primary {
+  background: var(--fandex-primary);
+  color: var(--fandex-text-inverse);
+  border-color: var(--fandex-primary);
+}
+
+.fandex-btn-primary:hover {
+  background: var(--fandex-primary-hover);
+  border-color: var(--fandex-primary-hover);
+  color: var(--fandex-text-inverse);
+}
+
+/* ========== FANDEX 左侧色条装饰 ========== */
+.fandex-bar-left {
+  position: relative;
+  padding-left: 12px;
+}
+
+.fandex-bar-left::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--fandex-primary);
+  border-radius: 2px;
+}
+
+.fandex-bar-left-secondary::before {
+  background: var(--fandex-secondary);
+}
+
+.fandex-bar-left-tertiary::before {
+  background: var(--fandex-tertiary);
+}
+
+/* ========== FANDEX 1px 网格间距(充当边框) ========== */
+.fandex-grid {
+  display: grid;
+  gap: 1px;
+  background: var(--fandex-border-light);
+  border: 1px solid var(--fandex-border-light);
+}
+
+.fandex-grid > * {
+  background: var(--fandex-bg);
+}
+
+/* ========== FANDEX 毛玻璃导航栏 ========== */
+.fandex-nav-blur {
+  background: var(--fandex-bg-nav);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* ========== TipTap 编辑器 ProseMirror 样式 ========== */
 .ProseMirror {
   color: var(--fandex-text);
-  font-size: 16px;
-  line-height: 1.8;
+  font-family: var(--fandex-font-body);
+  font-size: 1.0625rem;
+  line-height: 1.85;
   outline: none;
+  text-align: justify;
 }
 
+/* h1: 左侧 3px 竖线 + 底部边框 */
 .ProseMirror h1 {
-  font-size: 1.8em;
+  font-size: 1.7em;
   font-weight: 700;
+  line-height: 1.35;
   margin: 0.8em 0 0.4em;
+  padding-left: 12px;
+  border-left: 3px solid var(--fandex-primary);
+  border-bottom: 1px solid var(--fandex-border-light);
+  padding-bottom: 0.3em;
   color: var(--fandex-text);
+  scroll-margin-top: calc(var(--fandex-nav-height) + 24px);
 }
 
+/* h2: 底部 2px 彩色边框(secondary) */
 .ProseMirror h2 {
-  font-size: 1.4em;
-  font-weight: 600;
+  font-size: 1.35em;
+  font-weight: 700;
+  line-height: 1.35;
   margin: 0.6em 0 0.3em;
+  border-bottom: 2px solid var(--fandex-secondary);
+  padding-bottom: 0.2em;
   color: var(--fandex-text);
+  scroll-margin-top: calc(var(--fandex-nav-height) + 24px);
 }
 
+/* h3: 左侧 3px 竖线(tertiary) */
 .ProseMirror h3 {
-  font-size: 1.2em;
-  font-weight: 600;
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: 1.35;
   margin: 0.5em 0 0.2em;
+  padding-left: 12px;
+  border-left: 3px solid var(--fandex-tertiary);
   color: var(--fandex-text-secondary);
+  scroll-margin-top: calc(var(--fandex-nav-height) + 24px);
+}
+
+.ProseMirror h4 {
+  font-size: 1.05em;
+  font-weight: 700;
+  margin: 0.4em 0 0.2em;
+  border-bottom: 1px solid var(--fandex-border-light);
+  color: var(--fandex-text);
 }
 
 .ProseMirror p {
   margin: 0.5em 0;
 }
 
+/* 引用块: 左侧 3px primary 色边框 + 卡片背景 */
 .ProseMirror blockquote {
   border-left: 3px solid var(--fandex-primary);
-  padding-left: 1em;
+  padding: 0.5em 1em;
   margin: 0.8em 0;
+  background: var(--fandex-bg-card);
   color: var(--fandex-text-secondary);
   font-style: italic;
 }
@@ -135,6 +318,48 @@ html, body, #root {
 .ProseMirror ol {
   padding-left: 1.5em;
   margin: 0.5em 0;
+}
+
+/* 无序列表: 自定义圆点 */
+.ProseMirror ul li {
+  list-style: none;
+  position: relative;
+  margin: 0.2em 0;
+}
+
+.ProseMirror ul li::before {
+  content: '';
+  position: absolute;
+  left: -1.2em;
+  top: 0.7em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fandex-primary);
+  opacity: 0.6;
+}
+
+.ProseMirror ol {
+  counter-reset: item;
+}
+
+.ProseMirror ol li {
+  list-style: none;
+  position: relative;
+  counter-increment: item;
+  margin: 0.2em 0;
+}
+
+.ProseMirror ol li::before {
+  content: counter(item);
+  position: absolute;
+  left: -1.8em;
+  top: 0;
+  color: var(--fandex-primary);
+  font-weight: 700;
+  font-family: var(--fandex-font-display);
+  text-align: right;
+  width: 1.2em;
 }
 
 .ProseMirror li {
@@ -150,25 +375,33 @@ html, body, #root {
   font-style: italic;
 }
 
+/* 行内代码: bg-code + 1px 边框 + 3px 圆角 */
 .ProseMirror code {
   background: var(--fandex-bg-code);
-  padding: 0.2em 0.4em;
+  border: 1px solid var(--fandex-border-light);
+  padding: 0.1em 0.3em;
   border-radius: 3px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.9em;
+  font-family: var(--fandex-font-code);
+  font-size: 0.875em;
 }
 
+/* 代码块: 1px 边框 + 4px 圆角 */
 .ProseMirror pre {
   background: var(--fandex-bg-code);
-  padding: 0.8em;
-  border-radius: 6px;
+  border: 1px solid var(--fandex-border);
+  padding: 1.25em 1em;
+  border-radius: 4px;
   margin: 0.8em 0;
   overflow-x: auto;
+  font-size: 0.875em;
+  line-height: 1.6;
 }
 
 .ProseMirror pre code {
   background: transparent;
+  border: none;
   padding: 0;
+  font-size: 1em;
 }
 
 /* 占位符样式 */
@@ -180,7 +413,31 @@ html, body, #root {
   height: 0;
 }
 
-/* 光标样式 */
 .ProseMirror:focus {
   outline: none;
+}
+
+/* ========== FANDEX 提示块(Admonition) ========== */
+.fandex-admonition {
+  border-left: 4px solid;
+  border-radius: 6px;
+  padding: 0.8em 1em;
+  margin: 0.8em 0;
+  background: var(--fandex-bg-card);
+}
+
+.fandex-admonition-note {
+  border-color: #448aff;
+}
+
+.fandex-admonition-tip {
+  border-color: #00c853;
+}
+
+.fandex-admonition-warning {
+  border-color: #ff9100;
+}
+
+.fandex-admonition-danger {
+  border-color: #ff1744;
 }

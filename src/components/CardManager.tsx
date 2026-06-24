@@ -177,7 +177,7 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
   if (editingCard) {
     return (
       <div className="flex-1 flex flex-col bg-nf-bg overflow-hidden">
-        {/* 顶部工具栏 */}
+        {/* 顶部工具栏 - FANDEX 左侧色条标题 */}
         <div className="flex items-center gap-3 px-4 py-2 border-b border-nf-border-light bg-nf-bg-sidebar">
           <button
             onClick={() => {
@@ -189,13 +189,13 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
             <ChevronLeft className="w-4 h-4" />
             返回列表
           </button>
-          <h2 className="text-sm font-semibold text-nf-text">{editingCard.title}</h2>
+          <h2 className="fandex-bar-left text-sm font-bold font-display text-nf-text">{editingCard.title}</h2>
           <div className="ml-auto flex items-center gap-2">
             {dirty && <span className="text-xs text-fandex-tertiary">未保存</span>}
             <button
               onClick={handleSave}
               disabled={!dirty}
-              className="flex items-center gap-1 px-3 py-1 text-sm text-fandex-primary border border-fandex-primary/30 rounded-lg hover:bg-fandex-primary/10 transition-fast disabled:opacity-30"
+              className="flex items-center gap-1 px-3 py-1 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast disabled:opacity-30"
             >
               <Save className="w-3.5 h-3.5" />
               保存
@@ -222,19 +222,19 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
   // 列表模式
   return (
     <div className="flex-1 flex flex-col bg-nf-bg overflow-hidden">
-      {/* 顶部标题栏 */}
+      {/* 顶部标题栏 - FANDEX 左侧色条 */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light">
-        <h2 className="text-lg font-semibold text-nf-text">{categoryLabel}</h2>
+        <h2 className="fandex-bar-left text-lg font-bold font-display text-nf-text">{categoryLabel}</h2>
         <button
           onClick={handleCreateCard}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary/30 rounded-lg hover:bg-fandex-primary/10 transition-fast"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast"
         >
           <Plus className="w-4 h-4" />
           新建{categoryLabel}
         </button>
       </div>
 
-      {/* 卡片网格 */}
+      {/* 卡片网格 - FANDEX 1px 间距网格 */}
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center h-full text-nf-text-tertiary text-sm">
@@ -248,23 +248,23 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-1 bg-nf-border-light border border-nf-border-light">
             {cards.map((card) => (
               <div
                 key={card.node.relative_path}
                 onClick={() => handleOpenCard(card)}
-                className="group relative bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/30 rounded-xl p-4 cursor-pointer transition-fast hover:-translate-y-0.5"
+                className="group relative bg-nf-bg hover:bg-nf-bg-hover p-4 cursor-pointer transition-fast"
               >
                 {/* 删除按钮 */}
                 <button
                   onClick={(e) => handleDeleteCard(card, e)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded text-nf-text-tertiary hover:text-red-400 transition-fast"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-nf-text-tertiary hover:text-red-400 transition-fast"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
 
-                {/* 卡片标题 */}
-                <h3 className="text-sm font-semibold text-nf-text mb-2 pr-6 truncate">
+                {/* 卡片标题 - FANDEX 左侧色条 */}
+                <h3 className="fandex-bar-left text-sm font-bold font-display text-nf-text mb-2 pr-6 truncate">
                   {card.title}
                 </h3>
 
