@@ -54,11 +54,11 @@ export default function ProjectCard({ project, projectInfo }: ProjectCardProps) 
   return (
     <div
       onClick={handleClick}
-      className="group bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/30 rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-base transform hover:-translate-y-1 cursor-pointer flex flex-col justify-between min-h-[180px]"
+      className="group bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/30 rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-base transform hover:-translate-y-1 cursor-pointer flex flex-col min-h-[168px]"
     >
       {/* 渐变头部区域 */}
-      <div className={`h-12 bg-gradient-to-r ${project.gradient} opacity-70 group-hover:opacity-90 transition-base relative`}>
-        <div className="absolute -bottom-3.5 left-4">
+      <div className={`h-10 bg-gradient-to-r ${project.gradient} opacity-70 group-hover:opacity-90 transition-base relative`}>
+        <div className="absolute -bottom-3 left-4">
           <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${project.typeColor} shadow-sm backdrop-blur-md`}>
             {project.type}
           </span>
@@ -66,23 +66,23 @@ export default function ProjectCard({ project, projectInfo }: ProjectCardProps) 
       </div>
 
       {/* 卡片主体 */}
-      <div className="p-4 pt-6 flex-1 flex flex-col justify-between">
-        <h3 className="text-base font-semibold text-nf-text group-hover:text-fandex-primary transition-fast tracking-tight line-clamp-1">
+      <div className="px-4 pt-5 pb-3 flex-1 flex flex-col">
+        <h3 className="text-base font-semibold text-nf-text group-hover:text-fandex-primary transition-fast tracking-tight line-clamp-1 mb-3">
           {project.name}
         </h3>
 
         {/* 项目元数据底部栏 */}
-        <div className="flex items-center justify-between text-xs text-nf-text-tertiary border-t border-nf-border-light pt-3 mt-4">
-          <div className="flex items-center gap-1.5" title="总字数">
-            <BarChart3 className="w-3.5 h-3.5 text-nf-text-tertiary" />
+        <div className="mt-auto flex items-center justify-between text-xs text-nf-text-tertiary border-t border-nf-border-light pt-2.5">
+          <div className="flex items-center gap-1" title="总字数">
+            <BarChart3 className="w-3 h-3 text-nf-text-tertiary" />
             <span>{project.words}</span>
           </div>
-          <div className="flex items-center gap-1.5" title="正文章节数">
-            <BookOpen className="w-3.5 h-3.5 text-nf-text-tertiary" />
+          <div className="flex items-center gap-1" title="正文章节数">
+            <BookOpen className="w-3 h-3 text-nf-text-tertiary" />
             <span>{project.chapters} 章</span>
           </div>
-          <div className="flex items-center gap-1.5" title="最后更新">
-            <Clock className="w-3.5 h-3.5 text-nf-text-tertiary" />
+          <div className="flex items-center gap-1" title="最后更新">
+            <Clock className="w-3 h-3 text-nf-text-tertiary" />
             <span>{project.updated}</span>
           </div>
         </div>
