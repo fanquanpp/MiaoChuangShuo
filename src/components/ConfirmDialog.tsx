@@ -57,6 +57,8 @@ export default function ConfirmDialog({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
+        // Don't trigger confirm if a button is focused (let button's own handler fire)
+        if (e.target instanceof HTMLButtonElement) return;
         e.preventDefault();
         if (type === "prompt" && !inputValue.trim()) return;
         handleConfirm();
@@ -64,6 +66,23 @@ export default function ConfirmDialog({
       if (e.key === "Escape") {
         e.preventDefault();
         onCancel();
+      }
+      // Focus trap
+      if (e.key === "Tab" && e.currentTarget) {
+        const container = e.currentTarget as HTMLElement;
+        const focusable = container.querySelectorAll<HTMLElement>(
+          'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     },
     [handleConfirm, onCancel, type, inputValue]

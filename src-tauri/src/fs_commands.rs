@@ -507,22 +507,20 @@ pub fn create_file(
         .map_err(|e| format!("无法解析项目路径: {}", e))?;
     let file_path = root.join(&relative_path);
 
-    // 二次校验：确保拼接后的路径仍在项目内
-    let canonical = file_path
-        .canonicalize()
-        .unwrap_or_else(|_| file_path.clone());
-    if canonical.starts_with(&root) || file_path.starts_with(&root) {
-        if file_path.exists() {
-            return Err("文件已存在".to_string());
-        }
-        if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
-        }
-        fs::write(&file_path, content).map_err(|e| format!("创建文件失败: {}", e))?;
-        Ok(file_path.to_string_lossy().to_string())
-    } else {
-        Err("路径越界: 不允许在项目目录外创建文件".to_string())
+    // 使用统一的沙箱校验
+    let validated = validate_path_in_project(
+        &file_path.to_string_lossy(),
+        &project_path,
+    )?;
+
+    if validated.exists() {
+        return Err("文件已存在".to_string());
     }
+    if let Some(parent) = validated.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+    }
+    fs::write(&validated, content).map_err(|e| format!("创建文件失败: {}", e))?;
+    Ok(validated.to_string_lossy().to_string())
 }
 
 /// 删除文件或目录（含路径沙箱校验）
@@ -552,19 +550,8 @@ pub fn rename_path(
     // 校验原路径（必须存在，用 validate_path_in_project）
     let old_abs = validate_path_in_project(&old_path, &project_path)?;
 
-    // 校验项目根路径
-    let root = PathBuf::from(&project_path)
-        .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
-
-    // 新路径可能尚不存在，用与 create_file 相同的策略校验
-    let new_abs = PathBuf::from(&new_path);
-    let new_canonical = new_abs
-        .canonicalize()
-        .unwrap_or_else(|_| new_abs.clone());
-    if !new_canonical.starts_with(&root) && !new_abs.starts_with(&root) {
-        return Err("路径越界: 不允许重命名到项目目录外".to_string());
-    }
+    // 使用统一的沙箱校验新路径
+    let new_abs = validate_path_in_project(&new_path, &project_path)?;
 
     // 检查目标路径是否已存在
     if new_abs.exists() {

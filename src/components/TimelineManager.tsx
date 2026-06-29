@@ -30,13 +30,18 @@ interface TimelineEvent {
   branch: string;
 }
 
+// Locale-independent constants for data storage keys
+const TIMELINE_DIR = "时间线";
+const ALL_BRANCHES = "__all__";
+const MAIN_BRANCH = "主线";
+
 export default function TimelineManager() {
   const currentProject = useAppStore((s) => s.currentProject);
   const { t } = useI18n();
   const { showToast } = useToast();
   const [events, setEvents] = useState<TimelineEvent[]>([]);
-  const [branches, setBranches] = useState<string[]>([t("timeline.mainBranch")]);
-  const [activeBranch, setActiveBranch] = useState<string>(t("timeline.allBranches"));
+  const [branches, setBranches] = useState<string[]>([MAIN_BRANCH]);
+  const [activeBranch, setActiveBranch] = useState<string>(ALL_BRANCHES);
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,7 +52,7 @@ export default function TimelineManager() {
     let title = "";
     let time = "";
     let description = "";
-    let branch = t("timeline.mainBranch");
+    let branch = MAIN_BRANCH;
     let inDescription = false;
 
     for (const line of lines) {
@@ -97,11 +102,11 @@ export default function TimelineManager() {
     setLoading(true);
     try {
       const tree = await readProjectTree(currentProject.path);
-      const dir = findDirByName(tree, t("timeline.dirName"));
+      const dir = findDirByName(tree, TIMELINE_DIR);
       const files = dir?.children.filter((f) => !f.is_dir) || [];
 
       const eventList: TimelineEvent[] = [];
-      const branchSet = new Set<string>([t("timeline.mainBranch")]);
+      const branchSet = new Set<string>([MAIN_BRANCH]);
 
       for (const file of files) {
         try {
@@ -133,7 +138,7 @@ export default function TimelineManager() {
     } finally {
       setLoading(false);
     }
-  }, [currentProject, t]);
+  }, [currentProject]);
 
   useEffect(() => {
     loadEvents();
@@ -176,7 +181,7 @@ export default function TimelineManager() {
   }, [currentProject, loadEvents]);
 
   const filteredEvents =
-    activeBranch === t("timeline.allBranches")
+    activeBranch === ALL_BRANCHES
       ? events
       : events.filter((e) => e.branch === activeBranch);
 
@@ -197,7 +202,18 @@ export default function TimelineManager() {
 
       <div className="flex items-center gap-1 px-6 py-2 border-b border-nf-border-light bg-nf-bg-sidebar">
         <GitBranch className="w-3.5 h-3.5 text-nf-text-tertiary mr-1" />
-        {[t("timeline.allBranches"), ...branches].map((b) => (
+        <button
+          key={ALL_BRANCHES}
+          onClick={() => setActiveBranch(ALL_BRANCHES)}
+          className={`px-2.5 py-0.5 text-xs transition duration-fast ${
+            activeBranch === ALL_BRANCHES
+              ? "bg-fandex-primary/15 text-fandex-primary border border-fandex-primary/40"
+              : "text-nf-text-tertiary hover:text-nf-text border border-transparent"
+          }`}
+        >
+          {t("timeline.allBranches")}
+        </button>
+        {branches.map((b) => (
           <button
             key={b}
             onClick={() => setActiveBranch(b)}
@@ -320,7 +336,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
   const { showToast } = useToast();
   const [title, setTitle] = useState(event?.title || "");
   const [time, setTime] = useState(event?.time || "");
-  const [branch, setBranch] = useState(event?.branch || t("timeline.mainBranch"));
+  const [branch, setBranch] = useState(event?.branch || MAIN_BRANCH);
   const [description, setDescription] = useState(event?.description || "");
   const [newBranch, setNewBranch] = useState("");
   const [saving, setSaving] = useState(false);
@@ -363,7 +379,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
     const fileName = (title || t("timeline.unnamedEvent"))
       .replace(/[<>:"/\\|?*]/g, "_")
       .slice(0, 50);
-    return event?.relativePath || `${t("timeline.dirName")}/${fileName}.txt`;
+    return event?.relativePath || `${TIMELINE_DIR}/${fileName}.txt`;
   };
 
   const handleSave = async () => {

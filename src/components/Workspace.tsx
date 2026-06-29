@@ -105,8 +105,11 @@ export default function Workspace() {
       }
       // Escape 关闭命令面板
       if (e.key === "Escape") {
-        if (commandPaletteOpen) setCommandPaletteOpen(false);
-        if (focusMode) setFocusMode(false);
+        if (commandPaletteOpen) {
+          setCommandPaletteOpen(false);
+        } else if (focusMode) {
+          setFocusMode(false);
+        }
       }
     },
     [commandPaletteOpen, focusMode, showToast, setActiveCategory, t]
@@ -142,7 +145,7 @@ export default function Workspace() {
   );
 
   // 处理新建文件确认
-  const handleCreateFile = async (fileName: string) => {
+  const handleCreateFile = useCallback(async (fileName: string) => {
     if (!currentProject) throw new Error("无当前项目");
     const dirName = getCategoryDir(activeCategory);
     const relativePath = `${dirName}/${fileName}`;
@@ -151,7 +154,7 @@ export default function Workspace() {
     const tree = await readProjectTree(currentProject.path);
     setProjectTree(tree);
     showToast("success", t("workspace.fileCreated", { name: fileName }));
-  };
+  }, [currentProject, activeCategory, getFileTemplate, setProjectTree, showToast, t]);
 
   // 命令面板中触发新建文件
   const handleCommandCreateFile = useCallback((category: SidebarCategory) => {
@@ -177,7 +180,6 @@ export default function Workspace() {
           <NovelEditor
             filePath={selectedFilePath}
             focusMode={focusMode}
-            focusTimerActive={showFocusTimer}
           />
         );
     }

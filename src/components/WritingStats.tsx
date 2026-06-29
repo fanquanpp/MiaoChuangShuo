@@ -27,6 +27,20 @@ import { useAppStore } from "../lib/store";
 import { getWritingStats, type WritingStats as WritingStatsType } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
+function detectCategoryFromPath(relativePath: string): string {
+  const firstDir = relativePath.split(/[\\/]/)[0] || "";
+  const categoryMap: Record<string, string> = {
+    "正文": "manuscript",
+    "大纲": "outline",
+    "角色": "characters",
+    "世界观": "worldview",
+    "名词": "glossary",
+    "素材": "materials",
+    "时间线": "timeline",
+  };
+  return categoryMap[firstDir] || "manuscript";
+}
+
 export default function WritingStats() {
   const currentProject = useAppStore((s) => s.currentProject);
   const navigateToFile = useAppStore((s) => s.navigateToFile);
@@ -56,6 +70,7 @@ export default function WritingStats() {
   const handleJumpToChapter = (relativePath: string) => {
     if (!currentProject) return;
     const fileName = relativePath.split(/[\\/]/).pop() || relativePath;
+    const category = detectCategoryFromPath(relativePath);
     navigateToFile(
       {
         name: fileName,
@@ -64,7 +79,7 @@ export default function WritingStats() {
         children: [],
         size: 0,
       },
-      "manuscript"
+      category as any
     );
   };
 

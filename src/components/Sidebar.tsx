@@ -94,20 +94,29 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
   }, [currentProject]);
 
   return (
-    <div className="w-40 min-w-[150px] border-r border-nf-border-light bg-nf-bg-sidebar flex flex-col">
+    <div className="w-40 min-w-[150px] border-r border-nf-border-light bg-nf-bg-sidebar flex flex-col relative">
+      {/* 顶部渐变装饰条 */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{
+        background: 'linear-gradient(90deg, var(--fandex-primary), var(--fandex-secondary))',
+      }} />
+
       {/* 顶部: 项目名称与返回 - FANDEX 左侧色条 */}
-      <div className="px-3 py-3 border-b border-nf-border-light">
+      <div className="px-3 py-3 border-b border-nf-border-light relative overflow-hidden">
+        {/* 微妙的背景渐变 */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          background: 'linear-gradient(135deg, var(--fandex-primary), var(--fandex-secondary))',
+        }} />
         <button
           onClick={handleBackToLauncher}
-          className="flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition duration-fast mb-1.5"
+          className="relative flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition-all duration-base ease-fandex mb-1.5 group"
         >
-          <ChevronLeft className="w-3.5 h-3.5" />
+          <ChevronLeft className="w-3.5 h-3.5 transition-transform duration-fast group-hover:-translate-x-0.5" />
           {t("app.back")}
         </button>
-        <h1 className="fandex-bar-left text-sm font-bold font-display text-nf-text truncate" title={currentProject?.meta.name}>
+        <h1 className="relative fandex-bar-left text-sm font-bold font-display text-nf-text truncate leading-snug" title={currentProject?.meta.name}>
           {currentProject?.meta.name || t("sidebar.unnamedProject")}
         </h1>
-        <div className="text-[11px] text-nf-text-tertiary mt-0.5 truncate">
+        <div className="relative text-[11px] text-nf-text-tertiary mt-0.5 truncate pl-3">
           {currentProject?.meta.author || t("sidebar.anonymousAuthor")}
         </div>
       </div>
@@ -125,26 +134,31 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
               key={cat}
               onClick={() => setActiveCategory(cat)}
               title={CATEGORY_NAMES[cat]}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition duration-fast relative ${
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
                 isActive
                   ? "bg-fandex-primary/10 text-fandex-primary"
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
               }`}
             >
-              {/* FANDEX 左侧色条激活指示器 */}
-              {isActive && (
-                <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-fandex-primary"></span>
-              )}
-              <Icon className="w-4 h-4 flex-shrink-0" />
+              {/* FANDEX 左侧色条激活指示器 - 带过渡动画 */}
+              <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-base ease-fandex ${
+                isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
+              }`} style={{ transformOrigin: 'center' }} />
+              <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                isActive ? 'scale-110' : 'group-hover:scale-105'
+              }`} />
               <span className="truncate">{CATEGORY_NAMES[cat]}</span>
             </button>
           );
         })}
 
+        {/* 分隔线 */}
+        <div className="mx-3 my-2 border-t border-nf-border-light/60" />
+
         {/* 类型专属目录（模板扩展） */}
         {typeSpecificDirs.length > 0 && (
           <>
-            <div className="px-3 py-1 mt-3 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+            <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
               {t("sidebar.extensionSection")}
             </div>
             {typeSpecificDirs.map((dirName) => {
@@ -154,25 +168,30 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
                   key={dirName}
                   onClick={() => setActiveCategory(dirName as SidebarCategory)}
                   title={dirName}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition duration-fast relative ${
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
                     isActive
                       ? "bg-fandex-primary/10 text-fandex-primary"
                       : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
                   }`}
                 >
-                  {isActive && (
-                    <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-fandex-primary"></span>
-                  )}
-                  <Layers className="w-4 h-4 flex-shrink-0" />
+                  <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-base ease-fandex ${
+                    isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
+                  }`} style={{ transformOrigin: 'center' }} />
+                  <Layers className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                    isActive ? 'scale-110' : 'group-hover:scale-105'
+                  }`} />
                   <span className="truncate">{dirName}</span>
                 </button>
               );
             })}
+
+            {/* 分隔线 */}
+            <div className="mx-3 my-2 border-t border-nf-border-light/60" />
           </>
         )}
 
         {/* 工具分组 */}
-        <div className="px-3 py-1 mt-3 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+        <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
           {t("sidebar.toolSection")}
         </div>
         {TOOL_CATEGORIES.map((cat) => {
@@ -183,17 +202,19 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
               key={cat}
               onClick={() => setActiveCategory(cat)}
               title={CATEGORY_NAMES[cat]}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition duration-fast relative ${
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
                 isActive
                   ? "bg-fandex-tertiary/10 text-fandex-tertiary"
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
               }`}
             >
               {/* FANDEX 左侧色条激活指示器(工具类用 tertiary 色) */}
-              {isActive && (
-                <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-fandex-tertiary"></span>
-              )}
-              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-tertiary transition-all duration-base ease-fandex ${
+                isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
+              }`} style={{ transformOrigin: 'center' }} />
+              <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                isActive ? 'scale-110' : 'group-hover:scale-105'
+              }`} />
               <span className="truncate">{CATEGORY_NAMES[cat]}</span>
             </button>
           );
@@ -205,10 +226,10 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         <button
           onClick={toggleTheme}
           title={theme === "dark" ? t("sidebar.switchLight") : t("sidebar.switchDark")}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary hover:bg-nf-bg-hover transition duration-fast"
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex"
         >
           {theme === "dark" ? (
-            <Sun className="w-3.5 h-3.5" />
+            <Sun className="w-3.5 h-3.5 transition-transform duration-fast hover:rotate-45" />
           ) : (
             <Moon className="w-3.5 h-3.5" />
           )}
@@ -216,7 +237,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         </button>
         <button
           onClick={onCreateFile}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary hover:bg-nf-bg-hover transition duration-fast"
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/60 hover:bg-fandex-primary/5 transition-all duration-base ease-fandex"
         >
           <Plus className="w-3.5 h-3.5" />
           {t("sidebar.newFile")}

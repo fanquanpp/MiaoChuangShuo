@@ -38,13 +38,11 @@ import OutlineView from "./OutlineView";
 interface NovelEditorProps {
   filePath: string | null;
   focusMode?: boolean;
-  focusTimerActive?: boolean;
 }
 
 export default function NovelEditor({
   filePath,
   focusMode = false,
-  focusTimerActive = false,
 }: NovelEditorProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const { t } = useI18n();
@@ -162,6 +160,7 @@ export default function NovelEditor({
           content: docContent.length > 0 ? docContent : [{ type: "paragraph" }],
         });
         setDirty(false);
+        lastSavedContentRef.current = content;
         setWordCount(countWords(editor.getText()));
         setEditorText(editor.getText());
         // 记录最近文件
@@ -236,17 +235,6 @@ export default function NovelEditor({
       }
     }
   }, [editor, filePath, dirty, showToast, t, currentProject]);
-
-  // 初始化 lastSavedContent
-  useEffect(() => {
-    if (editor && filePath) {
-      readFile(filePath, currentProject?.path || "")
-        .then((content) => {
-          lastSavedContentRef.current = content;
-        })
-        .catch(() => {});
-    }
-  }, [editor, filePath, currentProject]);
 
   // 导出 TXT
   const handleExportTxt = useCallback(async () => {

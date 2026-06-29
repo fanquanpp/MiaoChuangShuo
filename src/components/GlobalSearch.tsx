@@ -23,6 +23,20 @@ import { searchInProject, type SearchResult } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 
+function detectCategoryFromPath(relativePath: string): string {
+  const firstDir = relativePath.split(/[\\/]/)[0] || "";
+  const categoryMap: Record<string, string> = {
+    "正文": "manuscript",
+    "大纲": "outline",
+    "角色": "characters",
+    "世界观": "worldview",
+    "名词": "glossary",
+    "素材": "materials",
+    "时间线": "timeline",
+  };
+  return categoryMap[firstDir] || "manuscript";
+}
+
 export default function GlobalSearch() {
   const currentProject = useAppStore((s) => s.currentProject);
   const navigateToFile = useAppStore((s) => s.navigateToFile);
@@ -72,6 +86,7 @@ export default function GlobalSearch() {
   }, []);
 
   const handleJumpToResult = (result: SearchResult) => {
+    const category = detectCategoryFromPath(result.relative_path);
     navigateToFile(
       {
         name: result.file_name,
@@ -80,7 +95,7 @@ export default function GlobalSearch() {
         children: [],
         size: 0,
       },
-      "manuscript"
+      category as any
     );
   };
 

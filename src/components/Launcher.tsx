@@ -289,33 +289,44 @@ export default function Launcher() {
   const isSearching = searchQuery.trim().length > 0;
 
   return (
-    <div className="flex h-screen bg-nf-bg overflow-hidden">
+    <div className="flex h-screen bg-nf-bg overflow-hidden relative">
+      {/* 背景装饰渐变 */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse 80% 60% at 70% 20%, rgba(124, 158, 255, 0.04), transparent)',
+      }} />
+
       {/* 左侧品牌栏 */}
-      <aside className="w-64 bg-nf-bg-sidebar border-r border-nf-border-light flex flex-col flex-shrink-0">
+      <aside className="w-64 bg-nf-bg-sidebar border-r border-nf-border-light flex flex-col flex-shrink-0 relative z-10">
+        {/* 顶部渐变装饰条 */}
+        <div className="absolute top-0 left-0 right-0 h-[2px]" style={{
+          background: 'linear-gradient(90deg, var(--fandex-primary), var(--fandex-secondary), var(--fandex-tertiary))',
+        }} />
         <div className="px-6 pt-12 pb-8">
           <div className="flex items-center gap-2 mb-1">
-            <PenLine className="w-5 h-5 text-fandex-primary" />
+            <div className="p-1.5 bg-fandex-primary/10 rounded-md">
+              <PenLine className="w-4 h-4 text-fandex-primary" />
+            </div>
             <h1 className="text-xl font-bold font-display text-nf-text tracking-tight">
               {t("launcher.title")}
             </h1>
           </div>
-          <p className="text-xs text-nf-text-tertiary mt-1">
+          <p className="text-xs text-nf-text-tertiary mt-1 pl-0.5">
             {t("launcher.subtitle")}
           </p>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
+        <nav className="flex-1 px-4 space-y-1.5">
           <button
             onClick={() => setShowCreateDialog(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition duration-fast"
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-all duration-base ease-fandex shadow-sm hover:shadow-md"
           >
             <BookOpen className="w-4 h-4" />
             {t("launcher.createNew")}
-            <ArrowRight className="w-3.5 h-3.5 ml-auto" />
+            <ArrowRight className="w-3.5 h-3.5 ml-auto transition-transform duration-fast group-hover:translate-x-0.5" />
           </button>
           <button
             onClick={handleImport}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light hover:border-fandex-primary/40 text-sm transition duration-fast"
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light hover:border-fandex-primary/40 text-sm transition-all duration-base ease-fandex"
           >
             <FolderOpen className="w-4 h-4" />
             {t("launcher.importLocal")}
@@ -379,8 +390,8 @@ export default function Launcher() {
       </aside>
 
       {/* 右侧主区域 */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between px-8 py-5 border-b border-nf-border-light bg-nf-bg">
+      <main className="flex-1 flex flex-col overflow-hidden relative z-10">
+        <header className="flex items-center justify-between px-8 py-5 border-b border-nf-border-light bg-nf-bg/80 backdrop-blur-sm">
           <div>
             <h2 className="text-lg font-bold font-display text-nf-text">
               {t("launcher.welcome")}
@@ -389,14 +400,14 @@ export default function Launcher() {
               {t("launcher.welcomeHint")}
             </p>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-nf-text-tertiary" />
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-nf-text-tertiary transition-colors duration-fast group-focus-within:text-fandex-primary" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("launcher.searchPlaceholder")}
-              className="w-64 bg-nf-bg-sidebar border border-nf-border-light pl-9 pr-8 py-1.5 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60"
+              className="w-64 bg-nf-bg-sidebar/80 border border-nf-border-light pl-9 pr-8 py-1.5 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 focus:bg-nf-bg transition-all duration-base ease-fandex"
             />
             {isSearching && (
               <button
@@ -414,21 +425,26 @@ export default function Launcher() {
           {loading ? (
             <ProjectGridSkeleton count={6} />
           ) : !hasProjects && !isSearching ? (
-            <div className="text-center py-12 text-nf-text-tertiary text-sm">
-              <BookOpen className="w-12 h-12 text-nf-border mx-auto mb-3" />
-              {t("launcher.noProjects")}
+            <div className="text-center py-16 text-nf-text-tertiary text-sm animate-fade-in">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
+                <BookOpen className="w-7 h-7 text-nf-border" />
+              </div>
+              <p className="text-nf-text-secondary font-medium mb-1">{t("launcher.noProjects")}</p>
+              <p className="text-xs text-nf-text-tertiary">{t("launcher.welcomeHint")}</p>
             </div>
           ) : isSearching && !hasSearchResults ? (
-            <div className="text-center py-12 text-nf-text-tertiary text-sm">
-              <Search className="w-12 h-12 text-nf-border mx-auto mb-3" />
-              {t("launcher.noSearchResults", { query: searchQuery })}
+            <div className="text-center py-16 text-nf-text-tertiary text-sm animate-fade-in">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
+                <Search className="w-7 h-7 text-nf-border" />
+              </div>
+              <p className="text-nf-text-secondary font-medium mb-1">{t("launcher.noSearchResults", { query: searchQuery })}</p>
             </div>
           ) : (
-            <section className="mb-10">
-              <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-4">
+            <section className="mb-10 animate-slide-in-right">
+              <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-5">
                 {t("launcher.recentProjectsCount", { count: sortedProjects.length })}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
                 {sortedProjects.map((p) => (
                   <ProjectCard
                     key={p.path}

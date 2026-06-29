@@ -52,11 +52,11 @@ export default {
         '3xl': '64px',
       },
       transitionDuration: {
-        'fast': '120ms',
-        'base': '220ms',
+        'fast': '150ms',
+        'base': '250ms',
       },
       transitionTimingFunction: {
-        'fandex': 'ease',
+        'fandex': 'cubic-bezier(0.4, 0, 0.2, 1)',
       },
       boxShadow: {
         'sm': 'var(--fandex-shadow-sm)',

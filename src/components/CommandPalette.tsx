@@ -111,6 +111,13 @@ export default function CommandPalette({
     }
   }, [open]);
 
+  // Clamp selectedIndex when filtered results shrink
+  useEffect(() => {
+    if (selectedIndex >= filtered.length && filtered.length > 0) {
+      setSelectedIndex(0);
+    }
+  }, [filtered.length, selectedIndex]);
+
   // 键盘导航
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -174,6 +181,7 @@ export default function CommandPalette({
             filtered.map((cmd, idx) => (
               <button
                 key={cmd.id}
+                ref={(el) => { if (idx === selectedIndex && el) el.scrollIntoView({ block: "nearest" }); }}
                 onClick={() => { cmd.action(); onClose(); }}
                 onMouseEnter={() => setSelectedIndex(idx)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition duration-fast ${

@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Timer, Play, Pause, RotateCcw, X, ChevronDown } from "lucide-react";
 import { useI18n } from "../lib/i18n";
+import { useToast } from "../lib/toast";
 
 const PRESET_DURATIONS = [15, 25, 40, 60, 90];
 const TICK_MS = 1000;
@@ -23,6 +24,7 @@ export function FocusTimer({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const { showToast } = useToast();
   const [targetMinutes, setTargetMinutes] = useState(25);
   const [remainingSeconds, setRemainingSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
@@ -48,6 +50,7 @@ export function FocusTimer({
       if (remainingSec <= 0) {
         setRunning(false);
         if (intervalRef.current) clearInterval(intervalRef.current);
+        showToast("success", t("timer.completed"));
       }
     }, TICK_MS);
   }, [total, remainingSeconds]);

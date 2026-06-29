@@ -254,6 +254,7 @@ const zhCN: TranslationDict = {
   "cardmanager.save": "保存",
   "cardmanager.created": "已创建「{name}」",
   "cardmanager.deleted": "已删除「{name}」",
+  "cardmanager.unsavedWarning": "当前卡片有未保存的更改，确定放弃吗？",
 
   // 项目对话框
   "project.createTitle": "创建新项目",
@@ -282,6 +283,7 @@ const zhCN: TranslationDict = {
   "timer.setDuration": "设置时长",
   "timer.minutes": "{d} 分钟",
   "timer.close": "关闭计时器",
+  "timer.completed": "专注时间结束，休息一下吧！",
 
   // 快捷键面板
   "shortcuts.title": "快捷键参考",
@@ -636,6 +638,7 @@ const enUS: TranslationDict = {
   "cardmanager.save": "Save",
   "cardmanager.created": "Created \"{name}\"",
   "cardmanager.deleted": "Deleted \"{name}\"",
+  "cardmanager.unsavedWarning": "This card has unsaved changes. Discard them?",
 
   // Project Dialog
   "project.createTitle": "New Project",
@@ -664,6 +667,7 @@ const enUS: TranslationDict = {
   "timer.setDuration": "Set duration",
   "timer.minutes": "{d} min",
   "timer.close": "Close timer",
+  "timer.completed": "Focus session complete. Take a break!",
 
   // Shortcut Panel
   "shortcuts.editor": "Editor",

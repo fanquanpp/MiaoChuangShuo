@@ -168,7 +168,9 @@ function showCharacterPicker(
       setSelectedItem(picker, items, i);
     };
     item.onmouseleave = () => {
-      if (document.activeElement === customInput) return;
+      // Check if focus is on the custom input (by checking active element tag)
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.tagName === 'INPUT' && picker.contains(activeEl)) return;
       item.style.background = "transparent";
       item.style.color = "var(--fandex-text, #ebebeb)";
       item.setAttribute("aria-selected", "false");

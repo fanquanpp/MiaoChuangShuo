@@ -361,9 +361,6 @@ export default function FileList({ onCreateFile }: FileListProps) {
     }
   };
 
-  const hasFiles = children.some((n) => !n.is_dir);
-  const hasDirs = children.some((n) => n.is_dir);
-
   return (
     <div className="w-72 min-w-[260px] border-l border-nf-border-light bg-nf-bg flex flex-col">
       {/* 顶部: 标题与视图切换 */}

@@ -85,26 +85,27 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
       const dir = findDirByName(tree, dirName);
       const files = dir?.children.filter((f) => !f.is_dir) || [];
 
-      const cardItems: CardItem[] = [];
-      for (const file of files) {
-        try {
-          const content = await readFile(
-            `${currentProject.path}/${file.relative_path}`,
-            currentProject.path
-          );
-          cardItems.push({
-            node: file,
-            title: file.name.replace(/\.txt$/i, ""),
-            preview: content.slice(0, 100).trim(),
-          });
-        } catch {
-          cardItems.push({
-            node: file,
-            title: file.name.replace(/\.txt$/i, ""),
-            preview: "",
-          });
-        }
-      }
+      const cardItems: CardItem[] = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const content = await readFile(
+              `${currentProject.path}/${file.relative_path}`,
+              currentProject.path
+            );
+            return {
+              node: file,
+              title: file.name.replace(/\.txt$/i, ""),
+              preview: content.slice(0, 100).trim(),
+            };
+          } catch {
+            return {
+              node: file,
+              title: file.name.replace(/\.txt$/i, ""),
+              preview: "",
+            };
+          }
+        })
+      );
       setCards(cardItems);
     } catch (e) {
       showToast("error", t("cardmanager.loadFailedShort", { error: String(e) }));
@@ -218,6 +219,10 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
         <div className="flex items-center gap-3 px-4 py-2 border-b border-nf-border-light bg-nf-bg-sidebar">
           <button
             onClick={() => {
+              if (dirty) {
+                const msg = t("cardmanager.unsavedWarning");
+                if (!window.confirm(msg)) return;
+              }
               setEditingCard(null);
               loadCards();
             }}

@@ -34,7 +34,7 @@ interface ToolbarButtonProps {
   children: React.ReactNode;
 }
 
-// 工具栏按钮 - FANDEX 直角风格
+// 工具栏按钮 - FANDEX 直角风格（增强版）
 export function ToolbarButton({
   onClick,
   active,
@@ -45,20 +45,26 @@ export function ToolbarButton({
     <button
       onClick={onClick}
       title={title}
-      className={`p-1.5 transition duration-fast border ${
+      className={`relative p-1.5 transition-all duration-base ease-fandex border group ${
         active
-          ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
-          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent"
+          ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/40"
+          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light"
       }`}
     >
-      {children}
+      <span className="transition-transform duration-fast group-hover:scale-110 group-active:scale-95 block">
+        {children}
+      </span>
+      {/* 激活态底部指示线 */}
+      {active && (
+        <span className="absolute bottom-0 left-1/4 right-1/4 h-[2px] bg-fandex-primary" />
+      )}
     </button>
   );
 }
 
 // 分隔符
 export function Divider() {
-  return <div className="w-px h-5 bg-nf-border-light mx-1" />;
+  return <div className="w-px h-4 bg-nf-border-light/60 mx-1.5" />;
 }
 
 // 工具栏属性
@@ -117,69 +123,84 @@ export default function EditorToolbar({
       {/* 聚焦模式下隐藏格式化按钮，仅保留状态和保存 */}
       {!focusMode && (
         <>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleBold().run()}
-            active={editor?.isActive("bold") || false}
-            title={t("editor.bold")}
-          >
-            <Bold className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleItalic().run()}
-            active={editor?.isActive("italic") || false}
-            title={t("editor.italic")}
-          >
-            <Italic className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={handleQuickQuote}
-            active={false}
-            title={t("editor.quickQuote")}
-          >
-            <Quote className="w-4 h-4" />
-          </ToolbarButton>
+          {/* 基础格式组 */}
+          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleBold().run()}
+              active={editor?.isActive("bold") || false}
+              title={t("editor.bold")}
+            >
+              <Bold className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleItalic().run()}
+              active={editor?.isActive("italic") || false}
+              title={t("editor.italic")}
+            >
+              <Italic className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={handleQuickQuote}
+              active={false}
+              title={t("editor.quickQuote")}
+            >
+              <Quote className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
           <Divider />
-          <ToolbarButton
-            onClick={() => dispatchEditorEvent("P", true, true)}
-            active={false}
-            title={t("editor.poetryFormat")}
-          >
-            <Pilcrow className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => dispatchEditorEvent("L", true, true)}
-            active={false}
-            title={t("editor.lyricsFormat")}
-          >
-            <Music className="w-4 h-4" />
-          </ToolbarButton>
+          {/* 排版格式组 */}
+          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
+            <ToolbarButton
+              onClick={() => dispatchEditorEvent("P", true, true)}
+              active={false}
+              title={t("editor.poetryFormat")}
+            >
+              <Pilcrow className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => dispatchEditorEvent("L", true, true)}
+              active={false}
+              title={t("editor.lyricsFormat")}
+            >
+              <Music className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
           <Divider />
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().undo().run()}
-            active={false}
-            title={t("editor.undo")}
-          >
-            <Undo className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().redo().run()}
-            active={false}
-            title={t("editor.redo")}
-          >
-            <Redo className="w-4 h-4" />
-          </ToolbarButton>
+          {/* 操作历史组 */}
+          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().undo().run()}
+              active={false}
+              title={t("editor.undo")}
+            >
+              <Undo className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().redo().run()}
+              active={false}
+              title={t("editor.redo")}
+            >
+              <Redo className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
         </>
       )}
 
       {/* 右侧状态区 */}
       <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary">
-        <span>{t("editor.wordCount", { count: wordCount })}</span>
-        {dirty && <span className="text-fandex-tertiary">{t("editor.unsaved")}</span>}
+        <span className="tabular-nums">{t("editor.wordCount", { count: wordCount })}</span>
+        {/* 保存状态指示器 - 更清晰的视觉反馈 */}
+        {dirty && (
+          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-fandex-tertiary/10 text-fandex-tertiary border border-fandex-tertiary/20">
+            <span className="w-1.5 h-1.5 bg-fandex-tertiary animate-pulse" />
+            {t("editor.unsaved")}
+          </span>
+        )}
         {!focusMode && (
           <button
             onClick={onExportTxt}
             title={t("editor.exportTxt")}
-            className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition duration-fast"
+            className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 transition-all duration-base ease-fandex"
           >
             <Download className="w-3.5 h-3.5" />
             TXT
@@ -188,7 +209,11 @@ export default function EditorToolbar({
         <button
           onClick={onSave}
           disabled={!dirty || saving}
-          className="flex items-center gap-1 px-2 py-1 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
+          className={`flex items-center gap-1 px-2.5 py-1 transition-all duration-base ease-fandex disabled:opacity-30 disabled:cursor-not-allowed ${
+            dirty
+              ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm hover:shadow-md'
+              : 'bg-fandex-primary/40 text-nf-text-inverse/60'
+          }`}
         >
           {saving ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
