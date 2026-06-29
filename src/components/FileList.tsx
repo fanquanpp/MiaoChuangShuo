@@ -42,6 +42,23 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// 从文件名中提取章节序号，用于正文文件自动排序
+function extractChapterNumber(name: string): number {
+  // Match patterns: 第X章, 第X节, 第X回, Chapter X, or leading numbers like "01.", "1."
+  const patterns = [
+    /第(\d+)章/,
+    /第(\d+)节/,
+    /第(\d+)回/,
+    /[Cc]hapter\s*(\d+)/,
+    /^(\d+)[._\-]/,
+  ];
+  for (const p of patterns) {
+    const m = name.match(p);
+    if (m) return parseInt(m[1], 10);
+  }
+  return Infinity; // non-chapter files sort last
+}
+
 // 递归渲染文件树节点（列表视图）
 function TreeNodeList({
   node,
@@ -298,8 +315,15 @@ export default function FileList({ onCreateFile }: FileListProps) {
 
   const children = useMemo(() => {
     const dir = findDirByName(projectTree, dirName);
-    return dir?.children || [];
-  }, [projectTree, dirName]);
+    const items = dir?.children ? [...dir.children] : [];
+    // 正文分类按章节序号自动排序
+    if (activeCategory === "manuscript") {
+      items.sort(
+        (a, b) => extractChapterNumber(a.name) - extractChapterNumber(b.name)
+      );
+    }
+    return items;
+  }, [projectTree, dirName, activeCategory]);
 
   const handleDelete = (node: FileNode, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -369,6 +393,16 @@ export default function FileList({ onCreateFile }: FileListProps) {
           {dirName}
         </h2>
         <div className="flex items-center gap-1">
+          {activeCategory === "manuscript" && (
+            <button
+              onClick={onCreateFile}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition duration-fast"
+              title={t("filelist.newChapter")}
+            >
+              <FilePlus className="w-3.5 h-3.5" />
+              <span>{t("filelist.newChapter")}</span>
+            </button>
+          )}
           <button
             onClick={() => setViewMode("grid")}
             className={`p-1.5 transition duration-fast border ${

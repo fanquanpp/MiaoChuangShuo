@@ -27,6 +27,7 @@ import {
   BarChart3,
   Search,
   Layers,
+  Network,
 } from "lucide-react";
 import {
   useAppStore,
@@ -48,6 +49,7 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   materials: FolderOpen,
   stats: BarChart3,
   search: Search,
+  knowledge: Network,
 };
 
 // 内容分类列表(按显示顺序)
@@ -62,7 +64,7 @@ const CONTENT_CATEGORIES: SidebarCategory[] = [
 ];
 
 // 工具分类列表
-const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
+const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search", "knowledge"];
 
 // 左侧导航栏属性接口
 interface SidebarProps {

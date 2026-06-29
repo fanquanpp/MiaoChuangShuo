@@ -19,6 +19,7 @@ import CardManager from "./CardManager";
 import TimelineManager from "./TimelineManager";
 import WritingStats from "./WritingStats";
 import GlobalSearch from "./GlobalSearch";
+import KnowledgeGraph from "./KnowledgeGraph";
 import CreateFileDialog from "./CreateFileDialog";
 import CommandPalette from "./CommandPalette";
 import { FocusTimer } from "./FocusTimer";
@@ -173,6 +174,8 @@ export default function Workspace() {
         return <WritingStats />;
       case "search":
         return <GlobalSearch />;
+      case "knowledge":
+        return <KnowledgeGraph />;
       case "card-manager":
         return <CardManager categoryLabel={getCategoryName(activeCategory)} />;
       default:

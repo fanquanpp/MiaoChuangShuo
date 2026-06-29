@@ -30,7 +30,8 @@ export type SidebarCategory =
   | "outline"
   | "materials"
   | "stats"
-  | "search";
+  | "search"
+  | "knowledge";
 
 // 分类中文名称
 export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
@@ -43,6 +44,7 @@ export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
   materials: "素材",
   stats: "统计",
   search: "搜索",
+  knowledge: "知识图谱",
 };
 
 // 分类对应目录名
@@ -56,6 +58,7 @@ export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
   materials: "素材",
   stats: "",
   search: "",
+  knowledge: "",
 };
 
 // 分类图标名 (lucide-react)
@@ -69,6 +72,7 @@ export const CATEGORY_ICONS: Record<SidebarCategory, string> = {
   materials: "FolderOpen",
   stats: "BarChart3",
   search: "Search",
+  knowledge: "Network",
 };
 
 // 组合后的完整 App 状态类型

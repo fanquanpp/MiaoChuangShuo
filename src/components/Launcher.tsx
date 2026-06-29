@@ -9,7 +9,7 @@
 // 1. 项目扫描与导入
 // 2. 最近项目列表展示（支持全部项目，不限数量）
 // 3. 搜索过滤
-// 4. 启动创建项目对话框
+// 4. 文体类型选择（侧边栏展开）→ 触发创建项目对话框
 // 5. 删除项目（带确认对话框）
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -24,6 +24,16 @@ import {
   Loader2,
   RefreshCw,
   X,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  BookMarked,
+  ScrollText,
+  MessageSquare,
+  Library,
+  Globe2,
+  Clapperboard,
+  Feather,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import {
@@ -31,7 +41,9 @@ import {
   importProject,
   pickDirectory,
   deleteProject,
+  PROJECT_TEMPLATES,
   type ProjectInfo,
+  type ProjectType,
 } from "../lib/api";
 import ProjectCard, { type ProjectData } from "./ProjectCard";
 import CreateProjectDialog from "./CreateProjectDialog";
@@ -42,6 +54,18 @@ import ConfirmDialog from "./ConfirmDialog";
 
 const SCAN_DIR_KEY = "novelforge:scanDir:v1";
 
+// 项目类型图标映射
+const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  standard: BookMarked,
+  short_story: FileText,
+  diary: ScrollText,
+  dialogue: MessageSquare,
+  multi_volume: Library,
+  shared_world: Globe2,
+  screenplay: Clapperboard,
+  poetry: Feather,
+};
+
 export default function Launcher() {
   const openProject = useAppStore((s) => s.openProject);
   const closeProject = useAppStore((s) => s.closeProject);
@@ -51,8 +75,10 @@ export default function Launcher() {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [selectedType, setSelectedType] = useState<ProjectType>("standard");
+  const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("1.4.0"); // 默认值
+  const [appVersion, setAppVersion] = useState("1.4.0");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
 
   const handleScan = useCallback(async () => {
@@ -72,7 +98,7 @@ export default function Launcher() {
   const handleImport = useCallback(async () => {
     try {
       const dir = await pickDirectory();
-      if (!dir) return; // 用户取消选择
+      if (!dir) return;
       const project = await importProject(dir);
       if (project) {
         setProjects((prev) => {
@@ -105,15 +131,13 @@ export default function Launcher() {
     closeProject();
   }, [closeProject]);
 
-  // 从 package.json 读取版本号（而非硬编码）
+  // 从 package.json 读取版本号
   useEffect(() => {
     import("../../package.json")
       .then((pkg) => {
         if (pkg.version) setAppVersion(pkg.version);
       })
-      .catch(() => {
-        // 保持默认值
-      });
+      .catch(() => {});
   }, []);
 
   // 从 localStorage 恢复扫描目录并自动扫描
@@ -121,14 +145,13 @@ export default function Launcher() {
     const savedDir = localStorage.getItem(SCAN_DIR_KEY);
     if (savedDir) {
       setScanDir(savedDir);
-      // 自动触发扫描
       (async () => {
         setLoading(true);
         try {
           const list = await scanProjects(savedDir);
           setProjects(list);
         } catch {
-          // 静默失败，用户可手动重试
+          // 静默失败
         } finally {
           setLoading(false);
         }
@@ -136,7 +159,7 @@ export default function Launcher() {
     }
   }, []);
 
-  // 持久化扫描目录到 localStorage
+  // 持久化扫描目录
   useEffect(() => {
     if (scanDir) {
       localStorage.setItem(SCAN_DIR_KEY, scanDir);
@@ -153,7 +176,7 @@ export default function Launcher() {
     );
   }, [projects, searchQuery]);
 
-  // 显示全部项目（按更新时间排序），不再限制为前 9 个
+  // 按更新时间排序
   const sortedProjects = useMemo(() => {
     return [...filteredProjects].sort((a, b) =>
       b.meta.updated_at.localeCompare(a.meta.updated_at)
@@ -247,6 +270,7 @@ export default function Launcher() {
 
   const handleCreateSuccess = useCallback(async (projectPath: string) => {
     setShowCreateDialog(false);
+    setTypePanelExpanded(false);
     try {
       const project = await importProject(projectPath);
       setProjects((prev) => {
@@ -259,12 +283,22 @@ export default function Launcher() {
         return [project, ...prev];
       });
       showToast("success", t("launcher.createSuccess"));
-      // 自动打开新创建的项目
       openProject(project);
     } catch (e) {
       showToast("error", t("launcher.importFailed", { error: String(e) }));
     }
   }, [openProject, t, showToast]);
+
+  // 点击"新建项目"按钮：展开类型选择面板
+  const handleNewProjectClick = useCallback(() => {
+    setTypePanelExpanded(true);
+  }, []);
+
+  // 选择文体类型后打开创建对话框
+  const handleTypeSelect = useCallback((typeId: ProjectType) => {
+    setSelectedType(typeId);
+    setShowCreateDialog(true);
+  }, []);
 
   // 删除项目处理
   const handleDeleteProject = useCallback((project: ProjectInfo) => {
@@ -295,75 +329,127 @@ export default function Launcher() {
         background: 'radial-gradient(ellipse 80% 60% at 70% 20%, rgba(124, 158, 255, 0.04), transparent)',
       }} />
 
-      {/* 左侧品牌栏 */}
-      <aside className="w-64 bg-nf-bg-sidebar border-r border-nf-border-light flex flex-col flex-shrink-0 relative z-10">
+      {/* 左侧品牌栏 - 优化布局 */}
+      <aside className="w-72 bg-nf-bg-sidebar border-r border-nf-border-light flex flex-col flex-shrink-0 relative z-10">
         {/* 顶部渐变装饰条 */}
         <div className="absolute top-0 left-0 right-0 h-[2px]" style={{
           background: 'linear-gradient(90deg, var(--fandex-primary), var(--fandex-secondary), var(--fandex-tertiary))',
         }} />
-        <div className="px-6 pt-12 pb-8">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="p-1.5 bg-fandex-primary/10 rounded-md">
-              <PenLine className="w-4 h-4 text-fandex-primary" />
+
+        {/* 品牌区域 */}
+        <div className="px-6 pt-8 pb-6">
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <div className="p-2 bg-fandex-primary/10 rounded-md">
+              <PenLine className="w-5 h-5 text-fandex-primary" />
             </div>
-            <h1 className="text-xl font-bold font-display text-nf-text tracking-tight">
-              {t("launcher.title")}
-            </h1>
+            <div>
+              <h1 className="text-lg font-bold font-display text-nf-text tracking-tight">
+                {t("launcher.title")}
+              </h1>
+              <p className="text-[10px] text-nf-text-tertiary">
+                {t("launcher.subtitle")}
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-nf-text-tertiary mt-1 pl-0.5">
-            {t("launcher.subtitle")}
-          </p>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1.5">
+        {/* 新建项目按钮 + 类型选择面板 */}
+        <div className="px-4 space-y-2">
           <button
-            onClick={() => setShowCreateDialog(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-all duration-base ease-fandex shadow-sm hover:shadow-md"
+            onClick={handleNewProjectClick}
+            className="w-full flex items-center gap-2.5 px-4 py-3 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-all duration-base ease-fandex shadow-sm hover:shadow-md"
           >
             <BookOpen className="w-4 h-4" />
             {t("launcher.createNew")}
             <ArrowRight className="w-3.5 h-3.5 ml-auto transition-transform duration-fast group-hover:translate-x-0.5" />
           </button>
+
+          {/* 文体类型选择面板 - 展开式 */}
+          <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
+            typePanelExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+          }`}>
+            <div className="border border-nf-border-light bg-nf-bg/50 mt-2">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-nf-border-light/50">
+                <span className="text-xs font-semibold text-nf-text-secondary">
+                  {t("project.formTypeLabel")}
+                </span>
+                <button
+                  onClick={() => setTypePanelExpanded(false)}
+                  className="p-0.5 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="p-1.5 max-h-64 overflow-y-auto space-y-0.5">
+                {PROJECT_TEMPLATES.map((tpl) => {
+                  const Icon = TYPE_ICONS[tpl.id] || FileText;
+                  return (
+                    <button
+                      key={tpl.id}
+                      onClick={() => handleTypeSelect(tpl.id)}
+                      className={`w-full flex items-start gap-2.5 px-2.5 py-2 text-left transition-all duration-fast hover:bg-fandex-primary/10 group ${
+                        selectedType === tpl.id ? 'bg-fandex-primary/5' : ''
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 text-fandex-primary/70 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium font-display text-nf-text group-hover:text-fandex-primary transition-colors">
+                          {tpl.name}
+                        </div>
+                        <div className="text-[11px] text-nf-text-tertiary mt-0.5 line-clamp-2 leading-relaxed">
+                          {tpl.desc}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity mt-1" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 导入按钮 */}
           <button
             onClick={handleImport}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light hover:border-fandex-primary/40 text-sm transition-all duration-base ease-fandex"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light hover:border-fandex-primary/40 text-sm transition-all duration-base ease-fandex"
           >
             <FolderOpen className="w-4 h-4" />
             {t("launcher.importLocal")}
           </button>
-        </nav>
+        </div>
 
-        <div className="px-4 pb-4 space-y-1.5">
-          <div className="flex items-center gap-1 text-xs text-nf-text-tertiary mb-1">
-            <FolderSync className="w-3 h-3" />
-            {t("launcher.setScanDir")}
+        {/* 扫描目录区域 */}
+        <div className="px-4 pt-6 pb-4 mt-auto">
+          <div className="flex items-center gap-1.5 text-xs text-nf-text-tertiary mb-2">
+            <FolderSync className="w-3.5 h-3.5" />
+            <span className="font-medium">{t("launcher.setScanDir")}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5 mb-2">
             <input
               type="text"
               value={scanDir}
               onChange={(e) => setScanDir(e.target.value)}
               placeholder={t("launcher.scanDirPlaceholder")}
-              className="flex-1 bg-nf-bg border border-nf-border-light px-2.5 py-1.5 text-xs text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60"
+              className="flex-1 bg-nf-bg border border-nf-border-light px-2.5 py-2 text-xs text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition duration-fast"
             />
             <button
               onClick={handleBrowseScanDir}
               title={t("launcher.scanDirPlaceholder")}
-              className="flex-shrink-0 px-2 py-1.5 text-xs text-nf-text-tertiary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition duration-fast"
+              className="flex-shrink-0 p-2 text-xs text-nf-text-tertiary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition duration-fast"
             >
-              <FolderSearch className="w-3.5 h-3.5" />
+              <FolderSearch className="w-4 h-4" />
             </button>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1.5">
             <button
               onClick={handleScan}
               disabled={!scanDir || loading}
-              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast disabled:opacity-40"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className="w-3.5 h-3.5" />
               )}
               {t("launcher.scanDir")}
             </button>
@@ -374,7 +460,7 @@ export default function Launcher() {
                   setProjects([]);
                   localStorage.removeItem(SCAN_DIR_KEY);
                 }}
-                className="px-2 py-1.5 text-xs text-nf-text-tertiary hover:text-nf-text border border-nf-border-light hover:bg-nf-bg-hover transition duration-fast"
+                className="px-3 py-2 text-xs text-nf-text-tertiary hover:text-nf-text border border-nf-border-light hover:bg-nf-bg-hover transition duration-fast"
               >
                 {t("launcher.changeDir")}
               </button>
@@ -382,6 +468,7 @@ export default function Launcher() {
           </div>
         </div>
 
+        {/* 版本信息 */}
         <div className="px-6 pb-4">
           <p className="text-[10px] text-nf-text-tertiary">
             {t("launcher.localReady")} (v{appVersion})
@@ -391,6 +478,7 @@ export default function Launcher() {
 
       {/* 右侧主区域 */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
+        {/* 顶部搜索栏 */}
         <header className="flex items-center justify-between px-8 py-5 border-b border-nf-border-light bg-nf-bg/80 backdrop-blur-sm">
           <div>
             <h2 className="text-lg font-bold font-display text-nf-text">
@@ -401,50 +489,64 @@ export default function Launcher() {
             </p>
           </div>
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-nf-text-tertiary transition-colors duration-fast group-focus-within:text-fandex-primary" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nf-text-tertiary transition-colors duration-fast group-focus-within:text-fandex-primary" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("launcher.searchPlaceholder")}
-              className="w-64 bg-nf-bg-sidebar/80 border border-nf-border-light pl-9 pr-8 py-1.5 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 focus:bg-nf-bg transition-all duration-base ease-fandex"
+              className="w-72 bg-nf-bg-sidebar/80 border border-nf-border-light pl-10 pr-9 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 focus:bg-nf-bg transition-all duration-base ease-fandex"
             />
             {isSearching && (
               <button
                 onClick={() => setSearchQuery("")}
                 title={t("launcher.clearSearch")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             )}
           </div>
         </header>
 
+        {/* 项目列表区域 */}
         <div className="flex-1 overflow-y-auto p-8">
           {loading ? (
             <ProjectGridSkeleton count={6} />
           ) : !hasProjects && !isSearching ? (
-            <div className="text-center py-16 text-nf-text-tertiary text-sm animate-fade-in">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
-                <BookOpen className="w-7 h-7 text-nf-border" />
+            <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in">
+              <div className="w-20 h-20 mb-5 rounded-lg bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
+                <BookOpen className="w-9 h-9 text-nf-border" />
               </div>
-              <p className="text-nf-text-secondary font-medium mb-1">{t("launcher.noProjects")}</p>
-              <p className="text-xs text-nf-text-tertiary">{t("launcher.welcomeHint")}</p>
+              <p className="text-nf-text-secondary font-medium text-base mb-2">
+                {t("launcher.noProjects")}
+              </p>
+              <p className="text-sm text-nf-text-tertiary max-w-sm">
+                {t("launcher.welcomeHint")}
+              </p>
+              <button
+                onClick={handleNewProjectClick}
+                className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-all duration-base ease-fandex shadow-sm hover:shadow-md"
+              >
+                <BookOpen className="w-4 h-4" />
+                {t("launcher.createNew")}
+              </button>
             </div>
           ) : isSearching && !hasSearchResults ? (
-            <div className="text-center py-16 text-nf-text-tertiary text-sm animate-fade-in">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
-                <Search className="w-7 h-7 text-nf-border" />
+            <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in">
+              <div className="w-20 h-20 mb-5 rounded-lg bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
+                <Search className="w-9 h-9 text-nf-border" />
               </div>
-              <p className="text-nf-text-secondary font-medium mb-1">{t("launcher.noSearchResults", { query: searchQuery })}</p>
+              <p className="text-nf-text-secondary font-medium text-base mb-2">
+                {t("launcher.noSearchResults", { query: searchQuery })}
+              </p>
             </div>
           ) : (
-            <section className="mb-10 animate-slide-in-right">
-              <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-5">
+            <section className="animate-slide-in-right">
+              <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-6">
                 {t("launcher.recentProjectsCount", { count: sortedProjects.length })}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {sortedProjects.map((p) => (
                   <ProjectCard
                     key={p.path}
@@ -459,8 +561,10 @@ export default function Launcher() {
         </div>
       </main>
 
+      {/* 创建项目对话框 - 传入预选类型 */}
       {showCreateDialog && (
         <CreateProjectDialog
+          defaultType={selectedType}
           onClose={() => setShowCreateDialog(false)}
           onSuccess={handleCreateSuccess}
         />

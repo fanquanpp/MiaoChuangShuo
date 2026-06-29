@@ -2,7 +2,7 @@
 
 import type { SidebarCategory } from "./store";
 
-export type PanelType = "editor" | "card-manager" | "timeline" | "stats" | "search";
+export type PanelType = "editor" | "card-manager" | "timeline" | "stats" | "search" | "knowledge";
 
 export interface CategoryConfig {
   // 中间面板渲染类型
@@ -22,6 +22,7 @@ const CATEGORY_CONFIG: Record<SidebarCategory, CategoryConfig> = {
   timeline:     { panelType: "timeline",      showFileList: false },
   stats:        { panelType: "stats",         showFileList: false },
   search:       { panelType: "search",        showFileList: false },
+  knowledge:    { panelType: "knowledge",     showFileList: false },
 };
 
 /**

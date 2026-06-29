@@ -2,17 +2,18 @@
 //
 // 功能概述：
 // 模态对话框，用于收集新建小说项目所需的参数。
+// 文体类型由侧边栏预选传入，此处仅显示简要标识和可更改选项。
 // 采用 FANDEX 美术风格：直角按钮、左侧色条标题、1px 边框。
-// 模板按文体体裁分类选择，题材作为次级可选项。
 //
 // 模块职责：
-// 1. 收集用户输入的项目元数据（名称、文体、题材、作者、描述）
-// 2. 调用目录选择器选择保存位置
-// 3. 调用后端 API 创建项目
-// 4. 创建成功后触发回调
+// 1. 显示预选的文体类型（可更改）
+// 2. 收集项目元数据（名称、题材、作者、描述）
+// 3. 调用目录选择器选择保存位置
+// 4. 调用后端 API 创建项目
+// 5. 创建成功后触发回调
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, FolderOpen, Loader2, ChevronDown } from "lucide-react";
+import { X, FolderOpen, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { createProject, pickDirectory, PROJECT_TEMPLATES, NOVEL_GENRES, type ProjectType } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
@@ -38,8 +39,12 @@ export default function CreateProjectDialog({
   const [parentPath, setParentPath] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
 
   const handleCreateRef = useRef<() => void>(() => {});
+
+  // 获取当前选中类型的模板信息
+  const currentTemplate = PROJECT_TEMPLATES.find((tpl) => tpl.id === type) || PROJECT_TEMPLATES[0];
 
   // Esc 关闭, Enter 提交
   const handleKeyDown = useCallback(
@@ -106,7 +111,6 @@ export default function CreateProjectDialog({
     }
   };
 
-  // 将 handleCreate 挂载到 ref 供键盘事件使用
   handleCreateRef.current = handleCreate;
 
   return (
@@ -119,7 +123,7 @@ export default function CreateProjectDialog({
       }}
     >
       <div
-        className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden animate-scale-in"
+        className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-xl overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
@@ -137,6 +141,61 @@ export default function CreateProjectDialog({
 
         {/* 表单内容 */}
         <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* 文体类型 - 紧凑显示，可展开更改 */}
+          <div>
+            <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
+              {t("project.formTypeLabel")}
+            </label>
+            <button
+              onClick={() => setShowTypeSelector(!showTypeSelector)}
+              className="w-full flex items-center gap-2 px-3 py-2.5 bg-nf-bg border border-nf-border-light hover:border-fandex-primary/50 transition duration-fast text-left"
+            >
+              <span className="flex-1">
+                <span className="text-sm font-medium font-display text-nf-text">
+                  {currentTemplate.name}
+                </span>
+                <span className="text-xs text-nf-text-tertiary ml-2">
+                  {currentTemplate.desc}
+                </span>
+              </span>
+              <ChevronDown className={`w-4 h-4 text-nf-text-tertiary transition-transform duration-fast ${
+                showTypeSelector ? 'rotate-180' : ''
+              }`} />
+            </button>
+
+            {/* 类型选择下拉面板 */}
+            {showTypeSelector && (
+              <div className="mt-1 border border-nf-border-light bg-nf-bg max-h-48 overflow-y-auto animate-fade-in">
+                {PROJECT_TEMPLATES.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    onClick={() => {
+                      setType(tpl.id);
+                      setShowTypeSelector(false);
+                    }}
+                    className={`w-full flex items-start gap-2 px-3 py-2 text-left transition duration-fast ${
+                      type === tpl.id
+                        ? 'bg-fandex-primary/10'
+                        : 'hover:bg-nf-bg-hover'
+                    }`}
+                  >
+                    <ChevronRight className={`w-3 h-3 mt-0.5 ${
+                      type === tpl.id ? 'text-fandex-primary' : 'text-transparent'
+                    }`} />
+                    <div>
+                      <div className="text-sm font-medium font-display text-nf-text">
+                        {tpl.name}
+                      </div>
+                      <div className="text-xs text-nf-text-tertiary mt-0.5 line-clamp-1">
+                        {tpl.desc}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* 项目名称 */}
           <div>
             <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
@@ -147,33 +206,9 @@ export default function CreateProjectDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("project.namePlaceholder")}
+              autoFocus
               className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition duration-fast"
             />
-          </div>
-
-          {/* 文体类型选择 */}
-          <div>
-            <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
-              {t("project.formTypeLabel")}
-            </label>
-            <div className="grid grid-cols-2 gap-1 bg-nf-border-light border border-nf-border-light">
-              {PROJECT_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  onClick={() => setType(tpl.id)}
-                  className={`p-3 text-left transition duration-fast bg-nf-bg ${
-                    type === tpl.id
-                      ? "bg-fandex-primary/10 ring-1 ring-fandex-primary ring-inset"
-                      : "hover:bg-nf-bg-hover"
-                  }`}
-                >
-                  <div className="text-sm font-medium font-display text-nf-text">{tpl.name}</div>
-                  <div className="text-xs text-nf-text-tertiary mt-0.5 line-clamp-2 leading-relaxed">
-                    {tpl.desc}
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* 题材（次级可选） */}

@@ -208,6 +208,7 @@ const zhCN: TranslationDict = {
   "sidebar.materials": "素材",
   "sidebar.stats": "统计",
   "sidebar.search": "搜索",
+  "sidebar.knowledge": "知识图谱",
   "sidebar.closeProject": "关闭项目",
   "sidebar.unnamedProject": "未命名项目",
   "sidebar.anonymousAuthor": "匿名作者",
@@ -300,6 +301,7 @@ const zhCN: TranslationDict = {
   "cardmanager.saving": "保存中…",
   "cardmanager.newCard": "新建{category}",
   "cardmanager.emptyCard": "暂无{category}，点击右上角新建",
+  "cardmanager.emptyHint": "点击下方按钮创建第一个{category}",
   "cardmanager.noContent": "暂无内容",
   "cardmanager.promptName": "输入{category}名称：",
   "cardmanager.createFailed": "创建失败：{error}",
@@ -423,6 +425,19 @@ const zhCN: TranslationDict = {
   // ── 骨架屏 ──
   "skeleton.loading": "加载中",
   "skeleton.loadingFiles": "加载文件列表",
+
+  // ── 知识图谱 ──
+  "knowledge.title": "知识图谱",
+  "knowledge.empty": "暂无关联数据，请先创建角色、世界观或名词卡片",
+  "knowledge.loading": "正在分析关联…",
+  "knowledge.nodeCount": "{count} 个节点",
+  "knowledge.edgeCount": "{count} 条关联",
+  "knowledge.zoomIn": "放大",
+  "knowledge.zoomOut": "缩小",
+  "knowledge.resetView": "重置视图",
+
+  // ── 文件列表 - 章节 ──
+  "filelist.newChapter": "新建章节",
 
   // ── 角色提及（characterMention 扩展） ──
   "characterMention.placeholder": "自定义角色名…",
@@ -618,6 +633,7 @@ const enUS: TranslationDict = {
   "sidebar.materials": "Materials",
   "sidebar.stats": "Statistics",
   "sidebar.search": "Search",
+  "sidebar.knowledge": "Knowledge Graph",
   "sidebar.closeProject": "Close Project",
   "sidebar.unnamedProject": "Untitled Project",
   "sidebar.anonymousAuthor": "Anonymous",
@@ -710,6 +726,7 @@ const enUS: TranslationDict = {
   "cardmanager.saving": "Saving…",
   "cardmanager.newCard": "New {category}",
   "cardmanager.emptyCard": "No {category} yet. Click + to create one.",
+  "cardmanager.emptyHint": "Click the button below to create your first {category}",
   "cardmanager.noContent": "No content",
   "cardmanager.promptName": "Enter {category} name:",
   "cardmanager.createFailed": "Create failed: {error}",
@@ -833,6 +850,19 @@ const enUS: TranslationDict = {
   // ── Skeleton ──
   "skeleton.loading": "Loading",
   "skeleton.loadingFiles": "Loading file list",
+
+  // ── Knowledge Graph ──
+  "knowledge.title": "Knowledge Graph",
+  "knowledge.empty": "No linked data yet. Create character, worldbuilding, or glossary cards first.",
+  "knowledge.loading": "Analyzing relationships…",
+  "knowledge.nodeCount": "{count} nodes",
+  "knowledge.edgeCount": "{count} links",
+  "knowledge.zoomIn": "Zoom In",
+  "knowledge.zoomOut": "Zoom Out",
+  "knowledge.resetView": "Reset View",
+
+  // ── File List - Chapters ──
+  "filelist.newChapter": "New Chapter",
 
   // ── Character Mention extension ──
   "characterMention.placeholder": "Custom character name…",

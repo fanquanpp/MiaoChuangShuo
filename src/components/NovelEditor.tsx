@@ -33,7 +33,6 @@ import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import EditorToolbar from "./EditorToolbar";
-import OutlineView from "./OutlineView";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -51,7 +50,6 @@ export default function NovelEditor({
   const [dirty, setDirty] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [characters, setCharacters] = useState<string[]>([]);
-  const [editorText, setEditorText] = useState("");
   const { showToast } = useToast();
 
   const projectType = currentProject?.meta?.type || "standard";
@@ -137,7 +135,6 @@ export default function NovelEditor({
       if (editor) {
         const wc = countWords(editor.getText());
         setWordCount(wc);
-        setEditorText(editor.getText());
         useAppStore.getState().setActiveFileWordCount(wc);
       }
     },
@@ -149,7 +146,6 @@ export default function NovelEditor({
       editor?.commands.clearContent();
       setWordCount(0);
       setDirty(false);
-      setEditorText("");
       return;
     }
 
@@ -169,7 +165,6 @@ export default function NovelEditor({
         setDirty(false);
         lastSavedContentRef.current = content;
         setWordCount(countWords(editor.getText()));
-        setEditorText(editor.getText());
         // 记录最近文件
         const relativePath = filePath.replace(
           (currentProject?.path || "") + "/",
@@ -393,8 +388,6 @@ export default function NovelEditor({
 
       <div className="flex-1 overflow-y-auto relative">
         <EditorContent editor={editor} />
-        {/* 大纲视图 — 编辑器右侧覆盖 */}
-        {filePath && <OutlineView htmlContent={editorText} />}
       </div>
     </div>
   );
