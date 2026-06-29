@@ -16,8 +16,11 @@ import { Plus, Trash2, Edit3, GitBranch, Clock, X } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import { readFile, writeFile, deletePath, readProjectTree } from "../lib/api";
 import type { FileNode } from "../lib/api";
-import { findDirByName } from "../lib/fileTreeUtils";
+import { findDirByName, getAbsolutePath } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
+import { useToast } from "../lib/toast";
+import ConfirmDialog from "./ConfirmDialog";
+import { SkeletonLines } from "./SkeletonComponents";
 
 interface TimelineEvent {
   relativePath: string;
@@ -30,12 +33,14 @@ interface TimelineEvent {
 export default function TimelineManager() {
   const { currentProject } = useAppStore();
   const { t } = useI18n();
+  const { showToast } = useToast();
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [branches, setBranches] = useState<string[]>([t("timeline.mainBranch")]);
   const [activeBranch, setActiveBranch] = useState<string>(t("timeline.allBranches"));
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TimelineEvent | null>(null);
 
   const parseEvent = (content: string, relativePath: string): TimelineEvent => {
     const lines = content.split("\n");
@@ -63,6 +68,30 @@ export default function TimelineManager() {
     return { relativePath, time, title, description, branch };
   };
 
+  // 尝试多种时间格式解析，返回可比较的时间戳或 null
+  const tryParseTime = (timeStr: string): number | null => {
+    // 标准 ISO / 常用日期格式
+    const parsed = Date.parse(timeStr);
+    if (!isNaN(parsed)) return parsed;
+
+    // 中文日期：2024年1月1日、2024年01月01日
+    const cnMatch = timeStr.match(/(\d{1,4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
+    if (cnMatch) {
+      const [, y, m, d] = cnMatch;
+      return Date.parse(`${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
+    }
+
+    // 公元前后格式：公元前221年 → 负值年份
+    const bcMatch = timeStr.match(/公元前\s*(\d+)\s*年/);
+    if (bcMatch) return -parseInt(bcMatch[1]) * 365.25 * 86400000;
+
+    // 纯数字年份（如 "2024"、"1999"）
+    const yearOnly = timeStr.match(/^(\d{1,4})$/);
+    if (yearOnly) return Date.parse(`${yearOnly[1].padStart(4, "0")}-01-01`);
+
+    return null;
+  };
+
   const loadEvents = useCallback(async () => {
     if (!currentProject) return;
     setLoading(true);
@@ -77,7 +106,8 @@ export default function TimelineManager() {
       for (const file of files) {
         try {
           const content = await readFile(
-            `${currentProject.path}\\${file.relative_path}`
+            getAbsolutePath(currentProject.path, file.relative_path),
+            currentProject.path
           );
           const event = parseEvent(content, file.relative_path);
           eventList.push(event);
@@ -88,11 +118,12 @@ export default function TimelineManager() {
       }
 
       eventList.sort((a, b) => {
-        const ta = Date.parse(a.time);
-        const tb = Date.parse(b.time);
-        if (!isNaN(ta) && !isNaN(tb)) return ta - tb;
-        if (!isNaN(ta)) return -1;
-        if (!isNaN(tb)) return 1;
+        const ta = tryParseTime(a.time);
+        const tb = tryParseTime(b.time);
+        if (ta !== null && tb !== null) return ta - tb;
+        if (ta !== null) return -1;
+        if (tb !== null) return 1;
+        // 都不可解析时按字典序稳定性排序
         return a.time.localeCompare(b.time);
       });
       setEvents(eventList);
@@ -118,21 +149,27 @@ export default function TimelineManager() {
     setShowEditor(true);
   };
 
-  const handleDelete = async (event: TimelineEvent) => {
-    if (!currentProject) return;
-    if (!confirm(t("timeline.confirmDelete", { title: event.title }))) return;
+  const handleDelete = (event: TimelineEvent) => {
+    setDeleteTarget(event);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!currentProject || !deleteTarget) return;
+    const event = deleteTarget;
+    setDeleteTarget(null);
     try {
-      await deletePath(`${currentProject.path}\\${event.relativePath}`);
+      await deletePath(getAbsolutePath(currentProject.path, event.relativePath), currentProject.path);
+      showToast("success", t("timeline.deleted", { title: event.title }));
       await loadEvents();
     } catch (e) {
-      alert(t("timeline.deleteFailed", { error: String(e) }));
+      showToast("error", t("timeline.deleteFailed", { error: String(e) }));
     }
   };
 
   const handleSaveEvent = useCallback(async (event: TimelineEvent) => {
     if (!currentProject) return;
     const content = `# ${event.title}\n\n- 时间: ${event.time}\n- 分支: ${event.branch}\n\n---\n\n${event.description}\n`;
-    await writeFile(`${currentProject.path}\\${event.relativePath}`, content);
+    await writeFile(getAbsolutePath(currentProject.path, event.relativePath), content, currentProject.path);
     setShowEditor(false);
     setEditingEvent(null);
     await loadEvents();
@@ -177,8 +214,12 @@ export default function TimelineManager() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <div className="flex items-center justify-center h-full text-nf-text-tertiary text-sm">
-            {t("timeline.loading")}
+          <div className="max-w-3xl mx-auto space-y-6" role="status" aria-label={t("timeline.loading")}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="fandex-bar-left bg-nf-bg-card/40 border border-nf-border-light p-4">
+                <SkeletonLines lines={3} />
+              </div>
+            ))}
           </div>
         ) : filteredEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -253,6 +294,16 @@ export default function TimelineManager() {
           onSave={handleSaveEvent}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        type="danger"
+        title={t("timeline.confirmDelete", { title: deleteTarget?.title || "" })}
+        message={t("timeline.confirmDelete", { title: deleteTarget?.title || "" })}
+        confirmLabel={t("app.delete")}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
@@ -266,12 +317,14 @@ interface EventEditorProps {
 
 function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
   const { t } = useI18n();
+  const { showToast } = useToast();
   const [title, setTitle] = useState(event?.title || "");
   const [time, setTime] = useState(event?.time || "");
   const [branch, setBranch] = useState(event?.branch || t("timeline.mainBranch"));
   const [description, setDescription] = useState(event?.description || "");
   const [newBranch, setNewBranch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [titleError, setTitleError] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
@@ -310,14 +363,16 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
     const fileName = (title || t("timeline.unnamedEvent"))
       .replace(/[<>:"/\\|?*]/g, "_")
       .slice(0, 50);
-    return event?.relativePath || `${t("timeline.dirName")}/${fileName}.md`;
+    return event?.relativePath || `${t("timeline.dirName")}/${fileName}.txt`;
   };
 
   const handleSave = async () => {
     if (!title.trim()) {
-      alert(t("timeline.titleRequired"));
+      setTitleError(true);
+      showToast("error", t("timeline.titleRequired"));
       return;
     }
+    setTitleError(false);
     if (saving) return;
     setSaving(true);
     try {
@@ -359,10 +414,20 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
               ref={firstInputRef}
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (titleError) setTitleError(false);
+              }}
               placeholder={t("timeline.eventTitlePlaceholder")}
-              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
+              className={`w-full bg-nf-bg border px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition-fast ${
+                titleError
+                  ? "border-red-400 focus:border-red-400"
+                  : "border-nf-border-light focus:border-fandex-primary/60"
+              }`}
             />
+            {titleError && (
+              <p className="text-[10px] text-red-400 mt-0.5">{t("timeline.titleRequired")}</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

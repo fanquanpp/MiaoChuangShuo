@@ -14,6 +14,7 @@ import { Clock, BarChart3, BookOpen } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import type { ProjectInfo } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
 
 export interface ProjectData {
   id: string;
@@ -32,12 +33,18 @@ export interface ProjectCardProps {
 }
 
 export default function ProjectCard({ project, projectInfo }: ProjectCardProps) {
-  const { openProject } = useAppStore();
+  const { currentProject } = useAppStore();
+  const { handleSwitchProject } = useAutoSaveOnExit();
   const { t } = useI18n();
 
   const handleClick = () => {
     if (projectInfo) {
-      openProject(projectInfo);
+      // 如果当前已有项目打开，走保存→切换流程；否则直接打开
+      if (currentProject) {
+        handleSwitchProject(projectInfo);
+      } else {
+        useAppStore.getState().openProject(projectInfo);
+      }
     }
   };
 

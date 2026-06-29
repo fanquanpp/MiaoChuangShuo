@@ -1,8 +1,9 @@
-// 编辑器工具栏组件
+// 编辑器工具栏组件（纯文本/WYSIWYG 模式）
 //
 // 功能概述：
-// 提供 TipTap 编辑器的格式化工具栏，包含加粗、斜体、标题、
-// 列表、引用、诗歌/歌词排版、撤销/重做等按钮，以及保存状态指示。
+// 提供 TipTap 编辑器的精简格式化工具栏，仅包含加粗、斜体基础富文本按钮。
+// 移除 Markdown 相关按钮（标题/列表/引用）。
+// 保留诗歌/歌词排版、撤销/重做、保存状态指示。
 // 采用 FANDEX 直角按钮 + 毛玻璃风格。
 //
 // 模块职责：
@@ -14,11 +15,6 @@ import type { Editor } from "@tiptap/core";
 import {
   Bold,
   Italic,
-  Heading1,
-  Heading2,
-  List,
-  ListOrdered,
-  Quote,
   Undo,
   Redo,
   Save,
@@ -75,7 +71,7 @@ interface EditorToolbarProps {
   focusMode?: boolean;
 }
 
-// 编辑器工具栏组件
+// 编辑器工具栏组件（纯文本模式）
 export default function EditorToolbar({
   editor,
   wordCount,
@@ -115,47 +111,6 @@ export default function EditorToolbar({
             title={t("editor.italic")}
           >
             <Italic className="w-4 h-4" />
-          </ToolbarButton>
-          <Divider />
-          <ToolbarButton
-            onClick={() =>
-              editor?.chain().focus().toggleHeading({ level: 1 }).run()
-            }
-            active={editor?.isActive("heading", { level: 1 }) || false}
-            title={t("editor.heading1")}
-          >
-            <Heading1 className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() =>
-              editor?.chain().focus().toggleHeading({ level: 2 }).run()
-            }
-            active={editor?.isActive("heading", { level: 2 }) || false}
-            title={t("editor.heading2")}
-          >
-            <Heading2 className="w-4 h-4" />
-          </ToolbarButton>
-          <Divider />
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleBulletList().run()}
-            active={editor?.isActive("bulletList") || false}
-            title={t("editor.bulletList")}
-          >
-            <List className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-            active={editor?.isActive("orderedList") || false}
-            title={t("editor.orderedList")}
-          >
-            <ListOrdered className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-            active={editor?.isActive("blockquote") || false}
-            title={t("editor.blockquote")}
-          >
-            <Quote className="w-4 h-4" />
           </ToolbarButton>
           <Divider />
           <ToolbarButton

@@ -38,6 +38,7 @@ pub fn run() {
             fs_commands::write_file,
             fs_commands::create_file,
             fs_commands::delete_path,
+            fs_commands::rename_path,
             // 搜索与统计命令
             fs_commands::search_in_project,
             fs_commands::get_writing_stats,

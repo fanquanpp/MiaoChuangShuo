@@ -26,6 +26,19 @@ import { useAppStore, CATEGORY_DIRS, CATEGORY_NAMES, type SidebarCategory } from
 import { readProjectTree, createFile } from "../lib/api";
 import { getCategoryConfig } from "../lib/categoryRegistry";
 import { useToast } from "../lib/toast";
+import { useI18n } from "../lib/i18n";
+
+/** Alt+数字键 → 侧边栏分类映射 */
+const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
+  "1": "manuscript",
+  "2": "outline",
+  "3": "characters",
+  "4": "worldview",
+  "5": "glossary",
+  "6": "materials",
+  "7": "timeline",
+  "8": "stats",
+};
 
 export default function Workspace() {
   const {
@@ -34,6 +47,7 @@ export default function Workspace() {
     activeCategory,
     setProjectTree,
     setLoading,
+    setActiveCategory,
   } = useAppStore();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -41,6 +55,7 @@ export default function Workspace() {
   const [focusMode, setFocusMode] = useState(false);
   const [showFocusTimer, setShowFocusTimer] = useState(false);
   const { showToast } = useToast();
+  const { t } = useI18n();
 
   // 加载项目目录树
   useEffect(() => {
@@ -48,9 +63,12 @@ export default function Workspace() {
     setLoading(true);
     readProjectTree(currentProject.path)
       .then((tree) => setProjectTree(tree))
-      .catch((e) => console.error("加载目录树失败:", e))
+      .catch((e) => {
+        console.error("加载目录树失败:", e);
+        showToast("error", t("cardmanager.loadFailedShort"));
+      })
       .finally(() => setLoading(false));
-  }, [currentProject, setProjectTree, setLoading]);
+  }, [currentProject, setProjectTree, setLoading, showToast, t]);
 
   // 全局快捷键监听
   const handleGlobalKeyDown = useCallback(
@@ -64,8 +82,11 @@ export default function Workspace() {
       // 聚焦模式 F11
       if (e.key === "F11") {
         e.preventDefault();
-        setFocusMode((prev) => !prev);
-        showToast("info", focusMode ? "已退出聚焦模式" : "已进入聚焦模式 (F11 退出)");
+        setFocusMode((prev) => {
+          const next = !prev;
+          showToast("info", next ? t("workspace.focusModeEnter") : t("workspace.focusModeExit"));
+          return next;
+        });
         return;
       }
       // 专注计时器 Ctrl+Shift+T
@@ -74,13 +95,23 @@ export default function Workspace() {
         setShowFocusTimer((prev) => !prev);
         return;
       }
+      // Alt+数字键 侧边栏分类切换
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        const cat = ALT_CATEGORY_MAP[e.key];
+        if (cat) {
+          e.preventDefault();
+          setActiveCategory(cat);
+          setCommandPaletteOpen(false);
+          return;
+        }
+      }
       // Escape 关闭命令面板
       if (e.key === "Escape") {
         if (commandPaletteOpen) setCommandPaletteOpen(false);
         if (focusMode) setFocusMode(false);
       }
     },
-    [commandPaletteOpen, focusMode, showToast]
+    [commandPaletteOpen, focusMode, showToast, setActiveCategory, t]
   );
 
   useEffect(() => {
@@ -91,7 +122,7 @@ export default function Workspace() {
   // 计算选中文件的完整路径
   const selectedFilePath =
     selectedFile && currentProject
-      ? `${currentProject.path}\\${selectedFile.relative_path}`
+      ? `${currentProject.path}/${selectedFile.relative_path}`
       : null;
 
   // 处理新建文件确认
@@ -102,7 +133,7 @@ export default function Workspace() {
     await createFile(currentProject.path, relativePath, "");
     const tree = await readProjectTree(currentProject.path);
     setProjectTree(tree);
-    showToast("success", `已创建文件: ${fileName}`);
+    showToast("success", t("workspace.fileCreated", { name: fileName }));
   };
 
   // 命令面板中触发新建文件

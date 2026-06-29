@@ -11,6 +11,7 @@
 
 import { useCallback } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { useAppStore } from "../lib/store";
 import { getEditorSaveFn } from "../lib/stores/viewSlice";
 import type { ProjectInfo } from "../lib/api";
@@ -20,17 +21,33 @@ const MSG = {
   zh: {
     unsavedTitle: "未保存的修改",
     unsavedMessage: "有未保存的修改，是否保存后再退出？",
+    saveFailedForceTitle: "保存失败",
     saveFailedForce: "保存失败，是否强制退出（未保存的修改将丢失）？",
+    saveFailedTitle: "保存失败",
     saveFailed: "保存失败: {error}",
   },
   en: {
     unsavedTitle: "Unsaved Changes",
     unsavedMessage: "You have unsaved changes. Save before exiting?",
+    saveFailedForceTitle: "Save Failed",
     saveFailedForce:
       "Save failed. Force exit? Unsaved changes will be lost.",
+    saveFailedTitle: "Save Failed",
     saveFailed: "Save failed: {error}",
   },
 };
+
+/**
+ * 异步确认对话框（替代原生 confirm）
+ * Tauri 环境使用原生对话框，浏览器开发模式回退到 window.confirm
+ */
+async function asyncConfirm(message: string, title?: string): Promise<boolean> {
+  try {
+    return await ask(message, title ? { title } : undefined);
+  } catch {
+    return window.confirm(message);
+  }
+}
 
 function getMsg(key: keyof typeof MSG.zh, error?: string): string {
   // 从 store 获取当前语言
@@ -62,7 +79,10 @@ async function saveBeforeExit(): Promise<boolean> {
   if (!editorDirty) return true;
 
   // 询问是否保存
-  const shouldSave = confirm(getMsg("unsavedMessage"));
+  const shouldSave = await asyncConfirm(
+    getMsg("unsavedMessage"),
+    getMsg("unsavedTitle")
+  );
   if (!shouldSave) {
     // 用户选择不保存 → 清除脏标记，允许退出
     useAppStore.getState().setEditorDirty(false);
@@ -81,15 +101,19 @@ async function saveBeforeExit(): Promise<boolean> {
     if (success) return true;
 
     // 保存失败 → 询问是否强制退出
-    const forceExit = confirm(getMsg("saveFailedForce"));
+    const forceExit = await asyncConfirm(
+      getMsg("saveFailedForce"),
+      getMsg("saveFailedForceTitle")
+    );
     if (forceExit) {
       useAppStore.getState().setEditorDirty(false);
       return true;
     }
     return false; // 用户取消退出
   } catch (e) {
-    const forceExit = confirm(
-      getMsg("saveFailed", String(e))
+    const forceExit = await asyncConfirm(
+      getMsg("saveFailed", String(e)),
+      getMsg("saveFailedTitle")
     );
     if (forceExit) {
       useAppStore.getState().setEditorDirty(false);

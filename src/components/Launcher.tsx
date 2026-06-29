@@ -32,15 +32,18 @@ import ProjectCard, { type ProjectData } from "./ProjectCard";
 import CreateProjectDialog from "./CreateProjectDialog";
 import { ProjectGridSkeleton } from "./SkeletonComponents";
 import { useI18n } from "../lib/i18n";
+import { useToast } from "../lib/toast";
 
 export default function Launcher() {
   const { openProject, currentProject, closeProject } = useAppStore();
   const { t } = useI18n();
+  const { showToast } = useToast();
   const [scanDir, setScanDir] = useState("");
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [appVersion, setAppVersion] = useState("1.3.0"); // 默认值
 
   const handleScan = useCallback(async () => {
     if (!scanDir) return;
@@ -49,11 +52,11 @@ export default function Launcher() {
       const list = await scanProjects(scanDir);
       setProjects(list);
     } catch (e) {
-      console.error(t("launcher.scanFailed"), e);
+      showToast("error", t("launcher.scanFailed", { error: String(e) }));
     } finally {
       setLoading(false);
     }
-  }, [scanDir, t]);
+  }, [scanDir, t, showToast]);
 
   const handleImport = useCallback(async () => {
     try {
@@ -70,14 +73,25 @@ export default function Launcher() {
         });
       }
     } catch (e) {
-      console.error(t("launcher.importFailed"), e);
+      showToast("error", t("launcher.importFailed", { error: String(e) }));
     }
-  }, [t]);
+  }, [t, showToast]);
 
   useEffect(() => {
     if (currentProject) {
       closeProject();
     }
+  }, []);
+
+  // 从 package.json 读取版本号（而非硬编码）
+  useEffect(() => {
+    import("../../package.json")
+      .then((pkg) => {
+        if (pkg.version) setAppVersion(pkg.version);
+      })
+      .catch(() => {
+        // 保持默认值
+      });
   }, []);
 
   const filteredProjects = useMemo(() => {
@@ -115,10 +129,15 @@ export default function Launcher() {
   };
 
   const toProjectData = (p: ProjectInfo): ProjectData => {
-    const typeNames: Record<string, string> = {
-      epic: "西幻史诗", standard: "标准长篇", essay: "散文随笔",
-      script: "舞台剧本", wuxia: "武侠江湖", scifi: "科幻未来",
-      mystery: "悬疑推理", romance: "言情都市",
+    const typeI18nMap: Record<string, string> = {
+      epic: t("launcher.typeEpic"),
+      standard: t("launcher.typeStandard"),
+      essay: t("launcher.typeEssay"),
+      script: t("launcher.typeScript"),
+      wuxia: t("launcher.typeWuxia"),
+      scifi: t("launcher.typeScifi"),
+      mystery: t("launcher.typeMystery"),
+      romance: t("launcher.typeRomance"),
     };
     const typeColors: Record<string, string> = {
       epic: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
@@ -143,7 +162,7 @@ export default function Launcher() {
     return {
       id: p.path,
       name: p.meta.name,
-      type: typeNames[p.meta.type] || p.meta.type,
+      type: typeI18nMap[p.meta.type] || p.meta.type,
       typeColor: typeColors[p.meta.type] || "bg-nf-bg-hover text-nf-text-secondary border-nf-border",
       words: formatWordCount(p.word_count),
       chapters: p.chapter_count,
@@ -195,7 +214,7 @@ export default function Launcher() {
             type="text"
             value={scanDir}
             onChange={(e) => setScanDir(e.target.value)}
-            placeholder="C:\\Users\\..."
+            placeholder={t("launcher.scanDirPlaceholder")}
             className="w-full bg-nf-bg border border-nf-border-light px-2.5 py-1.5 text-xs text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60"
           />
           <div className="flex gap-1">
@@ -222,7 +241,7 @@ export default function Launcher() {
 
         <div className="px-6 pb-4">
           <p className="text-[10px] text-nf-text-tertiary">
-            {t("launcher.localReady")} (v1.0.0)
+            {t("launcher.localReady")} (v{appVersion})
           </p>
         </div>
       </aside>

@@ -1,34 +1,12 @@
-// 大纲视图组件 - 骨架屏等无 UI 文案部分
+// 大纲视图组件 — 纯文本解析版
 //
-// 大纲视图组件 — i18n 版
+// 从编辑器纯文本内容中提取章节标题，显示为可点击的大纲列表。
+// 点击大纲项时滚动编辑器到对应行。
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { ListTree, Hash, X } from "lucide-react";
 import { useI18n } from "../lib/i18n";
-
-interface Heading {
-  level: 1 | 2;
-  text: string;
-  id: string;
-}
-
-function extractHeadingsFromHtml(htmlContent: string): Heading[] {
-  if (!htmlContent) return [];
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlContent, "text/html");
-  const headings: Heading[] = [];
-
-  const elements = doc.querySelectorAll("h1, h2");
-  elements.forEach((el, idx) => {
-    const text = el.textContent?.trim() || "";
-    if (!text) return;
-    const level = el.tagName === "H1" ? 1 : 2;
-    const id = `outline-h-${idx}`;
-    headings.push({ level, text, id });
-  });
-
-  return headings;
-}
+import { extractOutlineFromText, type OutlineHeading } from "../lib/outlineParser";
 
 interface OutlineViewProps {
   htmlContent: string;
@@ -38,25 +16,24 @@ export default function OutlineView({ htmlContent }: OutlineViewProps) {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
 
-  const headings = useMemo(() => extractHeadingsFromHtml(htmlContent), [htmlContent]);
+  const headings: OutlineHeading[] = useMemo(
+    () => extractOutlineFromText(htmlContent),
+    [htmlContent]
+  );
 
-  useEffect(() => {
-    if (!htmlContent) return;
-    const headingsList = extractHeadingsFromHtml(htmlContent);
-    const editorEl = document.querySelector(".ProseMirror");
+  const handleClick = (line: number) => {
+    const editorEl = document.querySelector(".ProseMirror") as HTMLElement | null;
     if (!editorEl) return;
-    const realHeadings = editorEl.querySelectorAll("h1, h2");
-    realHeadings.forEach((el, idx) => {
-      if (idx < headingsList.length) {
-        el.setAttribute("id", headingsList[idx].id);
-      }
-    });
-  }, [htmlContent]);
 
-  const handleClick = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // ProseMirror 内部按块级元素渲染，每个段落/文本块是一个子元素
+    // 按行号查找对应块并滚动
+    const blocks = editorEl.querySelectorAll("p, h1, h2, h3, div");
+    if (line < blocks.length) {
+      blocks[line]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      // 回退：直接按像素估算滚动位置
+      const lineHeight = 28;
+      editorEl.scrollTop = line * lineHeight;
     }
   };
 
@@ -100,8 +77,8 @@ export default function OutlineView({ htmlContent }: OutlineViewProps) {
         ) : (
           headings.map((h) => (
             <button
-              key={h.id}
-              onClick={() => handleClick(h.id)}
+              key={`${h.line}-${h.text}`}
+              onClick={() => handleClick(h.line)}
               className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-left text-nf-text hover:bg-nf-bg-hover transition-fast truncate"
               style={{ paddingLeft: h.level === 1 ? "12px" : "24px" }}
               title={h.text}

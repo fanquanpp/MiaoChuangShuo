@@ -38,6 +38,7 @@ const zhCN: TranslationDict = {
   "app.back": "返回",
   "app.close": "关闭",
   "app.browse": "浏览",
+  "common.loading": "加载中...",
 
   // 启动器
   "launcher.title": "NovelForge",
@@ -56,8 +57,9 @@ const zhCN: TranslationDict = {
   "launcher.importLocal": "导入本地已存项目",
   "launcher.welcome": "欢迎使用 NovelForge",
   "launcher.welcomeHint": "点击左侧「创建全新项目」开始你的创作之旅",
-  "launcher.importFailed": "导入失败",
-  "launcher.scanFailed": "扫描项目失败",
+  "launcher.importFailed": "导入失败: {error}",
+  "launcher.scanFailed": "扫描项目失败: {error}",
+  "launcher.scanDirPlaceholder": "选择或输入文件夹路径...",
 
   // 启动器 - 格式化
   "launcher.wanWords": "万字",
@@ -69,11 +71,24 @@ const zhCN: TranslationDict = {
   "launcher.unknownTime": "未知",
   "launcher.chapterUnit": "章",
 
+  // 启动器 - 项目类型名称
+  "launcher.typeEpic": "西幻史诗",
+  "launcher.typeStandard": "标准长篇",
+  "launcher.typeEssay": "散文随笔",
+  "launcher.typeScript": "舞台剧本",
+  "launcher.typeWuxia": "武侠江湖",
+  "launcher.typeScifi": "科幻未来",
+  "launcher.typeMystery": "悬疑推理",
+  "launcher.typeRomance": "言情都市",
+
   // 工作台
   "workspace.newFile": "新建文件",
   "workspace.fileName": "文件名",
   "workspace.createIn": "将创建在 {dir} 目录下",
   "workspace.creating": "创建中...",
+  "workspace.focusModeEnter": "已进入聚焦模式 (F11 退出)",
+  "workspace.focusModeExit": "已退出聚焦模式",
+  "workspace.fileCreated": "已创建文件: {name}",
 
   // 编辑器
   "editor.placeholder": "开始你的创作...",
@@ -117,10 +132,12 @@ const zhCN: TranslationDict = {
   "filelist.invalidChars": "文件名不能包含以下字符: < > : \" / \\ | ? *",
   "filelist.deleteFailed": "删除失败: {error}",
   "filelist.renameFailed": "重命名失败: {error}",
+  "filelist.deleted": "已删除「{name}」",
+  "filelist.renamed": "已重命名为「{name}」",
   "filelist.itemUnit": "项",
   "filelist.wordCount": "{count} 字",
-  "filelist.unsupportedExt": "仅支持 .md 或 .txt 文件",
-  "filelist.autoMd": "不输入扩展名将自动添加 .md",
+  "filelist.unsupportedExt": "仅支持 .txt 文件",
+  "filelist.autoMd": "不输入扩展名将自动添加 .txt",
 
   // 侧边栏
   "sidebar.characters": "角色",
@@ -197,6 +214,7 @@ const zhCN: TranslationDict = {
   "timeline.unnamedEvent": "未命名事件",
   "timeline.unknownTime": "未知时间",
   "timeline.loading": "加载中...",
+  "timeline.deleted": "已删除事件「{title}」",
 
   // 卡片管理器
   "cardmanager.editorPlaceholder": "开始编辑卡片内容...",
@@ -213,6 +231,10 @@ const zhCN: TranslationDict = {
   "cardmanager.saveFailed": "保存失败: {error}",
   "cardmanager.loadFailed": "加载失败: {error}",
   "cardmanager.loadFailedShort": "加载失败",
+  "cardmanager.saved": "已保存",
+  "cardmanager.save": "保存",
+  "cardmanager.created": "已创建「{name}」",
+  "cardmanager.deleted": "已删除「{name}」",
 
   // 项目对话框
   "project.createTitle": "创建新项目",
@@ -364,6 +386,7 @@ const enUS: TranslationDict = {
   "app.back": "Back",
   "app.close": "Close",
   "app.browse": "Browse",
+  "common.loading": "Loading...",
 
   // Launcher
   "launcher.title": "NovelForge",
@@ -382,8 +405,9 @@ const enUS: TranslationDict = {
   "launcher.importLocal": "Import existing project",
   "launcher.welcome": "Welcome to NovelForge",
   "launcher.welcomeHint": 'Click "Create New Project" to start your journey',
-  "launcher.importFailed": "Import failed",
-  "launcher.scanFailed": "Failed to scan projects",
+  "launcher.importFailed": "Import failed: {error}",
+  "launcher.scanFailed": "Failed to scan projects: {error}",
+  "launcher.scanDirPlaceholder": "Select or enter a folder path...",
 
   // Launcher - formatting
   "launcher.wanWords": "0k words",
@@ -395,11 +419,24 @@ const enUS: TranslationDict = {
   "launcher.unknownTime": "Unknown",
   "launcher.chapterUnit": "ch",
 
+  // Launcher - Project type names
+  "launcher.typeEpic": "Epic Fantasy",
+  "launcher.typeStandard": "Standard Novel",
+  "launcher.typeEssay": "Essay/Prose",
+  "launcher.typeScript": "Stage Script",
+  "launcher.typeWuxia": "Martial Arts",
+  "launcher.typeScifi": "Sci-Fi",
+  "launcher.typeMystery": "Mystery",
+  "launcher.typeRomance": "Romance",
+
   // Workspace
   "workspace.newFile": "New File",
   "workspace.fileName": "File Name",
   "workspace.createIn": "Will be created in {dir}",
   "workspace.creating": "Creating...",
+  "workspace.focusModeEnter": "Focus mode entered (F11 to exit)",
+  "workspace.focusModeExit": "Focus mode exited",
+  "workspace.fileCreated": "File created: {name}",
 
   // Editor
   "editor.placeholder": "Start writing...",
@@ -445,10 +482,12 @@ const enUS: TranslationDict = {
   "filelist.invalidChars": 'File name cannot contain: < > : " / \\ | ? *',
   "filelist.deleteFailed": "Delete failed: {error}",
   "filelist.renameFailed": "Rename failed: {error}",
+  "filelist.deleted": "Deleted \"{name}\"",
+  "filelist.renamed": "Renamed to \"{name}\"",
   "filelist.itemUnit": "items",
   "filelist.wordCount": "{count} words",
-  "filelist.unsupportedExt": "Only .md or .txt files supported",
-  "filelist.autoMd": ".md extension added automatically",
+  "filelist.unsupportedExt": "Only .txt files supported",
+  "filelist.autoMd": ".txt extension added automatically",
 
   // Sidebar
   "sidebar.characters": "Characters",
@@ -525,6 +564,7 @@ const enUS: TranslationDict = {
   "timeline.unnamedEvent": "Unnamed Event",
   "timeline.unknownTime": "Unknown time",
   "timeline.loading": "Loading...",
+  "timeline.deleted": "Deleted event \"{title}\"",
 
   // Card Manager
   "cardmanager.editorPlaceholder": "Start editing card content...",
@@ -541,6 +581,10 @@ const enUS: TranslationDict = {
   "cardmanager.saveFailed": "Save failed: {error}",
   "cardmanager.loadFailed": "Load failed: {error}",
   "cardmanager.loadFailedShort": "Load failed",
+  "cardmanager.saved": "Saved",
+  "cardmanager.save": "Save",
+  "cardmanager.created": "Created \"{name}\"",
+  "cardmanager.deleted": "Deleted \"{name}\"",
 
   // Project Dialog
   "project.createTitle": "New Project",

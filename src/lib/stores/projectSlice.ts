@@ -15,7 +15,7 @@ export interface ProjectSlice {
   setProjectTree: (tree: FileNode[]) => void;
   setLoading: (loading: boolean) => void;
   /** 重新读取项目目录树（编辑器保存后触发，更新文件大小/修改时间） */
-  refreshProjectTree: () => Promise<void>;
+  refreshProjectTree: (onError?: (error: unknown) => void) => Promise<void>;
 }
 
 export const createProjectSlice: StateCreator<ProjectSlice> = (set, get) => ({
@@ -26,14 +26,14 @@ export const createProjectSlice: StateCreator<ProjectSlice> = (set, get) => ({
   setProjectTree: (tree) => set({ projectTree: tree }),
   setLoading: (loading) => set({ loading }),
 
-  refreshProjectTree: async () => {
+  refreshProjectTree: async (onError?: (error: unknown) => void) => {
     const { currentProject } = get();
     if (!currentProject) return;
     try {
       const tree = await readProjectTree(currentProject.path);
       set({ projectTree: tree });
-    } catch {
-      // 静默失败，避免干扰编辑体验
+    } catch (e) {
+      onError?.(e);
     }
   },
 });

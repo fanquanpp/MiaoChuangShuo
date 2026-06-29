@@ -21,10 +21,12 @@ import {
 import { useAppStore } from "../lib/store";
 import { searchInProject, type SearchResult } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { useToast } from "../lib/toast";
 
 export default function GlobalSearch() {
   const { currentProject, setActiveCategory, setSelectedFile } = useAppStore();
   const { t } = useI18n();
+  const { showToast } = useToast();
   const [query, setQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -45,6 +47,7 @@ export default function GlobalSearch() {
       setResults(data);
     } catch (e) {
       console.error("搜索失败:", e);
+      showToast("error", t("search.failed"));
       setResults([]);
     } finally {
       setLoading(false);
@@ -78,25 +81,42 @@ export default function GlobalSearch() {
     setActiveCategory("manuscript");
   };
 
-  const highlightKeyword = (text: string, keyword: string): React.ReactNode => {
-    if (!keyword) return text;
-    const searchKey = caseSensitive ? keyword : keyword.toLowerCase();
-    const searchText = caseSensitive ? text : text.toLowerCase();
-    const idx = searchText.indexOf(searchKey);
-    if (idx === -1) return text;
-    const before = text.slice(0, idx);
-    const match = text.slice(idx, idx + keyword.length);
-    const after = text.slice(idx + keyword.length);
-    return (
-      <>
-        {before}
-        <mark className="bg-fandex-tertiary/30 text-fandex-tertiary px-0.5">
-          {match}
-        </mark>
-        {after}
-      </>
-    );
-  };
+  // 关键词高亮（安全：React JSX 自动转义，高亮所有匹配项）
+  const highlightKeyword = useCallback(
+    (text: string, keyword: string): React.ReactNode => {
+      if (!keyword) return text;
+      const parts: React.ReactNode[] = [];
+      const searchKey = caseSensitive ? keyword : keyword.toLowerCase();
+      let remaining = text;
+      let keyIdx = 0;
+
+      while (remaining.length > 0) {
+        const searchText = caseSensitive ? remaining : remaining.toLowerCase();
+        const idx = searchText.indexOf(searchKey);
+        if (idx === -1) {
+          parts.push(<span key={keyIdx++}>{remaining}</span>);
+          break;
+        }
+        // 匹配前文本
+        if (idx > 0) {
+          parts.push(<span key={keyIdx++}>{remaining.slice(0, idx)}</span>);
+        }
+        // 高亮匹配部分
+        parts.push(
+          <mark
+            key={keyIdx++}
+            className="bg-fandex-tertiary/30 text-fandex-tertiary px-0.5"
+          >
+            {remaining.slice(idx, idx + keyword.length)}
+          </mark>
+        );
+        remaining = remaining.slice(idx + keyword.length);
+      }
+
+      return <>{parts}</>;
+    },
+    [caseSensitive]
+  );
 
   return (
     <div className="flex-1 flex flex-col bg-nf-bg overflow-hidden">

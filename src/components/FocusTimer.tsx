@@ -15,7 +15,7 @@ import { Timer, Play, Pause, RotateCcw, X, ChevronDown } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
 const PRESET_DURATIONS = [15, 25, 40, 60, 90];
-const TICK_MS = 200;
+const TICK_MS = 1000;
 
 export function FocusTimer({
   onClose,
@@ -33,21 +33,24 @@ export function FocusTimer({
   const total = targetMinutes * 60;
   const progress = total > 0 ? ((total - remainingSeconds) / total) * 100 : 0;
 
+  const startTimeRef = useRef<number>(0);
+
   const startTimer = useCallback(() => {
+    const remaining = remainingSeconds;
+    startTimeRef.current = Date.now() - (total - remaining) * 1000;
     setRunning(true);
     intervalRef.current = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          setRunning(false);
-          setElapsed(total);
-          return 0;
-        }
-        const n = prev - 1;
-        setElapsed(total - n);
-        return n;
-      });
+      const elapsedMs = Date.now() - startTimeRef.current;
+      const elapsedSec = Math.floor(elapsedMs / 1000);
+      const remainingSec = Math.max(0, total - elapsedSec);
+      setRemainingSeconds(remainingSec);
+      setElapsed(elapsedSec);
+      if (remainingSec <= 0) {
+        setRunning(false);
+        if (intervalRef.current) clearInterval(intervalRef.current);
+      }
     }, TICK_MS);
-  }, [total]);
+  }, [total, remainingSeconds]);
 
   const pauseTimer = useCallback(() => {
     setRunning(false);

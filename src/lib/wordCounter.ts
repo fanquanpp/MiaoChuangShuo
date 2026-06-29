@@ -24,7 +24,8 @@ export function countWords(text: string): number {
   for (const ch of text) {
     if (
       ("\u4E00" <= ch && ch <= "\u9FFF") ||
-      ("\u3400" <= ch && ch <= "\u4DBF")
+      ("\u3400" <= ch && ch <= "\u4DBF") ||
+      ("\uF900" <= ch && ch <= "\uFAFF")
     ) {
       count += 1;
       inWord = false;

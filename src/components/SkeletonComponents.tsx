@@ -7,7 +7,7 @@
 
 import React from "react";
 
-function SkeletonBlock({
+export function SkeletonBlock({
   className = "",
   style,
 }: {

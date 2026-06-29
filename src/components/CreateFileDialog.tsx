@@ -15,6 +15,7 @@ import { useState } from "react";
 import { X, FilePlus, Loader2 } from "lucide-react";
 import { isValidFileName } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
+import { useToast } from "../lib/toast";
 
 interface CreateFileDialogProps {
   open: boolean;
@@ -30,6 +31,7 @@ export default function CreateFileDialog({
   onConfirm,
 }: CreateFileDialogProps) {
   const { t } = useI18n();
+  const { showToast } = useToast();
   const [newFileName, setNewFileName] = useState("");
   const [fileNameError, setFileNameError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -47,7 +49,7 @@ export default function CreateFileDialog({
 
     if (name.includes(".")) {
       const ext = name.split(".").pop()?.toLowerCase();
-      if (ext !== "md" && ext !== "txt") {
+      if (ext !== "txt") {
         setFileNameError(t("filelist.unsupportedExt"));
         return;
       }
@@ -57,14 +59,14 @@ export default function CreateFileDialog({
     setCreating(true);
     try {
       let fileName = name;
-      if (!fileName.endsWith(".md") && !fileName.endsWith(".txt")) {
-        fileName += ".md";
+      if (!fileName.endsWith(".txt")) {
+        fileName += ".txt";
       }
       await onConfirm(fileName);
       setNewFileName("");
       onClose();
     } catch (e) {
-      alert(t("filelist.createFailed", { error: String(e) }));
+      showToast("error", t("filelist.createFailed", { error: String(e) }));
     } finally {
       setCreating(false);
     }

@@ -2,7 +2,7 @@
 //
 // 功能概述：
 // 提供 Tauri 命令接口，供前端调用以创建、读取、管理小说项目。
-// 所有文件操作均在用户选择的本地目录中执行。
+// 所有文件操作均经过路径沙箱校验，限制在项目目录内。
 //
 // 模块职责：
 // 1. 创建小说项目(生成完整目录结构)
@@ -20,6 +20,34 @@ use crate::project_template::{
     common_directories, common_files, create_project_meta, type_specific_directories,
     type_specific_files, ProjectMeta, ProjectType,
 };
+
+/// 路径沙箱校验：确保目标路径在项目根目录内
+/// 输入: target_path 目标路径, project_root 项目根目录
+/// 输出: Result<PathBuf, String> 规范化后的目标路径或错误
+/// 流程: 规范化两个路径并验证包含关系，防止目录穿越攻击
+fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf, String> {
+    let target_path = PathBuf::from(target)
+        .canonicalize()
+        .map_err(|e| format!("无法解析路径: {}", e))?;
+    let root_path = PathBuf::from(project_root)
+        .canonicalize()
+        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+
+    if !root_path.exists() {
+        return Err("项目路径不存在".to_string());
+    }
+
+    // 检查目标路径是否以项目根目录开头
+    if !target_path.starts_with(&root_path) {
+        return Err(format!(
+            "路径越界: 不允许访问项目目录外的路径 ({} 不在 {} 内)",
+            target_path.display(),
+            root_path.display()
+        ));
+    }
+
+    Ok(target_path)
+}
 
 /// 创建小说项目命令
 /// 输入: name 项目名称, type_str 类型字符串, author 作者, description 描述, parent_path 父目录
@@ -99,9 +127,9 @@ pub fn create_project(
     fs::write(&meta_path, meta_json)
         .map_err(|e| format!("写入元数据失败: {}", e))?;
 
-    // 创建正文初始文件
-    let main_doc = project_root.join("正文").join("第一章.md");
-    fs::write(&main_doc, "# 第一章\n\n开始你的创作...\n")
+    // 创建正文初始文件 (.txt 纯文本)
+    let main_doc = project_root.join("正文").join("第一章.txt");
+    fs::write(&main_doc, "第一章\n\n开始你的创作...\n")
         .map_err(|e| format!("创建正文文件失败: {}", e))?;
 
     Ok(project_root.to_string_lossy().to_string())
@@ -162,7 +190,7 @@ pub struct ProjectInfo {
     pub meta: ProjectMeta,
     /// 项目总字数
     pub word_count: u64,
-    /// 正文章节总数(正文目录下的 .md/.txt 文件数)
+    /// 正文章节总数(正文目录下的 .txt 文件数)
     pub chapter_count: u64,
 }
 
@@ -180,7 +208,7 @@ fn read_project_meta(project_root: &Path) -> Result<ProjectMeta, String> {
 /// 统计项目总字数
 /// 输入: project_root 项目根目录
 /// 输出: u64 总字数
-/// 流程: 遍历正文目录下的所有 .txt 和 .md 文件，统计字符数
+/// 流程: 遍历正文目录下的所有 .txt 文件，统计字符数
 fn count_project_words(project_root: &Path) -> u64 {
     let content_dir = project_root.join("正文");
     if !content_dir.exists() {
@@ -194,7 +222,7 @@ fn count_project_words(project_root: &Path) -> u64 {
 /// 统计项目正文章节数
 /// 输入: project_root 项目根目录
 /// 输出: u64 章节总数
-/// 流程: 递归统计正文目录下的 .md/.txt 文件数量
+/// 流程: 递归统计正文目录下的 .txt 文件数量
 fn count_project_chapters(project_root: &Path) -> u64 {
     let content_dir = project_root.join("正文");
     if !content_dir.exists() {
@@ -208,14 +236,14 @@ fn count_project_chapters(project_root: &Path) -> u64 {
 /// 递归统计目录下的章节数
 /// 输入: dir 目录路径, total 累计章节数
 /// 输出: 无
-/// 流程: 遍历目录，对 .txt/.md 文件计数
+/// 流程: 遍历目录，对 .txt 文件计数
 fn count_chapters_recursive(dir: &Path, total: &mut u64) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 count_chapters_recursive(&path, total);
-            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
                 *total += 1;
             }
         }
@@ -225,14 +253,14 @@ fn count_chapters_recursive(dir: &Path, total: &mut u64) {
 /// 递归统计目录下文件字数
 /// 输入: dir 目录路径, total 累计字数
 /// 输出: 无
-/// 流程: 遍历目录，对 .txt/.md 文件统计字符数
+/// 流程: 遍历目录，对 .txt 文件统计字符数
 fn count_words_recursive(dir: &Path, total: &mut u64) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 count_words_recursive(&path, total);
-            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
                 if let Ok(content) = fs::read_to_string(&path) {
                     // 中文字符按 1 字计算，英文单词按 1 字计算
                     *total += count_chinese_and_words(&content);
@@ -395,60 +423,117 @@ fn read_dir_recursive(current: &Path, root: &Path) -> Result<Vec<FileNode>, Stri
     Ok(nodes)
 }
 
-/// 读取文件内容
-/// 输入: file_path 文件绝对路径
+/// 读取文件内容（含路径沙箱校验）
+/// 输入: file_path 文件绝对路径, project_path 项目根目录用于校验
 /// 输出: Result<String, String> 文件内容或错误
-/// 流程: 读取文本文件内容
+/// 流程: 校验路径在项目内，读取文本文件内容
 #[tauri::command]
-pub fn read_file(file_path: String) -> Result<String, String> {
-    fs::read_to_string(&file_path).map_err(|e| format!("读取文件失败: {}", e))
+pub fn read_file(file_path: String, project_path: String) -> Result<String, String> {
+    let validated = validate_path_in_project(&file_path, &project_path)?;
+    fs::read_to_string(&validated).map_err(|e| format!("读取文件失败: {}", e))
 }
 
-/// 写入文件内容
-/// 输入: file_path 文件路径, content 内容
+/// 写入文件内容（含路径沙箱校验）
+/// 输入: file_path 文件路径, content 内容, project_path 项目根目录
 /// 输出: Result<(), String> 成功或错误
-/// 流程: 将内容写入文件
+/// 流程: 校验路径后创建父目录并写入
 #[tauri::command]
-pub fn write_file(file_path: String, content: String) -> Result<(), String> {
-    if let Some(parent) = PathBuf::from(&file_path).parent() {
+pub fn write_file(file_path: String, content: String, project_path: String) -> Result<(), String> {
+    let validated = validate_path_in_project(&file_path, &project_path)?;
+    if let Some(parent) = validated.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    fs::write(&file_path, content).map_err(|e| format!("写入文件失败: {}", e))
+    fs::write(&validated, content).map_err(|e| format!("写入文件失败: {}", e))
 }
 
-/// 创建新文件
+/// 创建新文件（含路径沙箱校验）
 /// 输入: project_path 项目路径, relative_path 相对路径, content 内容
 /// 输出: Result<String, String> 文件绝对路径或错误
-/// 流程: 在项目内创建新文件
+/// 流程: 在校验后的项目目录内创建新文件
 #[tauri::command]
 pub fn create_file(
     project_path: String,
     relative_path: String,
     content: String,
 ) -> Result<String, String> {
-    let file_path = PathBuf::from(&project_path).join(&relative_path);
-    if file_path.exists() {
-        return Err("文件已存在".to_string());
+    let root = PathBuf::from(&project_path)
+        .canonicalize()
+        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+    let file_path = root.join(&relative_path);
+
+    // 二次校验：确保拼接后的路径仍在项目内
+    let canonical = file_path
+        .canonicalize()
+        .unwrap_or_else(|_| file_path.clone());
+    if canonical.starts_with(&root) || file_path.starts_with(&root) {
+        if file_path.exists() {
+            return Err("文件已存在".to_string());
+        }
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+        }
+        fs::write(&file_path, content).map_err(|e| format!("创建文件失败: {}", e))?;
+        Ok(file_path.to_string_lossy().to_string())
+    } else {
+        Err("路径越界: 不允许在项目目录外创建文件".to_string())
     }
-    if let Some(parent) = file_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
-    }
-    fs::write(&file_path, content).map_err(|e| format!("创建文件失败: {}", e))?;
-    Ok(file_path.to_string_lossy().to_string())
 }
 
-/// 删除文件或目录
-/// 输入: path 路径
+/// 删除文件或目录（含路径沙箱校验）
+/// 输入: path 路径, project_path 项目根目录
 /// 输出: Result<(), String> 成功或错误
-/// 流程: 删除文件或递归删除目录
+/// 流程: 校验路径后删除文件或递归删除目录
 #[tauri::command]
-pub fn delete_path(path: String) -> Result<(), String> {
-    let p = PathBuf::from(&path);
+pub fn delete_path(path: String, project_path: String) -> Result<(), String> {
+    let p = validate_path_in_project(&path, &project_path)?;
     if p.is_dir() {
         fs::remove_dir_all(&p).map_err(|e| format!("删除目录失败: {}", e))
     } else {
         fs::remove_file(&p).map_err(|e| format!("删除文件失败: {}", e))
     }
+}
+
+/// 重命名文件或目录（含路径沙箱校验）
+/// 输入: old_path 原路径, new_path 新路径, project_path 项目根目录
+/// 输出: Result<(), String> 成功或错误
+/// 流程: 校验原路径在项目内，校验新路径在项目内且不存在，执行重命名
+#[tauri::command]
+pub fn rename_path(
+    old_path: String,
+    new_path: String,
+    project_path: String,
+) -> Result<(), String> {
+    // 校验原路径（必须存在，用 validate_path_in_project）
+    let old_abs = validate_path_in_project(&old_path, &project_path)?;
+
+    // 校验项目根路径
+    let root = PathBuf::from(&project_path)
+        .canonicalize()
+        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+
+    // 新路径可能尚不存在，用与 create_file 相同的策略校验
+    let new_abs = PathBuf::from(&new_path);
+    let new_canonical = new_abs
+        .canonicalize()
+        .unwrap_or_else(|_| new_abs.clone());
+    if !new_canonical.starts_with(&root) && !new_abs.starts_with(&root) {
+        return Err("路径越界: 不允许重命名到项目目录外".to_string());
+    }
+
+    // 检查目标路径是否已存在
+    if new_abs.exists() {
+        return Err("目标路径已存在".to_string());
+    }
+
+    // 确保新路径的父目录存在
+    if let Some(parent) = new_abs.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+        }
+    }
+
+    // 执行重命名
+    fs::rename(&old_abs, &new_abs).map_err(|e| format!("重命名失败: {}", e))
 }
 
 /// 搜索结果项结构
@@ -471,7 +556,7 @@ pub struct SearchResult {
 /// 全局搜索项目内文本内容
 /// 输入: project_path 项目路径, query 搜索关键词, case_sensitive 是否区分大小写
 /// 输出: Result<Vec<SearchResult>, String> 搜索结果列表
-/// 流程: 递归遍历项目内所有 .md/.txt 文件，逐行匹配关键词
+/// 流程: 递归遍历项目内所有 .txt 文件，逐行匹配关键词
 #[tauri::command]
 pub fn search_in_project(
     project_path: String,
@@ -500,7 +585,7 @@ pub fn search_in_project(
 /// 递归搜索目录下文件内容
 /// 输入: current 当前路径, root 项目根路径, query 搜索词, case_sensitive 区分大小写, results 结果集合
 /// 输出: 无
-/// 流程: 遍历目录，对 .txt/.md 文件逐行搜索匹配内容
+/// 流程: 遍历目录，对 .txt 文件逐行搜索匹配内容
 fn search_recursive(
     current: &Path,
     root: &Path,
@@ -518,7 +603,7 @@ fn search_recursive(
             }
             if path.is_dir() {
                 search_recursive(&path, root, query, case_sensitive, results);
-            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
                 search_in_file(&path, root, query, case_sensitive, results);
             }
         }
@@ -676,7 +761,7 @@ pub fn get_writing_stats(project_path: String) -> Result<WritingStats, String> {
 /// 递归收集章节字数统计
 /// 输入: dir 目录路径, root 项目根路径, total_words 累计字数, chapters 章节列表
 /// 输出: 无
-/// 流程: 遍历正文目录，统计每个 .md/.txt 文件的字数
+/// 流程: 遍历正文目录，统计每个 .txt 文件的字数
 fn collect_chapter_stats(
     dir: &Path,
     root: &Path,
@@ -688,7 +773,7 @@ fn collect_chapter_stats(
             let path = entry.path();
             if path.is_dir() {
                 collect_chapter_stats(&path, root, total_words, chapters);
-            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
                 if let Ok(content) = fs::read_to_string(&path) {
                     let words = count_chinese_and_words(&content);
                     *total_words += words;
@@ -714,14 +799,14 @@ fn collect_chapter_stats(
 /// 递归统计目录下文件字数
 /// 输入: dir 目录路径, total 累计字数
 /// 输出: 无
-/// 流程: 遍历目录，对 .txt/.md 文件统计字数
+/// 流程: 遍历目录，对 .txt 文件统计字数
 fn count_dir_words(dir: &Path, total: &mut u64) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 count_dir_words(&path, total);
-            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
                 if let Ok(content) = fs::read_to_string(&path) {
                     *total += count_chinese_and_words(&content);
                 }
@@ -733,7 +818,7 @@ fn count_dir_words(dir: &Path, total: &mut u64) {
 /// 递归统计目录下文件数
 /// 输入: dir 目录路径, total 累计文件数
 /// 输出: 无
-/// 流程: 遍历目录，统计 .md/.txt 文件数量
+/// 流程: 遍历目录，统计 .txt 文件数量
 fn count_files_recursive(dir: &Path, total: &mut u64) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -744,7 +829,7 @@ fn count_files_recursive(dir: &Path, total: &mut u64) {
             }
             if path.is_dir() {
                 count_files_recursive(&path, total);
-            } else if path.extension().map(|e| e == "txt" || e == "md").unwrap_or(false) {
+            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
                 *total += 1;
             }
         }

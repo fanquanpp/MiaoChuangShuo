@@ -121,20 +121,20 @@ export async function readProjectTree(projectPath: string): Promise<FileNode[]> 
   return invoke<FileNode[]>("read_project_tree", { projectPath });
 }
 
-// 读取文件内容
-// 输入: filePath 文件路径
+// 读取文件内容（含项目路径校验）
+// 输入: filePath 文件绝对路径, projectPath 项目根路径用于沙箱校验
 // 输出: Promise<string> 文件内容
-// 流程: 调用 Rust 后端 read_file 命令
-export async function readFile(filePath: string): Promise<string> {
-  return invoke<string>("read_file", { filePath });
+// 流程: 调用 Rust 后端 read_file 命令（后端校验路径在项目内）
+export async function readFile(filePath: string, projectPath: string): Promise<string> {
+  return invoke<string>("read_file", { filePath, projectPath });
 }
 
-// 写入文件内容
-// 输入: filePath 文件路径, content 内容
+// 写入文件内容（含项目路径校验）
+// 输入: filePath 文件绝对路径, content 内容, projectPath 项目根路径
 // 输出: Promise<void>
-// 流程: 调用 Rust 后端 write_file 命令
-export async function writeFile(filePath: string, content: string): Promise<void> {
-  return invoke<void>("write_file", { filePath, content });
+// 流程: 调用 Rust 后端 write_file 命令（后端校验路径并写入）
+export async function writeFile(filePath: string, content: string, projectPath: string): Promise<void> {
+  return invoke<void>("write_file", { filePath, content, projectPath });
 }
 
 // 创建新文件
@@ -153,12 +153,12 @@ export async function createFile(
   });
 }
 
-// 删除文件或目录
-// 输入: path 路径
+// 删除文件或目录（含项目路径校验）
+// 输入: path 文件/目录绝对路径, projectPath 项目根路径
 // 输出: Promise<void>
-// 流程: 调用 Rust 后端 delete_path 命令
-export async function deletePath(path: string): Promise<void> {
-  return invoke<void>("delete_path", { path });
+// 流程: 调用 Rust 后端 delete_path 命令（后端校验路径后删除）
+export async function deletePath(path: string, projectPath: string): Promise<void> {
+  return invoke<void>("delete_path", { path, projectPath });
 }
 
 // ===== 搜索与统计 API =====
@@ -233,24 +233,22 @@ export async function getWritingStats(projectPath: string): Promise<WritingStats
   return invoke<WritingStats>("get_writing_stats", { projectPath });
 }
 
-// 重命名文件/目录
+// 重命名文件/目录（跨平台路径归一化）
 // 输入: projectPath 项目根路径, oldRelPath 原相对路径, newRelPath 新相对路径
 // 输出: Promise<void>
-// 流程:
-//   - 如果是目录或二进制文件: 调用 Rust 后端 rename_path 命令
-//   - 如果是 .md/.txt 文本文件: 先读取内容, 写入新路径, 再删除旧文件
-// 说明: 确保重名安全（后端自行处理冲突）
+// 流程: 拼接绝对路径后调用 Rust 后端 rename_path 命令
 export async function renamePath(
   projectPath: string,
   oldRelPath: string,
   newRelPath: string
 ): Promise<void> {
-  const oldAbs = `${projectPath}\\${oldRelPath}`;
-  const newAbs = `${projectPath}\\${newRelPath}`;
+  // 跨平台路径拼接（使用正斜杠，后端 Rust PathBuf 自动适配）
+  const oldAbs = `${projectPath}/${oldRelPath}`;
+  const newAbs = `${projectPath}/${newRelPath}`;
 
-  // 调用后端统一的 rename 命令（最安全）
   return invoke<void>("rename_path", {
     oldPath: oldAbs,
     newPath: newAbs,
+    projectPath: projectPath,
   });
 }

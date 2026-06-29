@@ -28,6 +28,8 @@ import type { FileNode } from "../lib/api";
 import { deletePath, readProjectTree, renamePath } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
+import { useToast } from "../lib/toast";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface FileListProps {
   onCreateFile: () => void;
@@ -260,7 +262,10 @@ export default function FileList({ onCreateFile }: FileListProps) {
   const { projectTree, activeCategory, selectedFile, setSelectedFile, activeFileWordCount } =
     useAppStore();
   const { t } = useI18n();
+  const { showToast } = useToast();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
+  const [renameTarget, setRenameTarget] = useState<FileNode | null>(null);
 
   const dirName = CATEGORY_DIRS[activeCategory as SidebarCategory];
 
@@ -269,32 +274,43 @@ export default function FileList({ onCreateFile }: FileListProps) {
     return dir?.children || [];
   }, [projectTree, dirName]);
 
-  const handleDelete = async (node: FileNode, e: React.MouseEvent) => {
+  const handleDelete = (node: FileNode, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(t("filelist.confirmDelete", { name: node.name }))) {
-      const { currentProject } = useAppStore.getState();
-      if (!currentProject) return;
-      const fullPath = `${currentProject.path}\\${node.relative_path}`;
-      try {
-        await deletePath(fullPath);
-        const tree = await readProjectTree(currentProject.path);
-        useAppStore.getState().setProjectTree(tree);
-      } catch (e) {
-        alert(t("filelist.deleteFailed", { error: String(e) }));
-      }
+    setDeleteTarget(node);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const node = deleteTarget;
+    setDeleteTarget(null);
+    const { currentProject } = useAppStore.getState();
+    if (!currentProject) return;
+    const fullPath = `${currentProject.path}/${node.relative_path}`;
+    try {
+      await deletePath(fullPath, currentProject.path);
+      showToast("success", t("filelist.deleted", { name: node.name }));
+      const tree = await readProjectTree(currentProject.path);
+      useAppStore.getState().setProjectTree(tree);
+    } catch (e) {
+      showToast("error", t("filelist.deleteFailed", { error: String(e) }));
     }
   };
 
-  const handleRename = async (node: FileNode, e: React.MouseEvent) => {
+  const handleRename = (node: FileNode, e: React.MouseEvent) => {
     e.stopPropagation();
-    const { currentProject } = useAppStore.getState();
-    if (!currentProject) return;
-    const newName = prompt(t("filelist.renamePrompt"), node.name);
-    if (!newName || newName === node.name) return;
+    setRenameTarget(node);
+  };
+
+  const handleRenameConfirm = async (newName?: string) => {
+    const node = renameTarget;
+    setRenameTarget(null);
+    if (!node || !newName || newName === node.name) return;
     if (!isValidFileName(newName)) {
-      alert(t("filelist.invalidChars"));
+      showToast("error", t("filelist.invalidChars"));
       return;
     }
+    const { currentProject } = useAppStore.getState();
+    if (!currentProject) return;
     const dirPath = node.relative_path.substring(
       0,
       node.relative_path.lastIndexOf("/") + 1
@@ -302,10 +318,11 @@ export default function FileList({ onCreateFile }: FileListProps) {
     const newRelPath = dirPath + newName;
     try {
       await renamePath(currentProject.path, node.relative_path, newRelPath);
+      showToast("success", t("filelist.renamed", { name: newName }));
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
     } catch (e) {
-      alert(t("filelist.renameFailed", { error: String(e) }));
+      showToast("error", t("filelist.renameFailed", { error: String(e) }));
     }
   };
 
@@ -393,6 +410,26 @@ export default function FileList({ onCreateFile }: FileListProps) {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        type="danger"
+        title={t("filelist.confirmDelete", { name: deleteTarget?.name || "" })}
+        message={t("filelist.confirmDelete", { name: deleteTarget?.name || "" })}
+        confirmLabel={t("app.delete")}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={!!renameTarget}
+        type="prompt"
+        title={t("filelist.renamePrompt")}
+        message={t("filelist.renamePrompt")}
+        defaultValue={renameTarget?.name || ""}
+        onConfirm={handleRenameConfirm}
+        onCancel={() => setRenameTarget(null)}
+      />
     </div>
   );
 }

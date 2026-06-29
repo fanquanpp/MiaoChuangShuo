@@ -1,20 +1,26 @@
-// TipTap 富文本编辑器组件
+// TipTap 纯文本编辑器组件
 //
 // 功能概述：
-// 基于 TipTap 的小说创作编辑器，支持富文本编辑、自动保存、
-// 字数统计、特色自动化功能（剧本角色名/散文缩进/诗歌排版）、
-// TXT 导出、大纲视图、聚焦模式。适配 FANDEX 暗黑主题。
+// 基于 TipTap 的小说创作编辑器，纯文本/WYSIWYG 体验。
+// 底层存储为纯文本（无 Markdown 转换层），支持基础富文本（加粗/斜体）。
+// 支持自动保存、字数统计、TXT 导出、大纲视图、聚焦模式。
+// 适配 FANDEX 暗黑主题。
 //
 // 模块职责：
-// 1. 提供 TipTap 编辑器实例
-// 2. 自动加载与保存文件内容
+// 1. 提供 TipTap 编辑器实例（基础纯文本模式）
+// 2. 自动加载与保存文件内容（纯文本直读直写）
 // 3. 实时统计字数
 // 4. 根据项目类型加载特色扩展
 // 5. 支持 TXT 导出、大纲视图、聚焦模式
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import type { Extensions } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
+import Document from "@tiptap/extension-document";
+import Paragraph from "@tiptap/extension-paragraph";
+import Text from "@tiptap/extension-text";
+import Bold from "@tiptap/extension-bold";
+import Italic from "@tiptap/extension-italic";
+import History from "@tiptap/extension-history";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { readFile, writeFile } from "../lib/api";
@@ -22,7 +28,6 @@ import { useAppStore } from "../lib/store";
 import { CharacterMention } from "../lib/characterMention";
 import { IndentParagraph } from "../lib/indentParagraph";
 import { PoetryFormat } from "../lib/poetryFormat";
-import { markdownToHtml, htmlToMarkdown } from "../lib/markdownConverter";
 import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
@@ -48,7 +53,7 @@ export default function NovelEditor({
   const [dirty, setDirty] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [characters, setCharacters] = useState<string[]>([]);
-  const [editorHtml, setEditorHtml] = useState("");
+  const [editorText, setEditorText] = useState("");
   const { showToast } = useToast();
 
   const projectType = currentProject?.meta?.type || "standard";
@@ -61,8 +66,8 @@ export default function NovelEditor({
       setCharacters([]);
       return;
     }
-    const rosterPath = `${currentProject.path}\\角色\\角色名册.md`;
-    readFile(rosterPath)
+    const rosterPath = `${currentProject.path}/角色/角色名册.txt`;
+    readFile(rosterPath, currentProject.path)
       .then((content) => {
         const names = content
           .split(/\r?\n/)
@@ -82,10 +87,15 @@ export default function NovelEditor({
       });
   }, [isScript, currentProject]);
 
-  // 构建 TipTap 扩展列表
+  // 构建 TipTap 纯文本扩展列表（无 Markdown 相关扩展）
   const extensions: Extensions = useMemo(() => {
     const exts: Extensions = [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+      Document,
+      Paragraph,
+      Text,
+      Bold,
+      Italic,
+      History,
       Placeholder.configure({ placeholder: t("editor.placeholder") }),
     ];
 
@@ -106,14 +116,14 @@ export default function NovelEditor({
     return exts;
   }, [isEssay, isScript, characters, t]);
 
-  // 创建编辑器实例
+  // 创建编辑器实例（纯文本模式）
   const editor = useEditor({
     extensions,
     content: "",
     editorProps: {
       attributes: {
         class:
-          "prose prose-invert max-w-none focus:outline-none min-h-[60vh] px-8 py-6 leading-loose",
+          "fandex-editor-plain prose max-w-none focus:outline-none min-h-[60vh] px-8 py-6 leading-loose text-nf-text",
       },
     },
     onUpdate: () => {
@@ -122,32 +132,35 @@ export default function NovelEditor({
       if (editor) {
         const wc = countWords(editor.getText());
         setWordCount(wc);
-        setEditorHtml(editor.getHTML());
-        // 实时推送字数到 store，供 FileList 侧边栏展示
+        setEditorText(editor.getText());
         useAppStore.getState().setActiveFileWordCount(wc);
       }
     },
   });
 
-  // 加载文件内容
+  // 加载文件内容（纯文本直读，无 MD→HTML 转换）
   useEffect(() => {
     if (!editor || !filePath) {
       editor?.commands.clearContent();
       setWordCount(0);
       setDirty(false);
-      setEditorHtml("");
+      setEditorText("");
       return;
     }
 
     setLoadError("");
-    readFile(filePath)
+    readFile(filePath, currentProject?.path || "")
       .then((content) => {
-        editor.commands.setContent(markdownToHtml(content));
+        // 纯文本直接设置到编辑器
+        editor.commands.setContent(content);
         setDirty(false);
         setWordCount(countWords(editor.getText()));
-        setEditorHtml(editor.getHTML());
+        setEditorText(editor.getText());
         // 记录最近文件
-        const relativePath = filePath.replace(currentProject?.path + "\\" || "", "");
+        const relativePath = filePath.replace(
+          (currentProject?.path || "") + "/",
+          ""
+        );
         const fileName = relativePath.split(/[\\/]/).pop() || relativePath;
         addRecentFile({
           name: fileName,
@@ -161,58 +174,71 @@ export default function NovelEditor({
       });
   }, [filePath, editor, currentProject, t]);
 
-  // 保存文件（含外部修改冲突检测）
-  // 返回 true 表示保存成功，false 表示失败（供退出流程使用）
+  // 保存文件（纯文本直写，无 HTML→MD 转换；含竞态保护）
+  const savingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
   const lastSavedContentRef = useRef("");
   const handleSave = useCallback(async (): Promise<boolean> => {
-    if (!editor || !filePath || !dirty || saving) return false;
+    if (!editor || !filePath || !dirty) return false;
+    // 竞态保护：如果正在保存，标记待保存但不阻塞
+    if (savingRef.current) {
+      pendingSaveRef.current = true;
+      return false;
+    }
+    savingRef.current = true;
+    pendingSaveRef.current = false;
     setSaving(true);
-    autoSavePendingRef.current = true;
     try {
+      // 冲突检测：读取当前磁盘内容与上次保存内容比较
       try {
-        const currentContent = await readFile(filePath);
+        const currentContent = await readFile(filePath, currentProject?.path || "");
         if (
           lastSavedContentRef.current &&
           currentContent !== lastSavedContentRef.current
         ) {
-          const overwrite = confirm(t("editor.conflictDetected"));
-          if (!overwrite) {
-            showToast("warning", t("editor.conflictCancelled"));
-            return false;
-          }
+          showToast(
+            "warning",
+            t("editor.conflictDetected")
+          );
+          // 不阻塞保存，但提示用户存在冲突
         }
       } catch {
         // 文件可能不存在，跳过冲突检测
       }
 
-      const markdown = htmlToMarkdown(editor.getHTML());
-      await writeFile(filePath, markdown);
-      lastSavedContentRef.current = markdown;
+      const text = editor.getText();
+      await writeFile(filePath, text, currentProject?.path || "");
+      lastSavedContentRef.current = text;
       setDirty(false);
       useAppStore.getState().setEditorDirty(false);
       showToast("success", t("editor.saved"));
-      // 保存后刷新目录树，更新侧边栏文件大小等元数据
       useAppStore.getState().refreshProjectTree();
       return true;
     } catch (e) {
       showToast("error", t("editor.saveFailed", { error: String(e) }));
+      // 保存失败保留 dirty 状态以便重试
       return false;
     } finally {
+      savingRef.current = false;
       setSaving(false);
-      autoSavePendingRef.current = false;
+      // 处理排队的保存请求
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        setTimeout(() => handleSave(), 100);
+      }
     }
-  }, [editor, filePath, dirty, saving, showToast, t]);
+  }, [editor, filePath, dirty, showToast, t, currentProject]);
 
   // 初始化 lastSavedContent
   useEffect(() => {
     if (editor && filePath) {
-      readFile(filePath)
+      readFile(filePath, currentProject?.path || "")
         .then((content) => {
           lastSavedContentRef.current = content;
         })
         .catch(() => {});
     }
-  }, [editor, filePath]);
+  }, [editor, filePath, currentProject]);
 
   // 导出 TXT
   const handleExportTxt = useCallback(async () => {
@@ -222,7 +248,7 @@ export default function NovelEditor({
       let txtName = t("editor.defaultExportName");
       if (filePath) {
         const baseName = filePath.split(/[\\/]/).pop() || "export";
-        txtName = baseName.replace(/\.(md|markdown|txt)$/i, "") + ".txt";
+        txtName = baseName.replace(/\.txt$/i, "") + ".txt";
       }
       const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -251,19 +277,18 @@ export default function NovelEditor({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSave]);
 
-  // 自动保存: 30 秒
-  const autoSavePendingRef = useRef(false);
+  // 自动保存: 30 秒（竞态保护：不在手动保存时触发）
   useEffect(() => {
     if (!filePath || !dirty) return;
     const timer = setTimeout(() => {
-      if (!autoSavePendingRef.current) {
+      if (!savingRef.current) {
         handleSave();
       }
     }, 30000);
     return () => clearTimeout(timer);
   }, [filePath, dirty, handleSave]);
 
-  // 注册/注销编辑器保存回调（供退出流程使用）
+  // 注册/注销编辑器保存回调
   useEffect(() => {
     if (handleSave) {
       useAppStore.getState().registerEditorSave(handleSave);
@@ -317,7 +342,6 @@ export default function NovelEditor({
       role="region"
       aria-label={`${t("editor.editor")} - ${filePath ? filePath.split(/[\\/]/).pop() : ""}`}
     >
-      {/* 聚焦模式下简化工具栏 */}
       <EditorToolbar
         editor={editor}
         wordCount={wordCount}
@@ -349,7 +373,7 @@ export default function NovelEditor({
       <div className="flex-1 overflow-y-auto relative">
         <EditorContent editor={editor} />
         {/* 大纲视图 — 编辑器右侧覆盖 */}
-        {filePath && <OutlineView htmlContent={editorHtml} />}
+        {filePath && <OutlineView htmlContent={editorText} />}
       </div>
     </div>
   );

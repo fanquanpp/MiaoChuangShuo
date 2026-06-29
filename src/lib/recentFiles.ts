@@ -8,9 +8,6 @@
 // 1. addRecentFile: 记录最近打开的文件
 // 2. getRecentFiles: 获取最近文件列表
 // 3. clearRecentFiles: 清空记录
-// 4. useRecentFiles: React Hook 封装
-
-import { useState, useEffect, useCallback } from "react";
 
 export interface RecentFile {
   name: string;
@@ -56,19 +53,4 @@ export function getRecentFiles(projectPath?: string): RecentFile[] {
 // 清空全部记录
 export function clearRecentFiles(): void {
   saveAll([]);
-}
-
-// React Hook：最近文件状态
-export function useRecentFiles(projectPath?: string) {
-  const [files, setFiles] = useState<RecentFile[]>([]);
-
-  const refresh = useCallback(() => {
-    setFiles(getRecentFiles(projectPath));
-  }, [projectPath]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return { files, refresh };
 }
