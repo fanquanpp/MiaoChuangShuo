@@ -70,6 +70,7 @@ export const createViewSlice: StateCreator<CrossSliceState, [], [], ViewSlice> =
       viewMode: "workspace",
       activeCategory: "manuscript",
       selectedFile: null,
+      projectTree: [],
     }),
 
   closeProject: () =>

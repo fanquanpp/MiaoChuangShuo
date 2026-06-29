@@ -116,7 +116,7 @@ function ToastItemComponent({
       <span className="flex-1 text-sm text-nf-text leading-relaxed">{toast.message}</span>
       <button
         onClick={() => onRemove(toast.id)}
-        className="flex-shrink-0 text-nf-text-tertiary hover:text-nf-text transition-fast"
+        className="flex-shrink-0 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
         aria-label="关闭通知"
       >
         <X className="w-3.5 h-3.5" />

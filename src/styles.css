@@ -21,7 +21,7 @@
   /* 文字色 */
   --fandex-text: #ebebeb;
   --fandex-text-secondary: #b3b3b3;
-  --fandex-text-tertiary: #8a8a8a;
+  --fandex-text-tertiary: #9a9a9a;
   --fandex-text-inverse: #0d0d0d;
 
   /* 边框色 */
@@ -65,7 +65,7 @@
 
   --fandex-text: #0d0d0d;
   --fandex-text-secondary: #4d4d4d;
-  --fandex-text-tertiary: #808080;
+  --fandex-text-tertiary: #606060;
   --fandex-text-inverse: #ffffff;
 
   --fandex-border: #2e2e2e;

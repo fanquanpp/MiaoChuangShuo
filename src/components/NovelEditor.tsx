@@ -46,7 +46,7 @@ export default function NovelEditor({
   focusMode = false,
   focusTimerActive = false,
 }: NovelEditorProps) {
-  const { currentProject } = useAppStore();
+  const currentProject = useAppStore((s) => s.currentProject);
   const { t } = useI18n();
   const [wordCount, setWordCount] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -151,8 +151,16 @@ export default function NovelEditor({
     setLoadError("");
     readFile(filePath, currentProject?.path || "")
       .then((content) => {
-        // 纯文本直接设置到编辑器
-        editor.commands.setContent(content);
+        // 纯文本转为 ProseMirror JSON 文档结构，避免 setContent 将文本当作 HTML 解析
+        const lines = content.split(/\r?\n/);
+        const docContent = lines.map((line: string) => ({
+          type: "paragraph",
+          content: line ? [{ type: "text", text: line }] : [],
+        }));
+        editor.commands.setContent({
+          type: "doc",
+          content: docContent.length > 0 ? docContent : [{ type: "paragraph" }],
+        });
         setDirty(false);
         setWordCount(countWords(editor.getText()));
         setEditorText(editor.getText());

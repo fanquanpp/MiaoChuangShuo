@@ -73,8 +73,18 @@ export default function CreateFileDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="w-full max-w-md bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-5 py-3 border-b border-nf-border-light">
           <div className="flex items-center gap-2">
             <FilePlus className="w-4 h-4 text-fandex-primary" />
@@ -84,7 +94,7 @@ export default function CreateFileDialog({
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition-fast"
+            className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition duration-fast"
           >
             <X className="w-4 h-4" />
           </button>
@@ -106,7 +116,7 @@ export default function CreateFileDialog({
             }}
             placeholder={t("filelist.newFilePlaceholder")}
             autoFocus
-            className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
+            className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition duration-fast"
           />
           {fileNameError && (
             <p className="text-xs text-red-400 mt-1.5">{fileNameError}</p>
@@ -119,14 +129,14 @@ export default function CreateFileDialog({
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition-fast"
+            className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
           >
             {t("app.cancel")}
           </button>
           <button
             onClick={handleCreate}
             disabled={!newFileName.trim() || creating}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {creating ? t("app.creating") : t("filelist.create")}

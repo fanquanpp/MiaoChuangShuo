@@ -106,8 +106,18 @@ export default function CreateProjectDialog({
   handleCreateRef.current = handleCreate;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light">
           <h2 className="fandex-bar-left text-lg font-bold font-display text-nf-text">
@@ -115,7 +125,7 @@ export default function CreateProjectDialog({
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-nf-bg-hover text-nf-text-tertiary hover:text-nf-text transition-fast"
+            className="p-1.5 hover:bg-nf-bg-hover text-nf-text-tertiary hover:text-nf-text transition duration-fast"
           >
             <X className="w-5 h-5" />
           </button>
@@ -133,7 +143,7 @@ export default function CreateProjectDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("project.namePlaceholder")}
-              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition-fast"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition duration-fast"
             />
           </div>
 
@@ -147,7 +157,7 @@ export default function CreateProjectDialog({
                 <button
                   key={tpl.id}
                   onClick={() => setType(tpl.id)}
-                  className={`p-3 text-left transition-fast bg-nf-bg ${
+                  className={`p-3 text-left transition duration-fast bg-nf-bg ${
                     type === tpl.id
                       ? "bg-fandex-primary/10 border-fandex-primary"
                       : "hover:bg-nf-bg-hover"
@@ -172,7 +182,7 @@ export default function CreateProjectDialog({
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
               placeholder={t("project.authorPlaceholder")}
-              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition-fast"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition duration-fast"
             />
           </div>
 
@@ -186,7 +196,7 @@ export default function CreateProjectDialog({
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("project.descriptionPlaceholder")}
               rows={3}
-              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition-fast resize-none"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition duration-fast resize-none"
             />
           </div>
 
@@ -202,11 +212,11 @@ export default function CreateProjectDialog({
                 onChange={(e) => setParentPath(e.target.value)}
                 placeholder={t("project.saveLocationPlaceholder")}
                 readOnly
-                className="flex-1 bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition-fast"
+                className="flex-1 bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition duration-fast"
               />
               <button
                 onClick={handlePickDir}
-                className="px-3 py-2 bg-nf-bg-hover hover:bg-nf-border-light border border-nf-border-light text-sm text-nf-text flex items-center gap-1.5 transition-fast"
+                className="px-3 py-2 bg-nf-bg-hover hover:bg-nf-border-light border border-nf-border-light text-sm text-nf-text flex items-center gap-1.5 transition duration-fast"
               >
                 <FolderOpen className="w-4 h-4" />
                 {t("app.browse")}
@@ -226,14 +236,14 @@ export default function CreateProjectDialog({
         <div className="flex justify-end gap-1 px-6 py-4 border-t border-nf-border-light">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition-fast"
+            className="px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition duration-fast"
           >
             {t("app.cancel")}
           </button>
           <button
             onClick={handleCreate}
             disabled={creating}
-            className="px-4 py-2 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse flex items-center gap-1.5 transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse flex items-center gap-1.5 transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
             {creating ? t("app.creating") : t("project.createTitle")}

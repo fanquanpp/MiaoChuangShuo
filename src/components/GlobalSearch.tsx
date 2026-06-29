@@ -24,7 +24,8 @@ import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 
 export default function GlobalSearch() {
-  const { currentProject, setActiveCategory, setSelectedFile } = useAppStore();
+  const currentProject = useAppStore((s) => s.currentProject);
+  const navigateToFile = useAppStore((s) => s.navigateToFile);
   const { t } = useI18n();
   const { showToast } = useToast();
   const [query, setQuery] = useState("");
@@ -71,14 +72,16 @@ export default function GlobalSearch() {
   }, []);
 
   const handleJumpToResult = (result: SearchResult) => {
-    setSelectedFile({
-      name: result.file_name,
-      relative_path: result.relative_path,
-      is_dir: false,
-      children: [],
-      size: 0,
-    });
-    setActiveCategory("manuscript");
+    navigateToFile(
+      {
+        name: result.file_name,
+        relative_path: result.relative_path,
+        is_dir: false,
+        children: [],
+        size: 0,
+      },
+      "manuscript"
+    );
   };
 
   // 关键词高亮（安全：React JSX 自动转义，高亮所有匹配项）
@@ -133,13 +136,13 @@ export default function GlobalSearch() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("search.placeholder")}
-              className="w-full bg-nf-bg border border-nf-border-light pl-9 pr-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
+              className="w-full bg-nf-bg border border-nf-border-light pl-9 pr-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition duration-fast"
             />
           </div>
           <button
             onClick={() => setCaseSensitive(!caseSensitive)}
             title={caseSensitive ? t("search.caseSensitiveOn") : t("search.caseSensitiveOff")}
-            className={`flex items-center justify-center w-9 h-9 border transition-fast ${
+            className={`flex items-center justify-center w-9 h-9 border transition duration-fast ${
               caseSensitive
                 ? "bg-fandex-tertiary/15 text-fandex-tertiary border-fandex-tertiary/40"
                 : "text-nf-text-tertiary border-nf-border-light hover:text-nf-text hover:border-nf-text-tertiary"
@@ -153,7 +156,7 @@ export default function GlobalSearch() {
       {searched && !loading && (
         <div className="px-6 py-2 border-b border-nf-border-light bg-nf-bg-sidebar text-xs text-nf-text-tertiary">
           {results.length > 0
-            ? t("search.resultsMax", { count: results.length, suffix: results.length >= 200 ? t("search.resultsMaxHint") : "" })
+            ? `${t("search.results", { count: results.length })}${results.length >= 200 ? ` ${t("search.resultsMaxHint")}` : ""}`
             : t("search.noResults")}
         </div>
       )}
@@ -176,20 +179,20 @@ export default function GlobalSearch() {
               <div
                 key={`${result.relative_path}-${result.line_number}-${idx}`}
                 onClick={() => handleJumpToResult(result)}
-                className="fandex-bar-left bg-nf-bg-card border border-nf-border-light hover:border-fandex-primary/40 p-3 transition-fast cursor-pointer group"
+                className="fandex-bar-left bg-nf-bg-card border border-nf-border-light hover:border-fandex-primary/40 p-3 transition duration-fast cursor-pointer group"
               >
                 <div className="flex items-center gap-2 mb-1.5">
                   <FileText className="w-3.5 h-3.5 text-fandex-primary flex-shrink-0" />
-                  <span className="text-xs font-medium font-display text-nf-text group-hover:text-fandex-primary transition-fast truncate">
+                  <span className="text-xs font-medium font-display text-nf-text group-hover:text-fandex-primary transition duration-fast truncate">
                     {result.file_name}
                   </span>
                   <span className="text-[10px] text-nf-text-tertiary flex-shrink-0">
-                    {t("search.lineNum", { num: result.line_number })}
+                    {t("search.lineNum", { line: result.line_number })}
                   </span>
                   <span className="text-[10px] text-nf-text-tertiary truncate">
                     {result.relative_path}
                   </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary ml-auto group-hover:text-fandex-primary transition-fast flex-shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary ml-auto group-hover:text-fandex-primary transition duration-fast flex-shrink-0" />
                 </div>
                 <div className="text-xs text-nf-text-secondary leading-relaxed font-mono pl-5">
                   {highlightKeyword(result.line_content.trim(), query.trim())}

@@ -22,7 +22,7 @@ import GlobalSearch from "./GlobalSearch";
 import CreateFileDialog from "./CreateFileDialog";
 import CommandPalette from "./CommandPalette";
 import { FocusTimer } from "./FocusTimer";
-import { useAppStore, CATEGORY_DIRS, CATEGORY_NAMES, type SidebarCategory } from "../lib/store";
+import { useAppStore, getCategoryDir, getCategoryName, type SidebarCategory } from "../lib/store";
 import { readProjectTree, createFile } from "../lib/api";
 import { getCategoryConfig } from "../lib/categoryRegistry";
 import { useToast } from "../lib/toast";
@@ -41,14 +41,12 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
 };
 
 export default function Workspace() {
-  const {
-    currentProject,
-    selectedFile,
-    activeCategory,
-    setProjectTree,
-    setLoading,
-    setActiveCategory,
-  } = useAppStore();
+  const currentProject = useAppStore((s) => s.currentProject);
+  const selectedFile = useAppStore((s) => s.selectedFile);
+  const activeCategory = useAppStore((s) => s.activeCategory);
+  const setProjectTree = useAppStore((s) => s.setProjectTree);
+  const setLoading = useAppStore((s) => s.setLoading);
+  const setActiveCategory = useAppStore((s) => s.setActiveCategory);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -128,7 +126,7 @@ export default function Workspace() {
   // 处理新建文件确认
   const handleCreateFile = async (fileName: string) => {
     if (!currentProject) throw new Error("无当前项目");
-    const dirName = CATEGORY_DIRS[activeCategory];
+    const dirName = getCategoryDir(activeCategory);
     const relativePath = `${dirName}/${fileName}`;
     await createFile(currentProject.path, relativePath, "");
     const tree = await readProjectTree(currentProject.path);
@@ -138,8 +136,9 @@ export default function Workspace() {
 
   // 命令面板中触发新建文件
   const handleCommandCreateFile = useCallback((category: SidebarCategory) => {
+    setActiveCategory(category);
     setCreateDialogOpen(true);
-  }, []);
+  }, [setActiveCategory]);
 
   if (!currentProject) return null;
 
@@ -153,7 +152,7 @@ export default function Workspace() {
       case "search":
         return <GlobalSearch />;
       case "card-manager":
-        return <CardManager categoryLabel={CATEGORY_NAMES[activeCategory]} />;
+        return <CardManager categoryLabel={getCategoryName(activeCategory)} />;
       default:
         return (
           <NovelEditor
@@ -189,7 +188,7 @@ export default function Workspace() {
 
       <CreateFileDialog
         open={createDialogOpen}
-        dirName={CATEGORY_DIRS[activeCategory]}
+        dirName={getCategoryDir(activeCategory)}
         onClose={() => setCreateDialogOpen(false)}
         onConfirm={handleCreateFile}
       />

@@ -10,6 +10,7 @@
 // 3. 悬浮动画效果
 // 4. 点击触发打开项目
 
+import { memo } from "react";
 import { Clock, BarChart3, BookOpen } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import type { ProjectInfo } from "../lib/api";
@@ -32,26 +33,26 @@ export interface ProjectCardProps {
   projectInfo?: ProjectInfo;
 }
 
-export default function ProjectCard({ project, projectInfo }: ProjectCardProps) {
-  const { currentProject } = useAppStore();
+function ProjectCardImpl({ project, projectInfo }: ProjectCardProps) {
   const { handleSwitchProject } = useAutoSaveOnExit();
   const { t } = useI18n();
 
   const handleClick = () => {
-    if (projectInfo) {
-      // 如果当前已有项目打开，走保存→切换流程；否则直接打开
-      if (currentProject) {
-        handleSwitchProject(projectInfo);
-      } else {
-        useAppStore.getState().openProject(projectInfo);
-      }
+    if (!projectInfo) return;
+    // 在点击时读取当前项目状态，避免订阅 currentProject 导致的不必要重渲染
+    const currentProject = useAppStore.getState().currentProject;
+    if (currentProject) {
+      // 如果当前已有项目打开，走保存→切换流程
+      handleSwitchProject(projectInfo);
+    } else {
+      useAppStore.getState().openProject(projectInfo);
     }
   };
 
   return (
     <div
       onClick={handleClick}
-      className="group bg-nf-bg hover:bg-nf-bg-hover border-r border-b border-nf-border-light hover:border-fandex-primary transition-fast cursor-pointer flex flex-col min-h-[168px] relative"
+      className="group bg-nf-bg hover:bg-nf-bg-hover border-r border-b border-nf-border-light hover:border-fandex-primary transition duration-fast cursor-pointer flex flex-col min-h-[168px] relative"
     >
       <div className={`h-1 bg-gradient-to-r ${project.gradient}`}></div>
 
@@ -60,7 +61,7 @@ export default function ProjectCard({ project, projectInfo }: ProjectCardProps) 
           {project.type}
         </span>
 
-        <h3 className="fandex-bar-left text-base font-bold font-display text-nf-text group-hover:text-fandex-primary transition-fast tracking-tight line-clamp-1 mb-3">
+        <h3 className="fandex-bar-left text-base font-bold font-display text-nf-text group-hover:text-fandex-primary transition duration-fast tracking-tight line-clamp-1 mb-3">
           {project.name}
         </h3>
 
@@ -82,3 +83,6 @@ export default function ProjectCard({ project, projectInfo }: ProjectCardProps) 
     </div>
   );
 }
+
+const ProjectCard = memo(ProjectCardImpl);
+export default ProjectCard;

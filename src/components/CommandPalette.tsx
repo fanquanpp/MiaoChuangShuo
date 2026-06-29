@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Search, ArrowRight } from "lucide-react";
 import { useAppStore, CATEGORY_NAMES, type SidebarCategory } from "../lib/store";
+import { getTypeSpecificDirs } from "../lib/templateRegistry";
 import { useThemeStore } from "../lib/themeStore";
 import { useI18n } from "../lib/i18n";
 
@@ -40,10 +41,22 @@ export default function CommandPalette({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const {
-    setActiveCategory,
-  } = useAppStore();
+  const setActiveCategory = useAppStore((s) => s.setActiveCategory);
+  const currentProject = useAppStore((s) => s.currentProject);
   const { toggleTheme, theme } = useThemeStore();
+
+  // 类型专属目录导航命令（动态生成）
+  const typeSpecificCommands: Command[] = useMemo(() => {
+    if (!currentProject) return [];
+    const dirs = getTypeSpecificDirs(currentProject.meta.type);
+    return dirs.map((dirName) => ({
+      id: `cat-tpl-${dirName}`,
+      label: dirName,
+      category: t("command.categoryNav"),
+      keywords: [dirName, "设定", "扩展"],
+      action: () => setActiveCategory(dirName as SidebarCategory),
+    }));
+  }, [currentProject, setActiveCategory, t]);
 
   const commands: Command[] = useMemo(
     () => [
@@ -56,10 +69,11 @@ export default function CommandPalette({
       { id: "cat-timeline", label: CATEGORY_NAMES["timeline"], category: t("command.categoryNav"), keywords: ["时间线", "timeline"], action: () => setActiveCategory("timeline") },
       { id: "cat-stats", label: CATEGORY_NAMES["stats"], category: t("command.categoryNav"), keywords: ["统计", "stats", "字数"], action: () => setActiveCategory("stats") },
       { id: "cat-search", label: CATEGORY_NAMES["search"], category: t("command.categoryNav"), keywords: ["搜索", "search", "查找"], action: () => setActiveCategory("search") },
+      ...typeSpecificCommands,
       { id: "theme", label: t("command.toggleTheme", { mode: theme === "dark" ? t("command.darkToLight") : t("command.lightToDark") }), category: t("command.categoryApp"), keywords: ["主题", "theme", "暗色", "亮色"], action: () => toggleTheme() },
       { id: "shortcuts", label: t("command.shortcutsRef"), category: t("command.categoryHelp"), keywords: ["快捷键", "shortcuts", "键盘"], action: () => { onClose(); window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" })); } },
     ],
-    [setActiveCategory, toggleTheme, theme, onClose, t]
+    [setActiveCategory, toggleTheme, theme, onClose, t, typeSpecificCommands]
   );
 
   // 新建文件命令（按分类动态生成）
@@ -161,7 +175,7 @@ export default function CommandPalette({
                 key={cmd.id}
                 onClick={() => cmd.action()}
                 onMouseEnter={() => setSelectedIndex(idx)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-fast ${
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition duration-fast ${
                   idx === selectedIndex
                     ? "bg-fandex-primary/10 text-fandex-primary"
                     : "text-nf-text hover:bg-nf-bg-hover"

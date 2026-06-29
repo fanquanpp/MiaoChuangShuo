@@ -31,7 +31,7 @@ interface TimelineEvent {
 }
 
 export default function TimelineManager() {
-  const { currentProject } = useAppStore();
+  const currentProject = useAppStore((s) => s.currentProject);
   const { t } = useI18n();
   const { showToast } = useToast();
   const [events, setEvents] = useState<TimelineEvent[]>([]);
@@ -188,7 +188,7 @@ export default function TimelineManager() {
         </h2>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast"
         >
           <Plus className="w-4 h-4" />
           {t("timeline.newEvent")}
@@ -201,7 +201,7 @@ export default function TimelineManager() {
           <button
             key={b}
             onClick={() => setActiveBranch(b)}
-            className={`px-2.5 py-0.5 text-xs transition-fast ${
+            className={`px-2.5 py-0.5 text-xs transition duration-fast ${
               activeBranch === b
                 ? "bg-fandex-primary/15 text-fandex-primary border border-fandex-primary/40"
                 : "text-nf-text-tertiary hover:text-nf-text border border-transparent"
@@ -239,7 +239,7 @@ export default function TimelineManager() {
               >
                 <div className="absolute left-[11px] top-2 w-[10px] h-[10px] bg-fandex-primary border-2 border-nf-bg z-10" />
 
-                <div className="fandex-bar-left bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/40 p-4 transition-fast">
+                <div className="fandex-bar-left bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/40 p-4 transition duration-fast">
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -254,17 +254,17 @@ export default function TimelineManager() {
                         {event.title}
                       </h3>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-fast ml-2">
+                    <div className="flex items-center gap-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition duration-fast ml-2">
                       <button
                         onClick={() => handleEdit(event)}
-                        className="p-1 text-nf-text-tertiary hover:text-fandex-primary transition-fast"
+                        className="p-1 text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
                         title={t("timeline.editEvent")}
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(event)}
-                        className="p-1 text-nf-text-tertiary hover:text-red-400 transition-fast"
+                        className="p-1 text-nf-text-tertiary hover:text-red-400 transition duration-fast"
                         title={t("timeline.deleteEvent")}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -390,15 +390,26 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
   };
 
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
+    <div
+      ref={dialogRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-5 py-3 border-b border-nf-border-light">
           <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text">
             {event ? t("timeline.editEvent") : t("timeline.newEvent")}
           </h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition-fast"
+            className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition duration-fast"
             title={t("app.close")}
           >
             <X className="w-4 h-4" />
@@ -419,7 +430,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
                 if (titleError) setTitleError(false);
               }}
               placeholder={t("timeline.eventTitlePlaceholder")}
-              className={`w-full bg-nf-bg border px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition-fast ${
+              className={`w-full bg-nf-bg border px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition duration-fast ${
                 titleError
                   ? "border-red-400 focus:border-red-400"
                   : "border-nf-border-light focus:border-fandex-primary/60"
@@ -439,7 +450,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 placeholder={t("timeline.eventTimePlaceholder")}
-                className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
+                className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition duration-fast"
               />
             </div>
             <div>
@@ -449,7 +460,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
               <select
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
-                className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text focus:outline-none focus:border-fandex-primary/60 transition-fast"
+                className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text focus:outline-none focus:border-fandex-primary/60 transition duration-fast"
               >
                 {branches.map((b) => (
                   <option key={b} value={b}>
@@ -468,7 +479,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
               value={newBranch}
               onChange={(e) => setNewBranch(e.target.value)}
               placeholder={t("timeline.newBranchPlaceholder")}
-              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition duration-fast"
             />
           </div>
           <div>
@@ -480,7 +491,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("timeline.eventDescriptionPlaceholder")}
               rows={4}
-              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast resize-none"
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition duration-fast resize-none"
             />
           </div>
         </div>
@@ -488,14 +499,14 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition-fast"
+            className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
           >
             {t("app.cancel")}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? t("timeline.saving") : t("timeline.save")}
           </button>

@@ -49,7 +49,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           </p>
           <button
             onClick={this.handleRetry}
-            className="px-4 py-2 bg-fandex-primary text-nf-text-inverse text-sm hover:bg-fandex-primary-hover transition-fast"
+            className="px-4 py-2 bg-fandex-primary text-nf-text-inverse text-sm hover:bg-fandex-primary-hover transition duration-fast"
           >
             {ctx.t("error.retry")}
           </button>

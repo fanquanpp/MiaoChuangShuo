@@ -28,7 +28,8 @@ import { getWritingStats, type WritingStats as WritingStatsType } from "../lib/a
 import { useI18n } from "../lib/i18n";
 
 export default function WritingStats() {
-  const { currentProject, setActiveCategory, setSelectedFile } = useAppStore();
+  const currentProject = useAppStore((s) => s.currentProject);
+  const navigateToFile = useAppStore((s) => s.navigateToFile);
   const { t } = useI18n();
   const [stats, setStats] = useState<WritingStatsType | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,14 +56,16 @@ export default function WritingStats() {
   const handleJumpToChapter = (relativePath: string) => {
     if (!currentProject) return;
     const fileName = relativePath.split(/[\\/]/).pop() || relativePath;
-    setSelectedFile({
-      name: fileName,
-      relative_path: relativePath,
-      is_dir: false,
-      children: [],
-      size: 0,
-    });
-    setActiveCategory("manuscript");
+    navigateToFile(
+      {
+        name: fileName,
+        relative_path: relativePath,
+        is_dir: false,
+        children: [],
+        size: 0,
+      },
+      "manuscript"
+    );
   };
 
   if (loading) {
@@ -120,7 +123,7 @@ export default function WritingStats() {
     },
     {
       label: t("stats.creationDays"),
-      value: t("stats.dayUnit", { days: stats.days_since_creation }),
+      value: `${stats.days_since_creation} ${t("stats.dayUnit")}`,
       icon: Calendar,
       color: "text-fandex-primary",
       barClass: "fandex-bar-left",
@@ -135,7 +138,7 @@ export default function WritingStats() {
         </h2>
         <button
           onClick={loadStats}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary/30 hover:bg-fandex-primary/10 transition-fast"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary/30 hover:bg-fandex-primary/10 transition duration-fast"
         >
           <TrendingUp className="w-4 h-4" />
           {t("stats.refresh")}
@@ -251,14 +254,14 @@ export default function WritingStats() {
                           handleJumpToChapter(chapter.relative_path);
                         }
                       }}
-                      className="flex items-center gap-3 p-2 hover:bg-nf-bg-hover transition-fast cursor-pointer group focus-visible:outline focus-visible:outline-2 focus-visible:outline-fandex-primary focus-visible:outline-offset-[-2px]"
+                      className="flex items-center gap-3 p-2 hover:bg-nf-bg-hover transition duration-fast cursor-pointer group focus-visible:outline focus-visible:outline-2 focus-visible:outline-fandex-primary focus-visible:outline-offset-[-2px]"
                     >
                       <span className={`text-xs font-bold font-display w-6 text-center ${rankColor}`}>
                         {idx + 1}
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-nf-text truncate group-hover:text-fandex-primary transition-fast">
+                          <span className="text-xs text-nf-text truncate group-hover:text-fandex-primary transition duration-fast">
                             {chapter.file_name}
                           </span>
                           <span className="text-xs text-nf-text-tertiary ml-2 flex-shrink-0">
@@ -267,7 +270,7 @@ export default function WritingStats() {
                         </div>
                         <div className="h-1 bg-nf-bg-hover overflow-hidden">
                           <div
-                            className={`h-full transition-fast ${
+                            className={`h-full transition duration-fast ${
                               idx === 0
                                 ? "bg-fandex-tertiary"
                                 : idx === 1

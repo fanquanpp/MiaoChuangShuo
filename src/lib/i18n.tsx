@@ -70,6 +70,15 @@ const zhCN: TranslationDict = {
   "launcher.daysAgo": "{n}天前",
   "launcher.unknownTime": "未知",
   "launcher.chapterUnit": "章",
+  "launcher.monthsAgo": "{n}个月前",
+  "launcher.yearsAgo": "{n}年前",
+  "launcher.createSuccess": "项目创建成功",
+  "launcher.importSuccess": "项目导入成功: {name}",
+  "launcher.scanSuccess": "扫描完成，找到 {count} 个项目",
+  "launcher.noSearchResults": "未找到匹配「{query}」的项目",
+  "launcher.clearSearch": "清除搜索",
+  "launcher.continueWriting": "继续创作",
+  "launcher.lastOpened": "上次打开",
 
   // 启动器 - 项目类型名称
   "launcher.typeEpic": "西幻史诗",
@@ -155,6 +164,7 @@ const zhCN: TranslationDict = {
   "sidebar.categorySection": "分类",
   "sidebar.recentSection": "最近",
   "sidebar.toolSection": "工具",
+  "sidebar.extensionSection": "设定扩展",
   "sidebar.switchLight": "切换到亮色主题",
   "sidebar.switchDark": "切换到暗色主题",
   "sidebar.light": "亮色",
@@ -198,6 +208,7 @@ const zhCN: TranslationDict = {
   "timeline.mainBranch": "主线",
   "timeline.allBranches": "全部",
   "timeline.confirmDelete": "确定删除事件 \"{title}\" 吗?",
+  "timeline.deleteEvent": "删除事件",
   "timeline.deleteFailed": "删除失败: {error}",
   "timeline.editEvent": "编辑事件",
   "timeline.newEvent": "新建事件",
@@ -271,6 +282,7 @@ const zhCN: TranslationDict = {
 
   // 大纲视图
   "outline.open": "打开大纲",
+  "outline.collapse": "收起大纲",
   "outline.title": "大纲",
   "outline.noHeadings": "当前文档暂无标题",
   "outline.addHeadingsHint": "使用 Ctrl+1 / Ctrl+2 添加标题",
@@ -418,6 +430,15 @@ const enUS: TranslationDict = {
   "launcher.daysAgo": "{n} days ago",
   "launcher.unknownTime": "Unknown",
   "launcher.chapterUnit": "ch",
+  "launcher.monthsAgo": "{n} months ago",
+  "launcher.yearsAgo": "{n} years ago",
+  "launcher.createSuccess": "Project created successfully",
+  "launcher.importSuccess": "Project imported: {name}",
+  "launcher.scanSuccess": "Scan complete, found {count} projects",
+  "launcher.noSearchResults": "No projects found matching \"{query}\"",
+  "launcher.clearSearch": "Clear search",
+  "launcher.continueWriting": "Continue Writing",
+  "launcher.lastOpened": "Last opened",
 
   // Launcher - Project type names
   "launcher.typeEpic": "Epic Fantasy",
@@ -505,6 +526,7 @@ const enUS: TranslationDict = {
   "sidebar.categorySection": "Categories",
   "sidebar.recentSection": "Recent",
   "sidebar.toolSection": "Tools",
+  "sidebar.extensionSection": "Extensions",
   "sidebar.switchLight": "Switch to Light",
   "sidebar.switchDark": "Switch to Dark",
   "sidebar.light": "Light",
@@ -548,6 +570,7 @@ const enUS: TranslationDict = {
   "timeline.mainBranch": "Main",
   "timeline.allBranches": "All",
   "timeline.confirmDelete": 'Delete event "{title}"?',
+  "timeline.deleteEvent": "Delete event",
   "timeline.deleteFailed": "Delete failed: {error}",
   "timeline.editEvent": "Edit Event",
   "timeline.newEvent": "New Event",
@@ -620,6 +643,7 @@ const enUS: TranslationDict = {
 
   // Outline View
   "outline.open": "Open outline",
+  "outline.collapse": "Collapse outline",
   "outline.title": "Outline",
   "outline.noHeadings": "No headings in current document",
   "outline.addHeadingsHint": "Use Ctrl+1 / Ctrl+2 to add headings",

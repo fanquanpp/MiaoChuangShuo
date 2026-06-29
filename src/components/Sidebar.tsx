@@ -11,7 +11,7 @@
 // 4. 高亮当前选中分类
 // 5. 触发分类切换
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Users,
   Globe,
@@ -27,16 +27,20 @@ import {
   BarChart3,
   Search,
   Clock,
+  Layers,
 } from "lucide-react";
 import {
   useAppStore,
   CATEGORY_NAMES,
   CATEGORY_DIRS,
+  getCategoryName,
+  getCategoryDir,
   type SidebarCategory,
 } from "../lib/store";
 import { useThemeStore } from "../lib/themeStore";
 import { getRecentFiles, type RecentFile } from "../lib/recentFiles";
 import { findFileByPath } from "../lib/fileTreeUtils";
+import { getTypeSpecificDirs } from "../lib/templateRegistry";
 import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
 
@@ -80,12 +84,23 @@ interface SidebarProps {
 //   2. 中间显示分类列表
 //   3. 底部显示主题切换与新建文件按钮
 export default function Sidebar({ onCreateFile }: SidebarProps) {
-  const { currentProject, projectTree, activeCategory, selectedFile, setActiveCategory, setSelectedFile, closeProject } =
-    useAppStore();
+  const currentProject = useAppStore((s) => s.currentProject);
+  const projectTree = useAppStore((s) => s.projectTree);
+  const activeCategory = useAppStore((s) => s.activeCategory);
+  const selectedFile = useAppStore((s) => s.selectedFile);
+  const setActiveCategory = useAppStore((s) => s.setActiveCategory);
+  const setSelectedFile = useAppStore((s) => s.setSelectedFile);
+  const closeProject = useAppStore((s) => s.closeProject);
   const { theme, toggleTheme } = useThemeStore();
   const { t } = useI18n();
   const { handleBackToLauncher } = useAutoSaveOnExit();
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+
+  // 根据项目类型获取专属目录列表
+  const typeSpecificDirs = useMemo(() => {
+    if (!currentProject) return [];
+    return getTypeSpecificDirs(currentProject.meta.type);
+  }, [currentProject]);
 
   // 加载最近文件（仅显示当前项目的，文件切换时也刷新排序）
   useEffect(() => {
@@ -103,7 +118,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
       <div className="px-3 py-3 border-b border-nf-border-light">
         <button
           onClick={handleBackToLauncher}
-          className="flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition-fast mb-1.5"
+          className="flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition duration-fast mb-1.5"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
           {t("app.back")}
@@ -129,7 +144,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
               key={cat}
               onClick={() => setActiveCategory(cat)}
               title={CATEGORY_NAMES[cat]}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-fast relative ${
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition duration-fast relative ${
                 isActive
                   ? "bg-fandex-primary/10 text-fandex-primary"
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -144,6 +159,36 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
             </button>
           );
         })}
+
+        {/* 类型专属目录（模板扩展） */}
+        {typeSpecificDirs.length > 0 && (
+          <>
+            <div className="px-3 py-1 mt-3 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+              {t("sidebar.extensionSection")}
+            </div>
+            {typeSpecificDirs.map((dirName) => {
+              const isActive = activeCategory === dirName;
+              return (
+                <button
+                  key={dirName}
+                  onClick={() => setActiveCategory(dirName as SidebarCategory)}
+                  title={dirName}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition duration-fast relative ${
+                    isActive
+                      ? "bg-fandex-primary/10 text-fandex-primary"
+                      : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                  }`}
+                >
+                  {isActive && (
+                    <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-fandex-primary"></span>
+                  )}
+                  <Layers className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">{dirName}</span>
+                </button>
+              );
+            })}
+          </>
+        )}
 
         {/* 最近文件（仅当前项目） */}
         {recentFiles.length > 0 && (
@@ -163,15 +208,22 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
                     if (!node) return;
                     // 自动切换到文件所属分类
                     const topDir = rf.relative_path.split(/[\\/]/)[0] || "";
+                    // 先检查固定分类
+                    let matched = false;
                     for (const [cat, dir] of Object.entries(CATEGORY_DIRS)) {
                       if (dir === topDir) {
                         setActiveCategory(cat as SidebarCategory);
+                        matched = true;
                         break;
                       }
                     }
+                    // 固定分类未匹配，检查是否为类型专属目录
+                    if (!matched && typeSpecificDirs.includes(topDir)) {
+                      setActiveCategory(topDir as SidebarCategory);
+                    }
                     setSelectedFile(node);
                   }}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-fast truncate relative ${
+                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition duration-fast truncate relative ${
                     isActive
                       ? "bg-fandex-primary/10 text-fandex-primary"
                       : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -200,7 +252,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
               key={cat}
               onClick={() => setActiveCategory(cat)}
               title={CATEGORY_NAMES[cat]}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-fast relative ${
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition duration-fast relative ${
                 isActive
                   ? "bg-fandex-tertiary/10 text-fandex-tertiary"
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -222,7 +274,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         <button
           onClick={toggleTheme}
           title={theme === "dark" ? t("sidebar.switchLight") : t("sidebar.switchDark")}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary hover:bg-nf-bg-hover transition-fast"
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary hover:bg-nf-bg-hover transition duration-fast"
         >
           {theme === "dark" ? (
             <Sun className="w-3.5 h-3.5" />
@@ -233,7 +285,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         </button>
         <button
           onClick={onCreateFile}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary hover:bg-nf-bg-hover transition-fast"
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary hover:bg-nf-bg-hover transition duration-fast"
         >
           <Plus className="w-3.5 h-3.5" />
           {t("sidebar.newFile")}

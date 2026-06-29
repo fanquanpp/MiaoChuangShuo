@@ -17,6 +17,8 @@ export interface CategorySlice {
   setActiveCategory: (category: SidebarCategory) => void;
   setSelectedFile: (file: FileNode | null) => void;
   setActiveFileWordCount: (count: number) => void;
+  /** 一次性设置分类和文件，避免 setActiveCategory 重置 selectedFile 的竞态 */
+  navigateToFile: (file: FileNode, category: SidebarCategory) => void;
 }
 
 export const createCategorySlice: StateCreator<CategorySlice> = (set) => ({
@@ -30,4 +32,7 @@ export const createCategorySlice: StateCreator<CategorySlice> = (set) => ({
   setSelectedFile: (file) => set({ selectedFile: file, activeFileWordCount: 0 }),
 
   setActiveFileWordCount: (count) => set({ activeFileWordCount: count }),
+
+  navigateToFile: (file, category) =>
+    set({ activeCategory: category, selectedFile: file, activeFileWordCount: 0 }),
 });

@@ -20,9 +20,6 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
       shortcuts: [
         { keys: "Ctrl + B", desc: t("shortcuts.bold") },
         { keys: "Ctrl + I", desc: t("shortcuts.italic") },
-        { keys: "Ctrl + U", desc: t("shortcuts.underline") },
-        { keys: "Ctrl + 1", desc: t("shortcuts.heading1") },
-        { keys: "Ctrl + 2", desc: t("shortcuts.heading2") },
         { keys: "Ctrl + Shift + P", desc: t("shortcuts.poetryFormat") },
         { keys: "Ctrl + Shift + L", desc: t("shortcuts.lyricsFormat") },
         { keys: "Ctrl + Z", desc: t("shortcuts.undo") },
@@ -36,7 +33,6 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
       shortcuts: [
         { keys: "?", desc: t("shortcuts.togglePanel") },
         { keys: "Ctrl + K", desc: t("shortcuts.commandPalette") },
-        { keys: "Ctrl + Shift + F", desc: t("shortcuts.globalSearch") },
         { keys: "Escape", desc: t("shortcuts.close") },
         { keys: "F11", desc: t("shortcuts.focusMode") },
       ],
@@ -105,18 +101,31 @@ export default function ShortcutPanel() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-xl bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setOpen(false);
+        }
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="shortcuts-title"
+        className="w-full max-w-xl bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light">
           <div className="flex items-center gap-2.5">
             <Keyboard className="w-4 h-4 text-fandex-primary" />
-            <h2 className="fandex-bar-left text-lg font-bold font-display text-nf-text">
+            <h2 id="shortcuts-title" className="fandex-bar-left text-lg font-bold font-display text-nf-text">
               {t("shortcuts.title")}
             </h2>
           </div>
           <button
             onClick={() => setOpen(false)}
-            className="p-1.5 hover:bg-nf-bg-hover text-nf-text-tertiary hover:text-nf-text transition-fast"
+            className="p-1.5 hover:bg-nf-bg-hover text-nf-text-tertiary hover:text-nf-text transition duration-fast"
             aria-label={t("shortcuts.closePanel")}
           >
             <X className="w-5 h-5" />
@@ -137,7 +146,7 @@ export default function ShortcutPanel() {
                 {group.shortcuts.map((sc) => (
                   <div
                     key={sc.keys + sc.desc}
-                    className="flex items-center justify-between py-1.5 px-2 hover:bg-nf-bg-hover transition-fast"
+                    className="flex items-center justify-between py-1.5 px-2 hover:bg-nf-bg-hover transition duration-fast"
                   >
                     <span className="text-sm text-nf-text">{sc.desc}</span>
                     <div className="flex gap-1">

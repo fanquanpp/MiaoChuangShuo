@@ -102,14 +102,14 @@ export function FocusTimer({
       </div>
       <button
         onClick={running ? pauseTimer : startTimer}
-        className="text-nf-text-tertiary hover:text-fandex-primary transition-fast"
+        className="text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
         title={running ? t("timer.pause") : t("timer.start")}
       >
         {running ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
       </button>
       <button
         onClick={resetTimer}
-        className="text-nf-text-tertiary hover:text-nf-text transition-fast"
+        className="text-nf-text-tertiary hover:text-nf-text transition duration-fast"
         title={t("timer.reset")}
       >
         <RotateCcw className="w-3 h-3" />
@@ -118,7 +118,7 @@ export function FocusTimer({
       <div className="relative">
         <button
           onClick={() => setShowPresets((v) => !v)}
-          className="flex items-center gap-0.5 text-nf-text-tertiary hover:text-nf-text transition-fast"
+          className="flex items-center gap-0.5 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
           title={t("timer.setDuration")}
         >
           <span className="font-mono">{targetMinutes}m</span>
@@ -133,13 +133,13 @@ export function FocusTimer({
                   setDuration(d);
                   setShowPresets(false);
                 }}
-                className={`block w-full text-left px-3 py-1 hover:bg-nf-bg-hover transition-fast font-mono ${
+                className={`block w-full text-left px-3 py-1 hover:bg-nf-bg-hover transition duration-fast font-mono ${
                   d === targetMinutes
                     ? "text-fandex-primary"
                     : "text-nf-text-secondary"
                 }`}
               >
-                {t("timer.minutes", { num: d })}
+                {t("timer.minutes", { d })}
               </button>
             ))}
           </div>
@@ -148,7 +148,7 @@ export function FocusTimer({
 
       <button
         onClick={onClose}
-        className="text-nf-text-tertiary hover:text-nf-text transition-fast ml-1"
+        className="text-nf-text-tertiary hover:text-nf-text transition duration-fast ml-1"
         title={t("timer.close")}
       >
         <X className="w-3 h-3" />

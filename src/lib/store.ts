@@ -81,5 +81,20 @@ export const useAppStore = create<AppState>()((...args) => ({
   ...createProjectSlice(...args),
 }));
 
+/**
+ * 获取分类对应的目录名，动态分类（模板专属目录）回退为分类名本身。
+ * 用于 FileList/Workspace 等组件按分类定位文件目录。
+ */
+export function getCategoryDir(category: string): string {
+  return CATEGORY_DIRS[category as SidebarCategory] ?? category;
+}
+
+/**
+ * 获取分类的显示名称，动态分类回退为分类名本身。
+ */
+export function getCategoryName(category: string): string {
+  return CATEGORY_NAMES[category as SidebarCategory] ?? category;
+}
+
 // 重新导出 ViewMode 供外部使用
 export type { ViewMode } from "./stores/viewSlice";

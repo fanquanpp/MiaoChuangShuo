@@ -4,7 +4,7 @@
 // 点击大纲项时滚动编辑器到对应行。
 
 import { useState, useMemo } from "react";
-import { ListTree, Hash, X } from "lucide-react";
+import { ListTree, Hash, ChevronRight } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { extractOutlineFromText, type OutlineHeading } from "../lib/outlineParser";
 
@@ -41,7 +41,7 @@ export default function OutlineView({ htmlContent }: OutlineViewProps) {
     return (
       <button
         onClick={() => setCollapsed(false)}
-        className="fandex-nav-blur absolute right-2 bottom-2 p-1.5 border border-nf-border-light bg-nf-bg-card hover:bg-nf-bg-hover transition-fast z-10"
+        className="fandex-nav-blur absolute right-2 bottom-2 p-1.5 border border-nf-border-light bg-nf-bg-card hover:bg-nf-bg-hover transition duration-fast z-10"
         title={t("outline.open")}
       >
         <ListTree className="w-4 h-4 text-nf-text-tertiary" />
@@ -61,9 +61,10 @@ export default function OutlineView({ htmlContent }: OutlineViewProps) {
         </div>
         <button
           onClick={() => setCollapsed(true)}
-          className="text-nf-text-tertiary hover:text-nf-text transition-fast"
+          className="text-nf-text-tertiary hover:text-nf-text transition duration-fast"
+          title={t("outline.collapse")}
         >
-          <X className="w-3.5 h-3.5" />
+          <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -79,7 +80,7 @@ export default function OutlineView({ htmlContent }: OutlineViewProps) {
             <button
               key={`${h.line}-${h.text}`}
               onClick={() => handleClick(h.line)}
-              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-left text-nf-text hover:bg-nf-bg-hover transition-fast truncate"
+              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-left text-nf-text hover:bg-nf-bg-hover transition duration-fast truncate"
               style={{ paddingLeft: h.level === 1 ? "12px" : "24px" }}
               title={h.text}
             >

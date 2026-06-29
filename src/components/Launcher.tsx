@@ -16,16 +16,19 @@ import {
   Search,
   FolderSync,
   FolderOpen,
+  FolderSearch,
   BookOpen,
   PenLine,
   ArrowRight,
   Loader2,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import {
   scanProjects,
   importProject,
+  pickDirectory,
   type ProjectInfo,
 } from "../lib/api";
 import ProjectCard, { type ProjectData } from "./ProjectCard";
@@ -34,8 +37,11 @@ import { ProjectGridSkeleton } from "./SkeletonComponents";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 
+const SCAN_DIR_KEY = "novelforge:scanDir:v1";
+
 export default function Launcher() {
-  const { openProject, currentProject, closeProject } = useAppStore();
+  const openProject = useAppStore((s) => s.openProject);
+  const closeProject = useAppStore((s) => s.closeProject);
   const { t } = useI18n();
   const { showToast } = useToast();
   const [scanDir, setScanDir] = useState("");
@@ -43,7 +49,7 @@ export default function Launcher() {
   const [loading, setLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("1.3.0"); // 默认值
+  const [appVersion, setAppVersion] = useState("1.4.0"); // 默认值
 
   const handleScan = useCallback(async () => {
     if (!scanDir) return;
@@ -51,6 +57,7 @@ export default function Launcher() {
     try {
       const list = await scanProjects(scanDir);
       setProjects(list);
+      showToast("success", t("launcher.scanSuccess", { count: list.length }));
     } catch (e) {
       showToast("error", t("launcher.scanFailed", { error: String(e) }));
     } finally {
@@ -60,7 +67,9 @@ export default function Launcher() {
 
   const handleImport = useCallback(async () => {
     try {
-      const project = await importProject("");
+      const dir = await pickDirectory();
+      if (!dir) return; // 用户取消选择
+      const project = await importProject(dir);
       if (project) {
         setProjects((prev) => {
           const idx = prev.findIndex((p) => p.path === project.path);
@@ -71,17 +80,26 @@ export default function Launcher() {
           }
           return [project, ...prev];
         });
+        showToast("success", t("launcher.importSuccess", { name: project.meta.name }));
       }
     } catch (e) {
       showToast("error", t("launcher.importFailed", { error: String(e) }));
     }
   }, [t, showToast]);
 
-  useEffect(() => {
-    if (currentProject) {
-      closeProject();
+  const handleBrowseScanDir = useCallback(async () => {
+    try {
+      const dir = await pickDirectory();
+      if (dir) setScanDir(dir);
+    } catch {
+      // 用户取消选择，静默忽略
     }
   }, []);
+
+  // 启动时关闭已有项目（从 workspace 返回场景）
+  useEffect(() => {
+    closeProject();
+  }, [closeProject]);
 
   // 从 package.json 读取版本号（而非硬编码）
   useEffect(() => {
@@ -93,6 +111,33 @@ export default function Launcher() {
         // 保持默认值
       });
   }, []);
+
+  // 从 localStorage 恢复扫描目录并自动扫描
+  useEffect(() => {
+    const savedDir = localStorage.getItem(SCAN_DIR_KEY);
+    if (savedDir) {
+      setScanDir(savedDir);
+      // 自动触发扫描
+      (async () => {
+        setLoading(true);
+        try {
+          const list = await scanProjects(savedDir);
+          setProjects(list);
+        } catch {
+          // 静默失败，用户可手动重试
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, []);
+
+  // 持久化扫描目录到 localStorage
+  useEffect(() => {
+    if (scanDir) {
+      localStorage.setItem(SCAN_DIR_KEY, scanDir);
+    }
+  }, [scanDir]);
 
   const filteredProjects = useMemo(() => {
     if (!searchQuery.trim()) return projects;
@@ -110,12 +155,12 @@ export default function Launcher() {
       .slice(0, 9);
   }, [filteredProjects]);
 
-  const formatWordCount = (n: number) => {
+  const formatWordCount = useCallback((n: number) => {
     if (n >= 10000) return `${(n / 10000).toFixed(1)}${t("launcher.wanWords")}`;
     return `${n}${t("launcher.wordUnit")}`;
-  };
+  }, [t]);
 
-  const formatTimeAgo = (ts: string) => {
+  const formatTimeAgo = useCallback((ts: string) => {
     const now = Date.now();
     const diff = now - new Date(ts).getTime();
     const minutes = Math.floor(diff / 60000);
@@ -125,10 +170,13 @@ export default function Launcher() {
     if (hours < 24) return t("launcher.hoursAgo", { n: hours });
     const days = Math.floor(hours / 24);
     if (days < 30) return t("launcher.daysAgo", { n: days });
-    return t("launcher.unknownTime");
-  };
+    const months = Math.floor(days / 30);
+    if (months < 12) return t("launcher.monthsAgo", { n: months });
+    const years = Math.floor(months / 12);
+    return t("launcher.yearsAgo", { n: years });
+  }, [t]);
 
-  const toProjectData = (p: ProjectInfo): ProjectData => {
+  const toProjectData = useCallback((p: ProjectInfo): ProjectData => {
     const typeI18nMap: Record<string, string> = {
       epic: t("launcher.typeEpic"),
       standard: t("launcher.typeStandard"),
@@ -169,7 +217,32 @@ export default function Launcher() {
       updated: formatTimeAgo(p.meta.updated_at),
       gradient: gradients[p.meta.type] || "from-nf-border to-nf-border/40",
     };
-  };
+  }, [t, formatWordCount, formatTimeAgo]);
+
+  const handleCreateSuccess = useCallback(async (projectPath: string) => {
+    setShowCreateDialog(false);
+    try {
+      const project = await importProject(projectPath);
+      setProjects((prev) => {
+        const idx = prev.findIndex((p) => p.path === projectPath);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = project;
+          return copy;
+        }
+        return [project, ...prev];
+      });
+      showToast("success", t("launcher.createSuccess"));
+      // 自动打开新创建的项目
+      openProject(project);
+    } catch (e) {
+      showToast("error", t("launcher.importFailed", { error: String(e) }));
+    }
+  }, [openProject, t, showToast]);
+
+  const hasProjects = projects.length > 0;
+  const hasSearchResults = recentProjects.length > 0;
+  const isSearching = searchQuery.trim().length > 0;
 
   return (
     <div className="flex h-screen bg-nf-bg overflow-hidden">
@@ -190,7 +263,7 @@ export default function Launcher() {
         <nav className="flex-1 px-4 space-y-1">
           <button
             onClick={() => setShowCreateDialog(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-fast"
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition duration-fast"
           >
             <BookOpen className="w-4 h-4" />
             {t("launcher.createNew")}
@@ -198,7 +271,7 @@ export default function Launcher() {
           </button>
           <button
             onClick={handleImport}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light hover:border-fandex-primary/40 text-sm transition-fast"
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light hover:border-fandex-primary/40 text-sm transition duration-fast"
           >
             <FolderOpen className="w-4 h-4" />
             {t("launcher.importLocal")}
@@ -210,18 +283,27 @@ export default function Launcher() {
             <FolderSync className="w-3 h-3" />
             {t("launcher.setScanDir")}
           </div>
-          <input
-            type="text"
-            value={scanDir}
-            onChange={(e) => setScanDir(e.target.value)}
-            placeholder={t("launcher.scanDirPlaceholder")}
-            className="w-full bg-nf-bg border border-nf-border-light px-2.5 py-1.5 text-xs text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60"
-          />
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={scanDir}
+              onChange={(e) => setScanDir(e.target.value)}
+              placeholder={t("launcher.scanDirPlaceholder")}
+              className="flex-1 bg-nf-bg border border-nf-border-light px-2.5 py-1.5 text-xs text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60"
+            />
+            <button
+              onClick={handleBrowseScanDir}
+              title={t("launcher.scanDirPlaceholder")}
+              className="flex-shrink-0 px-2 py-1.5 text-xs text-nf-text-tertiary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition duration-fast"
+            >
+              <FolderSearch className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <div className="flex gap-1">
             <button
               onClick={handleScan}
               disabled={!scanDir || loading}
-              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast disabled:opacity-40"
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast disabled:opacity-40"
             >
               {loading ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -230,12 +312,18 @@ export default function Launcher() {
               )}
               {t("launcher.scanDir")}
             </button>
-            <button
-              onClick={() => setScanDir("")}
-              className="px-2 py-1.5 text-xs text-nf-text-tertiary hover:text-nf-text border border-nf-border-light hover:bg-nf-bg-hover transition-fast"
-            >
-              {t("launcher.changeDir")}
-            </button>
+            {scanDir && (
+              <button
+                onClick={() => {
+                  setScanDir("");
+                  setProjects([]);
+                  localStorage.removeItem(SCAN_DIR_KEY);
+                }}
+                className="px-2 py-1.5 text-xs text-nf-text-tertiary hover:text-nf-text border border-nf-border-light hover:bg-nf-bg-hover transition duration-fast"
+              >
+                {t("launcher.changeDir")}
+              </button>
+            )}
           </div>
         </div>
 
@@ -264,38 +352,48 @@ export default function Launcher() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("launcher.searchPlaceholder")}
-              className="w-64 bg-nf-bg-sidebar border border-nf-border-light pl-9 pr-3 py-1.5 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60"
+              className="w-64 bg-nf-bg-sidebar border border-nf-border-light pl-9 pr-8 py-1.5 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60"
             />
+            {isSearching && (
+              <button
+                onClick={() => setSearchQuery("")}
+                title={t("launcher.clearSearch")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-8">
           {loading ? (
             <ProjectGridSkeleton count={6} />
+          ) : !hasProjects && !isSearching ? (
+            <div className="text-center py-12 text-nf-text-tertiary text-sm">
+              <BookOpen className="w-12 h-12 text-nf-border mx-auto mb-3" />
+              {t("launcher.noProjects")}
+            </div>
+          ) : isSearching && !hasSearchResults ? (
+            <div className="text-center py-12 text-nf-text-tertiary text-sm">
+              <Search className="w-12 h-12 text-nf-border mx-auto mb-3" />
+              {t("launcher.noSearchResults", { query: searchQuery })}
+            </div>
           ) : (
-            <>
-              <section className="mb-10">
-                <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-4">
-                  {t("launcher.recentProjectsCount", { count: recentProjects.length })}
-                </h3>
-                {recentProjects.length === 0 ? (
-                  <div className="text-center py-12 text-nf-text-tertiary text-sm">
-                    <BookOpen className="w-12 h-12 text-nf-border mx-auto mb-3" />
-                    {t("launcher.noProjects")}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {recentProjects.map((p) => (
-                      <ProjectCard
-                        key={p.path}
-                        project={toProjectData(p)}
-                        projectInfo={p}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            </>
+            <section className="mb-10">
+              <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-4">
+                {t("launcher.recentProjectsCount", { count: recentProjects.length })}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                {recentProjects.map((p) => (
+                  <ProjectCard
+                    key={p.path}
+                    project={toProjectData(p)}
+                    projectInfo={p}
+                  />
+                ))}
+              </div>
+            </section>
           )}
         </div>
       </main>
@@ -303,10 +401,7 @@ export default function Launcher() {
       {showCreateDialog && (
         <CreateProjectDialog
           onClose={() => setShowCreateDialog(false)}
-          onSuccess={(projectPath: string) => {
-            setProjects((prev) => [{ path: projectPath, meta: { name: projectPath.split(/[\\/]/).pop() || "", type: "standard", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), version: "1.0.0", author: "", description: "", word_count: 0 }, word_count: 0, chapter_count: 0 }, ...prev]);
-            setShowCreateDialog(false);
-          }}
+          onSuccess={handleCreateSuccess}
         />
       )}
     </div>

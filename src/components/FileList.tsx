@@ -23,7 +23,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
-import { useAppStore, CATEGORY_DIRS, type SidebarCategory } from "../lib/store";
+import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
 import type { FileNode } from "../lib/api";
 import { deletePath, readProjectTree, renamePath } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
@@ -69,7 +69,7 @@ function TreeNodeList({
     return (
       <div>
         <div
-          className="group flex items-center gap-2 px-3 py-2 cursor-pointer transition-fast border border-transparent hover:bg-nf-bg-hover hover:text-nf-text text-nf-text-secondary"
+          className="group flex items-center gap-2 px-3 py-2 cursor-pointer transition duration-fast border border-transparent hover:bg-nf-bg-hover hover:text-nf-text text-nf-text-secondary"
           style={{ paddingLeft: `${12 + depth * 16}px` }}
           onClick={() => hasChildren && setExpanded(!expanded)}
         >
@@ -116,7 +116,7 @@ function TreeNodeList({
     <div
       onClick={() => onSelect(node)}
       style={{ paddingLeft: `${12 + depth * 16}px` }}
-      className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-fast border ${
+      className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition duration-fast border ${
         isSelected
           ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
           : "text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text border-transparent"
@@ -135,13 +135,13 @@ function TreeNodeList({
       </span>
       <button
         onClick={(e) => onRename(node, e)}
-        className="opacity-0 group-hover:opacity-100 p-1 text-nf-text-tertiary hover:text-fandex-primary transition-fast"
+        className="opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
       >
         <PenLine className="w-3.5 h-3.5" />
       </button>
       <button
         onClick={(e) => onDelete(node, e)}
-        className="opacity-0 group-hover:opacity-100 p-1 text-nf-text-tertiary hover:text-red-400 transition-fast"
+        className="opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-red-400 transition duration-fast"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
@@ -176,7 +176,7 @@ function TreeNodeGrid({
     return (
       <div className="col-span-2">
         <div
-          className="flex items-center gap-2 p-2 cursor-pointer hover:bg-nf-bg-hover transition-fast border-b border-nf-border-light"
+          className="flex items-center gap-2 p-2 cursor-pointer hover:bg-nf-bg-hover transition duration-fast border-b border-nf-border-light"
           onClick={() => hasChildren && setExpanded(!expanded)}
         >
           {hasChildren ? (
@@ -224,7 +224,7 @@ function TreeNodeGrid({
   return (
     <div
       onClick={() => onSelect(node)}
-      className={`group relative p-3 cursor-pointer transition-fast bg-nf-bg ${
+      className={`group relative p-3 cursor-pointer transition duration-fast bg-nf-bg ${
         isSelected
           ? "bg-fandex-primary/10 border-fandex-primary"
           : "hover:bg-nf-bg-hover"
@@ -244,13 +244,13 @@ function TreeNodeGrid({
       </div>
       <button
         onClick={(e) => onRename(node, e)}
-        className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 p-1 text-nf-text-tertiary hover:text-fandex-primary transition-fast"
+        className="absolute top-2 right-8 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
       >
         <PenLine className="w-3.5 h-3.5" />
       </button>
       <button
         onClick={(e) => onDelete(node, e)}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-nf-text-tertiary hover:text-red-400 transition-fast"
+        className="absolute top-2 right-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-red-400 transition duration-fast"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
@@ -259,15 +259,18 @@ function TreeNodeGrid({
 }
 
 export default function FileList({ onCreateFile }: FileListProps) {
-  const { projectTree, activeCategory, selectedFile, setSelectedFile, activeFileWordCount } =
-    useAppStore();
+  const projectTree = useAppStore((s) => s.projectTree);
+  const activeCategory = useAppStore((s) => s.activeCategory);
+  const selectedFile = useAppStore((s) => s.selectedFile);
+  const setSelectedFile = useAppStore((s) => s.setSelectedFile);
+  const activeFileWordCount = useAppStore((s) => s.activeFileWordCount);
   const { t } = useI18n();
   const { showToast } = useToast();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
   const [renameTarget, setRenameTarget] = useState<FileNode | null>(null);
 
-  const dirName = CATEGORY_DIRS[activeCategory as SidebarCategory];
+  const dirName = getCategoryDir(activeCategory);
 
   const children = useMemo(() => {
     const dir = findDirByName(projectTree, dirName);
@@ -291,6 +294,10 @@ export default function FileList({ onCreateFile }: FileListProps) {
       showToast("success", t("filelist.deleted", { name: node.name }));
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
+      // 如果删除的是当前选中文件，清除选中状态
+      if (useAppStore.getState().selectedFile?.relative_path === node.relative_path) {
+        useAppStore.getState().setSelectedFile(null);
+      }
     } catch (e) {
       showToast("error", t("filelist.deleteFailed", { error: String(e) }));
     }
@@ -311,14 +318,16 @@ export default function FileList({ onCreateFile }: FileListProps) {
     }
     const { currentProject } = useAppStore.getState();
     if (!currentProject) return;
+    // 确保 .txt 扩展名
+    const ensuredName = newName.endsWith(".txt") ? newName : `${newName}.txt`;
     const dirPath = node.relative_path.substring(
       0,
       node.relative_path.lastIndexOf("/") + 1
     );
-    const newRelPath = dirPath + newName;
+    const newRelPath = dirPath + ensuredName;
     try {
       await renamePath(currentProject.path, node.relative_path, newRelPath);
-      showToast("success", t("filelist.renamed", { name: newName }));
+      showToast("success", t("filelist.renamed", { name: ensuredName }));
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
     } catch (e) {
@@ -339,7 +348,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setViewMode("grid")}
-            className={`p-1.5 transition-fast border ${
+            className={`p-1.5 transition duration-fast border ${
               viewMode === "grid"
                 ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
                 : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
@@ -350,7 +359,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
           </button>
           <button
             onClick={() => setViewMode("list")}
-            className={`p-1.5 transition-fast border ${
+            className={`p-1.5 transition duration-fast border ${
               viewMode === "list"
                 ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
                 : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
@@ -370,7 +379,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
             <p className="text-sm text-nf-text-tertiary mb-3">{t("filelist.empty")}</p>
             <button
               onClick={onCreateFile}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition-fast"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition duration-fast"
             >
               <FilePlus className="w-4 h-4" />
               {t("filelist.createFirst")}

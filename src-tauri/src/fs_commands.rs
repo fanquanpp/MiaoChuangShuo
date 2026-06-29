@@ -26,9 +26,6 @@ use crate::project_template::{
 /// 输出: Result<PathBuf, String> 规范化后的目标路径或错误
 /// 流程: 规范化两个路径并验证包含关系，防止目录穿越攻击
 fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf, String> {
-    let target_path = PathBuf::from(target)
-        .canonicalize()
-        .map_err(|e| format!("无法解析路径: {}", e))?;
     let root_path = PathBuf::from(project_root)
         .canonicalize()
         .map_err(|e| format!("无法解析项目路径: {}", e))?;
@@ -37,16 +34,50 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
         return Err("项目路径不存在".to_string());
     }
 
+    let target_path = PathBuf::from(target);
+
+    // 如果目标路径已存在，直接 canonicalize；否则 canonicalize 父目录后拼接文件名
+    let canonical = if target_path.exists() {
+        target_path
+            .canonicalize()
+            .map_err(|e| format!("无法解析路径: {}", e))?
+    } else {
+        // 目标路径不存在（如新建文件），canonicalize 父目录
+        let parent = target_path.parent().unwrap_or(std::path::Path::new(""));
+        if parent.exists() {
+            let canonical_parent = parent
+                .canonicalize()
+                .map_err(|e| format!("无法解析父路径: {}", e))?;
+            let filename = target_path
+                .file_name()
+                .ok_or_else(|| "无效的文件路径".to_string())?;
+            canonical_parent.join(filename)
+        } else {
+            // 父目录也不存在，做词法检查（路径归一化后比较前缀）
+            let target_str = target_path.to_string_lossy().replace('\\', "/");
+            let root_str = root_path.to_string_lossy().replace('\\', "/");
+            if target_str.starts_with(&root_str) {
+                target_path.clone()
+            } else {
+                return Err(format!(
+                    "路径越界: 不允许访问项目目录外的路径 ({} 不在 {} 内)",
+                    target_path.display(),
+                    root_path.display()
+                ));
+            }
+        }
+    };
+
     // 检查目标路径是否以项目根目录开头
-    if !target_path.starts_with(&root_path) {
+    if !canonical.starts_with(&root_path) {
         return Err(format!(
             "路径越界: 不允许访问项目目录外的路径 ({} 不在 {} 内)",
-            target_path.display(),
+            canonical.display(),
             root_path.display()
         ));
     }
 
-    Ok(target_path)
+    Ok(canonical)
 }
 
 /// 创建小说项目命令
@@ -300,11 +331,10 @@ fn count_chinese_and_words(text: &str) -> u64 {
 /// 打开目录选择对话框
 /// 输入: app AppHandle
 /// 输出: Result<Option<String>, String> 选中目录路径或错误
-/// 流程: 调用 Tauri dialog 插件弹出目录选择器
+/// 流程: 调用 Tauri dialog 插件弹出目录选择器，使用异步通道避免阻塞
 #[tauri::command]
 pub async fn pick_directory(app: AppHandle) -> Result<Option<String>, String> {
-    use std::sync::mpsc;
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
         .set_title("选择项目保存位置")
@@ -312,7 +342,7 @@ pub async fn pick_directory(app: AppHandle) -> Result<Option<String>, String> {
             let result = path.map(|p| p.to_string());
             let _ = tx.send(result);
         });
-    let result = rx.recv().map_err(|e| format!("对话框错误: {}", e))?;
+    let result = rx.await.map_err(|e| format!("对话框错误: {}", e))?;
     Ok(result)
 }
 
@@ -637,12 +667,32 @@ fn search_in_file(
                 line.to_lowercase()
             };
             if line_to_check.contains(query) {
-                // 提取匹配位置前后 40 字符作为上下文
+                // 提取匹配位置前后 40 字符作为上下文（安全 UTF-8 字符边界）
                 let match_pos = line_to_check.find(query).unwrap_or(0);
-                let start = if match_pos > 40 { match_pos - 40 } else { 0 };
-                let end = (match_pos + query.len() + 40).min(line.len());
+                let match_end = match_pos + query.len();
+
+                // 找到 start 位置最近的 UTF-8 字符边界（向前扫描）
+                let start = {
+                    let s = if match_pos > 40 { match_pos - 40 } else { 0 };
+                    let mut p = s;
+                    while p < match_pos && !line.is_char_boundary(p) {
+                        p += 1;
+                    }
+                    p
+                };
+
+                // 找到 end 位置最近的 UTF-8 字符边界（向后扫描）
+                let end = {
+                    let e = (match_end + 40).min(line.len());
+                    let mut p = e;
+                    while p < line.len() && !line.is_char_boundary(p) {
+                        p += 1;
+                    }
+                    p
+                };
+
                 let context_before = line[start..match_pos].to_string();
-                let context_after = line[(match_pos + query.len()).min(line.len())..end].to_string();
+                let context_after = line[match_end.min(line.len())..end].to_string();
                 results.push(SearchResult {
                     relative_path: relative_path.clone(),
                     file_name: file_name.clone(),

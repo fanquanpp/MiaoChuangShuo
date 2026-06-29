@@ -44,7 +44,7 @@ export function ToolbarButton({
     <button
       onClick={onClick}
       title={title}
-      className={`p-1.5 transition-fast border ${
+      className={`p-1.5 transition duration-fast border ${
         active
           ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
           : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent"
@@ -153,7 +153,7 @@ export default function EditorToolbar({
           <button
             onClick={onExportTxt}
             title={t("editor.exportTxt")}
-            className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition-fast"
+            className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition duration-fast"
           >
             <Download className="w-3.5 h-3.5" />
             TXT
@@ -162,7 +162,7 @@ export default function EditorToolbar({
         <button
           onClick={onSave}
           disabled={!dirty || saving}
-          className="flex items-center gap-1 px-2 py-1 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 px-2 py-1 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
         >
           {saving ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />

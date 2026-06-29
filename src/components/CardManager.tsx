@@ -17,7 +17,7 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Plus, Trash2, ChevronLeft, Save, FileText, Loader2 } from "lucide-react";
-import { useAppStore, CATEGORY_DIRS } from "../lib/store";
+import { useAppStore, getCategoryDir } from "../lib/store";
 import { readProjectTree, createFile, deletePath, readFile, writeFile } from "../lib/api";
 import type { FileNode } from "../lib/api";
 import { findDirByName } from "../lib/fileTreeUtils";
@@ -39,7 +39,8 @@ interface CardItem {
 }
 
 export default function CardManager({ categoryLabel }: CardManagerProps) {
-  const { currentProject, activeCategory } = useAppStore();
+  const currentProject = useAppStore((s) => s.currentProject);
+  const activeCategory = useAppStore((s) => s.activeCategory);
   const { showToast } = useToast();
   const { t } = useI18n();
   const [cards, setCards] = useState<CardItem[]>([]);
@@ -80,7 +81,7 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
     setLoading(true);
     try {
       const tree = await readProjectTree(currentProject.path);
-      const dirName = CATEGORY_DIRS[activeCategory];
+      const dirName = getCategoryDir(activeCategory);
       const dir = findDirByName(tree, dirName);
       const files = dir?.children.filter((f) => !f.is_dir) || [];
 
@@ -126,7 +127,7 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
     setShowCreatePrompt(false);
     if (!name?.trim() || !currentProject) return;
     try {
-      const dirName = CATEGORY_DIRS[activeCategory];
+      const dirName = getCategoryDir(activeCategory);
       await createFile(currentProject.path, `${dirName}/${name.trim()}.txt`, `${name.trim()}\n\n`);
       await loadCards();
       showToast("success", t("cardmanager.created", { name: name.trim() }));
@@ -204,7 +205,7 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
               setEditingCard(null);
               loadCards();
             }}
-            className="flex items-center gap-1 text-sm text-nf-text-tertiary hover:text-fandex-primary transition-fast"
+            className="flex items-center gap-1 text-sm text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
           >
             <ChevronLeft className="w-4 h-4" />
             {t("cardmanager.backToList")}
@@ -215,7 +216,7 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
             <button
               onClick={handleSave}
               disabled={!dirty || saving}
-              className="flex items-center gap-1 px-3 py-1 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <Save className="w-3.5 h-3.5" />
               {saving ? t("cardmanager.saving") : t("cardmanager.save")}
@@ -239,7 +240,7 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
         <h2 className="fandex-bar-left text-lg font-bold font-display text-nf-text">{categoryLabel}</h2>
         <button
           onClick={handleCreateCard}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast"
         >
           <Plus className="w-4 h-4" />
           {t("cardmanager.newCard", { category: categoryLabel })}
@@ -278,11 +279,11 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
                     handleOpenCard(card);
                   }
                 }}
-                className="group relative bg-nf-bg hover:bg-nf-bg-hover p-4 cursor-pointer transition-fast focus-visible:outline focus-visible:outline-2 focus-visible:outline-fandex-primary focus-visible:outline-offset-[-2px]"
+                className="group relative bg-nf-bg hover:bg-nf-bg-hover p-4 cursor-pointer transition duration-fast focus-visible:outline focus-visible:outline-2 focus-visible:outline-fandex-primary focus-visible:outline-offset-[-2px]"
               >
                 <button
                   onClick={(e) => handleDeleteCard(card, e)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-nf-text-tertiary hover:text-red-400 transition-fast"
+                  className="absolute top-2 right-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto p-1 text-nf-text-tertiary hover:text-red-400 transition duration-fast"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
