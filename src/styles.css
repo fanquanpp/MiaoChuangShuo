@@ -512,3 +512,81 @@ html {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
 }
+
+/* === UI 精细化打磨 === */
+
+/* 平滑滚动 */
+* {
+  scroll-behavior: smooth;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--fandex-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fandex-text-tertiary);
+}
+
+/* 面板切换入场动画 */
+.animate-slide-up {
+  animation: slideUp 0.25s ease-out;
+}
+@keyframes slideUp {
+  0% { transform: translateY(8px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* 选中模板高亮微动效 */
+button[class*="ring-fandex"]:active {
+  transform: scale(0.98);
+}
+
+/* 输入框聚焦过渡 */
+input:focus, textarea:focus, select:focus {
+  transition: border-color 0.15s ease;
+}
+
+/* 对话框遮罩入场 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* 对话框内容缩放入场 */
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+/* 错误抖动 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.animate-shake {
+  animation: shake 0.3s ease-in-out;
+}
+
+/* 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

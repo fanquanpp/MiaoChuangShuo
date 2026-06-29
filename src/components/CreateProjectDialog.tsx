@@ -3,16 +3,17 @@
 // 功能概述：
 // 模态对话框，用于收集新建小说项目所需的参数。
 // 采用 FANDEX 美术风格：直角按钮、左侧色条标题、1px 边框。
+// 模板按文体体裁分类选择，题材作为次级可选项。
 //
 // 模块职责：
-// 1. 收集用户输入的项目元数据
+// 1. 收集用户输入的项目元数据（名称、文体、题材、作者、描述）
 // 2. 调用目录选择器选择保存位置
 // 3. 调用后端 API 创建项目
 // 4. 创建成功后触发回调
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, FolderOpen, Loader2 } from "lucide-react";
-import { createProject, pickDirectory, PROJECT_TEMPLATES, type ProjectType } from "../lib/api";
+import { X, FolderOpen, Loader2, ChevronDown } from "lucide-react";
+import { createProject, pickDirectory, PROJECT_TEMPLATES, NOVEL_GENRES, type ProjectType } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
 // 组件属性接口
@@ -31,6 +32,7 @@ export default function CreateProjectDialog({
   const { t } = useI18n();
   const [name, setName] = useState("");
   const [type, setType] = useState<ProjectType>(defaultType);
+  const [genre, setGenre] = useState("");
   const [author, setAuthor] = useState("");
   const [description, setDescription] = useState("");
   const [parentPath, setParentPath] = useState("");
@@ -50,7 +52,8 @@ export default function CreateProjectDialog({
         e.key === "Enter" &&
         !creating &&
         !(e.target instanceof HTMLTextAreaElement) &&
-        !(e.target instanceof HTMLButtonElement)
+        !(e.target instanceof HTMLButtonElement) &&
+        !(e.target instanceof HTMLSelectElement)
       ) {
         e.preventDefault();
         handleCreateRef.current();
@@ -90,6 +93,7 @@ export default function CreateProjectDialog({
       const projectPath = await createProject({
         name: name.trim(),
         type_str: type,
+        genre: genre,
         author: author.trim(),
         description: description.trim(),
         parent_path: parentPath,
@@ -107,7 +111,7 @@ export default function CreateProjectDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -115,7 +119,7 @@ export default function CreateProjectDialog({
       }}
     >
       <div
-        className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden"
+        className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
@@ -147,10 +151,10 @@ export default function CreateProjectDialog({
             />
           </div>
 
-          {/* 项目类型 */}
+          {/* 文体类型选择 */}
           <div>
             <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
-              {t("project.typeLabel")}
+              {t("project.formTypeLabel")}
             </label>
             <div className="grid grid-cols-2 gap-1 bg-nf-border-light border border-nf-border-light">
               {PROJECT_TEMPLATES.map((tpl) => (
@@ -159,16 +163,38 @@ export default function CreateProjectDialog({
                   onClick={() => setType(tpl.id)}
                   className={`p-3 text-left transition duration-fast bg-nf-bg ${
                     type === tpl.id
-                      ? "bg-fandex-primary/10 border-fandex-primary"
+                      ? "bg-fandex-primary/10 ring-1 ring-fandex-primary ring-inset"
                       : "hover:bg-nf-bg-hover"
                   }`}
                 >
                   <div className="text-sm font-medium font-display text-nf-text">{tpl.name}</div>
-                  <div className="text-xs text-nf-text-tertiary mt-0.5 line-clamp-2">
+                  <div className="text-xs text-nf-text-tertiary mt-0.5 line-clamp-2 leading-relaxed">
                     {tpl.desc}
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* 题材（次级可选） */}
+          <div>
+            <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
+              {t("project.genreLabel")}
+              <span className="text-nf-text-tertiary ml-1">{t("project.genreOptional")}</span>
+            </label>
+            <div className="relative">
+              <select
+                value={genre}
+                onChange={(e) => setGenre(e.target.value)}
+                className="w-full appearance-none bg-nf-bg border border-nf-border-light px-3 py-2 pr-9 text-sm text-nf-text focus:outline-none focus:border-fandex-primary transition duration-fast cursor-pointer"
+              >
+                {NOVEL_GENRES.map((g) => (
+                  <option key={g} value={g}>
+                    {g || t("project.genreNone")}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nf-text-tertiary pointer-events-none" />
             </div>
           </div>
 
@@ -226,7 +252,7 @@ export default function CreateProjectDialog({
 
           {/* 错误提示 */}
           {error && (
-            <div className="fandex-admonition fandex-admonition-danger text-sm text-red-400">
+            <div className="fandex-admonition fandex-admonition-danger text-sm text-red-400 animate-shake">
               {error}
             </div>
           )}

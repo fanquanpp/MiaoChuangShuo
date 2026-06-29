@@ -15,9 +15,9 @@ export interface CategoryConfig {
 const CATEGORY_CONFIG: Record<SidebarCategory, CategoryConfig> = {
   manuscript:    { panelType: "editor",        showFileList: true },
   outline:      { panelType: "editor",        showFileList: true },
-  characters:   { panelType: "card-manager",  showFileList: true },
-  worldview:    { panelType: "card-manager",  showFileList: true },
-  glossary:     { panelType: "card-manager",  showFileList: true },
+  characters:   { panelType: "editor",        showFileList: true },
+  worldview:    { panelType: "editor",        showFileList: true },
+  glossary:     { panelType: "editor",        showFileList: true },
   materials:    { panelType: "editor",        showFileList: true },
   timeline:     { panelType: "timeline",      showFileList: false },
   stats:        { panelType: "stats",         showFileList: false },

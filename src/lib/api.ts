@@ -11,13 +11,22 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-// 项目类型枚举
-export type ProjectType = "epic" | "standard" | "essay" | "script" | "wuxia" | "scifi" | "mystery" | "romance";
+// 项目文体类型（按文体体裁分类）
+export type ProjectType =
+  | "short_story"
+  | "diary"
+  | "dialogue"
+  | "multi_volume"
+  | "shared_world"
+  | "screenplay"
+  | "poetry"
+  | "standard";
 
 // 项目元数据接口
 export interface ProjectMeta {
   name: string;
   type: string;
+  genre?: string;
   created_at: string;
   updated_at: string;
   version: string;
@@ -48,6 +57,7 @@ export interface FileNode {
 export interface CreateProjectParams {
   name: string;
   type_str: ProjectType;
+  genre: string;
   author: string;
   description: string;
   parent_path: string;
@@ -60,16 +70,36 @@ export interface TemplateInfo {
   desc: string;
 }
 
-// 可用的项目模板列表
+// 可用的项目文体模板列表（按文体体裁分类）
 export const PROJECT_TEMPLATES: TemplateInfo[] = [
-  { id: "epic", name: "西幻史诗", desc: "集成世界观宏观体系、势力编年史工具" },
-  { id: "standard", name: "标准长篇", desc: "常规网文/大纲流架构，多卷轴深度目录" },
-  { id: "essay", name: "散文随笔", desc: "侧重视觉留白，支持全自动双字首行缩进" },
-  { id: "script", name: "舞台剧本", desc: "台词智能排版，人名预设一键浮动呼出" },
-  { id: "wuxia", name: "武侠江湖", desc: "门派势力体系、武学总纲、兵器谱排名" },
-  { id: "scifi", name: "科幻未来", desc: "科技树、星际航路、文明等级分级体系" },
-  { id: "mystery", name: "悬疑推理", desc: "案件档案、线索追踪、诡计设计与推理链" },
-  { id: "romance", name: "言情都市", desc: "情感脉络图、人物关系网、情感节点追踪" },
+  { id: "standard", name: "标准长篇", desc: "通用长篇小说架构，分卷管理、伏笔追踪、人物关系图" },
+  { id: "short_story", name: "短篇小说", desc: "单篇精炼结构，灵感笔记与人物速写模板" },
+  { id: "diary", name: "日记体", desc: "日期驱动叙事，心理轨迹追踪、日记模板" },
+  { id: "dialogue", name: "对话体", desc: "对话推动叙事，角色声线设定、场景模板" },
+  { id: "multi_volume", name: "长篇分卷", desc: "多卷深度架构，分卷大纲、卷间关联、伏笔跨卷追踪" },
+  { id: "shared_world", name: "同世界观系列", desc: "多作品共享世界观，系列规划、跨作品伏笔、人物档案库" },
+  { id: "screenplay", name: "剧本式", desc: "幕次结构叙事，场景设定、道具清单、分幕大纲" },
+  { id: "poetry", name: "诗歌体", desc: "诗意叙事，诗稿模板、韵律笔记、意象集" },
+];
+
+// 小说题材列表（次级可选分类）
+export const NOVEL_GENRES: string[] = [
+  "",           // 不指定
+  "玄幻",
+  "仙侠",
+  "武侠",
+  "都市",
+  "历史",
+  "军事",
+  "科幻",
+  "悬疑",
+  "言情",
+  "奇幻",
+  "现实",
+  "同人",
+  "游戏",
+  "体育",
+  "传记",
 ];
 
 // ===== API 封装函数 =====
@@ -82,6 +112,7 @@ export async function createProject(params: CreateProjectParams): Promise<string
   return invoke<string>("create_project", {
     name: params.name,
     typeStr: params.type_str,
+    genre: params.genre,
     author: params.author,
     description: params.description,
     parentPath: params.parent_path,

@@ -196,16 +196,23 @@ export function useWindowCloseGuard() {
       const appWindow = getCurrentWindow();
       let isClosing = false; // 重入保护标志
       const unlisten = appWindow.onCloseRequested(async (event) => {
-        // 如果已经在关闭流程中，放行（避免 close() → onCloseRequested 循环）
-        if (isClosing) return;
-
-        // 仅在有未保存修改时才拦截关闭
-        const { editorDirty } = useAppStore.getState();
-        if (!editorDirty) return; // 让默认关闭行为生效
-
-        // 有未保存修改 → 拦截并询问
+        // 始终阻止默认关闭行为，由我们显式控制关闭流程
+        // Tauri v2 的 async handler 中，不调用 preventDefault 可能无法可靠关闭窗口
         event.preventDefault();
+
+        // 如果已经在关闭流程中，放行（避免 destroy() → onCloseRequested 循环）
+        if (isClosing) return;
         isClosing = true;
+
+        const { editorDirty } = useAppStore.getState();
+
+        // 无未保存修改 → 直接关闭
+        if (!editorDirty) {
+          await appWindow.destroy();
+          return;
+        }
+
+        // 有未保存修改 → 询问保存
         try {
           await handleWindowCloseStable();
           // 保存成功或用户确认退出 → 使用 destroy() 直接关闭（不触发 onCloseRequested）

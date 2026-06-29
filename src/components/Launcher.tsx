@@ -186,6 +186,13 @@ export default function Launcher() {
       scifi: t("launcher.typeScifi"),
       mystery: t("launcher.typeMystery"),
       romance: t("launcher.typeRomance"),
+      short_story: t("launcher.typeShortStory"),
+      diary: t("launcher.typeDiary"),
+      dialogue: t("launcher.typeDialogue"),
+      multi_volume: t("launcher.typeMultiVolume"),
+      shared_world: t("launcher.typeSharedWorld"),
+      screenplay: t("launcher.typeScreenplay"),
+      poetry: t("launcher.typePoetry"),
     };
     const typeColors: Record<string, string> = {
       epic: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
@@ -196,6 +203,13 @@ export default function Launcher() {
       scifi: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
       mystery: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
       romance: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
+      short_story: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
+      diary: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
+      dialogue: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
+      multi_volume: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
+      shared_world: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
+      screenplay: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
+      poetry: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
     };
     const gradients: Record<string, string> = {
       epic: "from-fandex-tertiary to-fandex-tertiary/40",
@@ -206,6 +220,13 @@ export default function Launcher() {
       scifi: "from-fandex-secondary to-fandex-secondary/40",
       mystery: "from-fandex-primary to-fandex-primary/40",
       romance: "from-fandex-tertiary to-fandex-tertiary/40",
+      short_story: "from-fandex-primary to-fandex-primary/40",
+      diary: "from-fandex-secondary to-fandex-secondary/40",
+      dialogue: "from-fandex-tertiary to-fandex-tertiary/40",
+      multi_volume: "from-fandex-primary to-fandex-primary/40",
+      shared_world: "from-fandex-secondary to-fandex-secondary/40",
+      screenplay: "from-fandex-tertiary to-fandex-tertiary/40",
+      poetry: "from-fandex-primary to-fandex-primary/40",
     };
     return {
       id: p.path,

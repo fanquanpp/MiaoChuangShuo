@@ -17,8 +17,8 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::project_template::{
-    common_directories, common_files, create_project_meta, type_specific_directories,
-    type_specific_files, ProjectMeta, ProjectType,
+    common_directories, common_files, create_project_meta, initial_manuscript_file,
+    type_specific_directories, type_specific_files, ProjectMeta, ProjectType,
 };
 
 /// 路径沙箱校验：确保目标路径在项目根目录内
@@ -81,7 +81,7 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
 }
 
 /// 创建小说项目命令
-/// 输入: name 项目名称, type_str 类型字符串, author 作者, description 描述, parent_path 父目录
+/// 输入: name 项目名称, type_str 文体类型, genre 题材(可选), author 作者, description 描述, parent_path 父目录
 /// 输出: Result<String, String> 项目根目录路径或错误
 /// 流程:
 ///   1. 校验项目名称合法性
@@ -93,6 +93,7 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
 pub fn create_project(
     name: String,
     type_str: String,
+    genre: String,
     author: String,
     description: String,
     parent_path: String,
@@ -151,16 +152,20 @@ pub fn create_project(
     }
 
     // 写入项目元数据
-    let meta = create_project_meta(&name, &project_type, &author, &description);
+    let meta = create_project_meta(&name, &project_type, &genre, &author, &description);
     let meta_path = project_root.join(".novelforge").join("project.json");
     let meta_json = serde_json::to_string_pretty(&meta)
         .map_err(|e| format!("序列化元数据失败: {}", e))?;
     fs::write(&meta_path, meta_json)
         .map_err(|e| format!("写入元数据失败: {}", e))?;
 
-    // 创建正文初始文件 (.txt 纯文本)
-    let main_doc = project_root.join("正文").join("第一章.txt");
-    fs::write(&main_doc, "第一章\n\n开始你的创作...\n")
+    // 创建正文初始文件 (.txt 纯文本，按文体类型)
+    let (manuscript_name, manuscript_content) = initial_manuscript_file(&project_type);
+    let manuscript_path = project_root.join("正文").join(manuscript_name);
+    if let Some(parent) = manuscript_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("创建正文子目录失败: {}", e))?;
+    }
+    fs::write(&manuscript_path, manuscript_content)
         .map_err(|e| format!("创建正文文件失败: {}", e))?;
 
     Ok(project_root.to_string_lossy().to_string())
@@ -419,13 +424,24 @@ fn read_dir_recursive(current: &Path, root: &Path) -> Result<Vec<FileNode>, Stri
             continue;
         }
 
+        let metadata = entry.metadata().map_err(|e| format!("读取元数据失败: {}", e))?;
+        let is_dir = metadata.is_dir();
+
+        // 非目录文件仅允许 .txt 扩展名（应用仅支持 .txt 文件）
+        if !is_dir {
+            let ext = path.extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
+            if ext != "txt" {
+                continue;
+            }
+        }
+
         let relative_path = path
             .strip_prefix(root)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|_| name.clone());
 
-        let metadata = entry.metadata().map_err(|e| format!("读取元数据失败: {}", e))?;
-        let is_dir = metadata.is_dir();
         let size = if is_dir { 0 } else { metadata.len() };
 
         let children = if is_dir {

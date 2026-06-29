@@ -1,7 +1,7 @@
 {
   "name": "novelforge",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.6.0",
   "type": "module",
   "description": "NovelForge - 离线小说创作工作站",
   "scripts": {

@@ -52,13 +52,27 @@ const BG_MAP: Record<ToastType, string> = {
   info: "bg-fandex-primary/10",
 };
 
+const MAX_TOASTS = 5;
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const showToast = useCallback(
     (type: ToastType, message: string, duration = 3000) => {
-      const id = nextId++;
-      setToasts((prev) => [...prev, { id, type, message, duration }]);
+      setToasts((prev) => {
+        // 去重：如果已有相同类型+消息的 toast，不重复添加
+        const isDuplicate = prev.some((t) => t.type === type && t.message === message);
+        if (isDuplicate) return prev;
+
+        const id = nextId++;
+        const newToasts = [...prev, { id, type, message, duration }];
+
+        // 超过上限时移除最早的 toast
+        if (newToasts.length > MAX_TOASTS) {
+          return newToasts.slice(newToasts.length - MAX_TOASTS);
+        }
+        return newToasts;
+      });
     },
     []
   );

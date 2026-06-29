@@ -89,6 +89,13 @@ const zhCN: TranslationDict = {
   "launcher.typeScifi": "科幻未来",
   "launcher.typeMystery": "悬疑推理",
   "launcher.typeRomance": "言情都市",
+  "launcher.typeShortStory": "短篇小说",
+  "launcher.typeDiary": "日记体",
+  "launcher.typeDialogue": "对话体",
+  "launcher.typeMultiVolume": "长篇分卷",
+  "launcher.typeSharedWorld": "同世界观系列",
+  "launcher.typeScreenplay": "剧本式",
+  "launcher.typePoetry": "诗歌体",
 
   // 工作台
   "workspace.newFile": "新建文件",
@@ -262,6 +269,10 @@ const zhCN: TranslationDict = {
   "project.locationRequired": "请选择保存位置",
   "project.createFailed": "创建失败: {error}",
   "project.dirPickFailed": "选择目录失败: {error}",
+  "project.formTypeLabel": "文体类型",
+  "project.genreLabel": "题材",
+  "project.genreOptional": "(可选)",
+  "project.genreNone": "不指定",
 
   // 专注计时器
   "timer.pause": "暂停",
@@ -304,7 +315,7 @@ const zhCN: TranslationDict = {
   "command.newFile": "新建文件",
 
   // 题材模板
-  "template.selectTitle": "选择创作题材架构",
+  "template.selectTitle": "选择文体类型",
 
   // --- auto-added ---
   "app.creating": "创建中...",
@@ -370,7 +381,7 @@ const zhCN: TranslationDict = {
   "stats.totalChapters": "章节数",
   "stats.totalFiles": "文件数",
   "stats.wordUnit": "字",
-  "template.chooseArch": "选择创作题材架构",
+  "template.chooseArch": "选择文体类型",
   "timeline.dirName": "时间线",
   "timeline.newBranchLabel": "新分支(可选,留空使用上方选择)",
   "timeline.noEvents": "暂无时间线事件",
@@ -449,6 +460,13 @@ const enUS: TranslationDict = {
   "launcher.typeScifi": "Sci-Fi",
   "launcher.typeMystery": "Mystery",
   "launcher.typeRomance": "Romance",
+  "launcher.typeShortStory": "Short Story",
+  "launcher.typeDiary": "Diary",
+  "launcher.typeDialogue": "Dialogue",
+  "launcher.typeMultiVolume": "Multi-Volume",
+  "launcher.typeSharedWorld": "Shared World",
+  "launcher.typeScreenplay": "Screenplay",
+  "launcher.typePoetry": "Poetry",
 
   // Workspace
   "workspace.newFile": "New File",
@@ -624,6 +642,10 @@ const enUS: TranslationDict = {
   "project.locationRequired": "Please select a save location",
   "project.createFailed": "Create failed: {error}",
   "project.dirPickFailed": "Failed to pick directory: {error}",
+  "project.formTypeLabel": "Literary Form",
+  "project.genreLabel": "Genre",
+  "project.genreOptional": "(optional)",
+  "project.genreNone": "Not specified",
 
   // Focus Timer
   "timer.pause": "Pause",
@@ -664,7 +686,7 @@ const enUS: TranslationDict = {
   "command.shortcutsRef": "Keyboard Shortcuts",
 
   // Template Selector
-  "template.selectTitle": "Choose a genre framework",
+  "template.selectTitle": "Choose a literary form",
 
   // --- auto-added ---
   "app.creating": "Creating...",
@@ -730,7 +752,7 @@ const enUS: TranslationDict = {
   "stats.totalChapters": "Chapters",
   "stats.totalFiles": "Files",
   "stats.wordUnit": "words",
-  "template.chooseArch": "Choose a genre framework",
+  "template.chooseArch": "Choose a literary form",
   "timeline.dirName": "Timeline",
   "timeline.newBranchLabel": "New branch (optional, leave blank to use above)",
   "timeline.noEvents": "No timeline events",
