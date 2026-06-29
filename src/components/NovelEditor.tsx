@@ -26,6 +26,7 @@ import { markdownToHtml, htmlToMarkdown } from "../lib/markdownConverter";
 import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
+import { useI18n } from "../lib/i18n";
 import EditorToolbar from "./EditorToolbar";
 import OutlineView from "./OutlineView";
 
@@ -41,6 +42,7 @@ export default function NovelEditor({
   focusTimerActive = false,
 }: NovelEditorProps) {
   const { currentProject } = useAppStore();
+  const { t } = useI18n();
   const [wordCount, setWordCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -84,7 +86,7 @@ export default function NovelEditor({
   const extensions: Extensions = useMemo(() => {
     const exts: Extensions = [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Placeholder.configure({ placeholder: "开始你的创作..." }),
+      Placeholder.configure({ placeholder: t("editor.placeholder") }),
     ];
 
     if (isEssay) {
@@ -102,7 +104,7 @@ export default function NovelEditor({
 
     exts.push(PoetryFormat.configure({ enabled: true }));
     return exts;
-  }, [isEssay, isScript, characters]);
+  }, [isEssay, isScript, characters, t]);
 
   // 创建编辑器实例
   const editor = useEditor({
@@ -116,9 +118,13 @@ export default function NovelEditor({
     },
     onUpdate: () => {
       setDirty(true);
+      useAppStore.getState().setEditorDirty(true);
       if (editor) {
-        setWordCount(countWords(editor.getText()));
+        const wc = countWords(editor.getText());
+        setWordCount(wc);
         setEditorHtml(editor.getHTML());
+        // 实时推送字数到 store，供 FileList 侧边栏展示
+        useAppStore.getState().setActiveFileWordCount(wc);
       }
     },
   });
@@ -151,14 +157,15 @@ export default function NovelEditor({
         });
       })
       .catch((e) => {
-        setLoadError(`加载文件失败: ${e}`);
+        setLoadError(t("editor.loadFailed", { error: String(e) }));
       });
-  }, [filePath, editor, currentProject]);
+  }, [filePath, editor, currentProject, t]);
 
   // 保存文件（含外部修改冲突检测）
+  // 返回 true 表示保存成功，false 表示失败（供退出流程使用）
   const lastSavedContentRef = useRef("");
-  const handleSave = useCallback(async () => {
-    if (!editor || !filePath || !dirty || saving) return;
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!editor || !filePath || !dirty || saving) return false;
     setSaving(true);
     autoSavePendingRef.current = true;
     try {
@@ -168,12 +175,10 @@ export default function NovelEditor({
           lastSavedContentRef.current &&
           currentContent !== lastSavedContentRef.current
         ) {
-          const overwrite = confirm(
-            '文件已被外部修改，是否覆盖保存？\n\n选择「确定」将覆盖外部修改，选择「取消」将跳过本次保存。'
-          );
+          const overwrite = confirm(t("editor.conflictDetected"));
           if (!overwrite) {
-            showToast("warning", "已取消保存（文件被外部修改）");
-            return;
+            showToast("warning", t("editor.conflictCancelled"));
+            return false;
           }
         }
       } catch {
@@ -184,14 +189,19 @@ export default function NovelEditor({
       await writeFile(filePath, markdown);
       lastSavedContentRef.current = markdown;
       setDirty(false);
-      showToast("success", "已保存");
+      useAppStore.getState().setEditorDirty(false);
+      showToast("success", t("editor.saved"));
+      // 保存后刷新目录树，更新侧边栏文件大小等元数据
+      useAppStore.getState().refreshProjectTree();
+      return true;
     } catch (e) {
-      showToast("error", `保存失败: ${e}`);
+      showToast("error", t("editor.saveFailed", { error: String(e) }));
+      return false;
     } finally {
       setSaving(false);
       autoSavePendingRef.current = false;
     }
-  }, [editor, filePath, dirty, saving, showToast]);
+  }, [editor, filePath, dirty, saving, showToast, t]);
 
   // 初始化 lastSavedContent
   useEffect(() => {
@@ -209,9 +219,9 @@ export default function NovelEditor({
     if (!editor) return;
     try {
       const text = editor.getText();
-      let txtName = "导出.txt";
+      let txtName = t("editor.defaultExportName");
       if (filePath) {
-        const baseName = filePath.split(/[\\/]/).pop() || "导出";
+        const baseName = filePath.split(/[\\/]/).pop() || "export";
         txtName = baseName.replace(/\.(md|markdown|txt)$/i, "") + ".txt";
       }
       const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -223,11 +233,11 @@ export default function NovelEditor({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast("success", `已导出: ${txtName}`);
+      showToast("success", t("editor.exported", { name: txtName }));
     } catch (e) {
-      showToast("error", `导出失败: ${e}`);
+      showToast("error", t("editor.exportFailed", { error: String(e) }));
     }
-  }, [editor, filePath, showToast]);
+  }, [editor, filePath, showToast, t]);
 
   // Ctrl+S 快捷键
   useEffect(() => {
@@ -253,6 +263,16 @@ export default function NovelEditor({
     return () => clearTimeout(timer);
   }, [filePath, dirty, handleSave]);
 
+  // 注册/注销编辑器保存回调（供退出流程使用）
+  useEffect(() => {
+    if (handleSave) {
+      useAppStore.getState().registerEditorSave(handleSave);
+    }
+    return () => {
+      useAppStore.getState().registerEditorSave(null);
+    };
+  }, [handleSave]);
+
   // 卸载时销毁编辑器
   const editorRef = useRef(editor);
   editorRef.current = editor;
@@ -267,10 +287,16 @@ export default function NovelEditor({
       <div className="flex-1 flex items-center justify-center bg-nf-bg">
         <div className="text-center space-y-3" role="status">
           <p className="text-sm text-nf-text-tertiary">
-            从左侧选择或创建一个文件开始编辑
+            {t("editor.selectFile")}
           </p>
           <p className="text-xs text-nf-text-tertiary/60">
-            按 <kbd className="px-1 py-0.5 bg-nf-bg-hover border border-nf-border-light rounded text-[10px] font-mono text-nf-text-secondary">Ctrl+K</kbd> 打开命令面板
+            {t("editor.commandPaletteHint").split("Ctrl+K").length === 2 ? (
+              <>
+                {t("editor.commandPaletteHint").split("Ctrl+K")[0]}
+                <kbd className="px-1 py-0.5 bg-nf-bg-hover border border-nf-border-light rounded text-[10px] font-mono text-nf-text-secondary">Ctrl+K</kbd>
+                {t("editor.commandPaletteHint").split("Ctrl+K")[1]}
+              </>
+            ) : t("editor.commandPaletteHint")}
           </p>
         </div>
       </div>
@@ -289,7 +315,7 @@ export default function NovelEditor({
     <div
       className={`flex-1 flex flex-col bg-nf-bg overflow-hidden ${focusMode ? "fandex-focus-mode" : ""}`}
       role="region"
-      aria-label={`编辑器 - ${filePath ? filePath.split(/[\\/]/).pop() : ""}`}
+      aria-label={`${t("editor.editor")} - ${filePath ? filePath.split(/[\\/]/).pop() : ""}`}
     >
       {/* 聚焦模式下简化工具栏 */}
       <EditorToolbar
@@ -304,19 +330,19 @@ export default function NovelEditor({
 
       {isScript && characters.length > 0 && (
         <div className="fandex-admonition fandex-admonition-note px-4 py-1.5 border-b border-nf-border-light text-xs text-nf-text-tertiary flex items-center gap-2">
-          <span className="text-fandex-primary font-medium">剧本模式</span>
+          <span className="text-fandex-primary font-medium">{t("editor.scriptMode")}</span>
           <span>·</span>
           <span>
-            在空行按 Tab 键呼出角色名选择（共 {characters.length} 个角色）
+            {t("editor.charRosterHint", { count: characters.length })}
           </span>
         </div>
       )}
 
       {isEssay && (
         <div className="fandex-admonition fandex-admonition-tip px-4 py-1.5 border-b border-nf-border-light text-xs text-nf-text-tertiary flex items-center gap-2">
-          <span className="text-fandex-secondary font-medium">散文模式</span>
+          <span className="text-fandex-secondary font-medium">{t("editor.essayMode")}</span>
           <span>·</span>
-          <span>已启用首行双字缩进</span>
+          <span>{t("editor.essayHint")}</span>
         </div>
       )}
 

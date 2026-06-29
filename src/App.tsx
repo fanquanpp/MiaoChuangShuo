@@ -13,24 +13,46 @@
 import { useEffect } from "react";
 import Launcher from "./components/Launcher";
 import Workspace from "./components/Workspace";
-import ErrorBoundary from "./components/ErrorBoundary";
+import ErrorBoundary, { setErrorBoundaryI18n } from "./components/ErrorBoundary";
 import ShortcutPanel from "./components/ShortcutPanel";
+import { setSkeletonI18n } from "./components/SkeletonComponents";
 import { useAppStore } from "./lib/store";
 import { useThemeStore } from "./lib/themeStore";
 import { ToastProvider } from "./lib/toast";
-import { I18nProvider } from "./lib/i18n";
+import { I18nProvider, useI18n } from "./lib/i18n";
+import { useWindowCloseGuard } from "./hooks/useAutoSaveOnExit";
+
+// 内部组件：在 I18nProvider 内，负责向静态组件注入 t 函数
+function I18nWiring() {
+  const { t } = useI18n();
+  useEffect(() => {
+    setErrorBoundaryI18n({ t });
+    setSkeletonI18n(t);
+  }, [t]);
+  return null;
+}
 
 function App() {
   const viewMode = useAppStore((s) => s.viewMode);
   const initTheme = useThemeStore((s) => s.initTheme);
+  const setupCloseGuard = useWindowCloseGuard();
 
   useEffect(() => {
     initTheme();
   }, [initTheme]);
 
+  // 注册 Tauri 窗口关闭事件（退出前自动保存）
+  useEffect(() => {
+    const unlisten = setupCloseGuard();
+    return () => {
+      unlisten?.then((fn) => fn());
+    };
+  }, [setupCloseGuard]);
+
   return (
     <ErrorBoundary>
       <I18nProvider>
+        <I18nWiring />
         <ToastProvider>
           <div className="antialiased text-nf-text bg-nf-bg min-h-screen">
             {viewMode === "launcher" ? <Launcher /> : <Workspace />}

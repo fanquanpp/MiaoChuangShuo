@@ -1,7 +1,9 @@
+// 模板选择器组件
+
 import React from "react";
 import { BookOpen, Feather, Clapperboard, Swords, Rocket, Eye, Heart } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 
-// 模板类型定义
 interface Template {
   id: string;
   name: string;
@@ -11,7 +13,6 @@ interface Template {
   barClass: string;
 }
 
-// 创作题材模板列表 - FANDEX 三色系(8 种模板)
 const TEMPLATES: Template[] = [
   {
     id: "epic",
@@ -79,15 +80,13 @@ const TEMPLATES: Template[] = [
   },
 ];
 
-// 模板选择器组件 - FANDEX 美术风格
-// 输入: onSelect 回调(可选)
-// 输出: 模板卡片列表
-// 流程: 遍历模板数据渲染卡片，点击时触发回调
 export default function TemplateSelector({ onSelect }: { onSelect?: (id: string) => void }) {
+  const { t } = useI18n();
+
   return (
     <div className="space-y-1 mt-4 max-h-[60vh] overflow-y-auto pr-1">
       <div className="text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider px-1 mb-2">
-        选择创作题材架构
+        {t("template.chooseArch")}
       </div>
       {TEMPLATES.map((tpl) => {
         const IconComponent = tpl.icon;

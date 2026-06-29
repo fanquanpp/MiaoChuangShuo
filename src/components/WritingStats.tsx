@@ -25,24 +25,15 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import { getWritingStats, type WritingStats as WritingStatsType } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 
-// 写作统计仪表盘组件
-// 输入: 无
-// 输出: 渲染统计仪表盘
-// 流程:
-//   1. 项目变化时加载统计数据
-//   2. 渲染统计卡片与图表
-//   3. 支持点击章节跳转
 export default function WritingStats() {
   const { currentProject, setActiveCategory, setSelectedFile } = useAppStore();
+  const { t } = useI18n();
   const [stats, setStats] = useState<WritingStatsType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 加载统计数据
-  // 输入: 无
-  // 输出: 无
-  // 流程: 调用 getWritingStats 获取统计信息
   const loadStats = useCallback(async () => {
     if (!currentProject) return;
     setLoading(true);
@@ -51,24 +42,18 @@ export default function WritingStats() {
       const data = await getWritingStats(currentProject.path);
       setStats(data);
     } catch (e) {
-      setError(`加载统计数据失败: ${e}`);
+      setError(t("stats.loadFailed", { error: String(e) }));
     } finally {
       setLoading(false);
     }
-  }, [currentProject]);
+  }, [currentProject, t]);
 
-  // 初始化加载
   useEffect(() => {
     loadStats();
   }, [loadStats]);
 
-  // 跳转到章节编辑
-  // 输入: relativePath 文件相对路径
-  // 输出: 无
-  // 流程: 切换到正文分类并选中文件
   const handleJumpToChapter = (relativePath: string) => {
     if (!currentProject) return;
-    // 构造 FileNode 并选中
     const fileName = relativePath.split(/[\\/]/).pop() || relativePath;
     setSelectedFile({
       name: fileName,
@@ -101,43 +86,41 @@ export default function WritingStats() {
   if (!stats) {
     return (
       <div className="flex-1 flex items-center justify-center bg-nf-bg text-nf-text-tertiary text-sm">
-        暂无统计数据
+        {t("stats.noData")}
       </div>
     );
   }
 
-  // 计算字数分布百分比
   const totalForDist = stats.manuscript_words + stats.setting_words + stats.outline_words;
   const manuscriptPct = totalForDist > 0 ? (stats.manuscript_words / totalForDist) * 100 : 0;
   const settingPct = totalForDist > 0 ? (stats.setting_words / totalForDist) * 100 : 0;
   const outlinePct = totalForDist > 0 ? (stats.outline_words / totalForDist) * 100 : 0;
 
-  // 统计卡片数据
   const cards = [
     {
-      label: "总字数",
+      label: t("stats.totalWords"),
       value: stats.total_words.toLocaleString(),
       icon: BarChart3,
       color: "text-fandex-primary",
       barClass: "fandex-bar-left",
     },
     {
-      label: "章节数",
+      label: t("stats.totalChapters"),
       value: stats.total_chapters.toString(),
       icon: BookOpen,
       color: "text-fandex-secondary",
       barClass: "fandex-bar-left-secondary",
     },
     {
-      label: "文件数",
+      label: t("stats.totalFiles"),
       value: stats.total_files.toString(),
       icon: FolderTree,
       color: "text-fandex-tertiary",
       barClass: "fandex-bar-left-tertiary",
     },
     {
-      label: "创作天数",
-      value: `${stats.days_since_creation} 天`,
+      label: t("stats.creationDays"),
+      value: t("stats.dayUnit", { days: stats.days_since_creation }),
       icon: Calendar,
       color: "text-fandex-primary",
       barClass: "fandex-bar-left",
@@ -146,24 +129,21 @@ export default function WritingStats() {
 
   return (
     <div className="flex-1 flex flex-col bg-nf-bg overflow-hidden">
-      {/* 顶部工具栏 */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light">
         <h2 className="fandex-bar-left text-lg font-semibold font-display text-nf-text">
-          写作统计
+          {t("stats.title")}
         </h2>
         <button
           onClick={loadStats}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary/30 hover:bg-fandex-primary/10 transition-fast"
         >
           <TrendingUp className="w-4 h-4" />
-          刷新
+          {t("stats.refresh")}
         </button>
       </div>
 
-      {/* 统计内容区 */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl mx-auto space-y-6">
-          {/* 统计卡片网格 - FANDEX 1px 网格 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-1 bg-nf-border-light border border-nf-border-light">
             {cards.map((card) => {
               const Icon = card.icon;
@@ -184,18 +164,16 @@ export default function WritingStats() {
             })}
           </div>
 
-          {/* 字数分布 - FANDEX 直角进度条 */}
           <div className="bg-nf-bg-card border border-nf-border-light p-5">
             <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-4">
-              字数分布
+              {t("stats.distribution")}
             </h3>
-            {/* 三色分段进度条 */}
             <div className="flex h-6 mb-4 border border-nf-border-light overflow-hidden">
               {manuscriptPct > 0 && (
                 <div
                   className="bg-fandex-primary flex items-center justify-center text-xs text-nf-text-inverse font-medium"
                   style={{ width: `${manuscriptPct}%` }}
-                  title={`正文 ${stats.manuscript_words} 字`}
+                  title={`${t("stats.manuscript")} ${stats.manuscript_words} ${t("stats.wordUnit")}`}
                 >
                   {manuscriptPct > 10 ? `${manuscriptPct.toFixed(0)}%` : ""}
                 </div>
@@ -204,7 +182,7 @@ export default function WritingStats() {
                 <div
                   className="bg-fandex-secondary flex items-center justify-center text-xs text-nf-text-inverse font-medium"
                   style={{ width: `${settingPct}%` }}
-                  title={`设定 ${stats.setting_words} 字`}
+                  title={`${t("stats.setting")} ${stats.setting_words} ${t("stats.wordUnit")}`}
                 >
                   {settingPct > 10 ? `${settingPct.toFixed(0)}%` : ""}
                 </div>
@@ -213,42 +191,40 @@ export default function WritingStats() {
                 <div
                   className="bg-fandex-tertiary flex items-center justify-center text-xs text-nf-text-inverse font-medium"
                   style={{ width: `${outlinePct}%` }}
-                  title={`大纲 ${stats.outline_words} 字`}
+                  title={`${t("stats.outline")} ${stats.outline_words} ${t("stats.wordUnit")}`}
                 >
                   {outlinePct > 10 ? `${outlinePct.toFixed(0)}%` : ""}
                 </div>
               )}
             </div>
-            {/* 图例 */}
             <div className="flex flex-wrap gap-4 text-xs">
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 bg-fandex-primary" />
-                <span className="text-nf-text-secondary">正文</span>
-                <span className="text-nf-text-tertiary">{stats.manuscript_words.toLocaleString()} 字</span>
+                <span className="text-nf-text-secondary">{t("stats.manuscript")}</span>
+                <span className="text-nf-text-tertiary">{stats.manuscript_words.toLocaleString()} {t("stats.wordUnit")}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 bg-fandex-secondary" />
-                <span className="text-nf-text-secondary">设定</span>
-                <span className="text-nf-text-tertiary">{stats.setting_words.toLocaleString()} 字</span>
+                <span className="text-nf-text-secondary">{t("stats.setting")}</span>
+                <span className="text-nf-text-tertiary">{stats.setting_words.toLocaleString()} {t("stats.wordUnit")}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 bg-fandex-tertiary" />
-                <span className="text-nf-text-secondary">大纲</span>
-                <span className="text-nf-text-tertiary">{stats.outline_words.toLocaleString()} 字</span>
+                <span className="text-nf-text-secondary">{t("stats.outline")}</span>
+                <span className="text-nf-text-tertiary">{stats.outline_words.toLocaleString()} {t("stats.wordUnit")}</span>
               </div>
             </div>
           </div>
 
-          {/* 章节字数排行 - FANDEX 直角列表 */}
           <div className="bg-nf-bg-card border border-nf-border-light p-5">
             <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-4 flex items-center gap-2">
               <Award className="w-4 h-4 text-fandex-tertiary" />
-              章节字数排行
+              {t("stats.chapterRanking")}
             </h3>
             {stats.chapter_words.length === 0 ? (
               <div className="text-center py-8 text-nf-text-tertiary text-sm">
                 <FileText className="w-12 h-12 text-nf-border mx-auto mb-2" />
-                暂无章节数据
+                {t("stats.noChapterData")}
               </div>
             ) : (
               <div className="space-y-1">
@@ -277,21 +253,18 @@ export default function WritingStats() {
                       }}
                       className="flex items-center gap-3 p-2 hover:bg-nf-bg-hover transition-fast cursor-pointer group focus-visible:outline focus-visible:outline-2 focus-visible:outline-fandex-primary focus-visible:outline-offset-[-2px]"
                     >
-                      {/* 排名 */}
                       <span className={`text-xs font-bold font-display w-6 text-center ${rankColor}`}>
                         {idx + 1}
                       </span>
-                      {/* 文件名与进度条 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs text-nf-text truncate group-hover:text-fandex-primary transition-fast">
                             {chapter.file_name}
                           </span>
                           <span className="text-xs text-nf-text-tertiary ml-2 flex-shrink-0">
-                            {chapter.word_count.toLocaleString()} 字
+                            {chapter.word_count.toLocaleString()} {t("stats.wordUnit")}
                           </span>
                         </div>
-                        {/* 字数进度条 */}
                         <div className="h-1 bg-nf-bg-hover overflow-hidden">
                           <div
                             className={`h-full transition-fast ${

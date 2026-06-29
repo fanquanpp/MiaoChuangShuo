@@ -17,48 +17,32 @@ import { useAppStore } from "../lib/store";
 import { readFile, writeFile, deletePath, readProjectTree } from "../lib/api";
 import type { FileNode } from "../lib/api";
 import { findDirByName } from "../lib/fileTreeUtils";
+import { useI18n } from "../lib/i18n";
 
-// 时间线事件接口
 interface TimelineEvent {
-  // 文件相对路径
   relativePath: string;
-  // 事件时间(用户自定义字符串)
   time: string;
-  // 事件标题
   title: string;
-  // 事件描述
   description: string;
-  // 分支标签(主线/支线A等)
   branch: string;
 }
 
-// 时间线管理组件
-// 输入: 无
-// 输出: 渲染时间线界面
-// 流程:
-//   1. 从时间线目录加载所有事件文件
-//   2. 解析事件元数据
-//   3. 按时间排序展示
-//   4. 支持新建/编辑/删除
 export default function TimelineManager() {
   const { currentProject } = useAppStore();
+  const { t } = useI18n();
   const [events, setEvents] = useState<TimelineEvent[]>([]);
-  const [branches, setBranches] = useState<string[]>(["主线"]);
-  const [activeBranch, setActiveBranch] = useState<string>("全部");
+  const [branches, setBranches] = useState<string[]>([t("timeline.mainBranch")]);
+  const [activeBranch, setActiveBranch] = useState<string>(t("timeline.allBranches"));
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 解析时间线文件内容为事件对象
-  // 输入: content 文件内容, relativePath 相对路径
-  // 输出: TimelineEvent 事件对象
-  // 流程: 解析 Markdown 格式的事件元数据
   const parseEvent = (content: string, relativePath: string): TimelineEvent => {
     const lines = content.split("\n");
     let title = "";
     let time = "";
     let description = "";
-    let branch = "主线";
+    let branch = t("timeline.mainBranch");
     let inDescription = false;
 
     for (const line of lines) {
@@ -79,21 +63,16 @@ export default function TimelineManager() {
     return { relativePath, time, title, description, branch };
   };
 
-  // 加载时间线事件
-  // 输入: 无
-  // 输出: 无
-  // 流程: 读取时间线目录下所有文件并解析
   const loadEvents = useCallback(async () => {
     if (!currentProject) return;
     setLoading(true);
     try {
       const tree = await readProjectTree(currentProject.path);
-      // 查找时间线目录
-      const dir = findDirByName(tree, "时间线");
+      const dir = findDirByName(tree, t("timeline.dirName"));
       const files = dir?.children.filter((f) => !f.is_dir) || [];
 
       const eventList: TimelineEvent[] = [];
-      const branchSet = new Set<string>(["主线"]);
+      const branchSet = new Set<string>([t("timeline.mainBranch")]);
 
       for (const file of files) {
         try {
@@ -104,11 +83,10 @@ export default function TimelineManager() {
           eventList.push(event);
           branchSet.add(event.branch);
         } catch {
-          // 跳过读取失败的文件
+          // 跳过
         }
       }
 
-      // 按时间排序（优先数值比较，回退字符串比较）
       eventList.sort((a, b) => {
         const ta = Date.parse(a.time);
         const tb = Date.parse(b.time);
@@ -124,50 +102,33 @@ export default function TimelineManager() {
     } finally {
       setLoading(false);
     }
-  }, [currentProject]);
+  }, [currentProject, t]);
 
-  // 初始化加载
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
 
-  // 新建事件
-  // 输入: 无
-  // 输出: 无
-  // 流程: 打开编辑器创建新事件
   const handleCreate = () => {
     setEditingEvent(null);
     setShowEditor(true);
   };
 
-  // 编辑事件
-  // 输入: event 事件对象
-  // 输出: 无
-  // 流程: 打开编辑器编辑现有事件
   const handleEdit = (event: TimelineEvent) => {
     setEditingEvent(event);
     setShowEditor(true);
   };
 
-  // 删除事件
-  // 输入: event 事件对象
-  // 输出: 无
-  // 流程: 确认后删除文件并刷新
   const handleDelete = async (event: TimelineEvent) => {
     if (!currentProject) return;
-    if (!confirm(`确定删除事件 "${event.title}" 吗?`)) return;
+    if (!confirm(t("timeline.confirmDelete", { title: event.title }))) return;
     try {
       await deletePath(`${currentProject.path}\\${event.relativePath}`);
       await loadEvents();
     } catch (e) {
-      alert(`删除失败: ${e}`);
+      alert(t("timeline.deleteFailed", { error: String(e) }));
     }
   };
 
-  // 保存事件
-  // 输入: event 事件数据
-  // 输出: 无
-  // 流程: 将事件序列化为 Markdown 并写入文件
   const handleSaveEvent = useCallback(async (event: TimelineEvent) => {
     if (!currentProject) return;
     const content = `# ${event.title}\n\n- 时间: ${event.time}\n- 分支: ${event.branch}\n\n---\n\n${event.description}\n`;
@@ -177,32 +138,29 @@ export default function TimelineManager() {
     await loadEvents();
   }, [currentProject, loadEvents]);
 
-  // 过滤当前分支的事件
   const filteredEvents =
-    activeBranch === "全部"
+    activeBranch === t("timeline.allBranches")
       ? events
       : events.filter((e) => e.branch === activeBranch);
 
   return (
     <div className="flex-1 flex flex-col bg-nf-bg overflow-hidden">
-      {/* 顶部工具栏 - FANDEX 直角 + 左侧色条标题 */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light">
         <h2 className="fandex-bar-left text-lg font-semibold font-display text-nf-text">
-          时间线
+          {t("timeline.title")}
         </h2>
         <button
           onClick={handleCreate}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition-fast"
         >
           <Plus className="w-4 h-4" />
-          新建事件
+          {t("timeline.newEvent")}
         </button>
       </div>
 
-      {/* 分支筛选 - FANDEX 直角标签 */}
       <div className="flex items-center gap-1 px-6 py-2 border-b border-nf-border-light bg-nf-bg-sidebar">
         <GitBranch className="w-3.5 h-3.5 text-nf-text-tertiary mr-1" />
-        {["全部", ...branches].map((b) => (
+        {[t("timeline.allBranches"), ...branches].map((b) => (
           <button
             key={b}
             onClick={() => setActiveBranch(b)}
@@ -217,22 +175,20 @@ export default function TimelineManager() {
         ))}
       </div>
 
-      {/* 时间线列表 */}
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center h-full text-nf-text-tertiary text-sm">
-            加载中...
+            {t("timeline.loading")}
           </div>
         ) : filteredEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <Clock className="w-16 h-16 text-nf-border mb-4" />
             <p className="text-sm text-nf-text-tertiary mb-4">
-              暂无时间线事件
+              {t("timeline.noEvents")}
             </p>
           </div>
         ) : (
           <div className="relative max-w-3xl mx-auto">
-            {/* 时间线竖线 - FANDEX 1px 主色渐变 */}
             <div className="absolute left-4 top-0 bottom-0 w-px bg-gradient-to-b from-fandex-primary/60 via-nf-border-light to-transparent" />
 
             {filteredEvents.map((event) => (
@@ -240,10 +196,8 @@ export default function TimelineManager() {
                 key={event.relativePath}
                 className="relative pl-12 pb-6 group"
               >
-                {/* 时间线节点 - FANDEX 直角方块 */}
                 <div className="absolute left-[11px] top-2 w-[10px] h-[10px] bg-fandex-primary border-2 border-nf-bg z-10" />
 
-                {/* 事件卡片 - FANDEX 直角 + 左侧色条 */}
                 <div className="fandex-bar-left bg-nf-bg-card/40 border border-nf-border-light hover:border-fandex-primary/40 p-4 transition-fast">
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
@@ -263,14 +217,14 @@ export default function TimelineManager() {
                       <button
                         onClick={() => handleEdit(event)}
                         className="p-1 text-nf-text-tertiary hover:text-fandex-primary transition-fast"
-                        title="编辑事件"
+                        title={t("timeline.editEvent")}
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(event)}
                         className="p-1 text-nf-text-tertiary hover:text-red-400 transition-fast"
-                        title="删除事件"
+                        title={t("timeline.deleteEvent")}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -288,7 +242,6 @@ export default function TimelineManager() {
         )}
       </div>
 
-      {/* 事件编辑器对话框 */}
       {showEditor && (
         <EventEditor
           event={editingEvent}
@@ -304,7 +257,6 @@ export default function TimelineManager() {
   );
 }
 
-// 事件编辑器对话框属性接口
 interface EventEditorProps {
   event: TimelineEvent | null;
   branches: string[];
@@ -312,21 +264,17 @@ interface EventEditorProps {
   onSave: (event: TimelineEvent) => void;
 }
 
-// 事件编辑器对话框组件 - FANDEX 直角风格
-// 输入: event 事件数据, branches 分支列表, onClose 关闭回调, onSave 保存回调
-// 输出: 渲染编辑对话框
-// 流程: 收集用户输入并触发保存
 function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
+  const { t } = useI18n();
   const [title, setTitle] = useState(event?.title || "");
   const [time, setTime] = useState(event?.time || "");
-  const [branch, setBranch] = useState(event?.branch || "主线");
+  const [branch, setBranch] = useState(event?.branch || t("timeline.mainBranch"));
   const [description, setDescription] = useState(event?.description || "");
   const [newBranch, setNewBranch] = useState("");
   const [saving, setSaving] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // 焦点陷阱 + Esc 关闭
   useEffect(() => {
     firstInputRef.current?.focus();
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -335,12 +283,10 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
         onClose();
         return;
       }
-      // Enter 提交（不在 textarea 内时）
       if (e.key === "Enter" && e.ctrlKey) {
         e.preventDefault();
         handleSave();
       }
-      // 焦点陷阱
       if (e.key === "Tab" && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
           'input, select, textarea, button, [tabindex]:not([tabindex="-1"])'
@@ -360,24 +306,16 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose, title, time, branch, description, newBranch]);
 
-  // 生成文件相对路径
-  // 输入: 无
-  // 输出: 文件相对路径
-  // 流程: 使用标题生成文件名
   const getRelativePath = () => {
-    const fileName = (title || "未命名事件")
+    const fileName = (title || t("timeline.unnamedEvent"))
       .replace(/[<>:"/\\|?*]/g, "_")
       .slice(0, 50);
-    return event?.relativePath || `时间线/${fileName}.md`;
+    return event?.relativePath || `${t("timeline.dirName")}/${fileName}.md`;
   };
 
-  // 处理保存
-  // 输入: 无
-  // 输出: 无
-  // 流程: 校验后调用 onSave
   const handleSave = async () => {
     if (!title.trim()) {
-      alert("请输入事件标题");
+      alert(t("timeline.titleRequired"));
       return;
     }
     if (saving) return;
@@ -386,7 +324,7 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
       const finalBranch = newBranch.trim() || branch;
       await onSave({
         relativePath: getRelativePath(),
-        time: time || "未知时间",
+        time: time || t("timeline.unknownTime"),
         title: title.trim(),
         description: description.trim(),
         branch: finalBranch,
@@ -399,51 +337,49 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
   return (
     <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
-        {/* 头部 - FANDEX 左侧色条标题 */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-nf-border-light">
           <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text">
-            {event ? "编辑事件" : "新建事件"}
+            {event ? t("timeline.editEvent") : t("timeline.newEvent")}
           </h3>
           <button
             onClick={onClose}
             className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition-fast"
-            title="关闭"
+            title={t("app.close")}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* 表单 - FANDEX 直角输入框 */}
         <div className="px-5 py-4 space-y-3">
           <div>
             <label className="block text-xs text-nf-text-secondary mb-1">
-              事件标题
+              {t("timeline.eventTitle")}
             </label>
             <input
               ref={firstInputRef}
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="输入事件标题"
+              placeholder={t("timeline.eventTitlePlaceholder")}
               className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-nf-text-secondary mb-1">
-                时间
+                {t("timeline.eventTime")}
               </label>
               <input
                 type="text"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                placeholder="如: 第一章 / 1000年"
+                placeholder={t("timeline.eventTimePlaceholder")}
                 className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
               />
             </div>
             <div>
               <label className="block text-xs text-nf-text-secondary mb-1">
-                分支
+                {t("timeline.eventBranch")}
               </label>
               <select
                 value={branch}
@@ -460,44 +396,43 @@ function EventEditor({ event, branches, onClose, onSave }: EventEditorProps) {
           </div>
           <div>
             <label className="block text-xs text-nf-text-secondary mb-1">
-              新分支(可选,留空使用上方选择)
+              {t("timeline.newBranchLabel")}
             </label>
             <input
               type="text"
               value={newBranch}
               onChange={(e) => setNewBranch(e.target.value)}
-              placeholder="输入新分支名"
+              placeholder={t("timeline.newBranchPlaceholder")}
               className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
             />
           </div>
           <div>
             <label className="block text-xs text-nf-text-secondary mb-1">
-              事件描述
+              {t("timeline.eventDescription")}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="详细描述事件内容"
+              placeholder={t("timeline.eventDescriptionPlaceholder")}
               rows={4}
               className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast resize-none"
             />
           </div>
         </div>
 
-        {/* 底部按钮 - FANDEX 直角 */}
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
           <button
             onClick={onClose}
             className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition-fast"
           >
-            取消
+            {t("app.cancel")}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {saving ? "保存中..." : "保存"}
+            {saving ? t("timeline.saving") : t("timeline.save")}
           </button>
         </div>
       </div>

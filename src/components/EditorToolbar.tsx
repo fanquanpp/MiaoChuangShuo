@@ -27,6 +27,7 @@ import {
   Music,
   Pilcrow,
 } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 
 // 工具栏按钮属性
 interface ToolbarButtonProps {
@@ -84,6 +85,8 @@ export default function EditorToolbar({
   onExportTxt,
   focusMode = false,
 }: EditorToolbarProps) {
+  const { t } = useI18n();
+
   const dispatchEditorEvent = (key: string, ctrlKey: boolean, shiftKey: boolean) => {
     const event = new KeyboardEvent("keydown", {
       key,
@@ -102,14 +105,14 @@ export default function EditorToolbar({
           <ToolbarButton
             onClick={() => editor?.chain().focus().toggleBold().run()}
             active={editor?.isActive("bold") || false}
-            title="加粗"
+            title={t("editor.bold")}
           >
             <Bold className="w-4 h-4" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor?.chain().focus().toggleItalic().run()}
             active={editor?.isActive("italic") || false}
-            title="斜体"
+            title={t("editor.italic")}
           >
             <Italic className="w-4 h-4" />
           </ToolbarButton>
@@ -119,7 +122,7 @@ export default function EditorToolbar({
               editor?.chain().focus().toggleHeading({ level: 1 }).run()
             }
             active={editor?.isActive("heading", { level: 1 }) || false}
-            title="一级标题"
+            title={t("editor.heading1")}
           >
             <Heading1 className="w-4 h-4" />
           </ToolbarButton>
@@ -128,7 +131,7 @@ export default function EditorToolbar({
               editor?.chain().focus().toggleHeading({ level: 2 }).run()
             }
             active={editor?.isActive("heading", { level: 2 }) || false}
-            title="二级标题"
+            title={t("editor.heading2")}
           >
             <Heading2 className="w-4 h-4" />
           </ToolbarButton>
@@ -136,21 +139,21 @@ export default function EditorToolbar({
           <ToolbarButton
             onClick={() => editor?.chain().focus().toggleBulletList().run()}
             active={editor?.isActive("bulletList") || false}
-            title="无序列表"
+            title={t("editor.bulletList")}
           >
             <List className="w-4 h-4" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor?.chain().focus().toggleOrderedList().run()}
             active={editor?.isActive("orderedList") || false}
-            title="有序列表"
+            title={t("editor.orderedList")}
           >
             <ListOrdered className="w-4 h-4" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor?.chain().focus().toggleBlockquote().run()}
             active={editor?.isActive("blockquote") || false}
-            title="引用"
+            title={t("editor.blockquote")}
           >
             <Quote className="w-4 h-4" />
           </ToolbarButton>
@@ -158,14 +161,14 @@ export default function EditorToolbar({
           <ToolbarButton
             onClick={() => dispatchEditorEvent("P", true, true)}
             active={false}
-            title="诗歌排版 (Ctrl+Shift+P)"
+            title={t("editor.poetryFormat")}
           >
             <Pilcrow className="w-4 h-4" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => dispatchEditorEvent("L", true, true)}
             active={false}
-            title="歌词排版 (Ctrl+Shift+L)"
+            title={t("editor.lyricsFormat")}
           >
             <Music className="w-4 h-4" />
           </ToolbarButton>
@@ -173,14 +176,14 @@ export default function EditorToolbar({
           <ToolbarButton
             onClick={() => editor?.chain().focus().undo().run()}
             active={false}
-            title="撤销"
+            title={t("editor.undo")}
           >
             <Undo className="w-4 h-4" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor?.chain().focus().redo().run()}
             active={false}
-            title="重做"
+            title={t("editor.redo")}
           >
             <Redo className="w-4 h-4" />
           </ToolbarButton>
@@ -189,12 +192,12 @@ export default function EditorToolbar({
 
       {/* 右侧状态区 */}
       <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary">
-        <span>{wordCount} 字</span>
-        {dirty && <span className="text-fandex-tertiary">未保存</span>}
+        <span>{t("editor.wordCount", { count: wordCount })}</span>
+        {dirty && <span className="text-fandex-tertiary">{t("editor.unsaved")}</span>}
         {!focusMode && (
           <button
             onClick={onExportTxt}
-            title="导出为 TXT"
+            title={t("editor.exportTxt")}
             className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition-fast"
           >
             <Download className="w-3.5 h-3.5" />
@@ -211,7 +214,7 @@ export default function EditorToolbar({
           ) : (
             <Save className="w-3.5 h-3.5" />
           )}
-          保存
+          {t("app.save")}
         </button>
       </div>
     </div>

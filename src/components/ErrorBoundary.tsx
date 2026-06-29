@@ -3,6 +3,16 @@
 
 import React from "react";
 
+interface ErrorBoundaryContext {
+  t: (key: string) => string;
+}
+
+let ctx: ErrorBoundaryContext = { t: (key: string) => key };
+
+export function setErrorBoundaryI18n(i18nCtx: ErrorBoundaryContext) {
+  ctx = i18nCtx;
+}
+
 interface Props {
   children: React.ReactNode;
   fallback?: React.ReactNode;
@@ -33,15 +43,15 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       if (this.props.fallback) return this.props.fallback;
       return (
         <div className="flex flex-col items-center justify-center h-screen bg-nf-bg text-nf-text">
-          <h2 className="text-lg font-semibold mb-2">页面渲染异常</h2>
+          <h2 className="text-lg font-semibold mb-2">{ctx.t("error.renderError")}</h2>
           <p className="text-sm text-nf-text-secondary mb-4 max-w-md text-center">
-            {this.state.error?.message || "发生了未知错误"}
+            {this.state.error?.message || ctx.t("error.unknownError")}
           </p>
           <button
             onClick={this.handleRetry}
             className="px-4 py-2 bg-fandex-primary text-nf-text-inverse text-sm hover:bg-fandex-primary-hover transition-fast"
           >
-            重试
+            {ctx.t("error.retry")}
           </button>
         </div>
       );

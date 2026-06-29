@@ -14,15 +14,12 @@
 import { useState } from "react";
 import { X, FilePlus, Loader2 } from "lucide-react";
 import { isValidFileName } from "../lib/fileTreeUtils";
+import { useI18n } from "../lib/i18n";
 
 interface CreateFileDialogProps {
-  // 对话框是否可见
   open: boolean;
-  // 目标目录名（提示用）
   dirName: string;
-  // 关闭对话框回调
   onClose: () => void;
-  // 确认创建回调，传入文件名（不含目录前缀）
   onConfirm: (fileName: string) => Promise<void>;
 }
 
@@ -32,6 +29,7 @@ export default function CreateFileDialog({
   onClose,
   onConfirm,
 }: CreateFileDialogProps) {
+  const { t } = useI18n();
   const [newFileName, setNewFileName] = useState("");
   const [fileNameError, setFileNameError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -43,14 +41,14 @@ export default function CreateFileDialog({
     if (!name) return;
 
     if (!isValidFileName(name)) {
-      setFileNameError('文件名不能包含以下字符: < > : " / \\ | ? *');
+      setFileNameError(t("filelist.invalidChars"));
       return;
     }
 
     if (name.includes(".")) {
       const ext = name.split(".").pop()?.toLowerCase();
       if (ext !== "md" && ext !== "txt") {
-        setFileNameError("仅支持 .md 或 .txt 文件");
+        setFileNameError(t("filelist.unsupportedExt"));
         return;
       }
     }
@@ -66,7 +64,7 @@ export default function CreateFileDialog({
       setNewFileName("");
       onClose();
     } catch (e) {
-      alert(`创建文件失败: ${e}`);
+      alert(t("filelist.createFailed", { error: String(e) }));
     } finally {
       setCreating(false);
     }
@@ -75,12 +73,11 @@ export default function CreateFileDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
-        {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-nf-border-light">
           <div className="flex items-center gap-2">
             <FilePlus className="w-4 h-4 text-fandex-primary" />
             <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text">
-              新建文件
+              {t("filelist.newFileTitle")}
             </h3>
           </div>
           <button
@@ -91,10 +88,9 @@ export default function CreateFileDialog({
           </button>
         </div>
 
-        {/* 内容 */}
         <div className="px-5 py-4">
           <label className="block text-xs text-nf-text-secondary mb-1.5">
-            文件名（将创建在 {dirName} 目录下）
+            {t("filelist.newFileName", { dirName })}
           </label>
           <input
             type="text"
@@ -106,7 +102,7 @@ export default function CreateFileDialog({
             onKeyDown={(e) => {
               if (e.key === "Enter") handleCreate();
             }}
-            placeholder="输入文件名"
+            placeholder={t("filelist.newFilePlaceholder")}
             autoFocus
             className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition-fast"
           />
@@ -114,17 +110,16 @@ export default function CreateFileDialog({
             <p className="text-xs text-red-400 mt-1.5">{fileNameError}</p>
           )}
           <p className="text-xs text-nf-text-tertiary mt-2">
-            不输入扩展名将自动添加 .md
+            {t("filelist.autoMd")}
           </p>
         </div>
 
-        {/* 底部按钮 */}
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
           <button
             onClick={onClose}
             className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition-fast"
           >
-            取消
+            {t("app.cancel")}
           </button>
           <button
             onClick={handleCreate}
@@ -132,7 +127,7 @@ export default function CreateFileDialog({
             className="flex items-center gap-1.5 px-3 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {creating ? "创建中..." : "创建"}
+            {creating ? t("app.creating") : t("filelist.create")}
           </button>
         </div>
       </div>

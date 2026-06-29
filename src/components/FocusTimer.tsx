@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Timer, Play, Pause, RotateCcw, X, ChevronDown } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 
 const PRESET_DURATIONS = [15, 25, 40, 60, 90];
 const TICK_MS = 200;
@@ -21,6 +22,7 @@ export function FocusTimer({
 }: {
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [targetMinutes, setTargetMinutes] = useState(25);
   const [remainingSeconds, setRemainingSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
@@ -87,7 +89,6 @@ export function FocusTimer({
       <span className="font-mono font-medium text-nf-text tabular-nums">
         {formatTime(remainingSeconds)}
       </span>
-      {/* 进度条 */}
       <div className="flex-1 h-1.5 bg-nf-bg-hover overflow-hidden max-w-[120px]">
         <div
           className={`h-full transition-all duration-200 ease-linear ${
@@ -96,28 +97,26 @@ export function FocusTimer({
           style={{ width: `${remainingPct}%` }}
         />
       </div>
-      {/* 控制按钮 */}
       <button
         onClick={running ? pauseTimer : startTimer}
         className="text-nf-text-tertiary hover:text-fandex-primary transition-fast"
-        title={running ? "暂停" : "开始"}
+        title={running ? t("timer.pause") : t("timer.start")}
       >
         {running ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
       </button>
       <button
         onClick={resetTimer}
         className="text-nf-text-tertiary hover:text-nf-text transition-fast"
-        title="重置"
+        title={t("timer.reset")}
       >
         <RotateCcw className="w-3 h-3" />
       </button>
 
-      {/* 目标时长选择 */}
       <div className="relative">
         <button
           onClick={() => setShowPresets((v) => !v)}
           className="flex items-center gap-0.5 text-nf-text-tertiary hover:text-nf-text transition-fast"
-          title="设置时长"
+          title={t("timer.setDuration")}
         >
           <span className="font-mono">{targetMinutes}m</span>
           <ChevronDown className="w-3 h-3" />
@@ -137,18 +136,17 @@ export function FocusTimer({
                     : "text-nf-text-secondary"
                 }`}
               >
-                {d} 分钟
+                {t("timer.minutes", { num: d })}
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* 关闭 */}
       <button
         onClick={onClose}
         className="text-nf-text-tertiary hover:text-nf-text transition-fast ml-1"
-        title="关闭计时器"
+        title={t("timer.close")}
       >
         <X className="w-3 h-3" />
       </button>

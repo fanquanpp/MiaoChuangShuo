@@ -31,10 +31,14 @@ import {
 import {
   useAppStore,
   CATEGORY_NAMES,
+  CATEGORY_DIRS,
   type SidebarCategory,
 } from "../lib/store";
 import { useThemeStore } from "../lib/themeStore";
 import { getRecentFiles, type RecentFile } from "../lib/recentFiles";
+import { findFileByPath } from "../lib/fileTreeUtils";
+import { useI18n } from "../lib/i18n";
+import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
 
 // 图标映射
 const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string }>> = {
@@ -76,12 +80,14 @@ interface SidebarProps {
 //   2. 中间显示分类列表
 //   3. 底部显示主题切换与新建文件按钮
 export default function Sidebar({ onCreateFile }: SidebarProps) {
-  const { currentProject, activeCategory, setActiveCategory, closeProject } =
+  const { currentProject, projectTree, activeCategory, selectedFile, setActiveCategory, setSelectedFile, closeProject } =
     useAppStore();
   const { theme, toggleTheme } = useThemeStore();
+  const { t } = useI18n();
+  const { handleBackToLauncher } = useAutoSaveOnExit();
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
 
-  // 加载最近文件（仅显示当前项目的）
+  // 加载最近文件（仅显示当前项目的，文件切换时也刷新排序）
   useEffect(() => {
     if (!currentProject) return;
     const all = getRecentFiles();
@@ -89,31 +95,31 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
       (f) => f.project_path === currentProject.path
     );
     setRecentFiles(projectFiles.slice(0, 5));
-  }, [currentProject]);
+  }, [currentProject, selectedFile]);
 
   return (
     <div className="w-40 min-w-[150px] border-r border-nf-border-light bg-nf-bg-sidebar flex flex-col">
       {/* 顶部: 项目名称与返回 - FANDEX 左侧色条 */}
       <div className="px-3 py-3 border-b border-nf-border-light">
         <button
-          onClick={closeProject}
+          onClick={handleBackToLauncher}
           className="flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition-fast mb-1.5"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
-          返回
+          {t("app.back")}
         </button>
         <h1 className="fandex-bar-left text-sm font-bold font-display text-nf-text truncate" title={currentProject?.meta.name}>
-          {currentProject?.meta.name || "未命名项目"}
+          {currentProject?.meta.name || t("sidebar.unnamedProject")}
         </h1>
         <div className="text-[11px] text-nf-text-tertiary mt-0.5 truncate">
-          {currentProject?.meta.author || "匿名作者"}
+          {currentProject?.meta.author || t("sidebar.anonymousAuthor")}
         </div>
       </div>
 
       {/* 中间: 分类导航 - FANDEX 左侧色条激活态 */}
       <div className="flex-1 overflow-y-auto py-2">
         <div className="px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
-          分类
+          {t("sidebar.categorySection")}
         </div>
         {CONTENT_CATEGORIES.map((cat) => {
           const Icon = ICON_MAP[cat];
@@ -144,24 +150,47 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
           <>
             <div className="px-3 py-1 mt-3 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider flex items-center gap-1">
               <Clock className="w-3 h-3" />
-              最近
+              {t("sidebar.recentSection")}
             </div>
-            {recentFiles.map((rf) => (
-              <button
-                key={rf.relative_path}
-                title={rf.name}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover transition-fast truncate"
-              >
-                <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{rf.name}</span>
-              </button>
-            ))}
+            {recentFiles.map((rf) => {
+              const isActive = selectedFile?.relative_path === rf.relative_path;
+              return (
+                <button
+                  key={rf.relative_path}
+                  title={rf.name}
+                  onClick={() => {
+                    const node = findFileByPath(projectTree, rf.relative_path);
+                    if (!node) return;
+                    // 自动切换到文件所属分类
+                    const topDir = rf.relative_path.split(/[\\/]/)[0] || "";
+                    for (const [cat, dir] of Object.entries(CATEGORY_DIRS)) {
+                      if (dir === topDir) {
+                        setActiveCategory(cat as SidebarCategory);
+                        break;
+                      }
+                    }
+                    setSelectedFile(node);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-fast truncate relative ${
+                    isActive
+                      ? "bg-fandex-primary/10 text-fandex-primary"
+                      : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
+                  }`}
+                >
+                  {isActive && (
+                    <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-fandex-primary"></span>
+                  )}
+                  <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{rf.name}</span>
+                </button>
+              );
+            })}
           </>
         )}
 
         {/* 工具分组 */}
         <div className="px-3 py-1 mt-3 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
-          工具
+          {t("sidebar.toolSection")}
         </div>
         {TOOL_CATEGORIES.map((cat) => {
           const Icon = ICON_MAP[cat];
@@ -192,7 +221,7 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
       <div className="px-2 py-2 border-t border-nf-border-light space-y-1">
         <button
           onClick={toggleTheme}
-          title={theme === "dark" ? "切换到亮色主题" : "切换到暗色主题"}
+          title={theme === "dark" ? t("sidebar.switchLight") : t("sidebar.switchDark")}
           className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary hover:bg-nf-bg-hover transition-fast"
         >
           {theme === "dark" ? (
@@ -200,14 +229,14 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
           ) : (
             <Moon className="w-3.5 h-3.5" />
           )}
-          {theme === "dark" ? "亮色" : "暗色"}
+          {theme === "dark" ? t("sidebar.light") : t("sidebar.dark")}
         </button>
         <button
           onClick={onCreateFile}
           className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary hover:bg-nf-bg-hover transition-fast"
         >
           <Plus className="w-3.5 h-3.5" />
-          新建文件
+          {t("sidebar.newFile")}
         </button>
       </div>
     </div>

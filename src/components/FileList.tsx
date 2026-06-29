@@ -27,6 +27,7 @@ import { useAppStore, CATEGORY_DIRS, type SidebarCategory } from "../lib/store";
 import type { FileNode } from "../lib/api";
 import { deletePath, readProjectTree, renamePath } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
+import { useI18n } from "../lib/i18n";
 
 interface FileListProps {
   onCreateFile: () => void;
@@ -47,6 +48,8 @@ function TreeNodeList({
   onSelect,
   onRename,
   onDelete,
+  t,
+  activeFileWordCount,
 }: {
   node: FileNode;
   depth: number;
@@ -54,6 +57,8 @@ function TreeNodeList({
   onSelect: (node: FileNode) => void;
   onRename: (node: FileNode, e: React.MouseEvent) => void;
   onDelete: (node: FileNode, e: React.MouseEvent) => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  activeFileWordCount?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -82,7 +87,7 @@ function TreeNodeList({
           )}
           <span className="flex-1 text-sm truncate">{node.name}</span>
           <span className="text-[10px] text-nf-text-tertiary">
-            {node.children?.length || 0} 项
+            {node.children?.length || 0} {t("filelist.itemUnit")}
           </span>
         </div>
         {expanded &&
@@ -95,6 +100,8 @@ function TreeNodeList({
               onSelect={onSelect}
               onRename={onRename}
               onDelete={onDelete}
+              t={t}
+              activeFileWordCount={activeFileWordCount}
             />
           ))}
       </div>
@@ -102,12 +109,13 @@ function TreeNodeList({
   }
 
   // 文件节点
+  const isSelected = selectedPath === node.relative_path;
   return (
     <div
       onClick={() => onSelect(node)}
       style={{ paddingLeft: `${12 + depth * 16}px` }}
       className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-fast border ${
-        selectedPath === node.relative_path
+        isSelected
           ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
           : "text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text border-transparent"
       }`}
@@ -115,7 +123,14 @@ function TreeNodeList({
       <span className="w-3.5 flex-shrink-0" />
       <FileText className="w-4 h-4 flex-shrink-0" />
       <span className="flex-1 text-sm truncate">{node.name}</span>
-      <span className="text-xs text-nf-text-tertiary">{formatSize(node.size)}</span>
+      <span className="text-xs text-nf-text-tertiary whitespace-nowrap">
+        {formatSize(node.size)}
+        {isSelected && activeFileWordCount !== undefined && activeFileWordCount > 0 && (
+          <span className="ml-1.5 text-fandex-primary">
+            {t("filelist.wordCount", { count: activeFileWordCount })}
+          </span>
+        )}
+      </span>
       <button
         onClick={(e) => onRename(node, e)}
         className="opacity-0 group-hover:opacity-100 p-1 text-nf-text-tertiary hover:text-fandex-primary transition-fast"
@@ -140,6 +155,8 @@ function TreeNodeGrid({
   onSelect,
   onRename,
   onDelete,
+  activeFileWordCount,
+  t,
 }: {
   node: FileNode;
   depth: number;
@@ -147,6 +164,8 @@ function TreeNodeGrid({
   onSelect: (node: FileNode) => void;
   onRename: (node: FileNode, e: React.MouseEvent) => void;
   onDelete: (node: FileNode, e: React.MouseEvent) => void;
+  activeFileWordCount?: number;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -188,6 +207,8 @@ function TreeNodeGrid({
                 onSelect={onSelect}
                 onRename={onRename}
                 onDelete={onDelete}
+                activeFileWordCount={activeFileWordCount}
+                t={t}
               />
             ))}
           </div>
@@ -197,11 +218,12 @@ function TreeNodeGrid({
   }
 
   // 文件卡片
+  const isSelected = selectedPath === node.relative_path;
   return (
     <div
       onClick={() => onSelect(node)}
       className={`group relative p-3 cursor-pointer transition-fast bg-nf-bg ${
-        selectedPath === node.relative_path
+        isSelected
           ? "bg-fandex-primary/10 border-fandex-primary"
           : "hover:bg-nf-bg-hover"
       }`}
@@ -212,6 +234,11 @@ function TreeNodeGrid({
       </div>
       <div className="text-[10px] text-nf-text-tertiary mt-1">
         {formatSize(node.size)}
+        {isSelected && activeFileWordCount !== undefined && activeFileWordCount > 0 && (
+          <span className="ml-1 text-fandex-primary">
+            {t("filelist.wordCount", { count: activeFileWordCount })}
+          </span>
+        )}
       </div>
       <button
         onClick={(e) => onRename(node, e)}
@@ -230,8 +257,9 @@ function TreeNodeGrid({
 }
 
 export default function FileList({ onCreateFile }: FileListProps) {
-  const { projectTree, activeCategory, selectedFile, setSelectedFile } =
+  const { projectTree, activeCategory, selectedFile, setSelectedFile, activeFileWordCount } =
     useAppStore();
+  const { t } = useI18n();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const dirName = CATEGORY_DIRS[activeCategory as SidebarCategory];
@@ -243,7 +271,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
 
   const handleDelete = async (node: FileNode, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`确定删除 "${node.name}" 吗?`)) {
+    if (confirm(t("filelist.confirmDelete", { name: node.name }))) {
       const { currentProject } = useAppStore.getState();
       if (!currentProject) return;
       const fullPath = `${currentProject.path}\\${node.relative_path}`;
@@ -252,7 +280,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
         const tree = await readProjectTree(currentProject.path);
         useAppStore.getState().setProjectTree(tree);
       } catch (e) {
-        alert(`删除失败: ${e}`);
+        alert(t("filelist.deleteFailed", { error: String(e) }));
       }
     }
   };
@@ -261,10 +289,10 @@ export default function FileList({ onCreateFile }: FileListProps) {
     e.stopPropagation();
     const { currentProject } = useAppStore.getState();
     if (!currentProject) return;
-    const newName = prompt("输入新文件名:", node.name);
+    const newName = prompt(t("filelist.renamePrompt"), node.name);
     if (!newName || newName === node.name) return;
     if (!isValidFileName(newName)) {
-      alert('文件名不能包含以下字符: < > : " / \\ | ? *');
+      alert(t("filelist.invalidChars"));
       return;
     }
     const dirPath = node.relative_path.substring(
@@ -277,7 +305,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
     } catch (e) {
-      alert(`重命名失败: ${e}`);
+      alert(t("filelist.renameFailed", { error: String(e) }));
     }
   };
 
@@ -299,7 +327,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
                 ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
                 : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
             }`}
-            title="卡片视图"
+            title={t("filelist.gridView")}
           >
             <Grid className="w-4 h-4" />
           </button>
@@ -310,7 +338,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
                 ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
                 : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
             }`}
-            title="列表视图"
+            title={t("filelist.listView")}
           >
             <List className="w-4 h-4" />
           </button>
@@ -322,13 +350,13 @@ export default function FileList({ onCreateFile }: FileListProps) {
         {children.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <FileText className="w-12 h-12 text-nf-border mb-3" />
-            <p className="text-sm text-nf-text-tertiary mb-3">此分类下暂无文件</p>
+            <p className="text-sm text-nf-text-tertiary mb-3">{t("filelist.empty")}</p>
             <button
               onClick={onCreateFile}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition-fast"
             >
               <FilePlus className="w-4 h-4" />
-              创建第一个文件
+              {t("filelist.createFirst")}
             </button>
           </div>
         ) : viewMode === "grid" ? (
@@ -342,6 +370,8 @@ export default function FileList({ onCreateFile }: FileListProps) {
                 onSelect={setSelectedFile}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                activeFileWordCount={activeFileWordCount}
+                t={t}
               />
             ))}
           </div>
@@ -356,6 +386,8 @@ export default function FileList({ onCreateFile }: FileListProps) {
                 onSelect={setSelectedFile}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                t={t}
+                activeFileWordCount={activeFileWordCount}
               />
             ))}
           </div>

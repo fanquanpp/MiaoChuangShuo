@@ -7,7 +7,6 @@
 
 import React from "react";
 
-// 基础骨架块 — 带闪烁动画
 function SkeletonBlock({
   className = "",
   style,
@@ -24,7 +23,6 @@ function SkeletonBlock({
   );
 }
 
-// 单行文本骨架
 export function SkeletonText({
   width = "100%",
   className = "",
@@ -35,7 +33,6 @@ export function SkeletonText({
   return <SkeletonBlock className={`h-3 ${className}`} style={{ width }} />;
 }
 
-// 多行文本骨架
 export function SkeletonLines({
   lines = 3,
   className = "",
@@ -55,7 +52,6 @@ export function SkeletonLines({
   );
 }
 
-// 项目卡片骨架
 export function ProjectCardSkeleton() {
   return (
     <div className="bg-nf-bg border-r border-b border-nf-border-light flex flex-col min-h-[168px]">
@@ -73,10 +69,15 @@ export function ProjectCardSkeleton() {
   );
 }
 
-// 项目卡片网格骨架
+// 从外部注入的 t 函数，由 I18nProvider 设置
+let _skeletonT = (key: string) => key;
+export function setSkeletonI18n(t: (key: string) => string) {
+  _skeletonT = t;
+}
+
 export function ProjectGridSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" role="status" aria-label="加载中">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" role="status" aria-label={_skeletonT("skeleton.loading")}>
       {Array.from({ length: count }).map((_, i) => (
         <ProjectCardSkeleton key={i} />
       ))}
@@ -84,7 +85,6 @@ export function ProjectGridSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
-// 统计卡片骨架
 export function StatsCardSkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-1 bg-nf-border-light border border-nf-border-light">
@@ -101,7 +101,6 @@ export function StatsCardSkeleton() {
   );
 }
 
-// 文件列表项骨架
 export function FileListItemSkeleton() {
   return (
     <div className="flex items-center gap-2.5 px-2 py-2">
@@ -112,10 +111,9 @@ export function FileListItemSkeleton() {
   );
 }
 
-// 文件列表骨架
 export function FileListSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="space-y-0.5" role="status" aria-label="加载文件列表">
+    <div className="space-y-0.5" role="status" aria-label={_skeletonT("skeleton.loadingFiles")}>
       {Array.from({ length: count }).map((_, i) => (
         <FileListItemSkeleton key={i} />
       ))}
@@ -123,11 +121,9 @@ export function FileListSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
-// 编辑器区域骨架
 export function EditorSkeleton() {
   return (
     <div className="flex-1 flex flex-col bg-nf-bg">
-      {/* 工具栏骨架 */}
       <div className="flex items-center gap-1 px-4 py-2 border-b border-nf-border-light">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <SkeletonBlock key={i} className="w-7 h-7" />
@@ -136,7 +132,6 @@ export function EditorSkeleton() {
           <SkeletonBlock className="w-20 h-7" />
         </div>
       </div>
-      {/* 内容区骨架 */}
       <div className="flex-1 p-8">
         <SkeletonBlock className="h-6 w-1/3 mb-4" />
         <SkeletonLines lines={8} />

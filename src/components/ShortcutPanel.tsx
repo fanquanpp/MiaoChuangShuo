@@ -6,60 +6,65 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { X, Keyboard } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 
 interface ShortcutGroup {
   title: string;
   shortcuts: { keys: string; desc: string }[];
 }
 
-const SHORTCUTS: ShortcutGroup[] = [
-  {
-    title: "编辑器",
-    shortcuts: [
-      { keys: "Ctrl + B", desc: "加粗" },
-      { keys: "Ctrl + I", desc: "斜体" },
-      { keys: "Ctrl + U", desc: "下划线" },
-      { keys: "Ctrl + 1", desc: "一级标题" },
-      { keys: "Ctrl + 2", desc: "二级标题" },
-      { keys: "Ctrl + Shift + P", desc: "诗歌排版" },
-      { keys: "Ctrl + Shift + L", desc: "歌词排版" },
-      { keys: "Ctrl + Z", desc: "撤销" },
-      { keys: "Ctrl + Shift + Z", desc: "重做" },
-      { keys: "Ctrl + S", desc: "保存" },
-      { keys: "Tab", desc: "剧本模式呼出角色" },
-    ],
-  },
-  {
-    title: "全局",
-    shortcuts: [
-      { keys: "?", desc: "打开/关闭快捷键面板" },
-      { keys: "Ctrl + K", desc: "命令面板" },
-      { keys: "Ctrl + Shift + F", desc: "全局搜索" },
-      { keys: "Escape", desc: "关闭面板/返回" },
-      { keys: "F11", desc: "切换聚焦模式" },
-    ],
-  },
-  {
-    title: "侧边栏导航",
-    shortcuts: [
-      { keys: "Alt + 1", desc: "正文" },
-      { keys: "Alt + 2", desc: "大纲" },
-      { keys: "Alt + 3", desc: "角色" },
-      { keys: "Alt + 4", desc: "世界观" },
-      { keys: "Alt + 5", desc: "名词" },
-      { keys: "Alt + 6", desc: "素材" },
-      { keys: "Alt + 7", desc: "时间线" },
-      { keys: "Alt + 8", desc: "统计" },
-    ],
-  },
-];
+function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
+  return [
+    {
+      title: t("shortcuts.editor"),
+      shortcuts: [
+        { keys: "Ctrl + B", desc: t("shortcuts.bold") },
+        { keys: "Ctrl + I", desc: t("shortcuts.italic") },
+        { keys: "Ctrl + U", desc: t("shortcuts.underline") },
+        { keys: "Ctrl + 1", desc: t("shortcuts.heading1") },
+        { keys: "Ctrl + 2", desc: t("shortcuts.heading2") },
+        { keys: "Ctrl + Shift + P", desc: t("shortcuts.poetryFormat") },
+        { keys: "Ctrl + Shift + L", desc: t("shortcuts.lyricsFormat") },
+        { keys: "Ctrl + Z", desc: t("shortcuts.undo") },
+        { keys: "Ctrl + Shift + Z", desc: t("shortcuts.redo") },
+        { keys: "Ctrl + S", desc: t("shortcuts.save") },
+        { keys: "Tab", desc: t("shortcuts.scriptMode") },
+      ],
+    },
+    {
+      title: t("shortcuts.global"),
+      shortcuts: [
+        { keys: "?", desc: t("shortcuts.togglePanel") },
+        { keys: "Ctrl + K", desc: t("shortcuts.commandPalette") },
+        { keys: "Ctrl + Shift + F", desc: t("shortcuts.globalSearch") },
+        { keys: "Escape", desc: t("shortcuts.close") },
+        { keys: "F11", desc: t("shortcuts.focusMode") },
+      ],
+    },
+    {
+      title: t("shortcuts.sidebarNav"),
+      shortcuts: [
+        { keys: "Alt + 1", desc: t("shortcuts.navManuscript") },
+        { keys: "Alt + 2", desc: t("shortcuts.navOutline") },
+        { keys: "Alt + 3", desc: t("shortcuts.navCharacters") },
+        { keys: "Alt + 4", desc: t("shortcuts.navWorldview") },
+        { keys: "Alt + 5", desc: t("shortcuts.navGlossary") },
+        { keys: "Alt + 6", desc: t("shortcuts.navMaterials") },
+        { keys: "Alt + 7", desc: t("shortcuts.navTimeline") },
+        { keys: "Alt + 8", desc: t("shortcuts.navStats") },
+      ],
+    },
+  ];
+}
 
 const STORAGE_KEY = "novelforge-shortcuts-seen";
 
 export default function ShortcutPanel() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
-  // 第一次打开时自动弹出
+  const SHORTCUTS = buildShortcuts(t);
+
   useEffect(() => {
     const seen = localStorage.getItem(STORAGE_KEY);
     if (!seen && typeof window !== "undefined") {
@@ -73,7 +78,6 @@ export default function ShortcutPanel() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // 在输入框内不触发
       const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
@@ -103,27 +107,25 @@ export default function ShortcutPanel() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-xl bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
-        {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light">
           <div className="flex items-center gap-2.5">
             <Keyboard className="w-4 h-4 text-fandex-primary" />
             <h2 className="fandex-bar-left text-lg font-bold font-display text-nf-text">
-              快捷键参考
+              {t("shortcuts.title")}
             </h2>
           </div>
           <button
             onClick={() => setOpen(false)}
             className="p-1.5 hover:bg-nf-bg-hover text-nf-text-tertiary hover:text-nf-text transition-fast"
-            aria-label="关闭快捷键面板"
+            aria-label={t("shortcuts.closePanel")}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* 内容 — 分类快捷键 */}
         <div className="px-6 py-5 max-h-[65vh] overflow-y-auto space-y-5">
           <p className="text-xs text-nf-text-tertiary leading-relaxed">
-            按 <kbd className="px-1.5 py-0.5 bg-nf-bg-hover border border-nf-border-light rounded text-nf-text text-[11px] font-mono">?</kbd> 随时打开此面板
+            {t("shortcuts.pressQuestionHint")}
           </p>
 
           {SHORTCUTS.map((group) => (
@@ -159,10 +161,9 @@ export default function ShortcutPanel() {
           ))}
         </div>
 
-        {/* 底部提示 */}
         <div className="px-6 py-3 border-t border-nf-border-light text-center">
           <span className="text-xs text-nf-text-tertiary">
-            此面板仅在首次使用时自动弹出，之后按 <kbd className="px-1 py-0.5 bg-nf-bg-hover border border-nf-border-light rounded text-[10px] font-mono text-nf-text-secondary">?</kbd> 打开
+            {t("shortcuts.autoShowHint")}
           </span>
         </div>
       </div>
