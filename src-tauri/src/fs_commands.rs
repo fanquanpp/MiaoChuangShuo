@@ -677,6 +677,35 @@ pub fn rename_path(
     fs::rename(&old_abs, &new_abs).map_err(|e| format!("重命名失败: {}", e))
 }
 
+/// 复制文件（在项目内复制文件到新路径）
+/// 输入: src_path 源文件路径, dest_path 目标文件路径, project_path 项目根目录
+/// 输出: Result<String, String> 目标文件绝对路径或错误
+/// 流程: 校验源路径存在且为文件，校验目标路径在项目内且不存在，执行复制
+#[tauri::command]
+pub fn copy_file(
+    src_path: String,
+    dest_path: String,
+    project_path: String,
+) -> Result<String, String> {
+    let src_abs = validate_path_in_project(&src_path, &project_path)?;
+    let dest_abs = validate_path_in_project(&dest_path, &project_path)?;
+
+    // 源必须是文件
+    if !src_abs.is_file() {
+        return Err("源路径不是文件".to_string());
+    }
+    // 目标不能已存在
+    if dest_abs.exists() {
+        return Err("目标文件已存在".to_string());
+    }
+    // 确保目标父目录存在
+    if let Some(parent) = dest_abs.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+    }
+    fs::copy(&src_abs, &dest_abs).map_err(|e| format!("复制文件失败: {}", e))?;
+    Ok(dest_abs.to_string_lossy().to_string())
+}
+
 /// 删除项目（移至系统回收站）
 /// 输入: project_path 项目根目录路径
 /// 输出: Result<(), String> 成功或错误

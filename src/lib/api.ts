@@ -420,6 +420,26 @@ export async function renamePath(
   });
 }
 
+// 复制文件到项目内新路径
+// 输入: projectPath 项目路径, srcRelPath 源相对路径, destRelPath 目标相对路径
+// 输出: Promise<string> 目标文件绝对路径
+// 流程: 拼接绝对路径后调用 Rust 后端 copy_file 命令
+export async function copyFile(
+  projectPath: string,
+  srcRelPath: string,
+  destRelPath: string
+): Promise<string> {
+  const sep = navigator.platform.toLowerCase().includes('win') ? '\\' : '/';
+  const normalizeRel = (p: string) => p.replace(/[\\/]/g, sep);
+  const srcAbs = `${projectPath}${sep}${normalizeRel(srcRelPath)}`;
+  const destAbs = `${projectPath}${sep}${normalizeRel(destRelPath)}`;
+  return invoke<string>("copy_file", {
+    srcPath: srcAbs,
+    destPath: destAbs,
+    projectPath: projectPath,
+  });
+}
+
 // ===== 自定义模板 API =====
 
 // 自定义模板接口

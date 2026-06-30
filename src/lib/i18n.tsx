@@ -789,6 +789,22 @@ const zhCN: TranslationDict = {
   "archive.archiveSize": "压缩后大小",
   "archive.projectNameLabel": "项目名",
   "archive.outputPath": "输出路径",
+
+  // ── 右键上下文菜单 ──
+  "ctxmenu.open": "打开",
+  "ctxmenu.rename": "重命名",
+  "ctxmenu.delete": "删除",
+  "ctxmenu.duplicate": "创建副本",
+  "ctxmenu.copyPath": "复制路径",
+  "ctxmenu.copyName": "复制文件名",
+  "ctxmenu.newFile": "在此创建文件",
+  "ctxmenu.expandAll": "展开全部",
+  "ctxmenu.collapseAll": "折叠全部",
+  "ctxmenu.duplicated": "已创建副本：{name}",
+  "ctxmenu.duplicateFailed": "创建副本失败：{error}",
+  "ctxmenu.pathCopied": "已复制路径到剪贴板",
+  "ctxmenu.nameCopied": "已复制文件名到剪贴板",
+  "ctxmenu.copyFailed": "复制到剪贴板失败",
 };
 
 // 英文翻译
@@ -1560,6 +1576,22 @@ const enUS: TranslationDict = {
   "archive.archiveSize": "Archive Size",
   "archive.projectNameLabel": "Project Name",
   "archive.outputPath": "Output Path",
+
+  // ── Context Menu ──
+  "ctxmenu.open": "Open",
+  "ctxmenu.rename": "Rename",
+  "ctxmenu.delete": "Delete",
+  "ctxmenu.duplicate": "Duplicate",
+  "ctxmenu.copyPath": "Copy Path",
+  "ctxmenu.copyName": "Copy Name",
+  "ctxmenu.newFile": "New File Here",
+  "ctxmenu.expandAll": "Expand All",
+  "ctxmenu.collapseAll": "Collapse All",
+  "ctxmenu.duplicated": "Duplicated: {name}",
+  "ctxmenu.duplicateFailed": "Duplicate failed: {error}",
+  "ctxmenu.pathCopied": "Path copied to clipboard",
+  "ctxmenu.nameCopied": "Name copied to clipboard",
+  "ctxmenu.copyFailed": "Copy to clipboard failed",
 };
 
 const translations: Record<Locale, TranslationDict> = {

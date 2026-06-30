@@ -28,10 +28,13 @@ import {
   RefreshCw,
   ListTree,
   BookCopy,
+  Copy,
+  ClipboardCopy,
+  Files,
 } from "lucide-react";
 import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
 import type { FileNode } from "../lib/api";
-import { deletePath, readProjectTree, renamePath } from "../lib/api";
+import { deletePath, readProjectTree, renamePath, copyFile } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
@@ -39,6 +42,7 @@ import { extractChapterNum } from "../lib/settingsStore";
 import ConfirmDialog from "./ConfirmDialog";
 import OutlineToChapters from "./OutlineToChapters";
 import VolumeChapterGenerator from "./VolumeChapterGenerator";
+import ContextMenu, { type ContextMenuItem } from "./ContextMenu";
 
 interface FileListProps {
   onCreateFile: () => void;
@@ -84,6 +88,7 @@ function TreeNodeList({
   onSelect,
   onRename,
   onDelete,
+  onContextMenu,
   t,
   activeFileWordCount,
   isDraggable,
@@ -100,6 +105,7 @@ function TreeNodeList({
   onSelect: (node: FileNode) => void;
   onRename: (node: FileNode, e: React.MouseEvent) => void;
   onDelete: (node: FileNode, e: React.MouseEvent) => void;
+  onContextMenu: (node: FileNode, e: React.MouseEvent) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   activeFileWordCount?: number;
   isDraggable?: boolean;
@@ -120,6 +126,7 @@ function TreeNodeList({
           className="group flex items-center gap-2 px-3 py-2 cursor-pointer transition duration-fast border border-transparent hover:bg-nf-bg-hover hover:text-nf-text text-nf-text-secondary"
           style={{ paddingLeft: `${12 + depth * 16}px` }}
           onClick={() => hasChildren && setExpanded(!expanded)}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
         >
           {hasChildren ? (
             expanded ? (
@@ -162,6 +169,7 @@ function TreeNodeList({
               onSelect={onSelect}
               onRename={onRename}
               onDelete={onDelete}
+              onContextMenu={onContextMenu}
               t={t}
               activeFileWordCount={activeFileWordCount}
             />
@@ -175,6 +183,7 @@ function TreeNodeList({
   return (
     <div
       onClick={() => onSelect(node)}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
       style={{ paddingLeft: `${12 + depth * 16}px` }}
       draggable={isDraggable}
       onDragStart={onDragStart}
@@ -229,6 +238,7 @@ function TreeNodeGrid({
   onSelect,
   onRename,
   onDelete,
+  onContextMenu,
   activeFileWordCount,
   t,
   isDraggable,
@@ -245,6 +255,7 @@ function TreeNodeGrid({
   onSelect: (node: FileNode) => void;
   onRename: (node: FileNode, e: React.MouseEvent) => void;
   onDelete: (node: FileNode, e: React.MouseEvent) => void;
+  onContextMenu: (node: FileNode, e: React.MouseEvent) => void;
   activeFileWordCount?: number;
   t: (key: string, params?: Record<string, string | number>) => string;
   isDraggable?: boolean;
@@ -264,6 +275,7 @@ function TreeNodeGrid({
         <div
           className="group flex items-center gap-2 p-2 cursor-pointer hover:bg-nf-bg-hover transition duration-fast border-b border-nf-border-light"
           onClick={() => hasChildren && setExpanded(!expanded)}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
         >
           {hasChildren ? (
             expanded ? (
@@ -307,6 +319,7 @@ function TreeNodeGrid({
                 onSelect={onSelect}
                 onRename={onRename}
                 onDelete={onDelete}
+                onContextMenu={onContextMenu}
                 activeFileWordCount={activeFileWordCount}
                 t={t}
               />
@@ -322,6 +335,7 @@ function TreeNodeGrid({
   return (
     <div
       onClick={() => onSelect(node)}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
       draggable={isDraggable}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
@@ -394,6 +408,10 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
   const [renameTarget, setRenameTarget] = useState<FileNode | null>(null);
+  // 右键上下文菜单状态
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; node: FileNode | null }>({
+    open: false, x: 0, y: 0, node: null,
+  });
 
   // 拖拽排序状态（仅正文分类有效）
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -604,6 +622,105 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
     }
   };
 
+  // 右键菜单触发：记录坐标与目标节点
+  const handleContextMenu = useCallback((node: FileNode, e: React.MouseEvent) => {
+    setCtxMenu({ open: true, x: e.clientX, y: e.clientY, node });
+  }, []);
+
+  // 创建文件副本：在同级目录下生成 副本_ 前缀的同名文件
+  const handleDuplicate = useCallback(async () => {
+    const node = ctxMenu.node;
+    setCtxMenu((prev) => ({ ...prev, open: false }));
+    if (!node || node.is_dir || !currentProject) return;
+    const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
+    const baseName = node.name.replace(/\.txt$/i, "");
+    const newName = `副本_${baseName}.txt`;
+    const newRelPath = dirPath + newName;
+    try {
+      await copyFile(currentProject.path, node.relative_path, newRelPath);
+      showToast("success", t("ctxmenu.duplicated", { name: newName }));
+      const tree = await readProjectTree(currentProject.path);
+      useAppStore.getState().setProjectTree(tree);
+    } catch (e) {
+      showToast("error", t("ctxmenu.duplicateFailed", { error: String(e) }));
+    }
+  }, [ctxMenu.node, currentProject, showToast, t]);
+
+  // 复制文件完整路径到剪贴板
+  const handleCopyPath = useCallback(async () => {
+    const node = ctxMenu.node;
+    setCtxMenu((prev) => ({ ...prev, open: false }));
+    if (!node || !currentProject) return;
+    const fullPath = `${currentProject.path}/${node.relative_path}`;
+    try {
+      await navigator.clipboard.writeText(fullPath);
+      showToast("success", t("ctxmenu.pathCopied"));
+    } catch {
+      showToast("error", t("ctxmenu.copyFailed"));
+    }
+  }, [ctxMenu.node, currentProject, showToast, t]);
+
+  // 复制文件名到剪贴板
+  const handleCopyName = useCallback(async () => {
+    const node = ctxMenu.node;
+    setCtxMenu((prev) => ({ ...prev, open: false }));
+    if (!node) return;
+    try {
+      await navigator.clipboard.writeText(node.name);
+      showToast("success", t("ctxmenu.nameCopied"));
+    } catch {
+      showToast("error", t("ctxmenu.copyFailed"));
+    }
+  }, [ctxMenu.node, showToast, t]);
+
+  // 构建右键菜单项
+  const ctxMenuItems: ContextMenuItem[] = useMemo(() => {
+    if (!ctxMenu.node) return [];
+    const node = ctxMenu.node;
+    return [
+      {
+        id: "open",
+        label: t("ctxmenu.open"),
+        icon: FileText,
+        action: () => { if (!node.is_dir) handleFileSelect(node); },
+      },
+      { id: "sep1", label: "", action: () => {}, separator: true },
+      {
+        id: "rename",
+        label: t("ctxmenu.rename"),
+        icon: PenLine,
+        action: () => setRenameTarget(node),
+      },
+      ...(!node.is_dir ? [{
+        id: "duplicate",
+        label: t("ctxmenu.duplicate"),
+        icon: Files,
+        action: handleDuplicate,
+      }] : []),
+      { id: "sep2", label: "", action: () => {}, separator: true },
+      {
+        id: "copyPath",
+        label: t("ctxmenu.copyPath"),
+        icon: ClipboardCopy,
+        action: handleCopyPath,
+      },
+      {
+        id: "copyName",
+        label: t("ctxmenu.copyName"),
+        icon: Copy,
+        action: handleCopyName,
+      },
+      { id: "sep3", label: "", action: () => {}, separator: true },
+      {
+        id: "delete",
+        label: t("ctxmenu.delete"),
+        icon: Trash2,
+        action: () => setDeleteTarget(node),
+        danger: true,
+      },
+    ];
+  }, [ctxMenu.node, t, handleFileSelect, handleDuplicate, handleCopyPath, handleCopyName]);
+
   // 判断某个文件节点是否正在被拖拽或作为拖拽目标
   const getFileDragProps = (node: FileNode, index: number) => {
     if (!isManuscript || node.is_dir) return {};
@@ -712,6 +829,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
                 onSelect={handleFileSelect}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                onContextMenu={handleContextMenu}
                 activeFileWordCount={activeFileWordCount}
                 t={t}
                 {...getFileDragProps(node, index)}
@@ -729,6 +847,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
                 onSelect={handleFileSelect}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                onContextMenu={handleContextMenu}
                 t={t}
                 activeFileWordCount={activeFileWordCount}
                 {...getFileDragProps(node, index)}
@@ -787,6 +906,15 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
           }}
         />
       )}
+
+      {/* 右键上下文菜单：文件列表节点右键触发 */}
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        items={ctxMenuItems}
+        onClose={() => setCtxMenu((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }

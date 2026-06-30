@@ -1,0 +1,20 @@
+feat(files): 文件列表右键上下文菜单系统
+
+修改目的：
+为 FileList 组件添加完整的右键上下文菜单系统，减少文件操作的鼠标移动距离，
+提升作者管理文件时的效率，无需再依赖 hover 才出现的按钮。
+
+修改范围：
+- 新增 src/components/ContextMenu.tsx 通用右键菜单组件
+- 新增 Rust 后端 copy_file 命令（fs_commands.rs + lib.rs 注册）
+- 新增前端 API copyFile 函数（api.ts）
+- FileList.tsx 集成右键菜单：目录与文件节点均支持右键
+- i18n.tsx 新增 ctxmenu.* 系列共 14 条中英文翻译键
+
+菜单项：打开、重命名、创建副本（仅文件）、复制路径、复制文件名、删除
+特性：自动边界检测、Escape 关闭、点击外部关闭、危险操作红色样式
+
+影响说明：
+- 不影响原有 hover 按钮功能，右键菜单为补充交互方式
+- ContextMenu 组件可被其他组件复用（编辑器、大纲等）
+- copy_file 命令经过路径沙箱校验，确保只在项目内复制
