@@ -38,6 +38,16 @@ interface SettingsState {
   indentEnabled: boolean;
   /** 首行缩进宽度（全角空格数，1-4） */
   indentWidth: number;
+  /** 打字机模式：光标行始终居中 */
+  typewriterMode: boolean;
+  /** 焦点暗化：非当前段落降低透明度 */
+  focusDim: boolean;
+  /** 焦点暗化透明度（0-1，越低越暗） */
+  focusDimOpacity: number;
+  /** 打字音效开关 */
+  typingSound: boolean;
+  /** 字数目标（本次会话，0=未设定） */
+  sessionWordTarget: number;
 
   // Actions
   setFontSize: (size: number) => void;
@@ -51,6 +61,11 @@ interface SettingsState {
   setAutoTemplateFill: (enabled: boolean) => void;
   setIndentEnabled: (enabled: boolean) => void;
   setIndentWidth: (width: number) => void;
+  setTypewriterMode: (enabled: boolean) => void;
+  setFocusDim: (enabled: boolean) => void;
+  setFocusDimOpacity: (opacity: number) => void;
+  setTypingSound: (enabled: boolean) => void;
+  setSessionWordTarget: (target: number) => void;
   /** 从 localStorage 加载并应用 */
   initSettings: () => void;
 }
@@ -70,6 +85,11 @@ interface SettingsData {
   autoTemplateFill: boolean;
   indentEnabled: boolean;
   indentWidth: number;
+  typewriterMode: boolean;
+  focusDim: boolean;
+  focusDimOpacity: number;
+  typingSound: boolean;
+  sessionWordTarget: number;
 }
 
 // 默认设置
@@ -85,6 +105,11 @@ const DEFAULT_SETTINGS: SettingsData = {
   autoTemplateFill: true,
   indentEnabled: true,
   indentWidth: 2,
+  typewriterMode: false,
+  focusDim: false,
+  focusDimOpacity: 0.35,
+  typingSound: false,
+  sessionWordTarget: 0,
 };
 
 function loadSettings(): SettingsData {
@@ -183,6 +208,38 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const data = { ...get(), indentWidth: clamped };
     saveSettings(data);
     set({ indentWidth: clamped });
+  },
+
+  setTypewriterMode: (enabled) => {
+    const data = { ...get(), typewriterMode: enabled };
+    saveSettings(data);
+    set({ typewriterMode: enabled });
+  },
+
+  setFocusDim: (enabled) => {
+    const data = { ...get(), focusDim: enabled };
+    saveSettings(data);
+    set({ focusDim: enabled });
+  },
+
+  setFocusDimOpacity: (opacity) => {
+    const clamped = Math.max(0.1, Math.min(0.7, opacity));
+    const data = { ...get(), focusDimOpacity: clamped };
+    saveSettings(data);
+    set({ focusDimOpacity: clamped });
+  },
+
+  setTypingSound: (enabled) => {
+    const data = { ...get(), typingSound: enabled };
+    saveSettings(data);
+    set({ typingSound: enabled });
+  },
+
+  setSessionWordTarget: (target) => {
+    const clamped = Math.max(0, Math.floor(target));
+    const data = { ...get(), sessionWordTarget: clamped };
+    saveSettings(data);
+    set({ sessionWordTarget: clamped });
   },
 
   initSettings: () => {

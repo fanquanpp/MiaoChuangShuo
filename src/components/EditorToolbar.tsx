@@ -5,11 +5,13 @@
 // 移除 Markdown 相关按钮（标题/列表/引用）。
 // 保留诗歌/歌词排版、撤销/重做、保存状态指示。
 // 采用 FANDEX 直角按钮 + 毛玻璃风格。
+// 集成写作会话统计（本次字数、时长、WPM、目标进度）与专注模式快捷切换。
 //
 // 模块职责：
 // 1. ToolbarButton: 通用工具栏按钮
 // 2. Divider: 分隔符
-// 3. EditorToolbar: 完整的工具栏组件
+// 3. SessionStats: 写作会话统计小组件
+// 4. EditorToolbar: 完整的工具栏组件
 
 import type { Editor } from "@tiptap/core";
 import {
@@ -27,6 +29,11 @@ import {
   Music,
   Pilcrow,
   ListTree,
+  Square,
+  Eye,
+  Pause,
+  Play,
+  Target,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
@@ -71,6 +78,104 @@ export function Divider() {
   return <div className="w-px h-4 bg-nf-border-light/60 mx-1.5" />;
 }
 
+// 会话统计属性
+interface SessionStatsProps {
+  /** 本次会话净增字数 */
+  sessionWords: number;
+  /** 会话时长（秒） */
+  sessionDuration: number;
+  /** 每分钟字数 */
+  wpm: number;
+  /** 字数目标（0=未设定） */
+  wordTarget: number;
+  /** 目标完成进度（0-1） */
+  progress: number;
+  /** 是否暂停 */
+  paused: boolean;
+  /** 暂停/恢复回调 */
+  onTogglePause: () => void;
+}
+
+/**
+ * 格式化时长为 mm:ss 或 hh:mm:ss
+ * 输入: seconds 秒数
+ * 输出: 格式化字符串
+ */
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
+}
+
+// 写作会话统计小组件
+// 显示本次会话字数、时长、WPM 与目标进度条
+function SessionStats({
+  sessionWords,
+  sessionDuration,
+  wpm,
+  wordTarget,
+  progress,
+  paused,
+  onTogglePause,
+}: SessionStatsProps) {
+  // 净增字数着色：正数绿色，负数红色，零灰色
+  const wordsColor =
+    sessionWords > 0
+      ? "text-fandex-secondary"
+      : sessionWords < 0
+        ? "text-fandex-tertiary"
+        : "text-nf-text-tertiary";
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      {/* 暂停/恢复按钮 */}
+      <button
+        onClick={onTogglePause}
+        title={paused ? "恢复会话" : "暂停会话"}
+        className={`p-1 transition-all duration-base ease-fandex border ${
+          paused
+            ? "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/40"
+            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light"
+        }`}
+      >
+        {paused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+      </button>
+      {/* 会话字数 */}
+      <span className={`tabular-nums font-medium ${wordsColor}`}>
+        {sessionWords > 0 ? "+" : ""}{sessionWords}
+      </span>
+      {/* 会话时长 */}
+      <span className="tabular-nums text-nf-text-tertiary">
+        {formatDuration(sessionDuration)}
+      </span>
+      {/* WPM */}
+      {wpm > 0 && (
+        <span className="tabular-nums text-nf-text-tertiary">
+          {wpm} <span className="text-nf-text-tertiary/60">wpm</span>
+        </span>
+      )}
+      {/* 目标进度条 */}
+      {wordTarget > 0 && (
+        <div className="flex items-center gap-1.5" title={`目标 ${wordTarget} 字 / 已完成 ${Math.round(progress * 100)}%`}>
+          <Target className="w-3 h-3 text-fandex-primary" />
+          <div className="w-16 h-1.5 bg-nf-bg-hover border border-nf-border-light/40 overflow-hidden">
+            <div
+              className="h-full bg-fandex-primary transition-all duration-base ease-fandex"
+              style={{ width: `${Math.min(100, progress * 100)}%` }}
+            />
+          </div>
+          <span className="tabular-nums text-nf-text-tertiary text-[10px]">
+            {Math.round(progress * 100)}%
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 工具栏属性
 interface EditorToolbarProps {
   editor: Editor | null;
@@ -82,6 +187,19 @@ interface EditorToolbarProps {
   focusMode?: boolean;
   showOutline?: boolean;
   onToggleOutline?: () => void;
+  // 写作会话统计
+  sessionWords: number;
+  sessionDuration: number;
+  wpm: number;
+  wordTarget: number;
+  progress: number;
+  sessionPaused: boolean;
+  onToggleSessionPause: () => void;
+  // 专注模式快捷切换
+  typewriterMode: boolean;
+  focusDim: boolean;
+  onToggleTypewriter: () => void;
+  onToggleFocusDim: () => void;
 }
 
 // 编辑器工具栏组件（纯文本模式 + 格式扩展）
@@ -95,6 +213,17 @@ export default function EditorToolbar({
   focusMode = false,
   showOutline = false,
   onToggleOutline,
+  sessionWords,
+  sessionDuration,
+  wpm,
+  wordTarget,
+  progress,
+  sessionPaused,
+  onToggleSessionPause,
+  typewriterMode,
+  focusDim,
+  onToggleTypewriter,
+  onToggleFocusDim,
 }: EditorToolbarProps) {
   const { t } = useI18n();
 
@@ -267,6 +396,36 @@ export default function EditorToolbar({
 
       {/* 右侧状态区 */}
       <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary">
+        {/* 写作会话统计 */}
+        <SessionStats
+          sessionWords={sessionWords}
+          sessionDuration={sessionDuration}
+          wpm={wpm}
+          wordTarget={wordTarget}
+          progress={progress}
+          paused={sessionPaused}
+          onTogglePause={onToggleSessionPause}
+        />
+        <Divider />
+        {/* 专注模式快捷切换 */}
+        {!focusMode && (
+          <div className="flex items-center gap-0.5">
+            <ToolbarButton
+              onClick={onToggleTypewriter}
+              active={typewriterMode}
+              title={t("editor.typewriterMode") || "打字机模式"}
+            >
+              <Square className="w-3.5 h-3.5" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={onToggleFocusDim}
+              active={focusDim}
+              title={t("editor.focusDim") || "焦点暗化"}
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </ToolbarButton>
+          </div>
+        )}
         <span className="tabular-nums">{t("editor.wordCount", { count: wordCount })}</span>
         {/* 保存状态指示器 */}
         {dirty && (

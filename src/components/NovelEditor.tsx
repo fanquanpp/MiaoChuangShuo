@@ -38,10 +38,13 @@ import { VSShortcuts } from "../lib/vscodeShortcuts";
 import { AutoPair } from "../lib/autoPair";
 import { LineHighlight } from "../lib/lineHighlight";
 import { SmartTab } from "../lib/smartTab";
+import { TypewriterMode } from "../lib/typewriterMode";
+import { FocusDim } from "../lib/focusDim";
 import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import { useWritingSession } from "../hooks/useWritingSession";
 import EditorToolbar from "./EditorToolbar";
 import OutlineView from "./OutlineView";
 
@@ -113,7 +116,13 @@ export default function NovelEditor({
   const diaryAutoDate = useSettingsStore((s) => s.diaryAutoDate);
   const indentEnabled = useSettingsStore((s) => s.indentEnabled);
   const indentWidth = useSettingsStore((s) => s.indentWidth);
+  const typewriterMode = useSettingsStore((s) => s.typewriterMode);
+  const focusDim = useSettingsStore((s) => s.focusDim);
+  const focusDimOpacity = useSettingsStore((s) => s.focusDimOpacity);
   const [showOutline, setShowOutline] = useState(false);
+
+  // 写作会话追踪：记录本次会话字数、时长、WPM
+  const session = useWritingSession(wordCount, filePath);
 
   // 从角色目录自动提取角色名（扫描每个 .txt 文件首行）
   // 文件格式约定：第一行为角色名（纯文本，不含冒号、不以分隔符开头）
@@ -218,6 +227,10 @@ export default function NovelEditor({
       LineHighlight.configure({ enabled: true, className: "current-paragraph" }),
       // VSCode 风格智能选中缩进（Tab/Shift+Tab 批量缩进多段）
       SmartTab.configure({ enabled: true, indentChar: "\u3000" }),
+      // 打字机模式：光标行始终居中（iA Writer 风格）
+      TypewriterMode.configure({ enabled: typewriterMode, centerRatio: 0.45 }),
+      // 焦点暗化：非当前段落降低透明度（iA Writer 风格）
+      FocusDim.configure({ enabled: focusDim, dimOpacity: focusDimOpacity, scope: "paragraph" }),
     ];
 
     // 散文类文体启用首行缩进（标准长篇/短篇/日记/分卷/同世界观/诗歌等）
@@ -244,7 +257,7 @@ export default function NovelEditor({
 
     exts.push(PoetryFormat.configure({ enabled: true }));
     return exts;
-  }, [isProse, isScript, isDialogue, characters, t, indentEnabled, indentWidth]);
+  }, [isProse, isScript, isDialogue, characters, t, indentEnabled, indentWidth, typewriterMode, focusDim, focusDimOpacity]);
 
   // 创建编辑器实例（纯文本模式）
   const editor = useEditor({
@@ -508,6 +521,17 @@ export default function NovelEditor({
         focusMode={focusMode}
         showOutline={showOutline}
         onToggleOutline={() => setShowOutline((prev) => !prev)}
+        sessionWords={session.sessionWords}
+        sessionDuration={session.sessionDuration}
+        wpm={session.wpm}
+        wordTarget={session.wordTarget}
+        progress={session.progress}
+        sessionPaused={session.paused}
+        onToggleSessionPause={session.togglePause}
+        typewriterMode={typewriterMode}
+        focusDim={focusDim}
+        onToggleTypewriter={() => useSettingsStore.getState().setTypewriterMode(!typewriterMode)}
+        onToggleFocusDim={() => useSettingsStore.getState().setFocusDim(!focusDim)}
       />
 
       {isScript && characters.length > 0 && (
