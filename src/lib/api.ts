@@ -662,6 +662,36 @@ export async function renameCharacterInProject(
   });
 }
 
+// 角色摘要信息接口（用于正文悬停卡片）
+export interface CharacterSummary {
+  // 角色名
+  name: string;
+  // 角色设定文件相对路径
+  source_file: string;
+  // 身份/职业
+  identity: string;
+  // 核心特质
+  personality: string;
+  // 一句话简介
+  brief: string;
+  // 是否找到角色设定文件
+  found: boolean;
+}
+
+// 读取指定角色的摘要信息
+// 输入: projectPath 项目路径, characterName 角色名
+// 输出: Promise<CharacterSummary> 角色摘要（含身份、性格、简介）
+// 流程: 调用 Rust 后端 read_character_summary 命令，扫描角色目录匹配首行
+export async function readCharacterSummary(
+  projectPath: string,
+  characterName: string
+): Promise<CharacterSummary> {
+  return invoke<CharacterSummary>("read_character_summary", {
+    projectPath,
+    characterName,
+  });
+}
+
 // ===== 项目导入导出 API =====
 
 // 导出结果统计

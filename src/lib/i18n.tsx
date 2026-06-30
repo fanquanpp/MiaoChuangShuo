@@ -1357,6 +1357,14 @@ const enUS: TranslationDict = {
   // ── Character Mention extension ──
   "characterMention.placeholder": "Custom character name…",
 
+  // ── Character Hover Card (hover character name in text to show summary) ──
+  "characterHover.loading": "Loading…",
+  "characterHover.loadFailed": "Failed to load",
+  "characterHover.notFound": "No character profile found",
+  "characterHover.identity": "Identity",
+  "characterHover.personality": "Personality",
+  "characterHover.brief": "Brief",
+
   // ── Character Linkage (appearance stats / global rename) ──
   "characterLinkage.appearanceBtn": "Appearance Stats",
   "characterLinkage.renameBtn": "Global Rename",

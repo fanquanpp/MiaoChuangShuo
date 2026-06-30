@@ -69,6 +69,7 @@ pub fn run() {
             // 角色联动命令
             character_commands::count_character_appearances,
             character_commands::rename_character_in_project,
+            character_commands::read_character_summary,
         ])
         .setup(|_app| {
             Ok(())

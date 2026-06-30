@@ -48,6 +48,7 @@ import { useWritingSession } from "../hooks/useWritingSession";
 import EditorToolbar from "./EditorToolbar";
 import OutlineView from "./OutlineView";
 import SnapshotHistory from "./SnapshotHistory";
+import CharacterHoverCard from "./CharacterHoverCard";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -104,6 +105,13 @@ export default function NovelEditor({
   const [loadError, setLoadError] = useState("");
   const [characters, setCharacters] = useState<string[]>([]);
   const { showToast } = useToast();
+  // 角色悬停卡片状态：鼠标悬停在正文中的角色名上时显示摘要卡片
+  const [hoverCard, setHoverCard] = useState<{ open: boolean; x: number; y: number; name: string }>({
+    open: false, x: 0, y: 0, name: "",
+  });
+  const hoverTimerRef = useRef<number | null>(null);
+  // 当前已显示的角色名引用：用于避免同一角色名上移动时反复触发计时器造成卡片闪烁
+  const hoverShownNameRef = useRef<string>("");
 
   const projectType = currentProject?.meta?.type || "standard";
   const isScript = projectType === "script" || projectType === "screenplay";
@@ -499,6 +507,117 @@ export default function NovelEditor({
     };
   }, []);
 
+  // 角色悬停卡片：监听编辑器内光标移动，悬停在角色名上时延迟显示摘要卡片
+  // 仅在剧本/对话体（已加载角色名列表）时启用
+  // 交互逻辑：
+  //   1. 首次悬停在某角色名上：延迟 500ms 后显示（避免误触）
+  //   2. 在同一角色名内移动：仅更新卡片坐标，不重置计时器（避免闪烁）
+  //   3. 从一个角色名切换到另一个：立即切换（已激活悬停态，无需再次延迟）
+  //   4. 移动到非角色名文本：立即隐藏卡片
+  //   5. 离开编辑器区域：立即隐藏卡片
+  useEffect(() => {
+    if (!editor || characters.length === 0) {
+      setHoverCard((prev) => (prev.open ? { ...prev, open: false } : prev));
+      hoverShownNameRef.current = "";
+      return;
+    }
+    const editorDom = editor.view.dom;
+    // 节流时间戳：每 60ms 最多检测一次，避免高频 mousemove 造成性能问题
+    let lastCheckTime = 0;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const now = Date.now();
+      if (now - lastCheckTime < 60) return;
+      lastCheckTime = now;
+
+      // 通过坐标获取光标位置的文本节点与偏移（Chromium 支持 caretRangeFromPoint）
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (!range) return;
+      const node = range.startContainer;
+      if (!node || node.nodeType !== Node.TEXT_NODE) {
+        // 非文本节点（如段落边界、空白区域）：清除计时器并隐藏
+        if (hoverTimerRef.current) {
+          clearTimeout(hoverTimerRef.current);
+          hoverTimerRef.current = null;
+        }
+        setHoverCard((prev) => (prev.open ? { ...prev, open: false } : prev));
+        hoverShownNameRef.current = "";
+        return;
+      }
+      const text = node.textContent || "";
+      const offset = range.startOffset;
+      // 检查光标偏移是否落在某个角色名范围内
+      let matchedName: string | null = null;
+      for (const name of characters) {
+        if (!name) continue;
+        let idx = text.indexOf(name);
+        while (idx !== -1) {
+          if (offset >= idx && offset <= idx + name.length) {
+            matchedName = name;
+            break;
+          }
+          idx = text.indexOf(name, idx + name.length);
+        }
+        if (matchedName) break;
+      }
+
+      if (matchedName) {
+        const name = matchedName;
+        if (hoverShownNameRef.current === name) {
+          // 同一角色名已显示：仅更新坐标，不触碰计时器
+          setHoverCard((prev) =>
+            prev.open ? { ...prev, x: e.clientX, y: e.clientY } : prev
+          );
+        } else if (hoverShownNameRef.current !== "") {
+          // 从一个角色名切换到另一个：立即切换（已激活悬停态）
+          if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = null;
+          }
+          hoverShownNameRef.current = name;
+          setHoverCard({ open: true, x: e.clientX, y: e.clientY, name });
+        } else {
+          // 首次悬停：延迟 500ms 显示，避免快速划过时误触
+          if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+          }
+          hoverTimerRef.current = window.setTimeout(() => {
+            hoverShownNameRef.current = name;
+            setHoverCard({ open: true, x: e.clientX, y: e.clientY, name });
+          }, 500);
+        }
+      } else {
+        // 非角色名文本：清除计时器并隐藏
+        if (hoverTimerRef.current) {
+          clearTimeout(hoverTimerRef.current);
+          hoverTimerRef.current = null;
+        }
+        setHoverCard((prev) => (prev.open ? { ...prev, open: false } : prev));
+        hoverShownNameRef.current = "";
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+      setHoverCard((prev) => (prev.open ? { ...prev, open: false } : prev));
+      hoverShownNameRef.current = "";
+    };
+
+    editorDom.addEventListener("mousemove", handleMouseMove);
+    editorDom.addEventListener("mouseleave", handleMouseLeave);
+    return () => {
+      editorDom.removeEventListener("mousemove", handleMouseMove);
+      editorDom.removeEventListener("mouseleave", handleMouseLeave);
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+    };
+  }, [editor, characters]);
+
   if (!filePath) {
     return (
       <div className="flex-1 flex items-center justify-center bg-nf-bg">
@@ -611,6 +730,15 @@ export default function NovelEditor({
           />
         )}
       </div>
+
+      {/* 角色悬停卡片：鼠标悬停在正文角色名上时浮动显示角色摘要 */}
+      <CharacterHoverCard
+        open={hoverCard.open}
+        x={hoverCard.x}
+        y={hoverCard.y}
+        characterName={hoverCard.name}
+        projectPath={currentProject?.path || ""}
+      />
     </div>
   );
 }
