@@ -200,10 +200,12 @@ export async function createFile(
   relativePath: string,
   content: string
 ): Promise<string> {
-  validatePathInProject(`${projectPath}/${relativePath}`, projectPath);
+  const sep = navigator.platform.toLowerCase().includes('win') ? '\\' : '/';
+  const normalizedRel = relativePath.replace(/[\\/]/g, sep);
+  validatePathInProject(`${projectPath}${sep}${normalizedRel}`, projectPath);
   return invoke<string>("create_file", {
     projectPath,
-    relativePath,
+    relativePath: normalizedRel,
     content,
   });
 }
@@ -298,9 +300,12 @@ export async function renamePath(
   oldRelPath: string,
   newRelPath: string
 ): Promise<void> {
-  // 跨平台路径拼接（使用正斜杠，后端 Rust PathBuf 自动适配）
-  const oldAbs = `${projectPath}/${oldRelPath}`;
-  const newAbs = `${projectPath}/${newRelPath}`;
+  // 跨平台路径拼接：统一使用反斜杠（Windows）或正斜杠（Unix）
+  // 关键：relativePath 可能含混合分隔符（来自后端），需先统一
+  const sep = navigator.platform.toLowerCase().includes('win') ? '\\' : '/';
+  const normalizeRel = (p: string) => p.replace(/[\\/]/g, sep);
+  const oldAbs = `${projectPath}${sep}${normalizeRel(oldRelPath)}`;
+  const newAbs = `${projectPath}${sep}${normalizeRel(newRelPath)}`;
 
   validatePathInProject(oldAbs, projectPath);
   validatePathInProject(newAbs, projectPath);

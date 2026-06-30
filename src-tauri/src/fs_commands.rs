@@ -34,7 +34,9 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
         return Err("项目路径不存在".to_string());
     }
 
-    let target_path = PathBuf::from(target);
+    // 归一化目标路径分隔符（处理前端传入的混合分隔符路径）
+    let normalized_target = normalize_path_separators(target);
+    let target_path = PathBuf::from(&normalized_target);
 
     // 如果目标路径已存在，直接 canonicalize；否则 canonicalize 父目录后拼接文件名
     let canonical = if target_path.exists() {
@@ -54,8 +56,9 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
             canonical_parent.join(filename)
         } else {
             // 父目录也不存在，做词法检查（路径归一化后比较前缀）
-            let target_str = target_path.to_string_lossy().replace('\\', "/");
-            let root_str = root_path.to_string_lossy().replace('\\', "/");
+            // 关键：去掉 \\?\ 长路径前缀后再比较，防止误判
+            let target_str = strip_verbatim_prefix(&target_path.to_string_lossy()).replace('\\', "/");
+            let root_str = strip_verbatim_prefix(&root_path.to_string_lossy()).replace('\\', "/");
             if target_str.starts_with(&root_str) {
                 target_path.clone()
             } else {
@@ -78,6 +81,23 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
     }
 
     Ok(canonical)
+}
+
+/// 去掉 Windows 长路径前缀 \\?\ 或 //?/
+fn strip_verbatim_prefix(path: &str) -> &str {
+    path.strip_prefix(r"\\?\")
+        .or_else(|| path.strip_prefix("//?/"))
+        .unwrap_or(path)
+}
+
+/// 统一路径分隔符为平台原生分隔符（Windows 用 \，Unix 用 /）
+/// 解决前端传入混合分隔符路径（如 C:\...\test/对话场景\file.txt）的问题
+fn normalize_path_separators(path: &str) -> String {
+    if cfg!(windows) {
+        path.replace('/', "\\")
+    } else {
+        path.replace('\\', "/")
+    }
 }
 
 /// 项目路径校验：确保路径是有效的项目根目录
