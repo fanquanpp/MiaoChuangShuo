@@ -71,6 +71,7 @@ const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
 interface SidebarProps {
   onCreateFile: () => void;
   onOpenSettings?: () => void;
+  onSwitchCategory?: (category: SidebarCategory) => void;
 }
 
 // 左侧导航栏组件
@@ -80,7 +81,7 @@ interface SidebarProps {
 //   1. 顶部显示项目名称与返回按钮
 //   2. 中间显示分类列表
 //   3. 底部显示主题切换与新建文件按钮
-export default function Sidebar({ onCreateFile, onOpenSettings }: SidebarProps) {
+export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory }: SidebarProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const activeCategory = useAppStore((s) => s.activeCategory);
   const setActiveCategory = useAppStore((s) => s.setActiveCategory);
@@ -88,6 +89,9 @@ export default function Sidebar({ onCreateFile, onOpenSettings }: SidebarProps) 
   const { theme, toggleTheme } = useThemeStore();
   const { t } = useI18n();
   const { handleBackToLauncher } = useAutoSaveOnExit();
+
+  // 分类切换：优先使用外部传入的保存后切换回调
+  const switchTo = onSwitchCategory || setActiveCategory;
 
   // 是否为分卷类型（决定是否显示分卷入口）
   const showVolumeEntry = useMemo(() => {
@@ -140,7 +144,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings }: SidebarProps) 
           return (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => switchTo(cat)}
               title={t(`sidebar.${cat}`)}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
                 isActive
@@ -167,7 +171,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings }: SidebarProps) 
         {showVolumeEntry && (
           <>
             <button
-              onClick={() => setActiveCategory("volumes" as SidebarCategory)}
+              onClick={() => switchTo("volumes" as SidebarCategory)}
               title={t("sidebar.volumes")}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
                 activeCategory === "volumes"
@@ -198,7 +202,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings }: SidebarProps) 
               return (
                 <button
                   key={dirName}
-                  onClick={() => setActiveCategory(dirName as SidebarCategory)}
+                  onClick={() => switchTo(dirName as SidebarCategory)}
                   title={dirName}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
                     isActive
@@ -232,7 +236,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings }: SidebarProps) 
           return (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => switchTo(cat)}
               title={t(`sidebar.${cat}`)}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
                 isActive

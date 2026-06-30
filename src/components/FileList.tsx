@@ -33,6 +33,7 @@ import ConfirmDialog from "./ConfirmDialog";
 
 interface FileListProps {
   onCreateFile: () => void;
+  onSelectFile?: (file: FileNode) => void;
 }
 
 // 格式化文件大小
@@ -299,7 +300,7 @@ function TreeNodeGrid({
   );
 }
 
-export default function FileList({ onCreateFile }: FileListProps) {
+export default function FileList({ onCreateFile, onSelectFile }: FileListProps) {
   const projectTree = useAppStore((s) => s.projectTree);
   const activeCategory = useAppStore((s) => s.activeCategory);
   const selectedFile = useAppStore((s) => s.selectedFile);
@@ -310,6 +311,9 @@ export default function FileList({ onCreateFile }: FileListProps) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
   const [renameTarget, setRenameTarget] = useState<FileNode | null>(null);
+
+  // 文件选择：优先使用外部传入的保存后切换回调
+  const handleFileSelect = onSelectFile || setSelectedFile;
 
   const dirName = getCategoryDir(activeCategory);
 
@@ -450,7 +454,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
                 node={node}
                 depth={0}
                 selectedPath={selectedFile?.relative_path ?? null}
-                onSelect={setSelectedFile}
+                onSelect={handleFileSelect}
                 onRename={handleRename}
                 onDelete={handleDelete}
                 activeFileWordCount={activeFileWordCount}
@@ -466,7 +470,7 @@ export default function FileList({ onCreateFile }: FileListProps) {
                 node={node}
                 depth={0}
                 selectedPath={selectedFile?.relative_path ?? null}
-                onSelect={setSelectedFile}
+                onSelect={handleFileSelect}
                 onRename={handleRename}
                 onDelete={handleDelete}
                 t={t}

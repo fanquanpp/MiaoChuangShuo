@@ -24,6 +24,7 @@ import CreateFileDialog from "./CreateFileDialog";
 import CommandPalette from "./CommandPalette";
 import { FocusTimer } from "./FocusTimer";
 import { useAppStore, getCategoryDir, getCategoryName, type SidebarCategory } from "../lib/store";
+import { getEditorSaveFn } from "../lib/stores/viewSlice";
 import { readProjectTree, createFile } from "../lib/api";
 import type { FileNode } from "../lib/api";
 import { getCategoryConfig } from "../lib/categoryRegistry";
@@ -63,6 +64,35 @@ export default function Workspace() {
   const autoFillBookTitle = useSettingsStore((s) => s.autoFillBookTitle);
   const autoOutlineSkeleton = useSettingsStore((s) => s.autoOutlineSkeleton);
   const bookTitle = currentProject?.meta?.name || "";
+
+  // 切换前自动保存编辑器脏内容，防止数据丢失
+  const saveBeforeSwitch = useCallback(async () => {
+    const state = useAppStore.getState();
+    if (state.editorDirty) {
+      const saveFn = getEditorSaveFn();
+      if (saveFn) {
+        try { await saveFn(); } catch { /* 保存失败也继续切换 */ }
+      }
+    }
+  }, []);
+
+  // 切换分类前先保存（侧边栏、快捷键、命令面板统一入口）
+  const handleSwitchCategory = useCallback(
+    async (cat: SidebarCategory) => {
+      await saveBeforeSwitch();
+      setActiveCategory(cat);
+    },
+    [saveBeforeSwitch, setActiveCategory]
+  );
+
+  // 切换文件前先保存（文件列表入口）
+  const handleSelectFile = useCallback(
+    async (file: FileNode) => {
+      await saveBeforeSwitch();
+      useAppStore.getState().setSelectedFile(file);
+    },
+    [saveBeforeSwitch]
+  );
 
   // 是否为分卷类型
   const isVolumeType = useMemo(() => {
@@ -113,7 +143,7 @@ export default function Workspace() {
         const cat = ALT_CATEGORY_MAP[e.key];
         if (cat) {
           e.preventDefault();
-          setActiveCategory(cat);
+          handleSwitchCategory(cat);
           setCommandPaletteOpen(false);
           return;
         }
@@ -127,7 +157,7 @@ export default function Workspace() {
         }
       }
     },
-    [commandPaletteOpen, focusMode, showToast, setActiveCategory, t]
+    [commandPaletteOpen, focusMode, showToast, handleSwitchCategory, t]
   );
 
   useEffect(() => {
@@ -264,10 +294,10 @@ export default function Workspace() {
   }, []);
 
   // 命令面板中触发新建文件
-  const handleCommandCreateFile = useCallback((category: SidebarCategory) => {
-    setActiveCategory(category);
+  const handleCommandCreateFile = useCallback(async (category: SidebarCategory) => {
+    await handleSwitchCategory(category);
     setCreateDialogOpen(true);
-  }, [setActiveCategory]);
+  }, [handleSwitchCategory]);
 
   // 新建文件入口：正文首次创建时显示选择对话框
   const handleNewFileRequest = useCallback(() => {
@@ -307,7 +337,7 @@ export default function Workspace() {
     <div className="h-screen w-screen flex bg-nf-bg overflow-hidden">
       {/* 聚焦模式下隐藏侧边栏 */}
       {!focusMode && (
-        <Sidebar onCreateFile={handleNewFileRequest} onOpenSettings={() => setSettingsOpen(true)} />
+        <Sidebar onCreateFile={handleNewFileRequest} onOpenSettings={() => setSettingsOpen(true)} onSwitchCategory={handleSwitchCategory} />
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -320,7 +350,7 @@ export default function Workspace() {
 
       {/* 聚焦模式下隐藏文件列表 */}
       {!focusMode && showFileList && (
-        <FileList onCreateFile={handleNewFileRequest} />
+        <FileList onCreateFile={handleNewFileRequest} onSelectFile={handleSelectFile} />
       )}
 
       <CreateFileDialog
@@ -334,6 +364,7 @@ export default function Workspace() {
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
         onCreateFile={handleCommandCreateFile}
+        onSwitchCategory={handleSwitchCategory}
       />
 
       <SettingsDialog

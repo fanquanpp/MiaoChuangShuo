@@ -29,12 +29,14 @@ interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
   onCreateFile?: (category: SidebarCategory) => void;
+  onSwitchCategory?: (category: SidebarCategory) => void;
 }
 
 export default function CommandPalette({
   open,
   onClose,
   onCreateFile,
+  onSwitchCategory,
 }: CommandPaletteProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -45,6 +47,9 @@ export default function CommandPalette({
   const currentProject = useAppStore((s) => s.currentProject);
   const { toggleTheme, theme } = useThemeStore();
 
+  // 分类切换：优先使用外部传入的保存后切换回调
+  const switchTo = onSwitchCategory || setActiveCategory;
+
   // 类型专属目录导航命令（动态生成）
   const typeSpecificCommands: Command[] = useMemo(() => {
     if (!currentProject) return [];
@@ -54,26 +59,26 @@ export default function CommandPalette({
       label: dirName,
       category: t("command.categoryNav"),
       keywords: [dirName, "设定", "扩展"],
-      action: () => setActiveCategory(dirName as SidebarCategory),
+      action: () => switchTo(dirName as SidebarCategory),
     }));
-  }, [currentProject, setActiveCategory, t]);
+  }, [currentProject, switchTo, t]);
 
   const commands: Command[] = useMemo(
     () => [
-      { id: "cat-manuscript", label: CATEGORY_NAMES["manuscript"], category: t("command.categoryNav"), keywords: ["正文", "manuscript", "章节"], action: () => setActiveCategory("manuscript") },
-      { id: "cat-outline", label: CATEGORY_NAMES["outline"], category: t("command.categoryNav"), keywords: ["大纲", "outline"], action: () => setActiveCategory("outline") },
-      { id: "cat-characters", label: CATEGORY_NAMES["characters"], category: t("command.categoryNav"), keywords: ["角色", "人物", "characters"], action: () => setActiveCategory("characters") },
-      { id: "cat-worldview", label: CATEGORY_NAMES["worldview"], category: t("command.categoryNav"), keywords: ["世界观", "设定", "worldview"], action: () => setActiveCategory("worldview") },
-      { id: "cat-glossary", label: CATEGORY_NAMES["glossary"], category: t("command.categoryNav"), keywords: ["名词", "术语", "glossary"], action: () => setActiveCategory("glossary") },
-      { id: "cat-materials", label: CATEGORY_NAMES["materials"], category: t("command.categoryNav"), keywords: ["素材", "资料", "materials"], action: () => setActiveCategory("materials") },
-      { id: "cat-timeline", label: CATEGORY_NAMES["timeline"], category: t("command.categoryNav"), keywords: ["时间线", "timeline"], action: () => setActiveCategory("timeline") },
-      { id: "cat-stats", label: CATEGORY_NAMES["stats"], category: t("command.categoryNav"), keywords: ["统计", "stats", "字数"], action: () => setActiveCategory("stats") },
-      { id: "cat-search", label: CATEGORY_NAMES["search"], category: t("command.categoryNav"), keywords: ["搜索", "search", "查找"], action: () => setActiveCategory("search") },
+      { id: "cat-manuscript", label: CATEGORY_NAMES["manuscript"], category: t("command.categoryNav"), keywords: ["正文", "manuscript", "章节"], action: () => switchTo("manuscript") },
+      { id: "cat-outline", label: CATEGORY_NAMES["outline"], category: t("command.categoryNav"), keywords: ["大纲", "outline"], action: () => switchTo("outline") },
+      { id: "cat-characters", label: CATEGORY_NAMES["characters"], category: t("command.categoryNav"), keywords: ["角色", "人物", "characters"], action: () => switchTo("characters") },
+      { id: "cat-worldview", label: CATEGORY_NAMES["worldview"], category: t("command.categoryNav"), keywords: ["世界观", "设定", "worldview"], action: () => switchTo("worldview") },
+      { id: "cat-glossary", label: CATEGORY_NAMES["glossary"], category: t("command.categoryNav"), keywords: ["名词", "术语", "glossary"], action: () => switchTo("glossary") },
+      { id: "cat-materials", label: CATEGORY_NAMES["materials"], category: t("command.categoryNav"), keywords: ["素材", "资料", "materials"], action: () => switchTo("materials") },
+      { id: "cat-timeline", label: CATEGORY_NAMES["timeline"], category: t("command.categoryNav"), keywords: ["时间线", "timeline"], action: () => switchTo("timeline") },
+      { id: "cat-stats", label: CATEGORY_NAMES["stats"], category: t("command.categoryNav"), keywords: ["统计", "stats", "字数"], action: () => switchTo("stats") },
+      { id: "cat-search", label: CATEGORY_NAMES["search"], category: t("command.categoryNav"), keywords: ["搜索", "search", "查找"], action: () => switchTo("search") },
       ...typeSpecificCommands,
       { id: "theme", label: t("command.toggleTheme", { mode: theme === "dark" ? t("command.darkToLight") : t("command.lightToDark") }), category: t("command.categoryApp"), keywords: ["主题", "theme", "暗色", "亮色"], action: () => toggleTheme() },
       { id: "shortcuts", label: t("command.shortcutsRef"), category: t("command.categoryHelp"), keywords: ["快捷键", "shortcuts", "键盘"], action: () => { onClose(); window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" })); } },
     ],
-    [setActiveCategory, toggleTheme, theme, onClose, t, typeSpecificCommands]
+    [switchTo, toggleTheme, theme, onClose, t, typeSpecificCommands]
   );
 
   // 新建文件命令（按分类动态生成）
