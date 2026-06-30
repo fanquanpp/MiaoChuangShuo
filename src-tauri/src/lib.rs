@@ -48,6 +48,8 @@ pub fn run() {
             fs_commands::search_in_project,
             fs_commands::replace_in_project,
             fs_commands::get_writing_stats,
+            // 分卷章节生成命令
+            fs_commands::generate_volume_chapters,
             // 自定义模板管理命令
             fs_commands::list_custom_templates,
             fs_commands::save_custom_template,

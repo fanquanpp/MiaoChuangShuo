@@ -27,6 +27,7 @@ import {
   GripVertical,
   RefreshCw,
   ListTree,
+  BookCopy,
 } from "lucide-react";
 import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
 import type { FileNode } from "../lib/api";
@@ -37,6 +38,7 @@ import { useToast } from "../lib/toast";
 import { extractChapterNum } from "../lib/settingsStore";
 import ConfirmDialog from "./ConfirmDialog";
 import OutlineToChapters from "./OutlineToChapters";
+import VolumeChapterGenerator from "./VolumeChapterGenerator";
 
 interface FileListProps {
   onCreateFile: () => void;
@@ -399,6 +401,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
   const [isRenumbering, setIsRenumbering] = useState(false);
   // 大纲生成章节对话框状态（仅正文分类有效）
   const [showOutlineToChapters, setShowOutlineToChapters] = useState(false);
+  const [showVolumeGenerator, setShowVolumeGenerator] = useState(false);
 
   // 文件选择：优先使用外部传入的保存后切换回调
   const handleFileSelect = onSelectFile || setSelectedFile;
@@ -642,6 +645,14 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
                 <span>{t("outlineToChapters.btn")}</span>
               </button>
               <button
+                onClick={() => setShowVolumeGenerator(true)}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-secondary border border-fandex-secondary/50 hover:bg-fandex-secondary/10 transition duration-fast"
+                title={t("volumeGen.title")}
+              >
+                <BookCopy className="w-3.5 h-3.5" />
+                <span>{t("volumeGen.title")}</span>
+              </button>
+              <button
                 onClick={handleBatchRenumber}
                 disabled={isRenumbering || children.filter(c => !c.is_dir).length < 2}
                 className="flex items-center gap-1 px-2 py-1 text-xs text-nf-text-secondary border border-nf-border-light hover:border-fandex-secondary/60 hover:text-fandex-secondary transition duration-fast disabled:opacity-40 disabled:cursor-not-allowed"
@@ -750,6 +761,21 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
       {showOutlineToChapters && currentProject && (
         <OutlineToChapters
           onClose={() => setShowOutlineToChapters(false)}
+          onCreated={async () => {
+            if (!currentProject) return;
+            try {
+              const tree = await readProjectTree(currentProject.path);
+              useAppStore.getState().setProjectTree(tree);
+            } catch {
+              // 刷新失败静默处理
+            }
+          }}
+        />
+      )}
+
+      {showVolumeGenerator && currentProject && (
+        <VolumeChapterGenerator
+          onClose={() => setShowVolumeGenerator(false)}
           onCreated={async () => {
             if (!currentProject) return;
             try {

@@ -326,6 +326,65 @@ export async function replaceInProject(
   });
 }
 
+// ===== 分卷章节生成 =====
+
+// 单个章节生成结果项
+export interface VolumeChapterResult {
+  /** 文件相对路径 */
+  relative_path: string;
+  /** 章节标题 */
+  chapter_title: string;
+  /** 是否为卷首语 */
+  is_prologue: boolean;
+  /** 是否为卷尾语 */
+  is_epilogue: boolean;
+  /** 是否已存在（跳过创建） */
+  already_exists: boolean;
+}
+
+// 分卷章节生成结果
+export interface VolumeGenerationResult {
+  /** 卷名（子目录名） */
+  volume_name: string;
+  /** 创建的文件数 */
+  created_count: number;
+  /** 跳过文件数（已存在） */
+  skipped_count: number;
+  /** 各文件详情 */
+  chapters: VolumeChapterResult[];
+}
+
+// 为分卷批量生成章节文件
+// 输入:
+//   projectPath 项目路径
+//   volumeName 分卷名（"正文"下的子目录名，如"第一卷"）
+//   chapterCount 章节数量
+//   startChapterNum 起始章节序号（默认1）
+//   includePrologue 是否生成卷首语
+//   includeEpilogue 是否生成卷尾语
+//   formatStr 标题格式: "chinese" | "arabic" | "english"
+// 输出: Promise<VolumeGenerationResult> 生成结果统计
+// 流程: 调用后端 generate_volume_chapters，在"正文/{卷名}"下批量创建章节文件
+export async function generateVolumeChapters(
+  projectPath: string,
+  volumeName: string,
+  chapterCount: number,
+  startChapterNum?: number,
+  includePrologue?: boolean,
+  includeEpilogue?: boolean,
+  formatStr?: string
+): Promise<VolumeGenerationResult> {
+  return invoke<VolumeGenerationResult>("generate_volume_chapters", {
+    projectPath,
+    volumeName,
+    chapterCount,
+    startChapterNum,
+    includePrologue,
+    includeEpilogue,
+    formatStr,
+  });
+}
+
 // 获取项目写作统计
 // 输入: projectPath 项目路径
 // 输出: Promise<WritingStats> 统计信息
