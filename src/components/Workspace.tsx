@@ -34,6 +34,7 @@ import { useSettingsStore, formatChapterHeading, getNextChapterNum } from "../li
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import { findDirByName } from "../lib/fileTreeUtils";
+import ForeshadowingPanel from "./ForeshadowingPanel";
 
 /** Alt+数字键 → 侧边栏分类映射 */
 const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
@@ -44,6 +45,7 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "5": "glossary",
   "6": "materials",
   "7": "stats",
+  "8": "foreshadowing",
 };
 
 /**
@@ -343,6 +345,8 @@ export default function Workspace() {
         return <GlobalSearch />;
       case "volume":
         return <VolumeManager />;
+      case "foreshadowing":
+        return <ForeshadowingPanel />;
       case "card-manager":
         return <CardManager categoryLabel={getCategoryName(activeCategory)} />;
       default:

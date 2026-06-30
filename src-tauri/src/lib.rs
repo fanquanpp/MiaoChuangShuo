@@ -14,6 +14,7 @@ mod fs_commands;
 mod project_template;
 mod snapshot_commands;
 mod character_commands;
+mod foreshadowing_commands;
 
 /// 应用入口函数
 /// 输入: 无
@@ -70,6 +71,8 @@ pub fn run() {
             character_commands::count_character_appearances,
             character_commands::rename_character_in_project,
             character_commands::read_character_summary,
+            // 伏笔追踪命令
+            foreshadowing_commands::scan_foreshadowing,
         ])
         .setup(|_app| {
             Ok(())

@@ -30,6 +30,7 @@ import {
   Settings,
   BookOpen,
   Folder,
+  Eye,
 } from "lucide-react";
 import {
   useAppStore,
@@ -56,6 +57,7 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   search: Search,
   knowledge: Search,
   volumes: BookOpen,
+  foreshadowing: Eye,
 };
 
 // 内容分类列表(按显示顺序)
@@ -66,6 +68,7 @@ const CONTENT_CATEGORIES: SidebarCategory[] = [
   "glossary",
   "outline",
   "materials",
+  "foreshadowing",
 ];
 
 // 工具分类列表

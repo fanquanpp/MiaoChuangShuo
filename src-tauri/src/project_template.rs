@@ -803,6 +803,16 @@ pub fn type_specific_files(project_type: &ProjectType) -> Vec<(&'static str, Str
                  F002 / / / / 待埋设\n".to_string(),
             ),
             (
+                "伏笔记录/_伏笔模板.txt",
+                "新伏笔\n\
+                 状态：未回收\n\
+                 埋设：\n\
+                 回收：\n\
+                 重要度：中\n\
+                 备注：\n\
+                 在此填写伏笔的详细描述...\n".to_string(),
+            ),
+            (
                 "分卷大纲/卷间关联.txt",
                 "卷间关联\n\n\
                  卷与卷之间的主线衔接、角色发展、伏笔传承\n\n\
@@ -1062,6 +1072,16 @@ pub fn type_specific_files(project_type: &ProjectType) -> Vec<(&'static str, Str
                  编号 | 伏笔内容 | 埋设 | 揭示 | 状态\n\
                  --- | --- | --- | --- | ---\n\
                  E001 | | | | \n".to_string(),
+            ),
+            (
+                "伏笔记录/_伏笔模板.txt",
+                "新伏笔\n\
+                 状态：未回收\n\
+                 埋设：\n\
+                 回收：\n\
+                 重要度：中\n\
+                 备注：\n\
+                 在此填写伏笔的详细描述...\n".to_string(),
             ),
             (
                 "卷宗/分卷规划.txt",

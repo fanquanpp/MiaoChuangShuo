@@ -805,6 +805,30 @@ const zhCN: TranslationDict = {
   "ctxmenu.pathCopied": "已复制路径到剪贴板",
   "ctxmenu.nameCopied": "已复制文件名到剪贴板",
   "ctxmenu.copyFailed": "复制到剪贴板失败",
+
+  // ── 角色悬停卡片 ──
+  "characterHover.loading": "加载中…",
+  "characterHover.loadFailed": "加载失败",
+  "characterHover.notFound": "未找到角色档案",
+  "characterHover.identity": "身份",
+  "characterHover.personality": "性格",
+  "characterHover.brief": "简介",
+
+  // ── 伏笔追踪 ──
+  "foreshadowing.title": "伏笔追踪",
+  "foreshadowing.refresh": "刷新",
+  "foreshadowing.total": "总数",
+  "foreshadowing.pending": "未回收",
+  "foreshadowing.resolved": "已回收",
+  "foreshadowing.abandoned": "已废弃",
+  "foreshadowing.plant": "埋设",
+  "foreshadowing.payoff": "回收",
+  "foreshadowing.notes": "备注",
+  "foreshadowing.openFile": "打开文件",
+  "foreshadowing.empty": "暂无伏笔记录。在「伏笔」目录下创建 .txt 文件即可开始追踪。",
+  "foreshadowing.loadFailed": "加载伏笔数据失败：{error}",
+  "foreshadowing.noData": "暂无数据",
+  "foreshadowing.otherStatus": "其他状态",
 };
 
 // 英文翻译
@@ -1364,6 +1388,22 @@ const enUS: TranslationDict = {
   "characterHover.identity": "Identity",
   "characterHover.personality": "Personality",
   "characterHover.brief": "Brief",
+
+  // ── Foreshadowing Tracking ──
+  "foreshadowing.title": "Foreshadowing",
+  "foreshadowing.refresh": "Refresh",
+  "foreshadowing.total": "Total",
+  "foreshadowing.pending": "Pending",
+  "foreshadowing.resolved": "Resolved",
+  "foreshadowing.abandoned": "Abandoned",
+  "foreshadowing.plant": "Plant",
+  "foreshadowing.payoff": "Payoff",
+  "foreshadowing.notes": "Notes",
+  "foreshadowing.openFile": "Open File",
+  "foreshadowing.empty": "No foreshadowing records yet. Create a .txt file per foreshadow under the \"伏笔记录\" directory to start tracking.",
+  "foreshadowing.loadFailed": "Failed to load foreshadowing data: {error}",
+  "foreshadowing.noData": "No data",
+  "foreshadowing.otherStatus": "Other",
 
   // ── Character Linkage (appearance stats / global rename) ──
   "characterLinkage.appearanceBtn": "Appearance Stats",

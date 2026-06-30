@@ -692,6 +692,50 @@ export async function readCharacterSummary(
   });
 }
 
+// ===== 伏笔追踪 API =====
+
+// 单个伏笔项接口
+export interface ForeshadowingItem {
+  /** 伏笔名称 */
+  name: string;
+  /** 文件相对路径 */
+  file_path: string;
+  /** 状态：未回收 / 已回收 / 已废弃 */
+  status: string;
+  /** 埋设位置描述 */
+  plant_location: string;
+  /** 回收位置描述 */
+  payoff_location: string;
+  /** 重要度：高 / 中 / 低 */
+  importance: string;
+  /** 备注 */
+  notes: string;
+}
+
+// 伏笔追踪汇总接口
+export interface ForeshadowingSummary {
+  /** 伏笔总数 */
+  total: number;
+  /** 未回收数 */
+  pending: number;
+  /** 已回收数 */
+  resolved: number;
+  /** 已废弃数 */
+  abandoned: number;
+  /** 所有伏笔项列表（按状态与重要度排序） */
+  items: ForeshadowingItem[];
+}
+
+// 扫描项目伏笔目录
+// 输入: projectPath 项目路径
+// 输出: Promise<ForeshadowingSummary> 伏笔追踪汇总
+// 流程: 调用 Rust 后端 scan_foreshadowing 命令，扫描伏笔目录并解析结构化数据
+export async function scanForeshadowing(
+  projectPath: string
+): Promise<ForeshadowingSummary> {
+  return invoke<ForeshadowingSummary>("scan_foreshadowing", { projectPath });
+}
+
 // ===== 项目导入导出 API =====
 
 // 导出结果统计

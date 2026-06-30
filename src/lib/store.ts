@@ -32,7 +32,8 @@ export type SidebarCategory =
   | "volumes"
   | "stats"
   | "search"
-  | "knowledge";
+  | "knowledge"
+  | "foreshadowing";
 
 // 分类中文名称
 export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
@@ -47,6 +48,7 @@ export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
   stats: "统计",
   search: "搜索",
   knowledge: "知识图谱",
+  foreshadowing: "伏笔",
 };
 
 // 分类对应目录名
@@ -62,6 +64,7 @@ export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
   stats: "",
   search: "",
   knowledge: "",
+  foreshadowing: "伏笔记录",
 };
 
 // 分类图标名 (lucide-react)
@@ -77,6 +80,7 @@ export const CATEGORY_ICONS: Record<SidebarCategory, string> = {
   stats: "BarChart3",
   search: "Search",
   knowledge: "Network",
+  foreshadowing: "Eye",
 };
 
 // 组合后的完整 App 状态类型
