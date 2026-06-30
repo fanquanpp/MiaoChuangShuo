@@ -50,6 +50,9 @@ pub fn run() {
             fs_commands::get_writing_stats,
             // 分卷章节生成命令
             fs_commands::generate_volume_chapters,
+            // 项目导入导出命令
+            fs_commands::export_project,
+            fs_commands::import_archive,
             // 自定义模板管理命令
             fs_commands::list_custom_templates,
             fs_commands::save_custom_template,

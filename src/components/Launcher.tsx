@@ -36,6 +36,7 @@ import {
   Feather,
   Layers,
   Settings,
+  FileArchive,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import {
@@ -58,6 +59,7 @@ import { useThemeStore } from "../lib/themeStore";
 import { exists, mkdir } from "@tauri-apps/plugin-fs";
 import { useToast } from "../lib/toast";
 import ConfirmDialog from "./ConfirmDialog";
+import ProjectArchiveDialog from "./ProjectArchiveDialog";
 
 const SCAN_DIR_KEY = "novelforge:scanDir:v1";
 
@@ -104,6 +106,7 @@ export default function Launcher() {
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [selectedCustomTemplate, setSelectedCustomTemplate] = useState<CustomTemplate | null>(null);
+  const [importArchiveOpen, setImportArchiveOpen] = useState(false);
 
   const handleScan = useCallback(async () => {
     if (!scanDir) return;
@@ -149,6 +152,33 @@ export default function Launcher() {
       showToast("error", t("launcher.importFailed", { error: String(e) }));
     }
   }, [t, showToast]);
+
+  // 从压缩包导入成功后的回调：扫描解压目录将新项目加入列表
+  const handleArchiveImported = useCallback(
+    async (targetDir: string, projectName: string) => {
+      try {
+        // 解压后的项目路径：targetDir/projectName
+        const projectPath = `${targetDir}/${projectName}`;
+        const project = await importProject(projectPath);
+        if (project) {
+          setProjects((prev) => {
+            const idx = prev.findIndex((p) => p.path === project.path);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = project;
+              return copy;
+            }
+            return [project, ...prev];
+          });
+          showToast("success", t("launcher.importSuccess", { name: project.meta.name }));
+        }
+      } catch (e) {
+        showToast("error", t("launcher.importFailed", { error: String(e) }));
+      }
+      setImportArchiveOpen(false);
+    },
+    [t, showToast]
+  );
 
   const handleBrowseScanDir = useCallback(async () => {
     try {
@@ -515,6 +545,15 @@ export default function Launcher() {
             <FolderOpen className="w-4 h-4" />
             {t("launcher.importLocal")}
           </button>
+
+          {/* 从压缩包导入按钮 */}
+          <button
+            onClick={() => setImportArchiveOpen(true)}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light hover:border-fandex-secondary/40 text-sm transition-all duration-base ease-fandex"
+          >
+            <FileArchive className="w-4 h-4" />
+            {t("archive.importTitle")}
+          </button>
         </div>
 
         {/* 扫描目录区域 */}
@@ -704,6 +743,14 @@ export default function Launcher() {
         confirmLabel={t("app.delete")}
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      {/* 从压缩包导入项目对话框 */}
+      <ProjectArchiveDialog
+        open={importArchiveOpen}
+        mode="import"
+        onClose={() => setImportArchiveOpen(false)}
+        onImported={handleArchiveImported}
       />
     </div>
   );

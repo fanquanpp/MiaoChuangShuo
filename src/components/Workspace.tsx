@@ -22,6 +22,7 @@ import VolumeManager from "./VolumeManager";
 import SettingsDialog from "./SettingsDialog";
 import CreateFileDialog from "./CreateFileDialog";
 import CommandPalette from "./CommandPalette";
+import ProjectArchiveDialog from "./ProjectArchiveDialog";
 import ErrorBoundary from "./ErrorBoundary";
 import { FocusTimer } from "./FocusTimer";
 import { useAppStore, getCategoryDir, getCategoryName, type SidebarCategory } from "../lib/store";
@@ -70,6 +71,7 @@ export default function Workspace() {
   const [focusMode, setFocusMode] = useState(false);
   const [showFocusTimer, setShowFocusTimer] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const { showToast } = useToast();
   const { t } = useI18n();
   const projectTree = useAppStore((s) => s.projectTree);
@@ -389,11 +391,21 @@ export default function Workspace() {
         onClose={() => setCommandPaletteOpen(false)}
         onCreateFile={handleCommandCreateFile}
         onSwitchCategory={handleSwitchCategory}
+        onExportProject={() => setExportDialogOpen(true)}
       />
 
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+      />
+
+      {/* 项目导出对话框 */}
+      <ProjectArchiveDialog
+        open={exportDialogOpen}
+        mode="export"
+        projectPath={currentProject?.path}
+        projectName={currentProject?.meta?.name}
+        onClose={() => setExportDialogOpen(false)}
       />
 
       {/* 首次创建文件选择对话框 */}

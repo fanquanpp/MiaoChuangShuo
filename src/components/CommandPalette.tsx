@@ -33,6 +33,7 @@ import {
   BookCopy,
   RotateCcw,
   History,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 import { useAppStore, CATEGORY_NAMES, type SidebarCategory } from "../lib/store";
@@ -68,6 +69,8 @@ interface CommandPaletteProps {
   onCreateFile?: (category: SidebarCategory) => void;
   /** 切换分类回调（带保存检查） */
   onSwitchCategory?: (category: SidebarCategory) => void;
+  /** 导出项目回调 */
+  onExportProject?: () => void;
 }
 
 // 最近使用记录的 localStorage 键
@@ -130,6 +133,7 @@ export default function CommandPalette({
   onClose,
   onCreateFile,
   onSwitchCategory,
+  onExportProject,
 }: CommandPaletteProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -236,8 +240,16 @@ export default function CommandPalette({
         },
         icon: RotateCcw,
       },
+      ...(onExportProject ? [{
+        id: "export-project",
+        label: t("archive.exportTitle"),
+        category: t("command.categoryApp"),
+        keywords: ["导出", "备份", "归档", "export", "archive", "novelforge"],
+        action: () => { onClose(); onExportProject(); },
+        icon: Download as LucideIcon,
+      }] : []),
     ],
-    [toggleTheme, theme, onClose, t, settings]
+    [toggleTheme, theme, onClose, t, settings, onExportProject]
   );
 
   // 新建文件命令（按分类动态生成）

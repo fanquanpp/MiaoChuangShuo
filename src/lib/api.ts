@@ -10,6 +10,7 @@
 // 3. 封装 Tauri invoke 调用
 
 import { invoke } from "@tauri-apps/api/core";
+import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 
 /**
  * 路径安全校验：确保文件路径在项目目录内
@@ -639,4 +640,86 @@ export async function renameCharacterInProject(
     oldName,
     newName,
   });
+}
+
+// ===== 项目导入导出 API =====
+
+// 导出结果统计
+export interface ExportResult {
+  /** 输出文件绝对路径 */
+  output_path: string;
+  /** 打包文件数 */
+  file_count: number;
+  /** 原始总大小（字节） */
+  total_size: number;
+  /** 压缩后大小（字节） */
+  output_size: number;
+}
+
+// 导入结果统计
+export interface ImportResult {
+  /** 解压目标目录绝对路径 */
+  target_dir: string;
+  /** 解压文件数 */
+  file_count: number;
+  /** 解压总大小（字节） */
+  total_size: number;
+  /** 推断的项目名（zip 内第一层目录名） */
+  project_name: string;
+}
+
+// 将整个项目打包导出为 .novelforge 压缩包
+// 输入:
+//   projectPath 项目根路径
+//   outputPath 输出文件路径（建议以 .novelforge 为扩展名）
+// 输出: Promise<ExportResult> 导出结果统计
+// 流程: 调用 Rust 后端 export_project，递归打包项目所有文件并写入元数据
+export async function exportProject(
+  projectPath: string,
+  outputPath: string
+): Promise<ExportResult> {
+  return invoke<ExportResult>("export_project", {
+    projectPath,
+    outputPath,
+  });
+}
+
+// 从 .novelforge 压缩包导入项目
+// 输入:
+//   archivePath 压缩包路径
+//   targetDir 解压目标目录（项目将解压到此目录下）
+// 输出: Promise<ImportResult> 导入结果统计
+// 流程: 调用 Rust 后端 import_archive，解压 zip 并做路径穿越防护
+export async function importArchive(
+  archivePath: string,
+  targetDir: string
+): Promise<ImportResult> {
+  return invoke<ImportResult>("import_archive", {
+    archivePath,
+    targetDir,
+  });
+}
+
+// 弹出文件保存对话框（用于选择导出位置）
+// 输入: defaultName 默认文件名（不含扩展名）
+// 输出: Promise<string | null> 用户选择的路径或取消返回 null
+// 流程: 调用 Tauri dialog 插件的 save 对话框
+export async function pickSaveFile(defaultName: string): Promise<string | null> {
+  const result = await saveDialog({
+    defaultPath: defaultName,
+    filters: [{ name: "NovelForge 项目包", extensions: ["novelforge"] }],
+  });
+  return result ?? null;
+}
+
+// 弹出文件选择对话框（用于选择导入压缩包）
+// 输出: Promise<string | null> 用户选择的路径或取消返回 null
+// 流程: 调用 Tauri dialog 插件的 open 对话框
+export async function pickOpenArchive(): Promise<string | null> {
+  const result = await openDialog({
+    multiple: false,
+    filters: [{ name: "NovelForge 项目包", extensions: ["novelforge", "zip"] }],
+  });
+  // open 返回 string | string[] | null，单选模式下为 string | null
+  return typeof result === "string" ? result : null;
 }
