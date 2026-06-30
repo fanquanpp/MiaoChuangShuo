@@ -62,12 +62,14 @@ export default function NovelEditor({
   const projectType = currentProject?.meta?.type || "standard";
   const isScript = projectType === "script" || projectType === "screenplay";
   const isEssay = projectType === "diary";
+  const isDialogue = projectType === "dialogue";
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
+  const diaryAutoDate = useSettingsStore((s) => s.diaryAutoDate);
   const [showOutline, setShowOutline] = useState(false);
 
-  // 加载剧本角色名列表
+  // 加载剧本/对话体角色名列表
   useEffect(() => {
-    if (!isScript || !currentProject) {
+    if ((!isScript && !isDialogue) || !currentProject) {
       setCharacters([]);
       return;
     }
@@ -90,7 +92,7 @@ export default function NovelEditor({
       .catch(() => {
         setCharacters([]);
       });
-  }, [isScript, currentProject]);
+  }, [isScript, isDialogue, currentProject]);
 
   // 构建 TipTap 扩展列表（纯文本 + 新增格式化扩展）
   const extensions: Extensions = useMemo(() => {
@@ -113,7 +115,7 @@ export default function NovelEditor({
       exts.push(IndentParagraph.configure({ enabled: true }));
     }
 
-    if (isScript) {
+    if (isScript || isDialogue) {
       exts.push(
         CharacterMention.configure({
           characters,
@@ -131,7 +133,7 @@ export default function NovelEditor({
 
     exts.push(PoetryFormat.configure({ enabled: true }));
     return exts;
-  }, [isEssay, isScript, characters, t]);
+  }, [isEssay, isScript, isDialogue, characters, t]);
 
   // 创建编辑器实例（纯文本模式）
   const editor = useEditor({
@@ -166,8 +168,16 @@ export default function NovelEditor({
     setLoadError("");
     readFile(filePath, currentProject?.path || "")
       .then((content) => {
+        // 日记模式：新建空文件时自动添加当天日期
+        let finalContent = content;
+        if (projectType === "diary" && diaryAutoDate && content.trim() === "") {
+          const today = new Date();
+          const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+          finalContent = `${dateStr}\n\n`;
+        }
+
         // 纯文本转为 ProseMirror JSON 文档结构，避免 setContent 将文本当作 HTML 解析
-        const lines = content.split(/\r?\n/);
+        const lines = finalContent.split(/\r?\n/);
         const docContent = lines.map((line: string) => ({
           type: "paragraph",
           content: line ? [{ type: "text", text: line }] : [],
@@ -177,7 +187,7 @@ export default function NovelEditor({
           content: docContent.length > 0 ? docContent : [{ type: "paragraph" }],
         });
         setDirty(false);
-        lastSavedContentRef.current = content;
+        lastSavedContentRef.current = finalContent;
         setWordCount(countWords(editor.getText()));
         // 记录最近文件
         const relativePath = filePath.replace(
@@ -195,7 +205,7 @@ export default function NovelEditor({
       .catch((e) => {
         setLoadError(t("editor.loadFailed", { error: String(e) }));
       });
-  }, [filePath, editor, currentProject, t]);
+  }, [filePath, editor, currentProject, t, projectType, diaryAutoDate]);
 
   // 保存文件（纯文本直写，无 HTML→MD 转换；含竞态保护）
   const savingRef = useRef(false);
@@ -284,7 +294,7 @@ export default function NovelEditor({
         e.preventDefault();
         handleSave();
       }
-      // Ctrl+Q 快速加引号「」
+      // Ctrl+Q 快速加引号""
       if ((e.ctrlKey || e.metaKey) && (e.key === "q" || e.key === "Q")) {
         e.preventDefault();
         if (!editor) return;
@@ -293,11 +303,11 @@ export default function NovelEditor({
         if (selectedText) {
           editor.chain().focus()
             .deleteSelection()
-            .insertContent(`「${selectedText}」`)
+            .insertContent(`\u201c${selectedText}\u201d`)
             .run();
         } else {
           editor.chain().focus()
-            .insertContent("「」")
+            .insertContent("\u201c\u201d")
             .setTextSelection(from + 1)
             .run();
         }
@@ -399,6 +409,20 @@ export default function NovelEditor({
           <span className="text-fandex-secondary font-medium">{t("editor.essayMode")}</span>
           <span>·</span>
           <span>{t("editor.essayHint")}</span>
+        </div>
+      )}
+
+      {isDialogue && characters.length > 0 && (
+        <div className="fandex-admonition fandex-admonition-note px-4 py-1.5 border-b border-nf-border-light text-xs text-nf-text-tertiary flex items-center gap-2">
+          <span className="text-fandex-primary font-medium">{t("editor.dialogueMode")}</span>
+          <span>·</span>
+          <span>
+            {t("editor.dialogueCharHint")}
+          </span>
+          <span>·</span>
+          <span>
+            {t("editor.charRosterHint", { count: characters.length })}
+          </span>
         </div>
       )}
 

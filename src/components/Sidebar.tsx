@@ -15,7 +15,7 @@ import { useMemo } from "react";
 import {
   Users,
   Globe,
-  BookMarked,
+  Quote,
   GitBranch,
   FileText,
   ListTree,
@@ -27,7 +27,6 @@ import {
   BarChart3,
   Search,
   Layers,
-  Network,
   Settings,
   BookOpen,
 } from "lucide-react";
@@ -44,14 +43,14 @@ import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
 const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string }>> = {
   characters: Users,
   worldview: Globe,
-  glossary: BookMarked,
+  glossary: Quote,
   timeline: GitBranch,
   manuscript: FileText,
   outline: ListTree,
   materials: FolderOpen,
   stats: BarChart3,
   search: Search,
-  knowledge: Network,
+  knowledge: Search,
   volumes: BookOpen,
 };
 
@@ -67,7 +66,7 @@ const CONTENT_CATEGORIES: SidebarCategory[] = [
 ];
 
 // 工具分类列表
-const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search", "knowledge"];
+const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
 
 // 左侧导航栏属性接口
 interface SidebarProps {
@@ -124,7 +123,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings }: SidebarProps) 
           {t("app.back")}
         </button>
         <h1 className="relative fandex-bar-left text-sm font-bold font-display text-nf-text truncate leading-snug" title={currentProject?.meta.name}>
-          {currentProject?.meta.name || t("sidebar.unnamedProject")}
+          《{currentProject?.meta.name || t("sidebar.unnamedProject")}》
         </h1>
         <div className="relative text-[11px] text-nf-text-tertiary mt-0.5 truncate pl-3">
           {currentProject?.meta.author || t("sidebar.anonymousAuthor")}

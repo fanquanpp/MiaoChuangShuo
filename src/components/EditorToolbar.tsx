@@ -98,17 +98,35 @@ export default function EditorToolbar({
 }: EditorToolbarProps) {
   const { t } = useI18n();
 
-  const dispatchEditorEvent = (key: string, ctrlKey: boolean, shiftKey: boolean) => {
-    const event = new KeyboardEvent("keydown", {
-      key,
-      ctrlKey,
-      shiftKey,
-      bubbles: true,
-    });
-    document.querySelector(".ProseMirror")?.dispatchEvent(event);
+  // 诗歌排版：切换居中样式
+  const handlePoetryToggle = () => {
+    if (!editor) return;
+    editor.chain().focus().togglePoetry().run();
   };
 
-  // 快速加引号：用「」包裹选中文本，无选中则在引号间放置光标
+  // 歌词排版：切换歌词样式
+  const handleLyricsToggle = () => {
+    if (!editor) return;
+    editor.chain().focus().toggleLyrics().run();
+  };
+
+  // 检测当前段落是否为诗歌样式
+  const isPoetryActive = (): boolean => {
+    if (!editor) return false;
+    const { $from } = editor.state.selection;
+    const para = $from.parent;
+    return para.attrs["data-poetry"] === "true";
+  };
+
+  // 检测当前段落是否为歌词样式
+  const isLyricsActive = (): boolean => {
+    if (!editor) return false;
+    const { $from } = editor.state.selection;
+    const para = $from.parent;
+    return para.attrs["data-lyrics"] === "true";
+  };
+
+  // 快速加引号：用""包裹选中文本，无选中则在引号间放置光标
   const handleQuickQuote = () => {
     if (!editor) return;
     const { from, to } = editor.state.selection;
@@ -116,11 +134,29 @@ export default function EditorToolbar({
     if (selectedText) {
       editor.chain().focus()
         .deleteSelection()
-        .insertContent(`「${selectedText}」`)
+        .insertContent(`\u201c${selectedText}\u201d`)
         .run();
     } else {
       editor.chain().focus()
-        .insertContent("「」")
+        .insertContent("\u201c\u201d")
+        .setTextSelection(from + 1)
+        .run();
+    }
+  };
+
+  // 引用格式：用""包裹选中文本
+  const handleBlockQuote = () => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, "\n");
+    if (selectedText) {
+      editor.chain().focus()
+        .deleteSelection()
+        .insertContent(`\u201c${selectedText}\u201d`)
+        .run();
+    } else {
+      editor.chain().focus()
+        .insertContent("\u201c\u201d")
         .setTextSelection(from + 1)
         .run();
     }
@@ -180,22 +216,22 @@ export default function EditorToolbar({
           {/* 排版格式组 */}
           <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
             <ToolbarButton
-              onClick={() => dispatchEditorEvent("P", true, true)}
-              active={false}
+              onClick={handlePoetryToggle}
+              active={isPoetryActive()}
               title={t("editor.poetryFormat")}
             >
               <Pilcrow className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => dispatchEditorEvent("L", true, true)}
-              active={false}
+              onClick={handleLyricsToggle}
+              active={isLyricsActive()}
               title={t("editor.lyricsFormat")}
             >
               <Music className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-              active={editor?.isActive("blockquote") || false}
+              onClick={handleBlockQuote}
+              active={false}
               title={t("editor.blockquote")}
             >
               <Quote className="w-4 h-4 rotate-180" />

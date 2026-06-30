@@ -52,12 +52,13 @@ const zhCN: TranslationDict = {
   "launcher.createNew": "创建全新项目",
   "launcher.scanDir": "扫描目录",
   "launcher.changeDir": "更改目录",
-  "launcher.setScanDir": "设置项目扫描目录",
+  "launcher.setScanDir": "项目存放目录",
   "launcher.localReady": "本地环境就绪",
   "launcher.searchPlaceholder": "搜索项目名称…",
   "launcher.importLocal": "导入本地已有项目",
   "launcher.welcome": "欢迎使用 NovelForge",
   "launcher.welcomeHint": "点击左侧「创建全新项目」开始你的创作之旅",
+  "launcher.welcomeRecentHint": "最近创作：《{name}》",
   "launcher.importFailed": "导入失败：{error}",
   "launcher.scanFailed": "扫描项目失败：{error}",
   "launcher.scanDirPlaceholder": "选择或输入文件夹路径…",
@@ -141,6 +142,12 @@ const zhCN: TranslationDict = {
   "workspace.focusModeEnter": "已进入聚焦模式（F11 退出）",
   "workspace.focusModeExit": "已退出聚焦模式",
   "workspace.fileCreated": "已创建文件：{name}",
+  "workspace.firstFileTitle": "开始你的创作",
+  "workspace.firstFileHint": "选择如何开始你的第一篇文章",
+  "workspace.createPrologue": "序章",
+  "workspace.prologueHint": "以序章开篇，为故事铺设前奏",
+  "workspace.createFirstChapter": "第一章",
+  "workspace.firstChapterHint": "直接从第一章开始，编号从 1 开始",
 
   // ── 编辑器 ──
   "editor.placeholder": "开始你的创作…",
@@ -201,7 +208,7 @@ const zhCN: TranslationDict = {
   // ── 侧边栏 ──
   "sidebar.characters": "角色",
   "sidebar.worldview": "世界观",
-  "sidebar.glossary": "名词",
+  "sidebar.glossary": "术语",
   "sidebar.timeline": "时间线",
   "sidebar.manuscript": "正文",
   "sidebar.outline": "大纲",
@@ -315,6 +322,20 @@ const zhCN: TranslationDict = {
   "cardmanager.created": "已创建「{name}」",
   "cardmanager.deleted": "已删除「{name}」",
   "cardmanager.unsavedWarning": "当前卡片有未保存的更改，确定放弃吗？",
+  "cardmanager.presetTitle": "选择角色预设",
+  "cardmanager.presetProtagonist": "主角模板",
+  "cardmanager.presetProtagonistDesc": "包含全部6个字段：外貌、性格、背景、动机、人物关系、说话风格",
+  "cardmanager.presetSupporting": "配角模板",
+  "cardmanager.presetSupportingDesc": "包含4个字段：外貌、性格、人物关系、说话风格",
+  "cardmanager.presetAntagonist": "反派模板",
+  "cardmanager.presetAntagonistDesc": "包含5个字段：外貌、性格、背景、动机、人物关系",
+  "cardmanager.presetMinor": "路人模板",
+  "cardmanager.presetMinorDesc": "包含2个字段：外貌、说话风格",
+  "cardmanager.presetFields": "{count} 个字段",
+  "cardmanager.customizeTemplate": "自定义模板",
+  "cardmanager.resetTemplate": "恢复默认",
+  "cardmanager.templateEditor": "编辑模板",
+  "cardmanager.templateSaved": "模板已保存",
 
   // 卡片模板 - 角色卡默认字段
   "card.characterAppearance": "【外貌】\n",
@@ -497,6 +518,38 @@ const zhCN: TranslationDict = {
   "volume.save": "保存",
   "volume.saving": "保存中…",
   "volume.unsaved": "未保存",
+
+  // ── 自动化设置 ──
+  "settings.automationSection": "自动化",
+  "settings.diaryAutoDate": "日记自动添加日期",
+  "settings.diaryAutoDateHint": "新建日记时自动在开头添加当天日期",
+  "settings.weatherAutoFill": "天气自动填充",
+  "settings.weatherAutoFillHint": "新建日记时自动填充当天天气信息",
+  "settings.autoNumbering": "章节自动编号",
+  "settings.autoNumberingHint": "新建正文文件时自动添加章节编号前缀",
+  "settings.autoTemplateFill": "模板自动填充",
+  "settings.autoTemplateFillHint": "新建文件时自动填充模板内容",
+
+  // ── 启动器 - 项目目录 ──
+  "launcher.projectDir": "项目存放目录",
+  "launcher.projectDirPlaceholder": "选择或输入项目存放路径…",
+  "launcher.autoCreateDir": "目录不存在时自动创建",
+
+  // ── 卡片管理器 - 导入 ──
+  "cardmanager.importCard": "从其他项目导入",
+  "cardmanager.importTitle": "导入{category}",
+  "cardmanager.importSelectProject": "选择源项目",
+  "cardmanager.importSelectCards": "选择要导入的卡片",
+  "cardmanager.importSuccess": "成功导入 {count} 张卡片",
+  "cardmanager.importFailed": "导入失败：{error}",
+
+  // ── 编辑器 - 日记/对话 ──
+  "editor.diaryDateHint": "今日：{date}",
+  "editor.dialogueMode": "对话体模式",
+  "editor.dialogueCharHint": "输入角色名后按 Tab 快速插入",
+
+  // ── 工作台 - 共享世界 ──
+  "workspace.sharedWorldHint": "在卷宗下创建章节文件",
 };
 
 // 英文翻译
@@ -533,12 +586,13 @@ const enUS: TranslationDict = {
   "launcher.createNew": "Create New Project",
   "launcher.scanDir": "Scan Directory",
   "launcher.changeDir": "Change Directory",
-  "launcher.setScanDir": "Set Project Scan Directory",
+  "launcher.setScanDir": "Project Storage Directory",
   "launcher.localReady": "Local Environment Ready",
   "launcher.searchPlaceholder": "Search projects…",
   "launcher.importLocal": "Import Existing Project",
   "launcher.welcome": "Welcome to NovelForge",
   "launcher.welcomeHint": "Click \"Create New Project\" to start your journey",
+  "launcher.welcomeRecentHint": "Recently working on: {name}",
   "launcher.importFailed": "Import failed: {error}",
   "launcher.scanFailed": "Failed to scan projects: {error}",
   "launcher.scanDirPlaceholder": "Select or enter a folder path…",
@@ -622,6 +676,12 @@ const enUS: TranslationDict = {
   "workspace.focusModeEnter": "Focus mode on (F11 to exit)",
   "workspace.focusModeExit": "Focus mode off",
   "workspace.fileCreated": "File created: {name}",
+  "workspace.firstFileTitle": "Start Your Journey",
+  "workspace.firstFileHint": "Choose how to begin your first piece",
+  "workspace.createPrologue": "Prologue",
+  "workspace.prologueHint": "Begin with a prologue to set the stage",
+  "workspace.createFirstChapter": "Chapter 1",
+  "workspace.firstChapterHint": "Start directly from Chapter 1, numbered from 1",
 
   // ── Editor ──
   "editor.placeholder": "Start writing…",
@@ -682,7 +742,7 @@ const enUS: TranslationDict = {
   // ── Sidebar ──
   "sidebar.characters": "Characters",
   "sidebar.worldview": "Worldbuilding",
-  "sidebar.glossary": "Glossary",
+  "sidebar.glossary": "Terms",
   "sidebar.timeline": "Timeline",
   "sidebar.manuscript": "Manuscript",
   "sidebar.outline": "Outline",
@@ -796,6 +856,20 @@ const enUS: TranslationDict = {
   "cardmanager.created": "Created \"{name}\"",
   "cardmanager.deleted": "Deleted \"{name}\"",
   "cardmanager.unsavedWarning": "This card has unsaved changes. Discard?",
+  "cardmanager.presetTitle": "Select Character Preset",
+  "cardmanager.presetProtagonist": "Protagonist Template",
+  "cardmanager.presetProtagonistDesc": "Includes all 6 fields: Appearance, Personality, Background, Motivation, Relationships, Speech Style",
+  "cardmanager.presetSupporting": "Supporting Character Template",
+  "cardmanager.presetSupportingDesc": "Includes 4 fields: Appearance, Personality, Relationships, Speech Style",
+  "cardmanager.presetAntagonist": "Antagonist Template",
+  "cardmanager.presetAntagonistDesc": "Includes 5 fields: Appearance, Personality, Background, Motivation, Relationships",
+  "cardmanager.presetMinor": "Minor Character Template",
+  "cardmanager.presetMinorDesc": "Includes 2 fields: Appearance, Speech Style",
+  "cardmanager.presetFields": "fields",
+  "cardmanager.customizeTemplate": "Customize Template",
+  "cardmanager.resetTemplate": "Reset to Default",
+  "cardmanager.templateEditor": "Edit Template",
+  "cardmanager.templateSaved": "Template saved",
 
   // Card templates - Character card default fields
   "card.characterAppearance": "[Appearance]\n",
@@ -978,6 +1052,38 @@ const enUS: TranslationDict = {
   "volume.save": "Save",
   "volume.saving": "Saving…",
   "volume.unsaved": "Unsaved",
+
+  // ── Automation Settings ──
+  "settings.automationSection": "Automation",
+  "settings.diaryAutoDate": "Auto-add date to diary",
+  "settings.diaryAutoDateHint": "Automatically add current date when creating diary entries",
+  "settings.weatherAutoFill": "Auto-fill weather",
+  "settings.weatherAutoFillHint": "Automatically fill weather info when creating diary entries",
+  "settings.autoNumbering": "Auto-number chapters",
+  "settings.autoNumberingHint": "Automatically add chapter number prefix to new manuscript files",
+  "settings.autoTemplateFill": "Auto-fill templates",
+  "settings.autoTemplateFillHint": "Automatically fill template content when creating new files",
+
+  // ── Launcher - Project Directory ──
+  "launcher.projectDir": "Project Directory",
+  "launcher.projectDirPlaceholder": "Select or enter project directory path…",
+  "launcher.autoCreateDir": "Auto-create if directory doesn't exist",
+
+  // ── Card Manager - Import ──
+  "cardmanager.importCard": "Import from other projects",
+  "cardmanager.importTitle": "Import {category}",
+  "cardmanager.importSelectProject": "Select source project",
+  "cardmanager.importSelectCards": "Select cards to import",
+  "cardmanager.importSuccess": "Successfully imported {count} cards",
+  "cardmanager.importFailed": "Import failed: {error}",
+
+  // ── Editor - Diary/Dialogue ──
+  "editor.diaryDateHint": "Today: {date}",
+  "editor.dialogueMode": "Dialogue mode",
+  "editor.dialogueCharHint": "Type character name then press Tab to insert",
+
+  // ── Workspace - Shared World ──
+  "workspace.sharedWorldHint": "Create chapter files under volumes",
 };
 
 const translations: Record<Locale, TranslationDict> = {

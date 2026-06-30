@@ -91,20 +91,20 @@ export default {
         },
         'shake': {
           '0%, 100%': { transform: 'translateX(0)' },
-          '25%': { transform: 'translateX(-4px)' },
-          '75%': { transform: 'translateX(4px)' },
+          '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-4px)' },
+          '20%, 40%, 60%, 80%': { transform: 'translateX(4px)' },
         },
         'slide-up': {
-          '0%': { transform: 'translateY(8px)', opacity: '0' },
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
       },
       animation: {
         'slide-in-right': 'slide-in-right 0.3s ease-out',
-        'fade-in': 'fade-in 0.2s ease-out',
+        'fade-in': 'fade-in 0.3s ease-out',
         'scale-in': 'scale-in 0.2s ease-out',
-        'shake': 'shake 0.3s ease-in-out',
-        'slide-up': 'slide-up 0.25s ease-out',
+        'shake': 'shake 0.4s ease-in-out',
+        'slide-up': 'slide-up 0.3s ease-out',
       },
       height: {
         'nav': 'var(--fandex-nav-height)',

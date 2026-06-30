@@ -2,13 +2,14 @@
 //
 // 功能概述：
 // 使用 HTML Canvas 渲染小说项目的知识图谱，展示角色、世界观、名词之间的关联关系。
-// 采用弹簧-库仑力模型实现力导向布局，支持平移、缩放、悬停高亮和点击导航。
+// 采用弹簧-库仑力模型实现力导向布局，支持平移、缩放、悬停高亮、节点拖拽和点击导航。
 //
 // 模块职责：
 // 1. 从项目目录树加载角色/世界观/名词卡片数据
 // 2. 通过文本交叉引用提取卡片间的关联边
 // 3. 运行力导向物理模拟并渲染到 Canvas
-// 4. 支持平移（拖拽背景）、缩放（滚轮）、悬停高亮、点击导航到卡片
+// 4. 支持平移（拖拽背景）、缩放（滚轮）、悬停高亮、节点拖拽固定、点击导航到卡片
+// 5. HTML 覆盖层渲染图例（清晰不模糊）和重置按钮
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useAppStore, CATEGORY_DIRS } from "../lib/store";
@@ -32,6 +33,7 @@ interface GraphNode {
   vx: number;                  // X 方向速度
   vy: number;                  // Y 方向速度
   filePath: string;            // 文件相对路径（用于导航定位）
+  pinned: boolean;             // 是否被用户固定（拖拽后固定）
 }
 
 // 图谱边接口
@@ -42,16 +44,17 @@ interface GraphEdge {
 
 // ===== 物理模拟常量 =====
 
-const REPULSION_STRENGTH = 3000;    // 库仑斥力强度
-const SPRING_STRENGTH = 0.005;      // 弹簧引力系数
-const SPRING_REST_LENGTH = 150;     // 弹簧自然长度（像素）
-const CENTER_GRAVITY = 0.01;        // 中心引力系数
-const VELOCITY_DAMPING = 0.85;      // 速度衰减因子（每帧乘以该值）
+const REPULSION_STRENGTH = 4000;    // 库仑斥力强度
+const SPRING_STRENGTH = 0.004;      // 弹簧引力系数
+const SPRING_REST_LENGTH = 160;     // 弹簧自然长度（像素）
+const CENTER_GRAVITY = 0.008;       // 中心引力系数
+const VELOCITY_DAMPING = 0.82;      // 速度衰减因子（每帧乘以该值）
 const MIN_VELOCITY = 0.01;          // 最小速度阈值（低于此值视为静止）
-const MAX_VELOCITY = 10;            // 最大速度限制（防止爆炸）
-const NODE_RADIUS = 20;             // 节点半径（像素）
-const LABEL_MAX_LENGTH = 8;         // 标签最大字符数（超出截断加省略号）
+const MAX_VELOCITY = 8;             // 最大速度限制（防止爆炸）
+const NODE_RADIUS = 18;             // 节点半径（像素）
+const LABEL_MAX_LENGTH = 10;        // 标签最大字符数（超出截断加省略号）
 const HOVER_RADIUS_FACTOR = 1.5;    // 悬停检测半径放大系数
+const EDGE_CURVE_OFFSET = 20;       // 边弯曲偏移量
 
 // ===== 辅助函数 =====
 
@@ -97,6 +100,17 @@ function getCSSColor(varName: string): string {
   return styles.getPropertyValue(varName).trim();
 }
 
+/**
+ * 将 hex 颜色转为 rgba 字符串
+ */
+function hexToRgba(hex: string, alpha: number): string {
+  const cleaned = hex.replace("#", "");
+  const r = parseInt(cleaned.substring(0, 2), 16);
+  const g = parseInt(cleaned.substring(2, 4), 16);
+  const b = parseInt(cleaned.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 // ===== 主组件 =====
 
 export default function KnowledgeGraph() {
@@ -123,11 +137,14 @@ export default function KnowledgeGraph() {
   // 视图变换状态（平移和缩放）
   const viewTransformRef = useRef({ offsetX: 0, offsetY: 0, scale: 1 });
 
-  // 拖拽状态
+  // 拖拽状态（背景平移 + 节点拖拽）
   const dragStateRef = useRef({
     isDragging: false,
+    isDraggingNode: false,
+    draggedNode: null as GraphNode | null,
     lastX: 0,
     lastY: 0,
+    hasMoved: false, // 判断是否发生了拖拽（区分点击和拖拽）
   });
 
   // 节点数据引用（物理模拟直接修改，避免频繁 setState）
@@ -137,6 +154,9 @@ export default function KnowledgeGraph() {
   // 模拟是否已趋于稳定（减少不必要的重绘）
   const simulationActiveRef = useRef(true);
 
+  // 用于强制刷新图例中的计数
+  const [graphStats, setGraphStats] = useState({ nodeCount: 0, edgeCount: 0 });
+
   // ===== 数据加载 =====
 
   useEffect(() => {
@@ -145,6 +165,7 @@ export default function KnowledgeGraph() {
       setEdges([]);
       nodesRef.current = [];
       edgesRef.current = [];
+      setGraphStats({ nodeCount: 0, edgeCount: 0 });
       return;
     }
 
@@ -175,6 +196,7 @@ export default function KnowledgeGraph() {
             setEdges([]);
             nodesRef.current = [];
             edgesRef.current = [];
+            setGraphStats({ nodeCount: 0, edgeCount: 0 });
             setLoading(false);
           }
           return;
@@ -214,6 +236,7 @@ export default function KnowledgeGraph() {
             vx: 0,
             vy: 0,
             filePath: f.filePath,
+            pinned: false,
           };
         });
 
@@ -256,12 +279,13 @@ export default function KnowledgeGraph() {
         edgesRef.current = newEdges;
         setNodes(newNodes);
         setEdges(newEdges);
+        setGraphStats({ nodeCount: newNodes.length, edgeCount: newEdges.length });
         simulationActiveRef.current = true;
 
         // 重置视图变换，居中显示
         viewTransformRef.current = { offsetX: 0, offsetY: 0, scale: 1 };
       } catch (err) {
-        console.error("[KnowledgeGraph] \u52a0\u8f7d\u56fe\u8c31\u6570\u636e\u5931\u8d25:", err);
+        console.error("[KnowledgeGraph] 加载图谱数据失败:", err);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -295,7 +319,7 @@ export default function KnowledgeGraph() {
      * 1. 所有节点对之间施加库仑斥力
      * 2. 沿边施加弹簧引力
      * 3. 施加向画布中心的引力
-     * 4. 衰减速度并更新位置
+     * 4. 衰减速度并更新位置（跳过被固定的节点）
      */
     function simulationStep(
       nodeList: GraphNode[],
@@ -320,10 +344,8 @@ export default function KnowledgeGraph() {
           const force = REPULSION_STRENGTH / distSq;
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
-          ni.vx += fx;
-          ni.vy += fy;
-          nj.vx -= fx;
-          nj.vy -= fy;
+          if (!ni.pinned) { ni.vx += fx; ni.vy += fy; }
+          if (!nj.pinned) { nj.vx -= fx; nj.vy -= fy; }
         }
       }
 
@@ -341,14 +363,18 @@ export default function KnowledgeGraph() {
         const force = SPRING_STRENGTH * displacement;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
-        ns.vx += fx;
-        ns.vy += fy;
-        nt.vx -= fx;
-        nt.vy -= fy;
+        if (!ns.pinned) { ns.vx += fx; ns.vy += fy; }
+        if (!nt.pinned) { nt.vx -= fx; nt.vy -= fy; }
       }
 
       // --- 中心引力 + 速度衰减 + 位置更新 ---
       for (const node of nodeList) {
+        if (node.pinned) {
+          node.vx = 0;
+          node.vy = 0;
+          continue;
+        }
+
         // 向中心拉拽，防止节点飘散
         node.vx += (centerX - node.x) * CENTER_GRAVITY;
         node.vy += (centerY - node.y) * CENTER_GRAVITY;
@@ -374,7 +400,7 @@ export default function KnowledgeGraph() {
     }
 
     /**
-     * 渲染一帧：清空画布、绘制边、绘制节点、绘制标签、绘制图例
+     * 渲染一帧：清空画布、绘制边（弯曲+渐变）、绘制节点（发光效果）、绘制标签
      */
     function render() {
       if (!canvas || !ctx) return;
@@ -415,183 +441,202 @@ export default function KnowledgeGraph() {
       const nodeMap = new Map<string, GraphNode>();
       for (const n of nodeList) nodeMap.set(n.id, n);
 
-      // --- 绘制边 ---
-      ctx.lineWidth = 1 / transform.scale; // 保持边线宽不随缩放变化
+      // 预计算悬停连接集合（加速渲染判断）
+      const connectedNodeIds = new Set<string>();
+      const highlightedEdgeKeys = new Set<string>();
+      if (hovered) {
+        connectedNodeIds.add(hovered.id);
+        for (const edge of edgeList) {
+          if (edge.source === hovered.id || edge.target === hovered.id) {
+            connectedNodeIds.add(edge.source);
+            connectedNodeIds.add(edge.target);
+            const key = edge.source < edge.target
+              ? `${edge.source}|${edge.target}`
+              : `${edge.target}|${edge.source}`;
+            highlightedEdgeKeys.add(key);
+          }
+        }
+      }
+
+      // --- 绘制边（弯曲 + 渐变透明度） ---
       for (const edge of edgeList) {
         const ns = nodeMap.get(edge.source);
         const nt = nodeMap.get(edge.target);
         if (!ns || !nt) continue;
 
-        // 判断是否为悬停节点相关的边（高亮显示）
-        const isHighlighted =
-          hovered && (hovered.id === edge.source || hovered.id === edge.target);
+        const edgeKey = edge.source < edge.target
+          ? `${edge.source}|${edge.target}`
+          : `${edge.target}|${edge.source}`;
+        const isHighlighted = highlightedEdgeKeys.has(edgeKey);
+
+        // 有悬停时，非相关边淡出
+        if (hovered && !isHighlighted) {
+          ctx.globalAlpha = 0.08;
+        } else if (isHighlighted) {
+          ctx.globalAlpha = 0.9;
+        } else {
+          ctx.globalAlpha = 0.3;
+        }
+
+        // 计算曲线控制点（在两节点连线中点垂直偏移）
+        const mx = (ns.x + nt.x) / 2;
+        const my = (ns.y + nt.y) / 2;
+        const dx = nt.x - ns.x;
+        const dy = nt.y - ns.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        // 法线方向偏移
+        const nx = -dy / dist;
+        const ny = dx / dist;
+        const cpx = mx + nx * EDGE_CURVE_OFFSET;
+        const cpy = my + ny * EDGE_CURVE_OFFSET;
+
+        // 创建沿边的渐变
+        const sourceColor = categoryColors[ns.category];
+        const targetColor = categoryColors[nt.category];
+
+        const gradient = ctx.createLinearGradient(ns.x, ns.y, nt.x, nt.y);
+        if (isHighlighted) {
+          gradient.addColorStop(0, hexToRgba(sourceColor, 0.9));
+          gradient.addColorStop(0.5, hexToRgba(textColor, 0.7));
+          gradient.addColorStop(1, hexToRgba(targetColor, 0.9));
+        } else {
+          gradient.addColorStop(0, hexToRgba(sourceColor, 0.5));
+          gradient.addColorStop(0.5, hexToRgba(borderColor, 0.3));
+          gradient.addColorStop(1, hexToRgba(targetColor, 0.5));
+        }
 
         ctx.beginPath();
         ctx.moveTo(ns.x, ns.y);
-        ctx.lineTo(nt.x, nt.y);
-        if (isHighlighted) {
-          ctx.strokeStyle = textColor;
-          ctx.lineWidth = 2 / transform.scale;
-          ctx.globalAlpha = 0.9;
-        } else {
-          ctx.strokeStyle = borderColor;
-          ctx.lineWidth = 1 / transform.scale;
-          ctx.globalAlpha = 0.4;
-        }
+        ctx.quadraticCurveTo(cpx, cpy, nt.x, nt.y);
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = isHighlighted ? 2.5 / transform.scale : 1.2 / transform.scale;
         ctx.stroke();
-        ctx.globalAlpha = 1;
       }
+      ctx.globalAlpha = 1;
 
-      // --- 绘制节点 ---
+      // --- 绘制节点（发光效果） ---
       for (const node of nodeList) {
         const color = categoryColors[node.category];
         const isHovered = hovered && hovered.id === node.id;
-        const isConnected =
-          hovered &&
-          edgeList.some(
-            (e) =>
-              (e.source === hovered.id && e.target === node.id) ||
-              (e.target === hovered.id && e.source === node.id)
-          );
+        const isConnected = hovered && connectedNodeIds.has(node.id) && !isHovered;
+
+        const baseRadius = NODE_RADIUS;
         const radius = isHovered
-          ? NODE_RADIUS * 1.3
+          ? baseRadius * 1.35
           : isConnected
-          ? NODE_RADIUS * 1.1
-          : NODE_RADIUS;
+          ? baseRadius * 1.1
+          : baseRadius;
 
         // 悬停或连接节点以外的节点在有悬停时半透明显示
         if (hovered && !isHovered && !isConnected) {
-          ctx.globalAlpha = 0.25;
+          ctx.globalAlpha = 0.2;
+        } else {
+          ctx.globalAlpha = 1;
         }
 
-        // 绘制节点圆形（外发光效果）
-        if (isHovered) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = 15;
-        }
+        // 外发光效果
+        const glowRadius = isHovered ? 20 : isConnected ? 10 : 6;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = glowRadius;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // 绘制节点圆形
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = color;
+
+        // 径向渐变填充（从亮到暗）
+        const nodeGradient = ctx.createRadialGradient(
+          node.x - radius * 0.3, node.y - radius * 0.3, radius * 0.1,
+          node.x, node.y, radius
+        );
+        nodeGradient.addColorStop(0, hexToRgba(color, 1));
+        nodeGradient.addColorStop(0.7, color);
+        nodeGradient.addColorStop(1, hexToRgba(color, 0.7));
+        ctx.fillStyle = nodeGradient;
         ctx.fill();
 
-        // 节点描边
-        ctx.strokeStyle = isHovered ? textColor : "rgba(255,255,255,0.2)";
-        ctx.lineWidth = isHovered ? 2.5 / transform.scale : 1 / transform.scale;
-        ctx.stroke();
-
+        // 清除阴影后再描边
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
+
+        // 节点描边
+        if (isHovered) {
+          ctx.strokeStyle = textColor;
+          ctx.lineWidth = 2.5 / transform.scale;
+        } else if (node.pinned) {
+          // 固定的节点用白色虚线描边标识
+          ctx.strokeStyle = "rgba(255,255,255,0.6)";
+          ctx.lineWidth = 2 / transform.scale;
+          ctx.setLineDash([3 / transform.scale, 3 / transform.scale]);
+        } else {
+          ctx.strokeStyle = "rgba(255,255,255,0.15)";
+          ctx.lineWidth = 1 / transform.scale;
+        }
+        ctx.stroke();
+        ctx.setLineDash([]); // 重置虚线
+
         ctx.globalAlpha = 1;
       }
 
       // --- 绘制节点标签 ---
       const fontSize = Math.max(10, 12 / transform.scale);
-      ctx.font = `${fontSize}px "Inter", "Noto Sans SC", system-ui, sans-serif`;
+      ctx.font = `500 ${fontSize}px "Inter", "Noto Sans SC", system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
 
       for (const node of nodeList) {
         const isHovered = hovered && hovered.id === node.id;
-        const isConnected =
-          hovered &&
-          edgeList.some(
-            (e) =>
-              (e.source === hovered.id && e.target === node.id) ||
-              (e.target === hovered.id && e.source === node.id)
-          );
+        const isConnected = hovered && connectedNodeIds.has(node.id) && !isHovered;
 
         // 有悬停时，仅显示悬停节点及其相邻节点的标签
         if (hovered && !isHovered && !isConnected) {
-          ctx.globalAlpha = 0.15;
+          ctx.globalAlpha = 0.1;
+        } else {
+          ctx.globalAlpha = 0.95;
         }
 
         const displayLabel = truncateLabel(node.label, LABEL_MAX_LENGTH);
-        const labelY = node.y + NODE_RADIUS + 4;
+        const labelY = node.y + NODE_RADIUS + 5;
 
         // 标签背景（提升可读性）
         const metrics = ctx.measureText(displayLabel);
-        const padding = 3;
+        const padding = 4;
+        const bgAlpha = hovered && !isHovered && !isConnected ? 0.3 : 0.7;
         ctx.fillStyle = bgColor;
-        ctx.globalAlpha = Math.max(ctx.globalAlpha * 0.7, 0);
-        ctx.fillRect(
-          node.x - metrics.width / 2 - padding,
-          labelY - 1,
-          metrics.width + padding * 2,
-          fontSize + padding * 2
-        );
+        ctx.globalAlpha = ctx.globalAlpha * bgAlpha;
+
+        // 圆角背景
+        const bgX = node.x - metrics.width / 2 - padding;
+        const bgY = labelY - 2;
+        const bgW = metrics.width + padding * 2;
+        const bgH = fontSize + padding * 2;
+        const bgR = 3;
+        ctx.beginPath();
+        ctx.moveTo(bgX + bgR, bgY);
+        ctx.lineTo(bgX + bgW - bgR, bgY);
+        ctx.arcTo(bgX + bgW, bgY, bgX + bgW, bgY + bgR, bgR);
+        ctx.lineTo(bgX + bgW, bgY + bgH - bgR);
+        ctx.arcTo(bgX + bgW, bgY + bgH, bgX + bgW - bgR, bgY + bgH, bgR);
+        ctx.lineTo(bgX + bgR, bgY + bgH);
+        ctx.arcTo(bgX, bgY + bgH, bgX, bgY + bgH - bgR, bgR);
+        ctx.lineTo(bgX, bgY + bgR);
+        ctx.arcTo(bgX, bgY, bgX + bgR, bgY, bgR);
+        ctx.closePath();
+        ctx.fill();
 
         // 标签文本
-        ctx.globalAlpha = hovered && !isHovered && !isConnected ? 0.15 : 0.9;
+        if (hovered && !isHovered && !isConnected) {
+          ctx.globalAlpha = 0.1;
+        } else {
+          ctx.globalAlpha = 0.95;
+        }
         ctx.fillStyle = textColor;
         ctx.fillText(displayLabel, node.x, labelY + padding);
         ctx.globalAlpha = 1;
       }
 
       ctx.restore();
-
-      // --- 绘制图例（左下角，不受视图变换影响） ---
-      drawLegend(ctx, categoryColors, width, height, textColor, bgColor, borderColor);
-    }
-
-    /**
-     * 绘制左下角的分类颜色图例
-     */
-    function drawLegend(
-      ctx: CanvasRenderingContext2D,
-      colors: Record<GraphCategory, string>,
-      canvasWidth: number,
-      canvasHeight: number,
-      textColor: string,
-      bgColor: string,
-      borderColor: string
-    ) {
-      const legendItems = [
-        { label: t("sidebar.characters"), color: colors.characters },
-        { label: t("sidebar.worldview"), color: colors.worldview },
-        { label: t("sidebar.glossary"), color: colors.glossary },
-      ];
-
-      const itemHeight = 20;
-      const dotRadius = 6;
-      const padding = 12;
-      const legendWidth = 120;
-      const legendHeight = legendItems.length * itemHeight + padding * 2;
-      const x = padding;
-      const y = canvasHeight - legendHeight - padding;
-
-      // 图例背景
-      ctx.fillStyle = bgColor;
-      ctx.globalAlpha = 0.85;
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(x, y, legendWidth, legendHeight, 6);
-      ctx.fill();
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      // 图例标题
-      ctx.font = `bold 11px "Inter", "Noto Sans SC", system-ui, sans-serif`;
-      ctx.fillStyle = textColor;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(t("knowledge.title"), x + padding, y + padding + 2);
-
-      // 各分类条目
-      ctx.font = `11px "Inter", "Noto Sans SC", system-ui, sans-serif`;
-      legendItems.forEach((item, i) => {
-        const itemY = y + padding + 18 + i * itemHeight;
-
-        // 颜色圆点
-        ctx.beginPath();
-        ctx.arc(x + padding + dotRadius, itemY + itemHeight / 2, dotRadius, 0, Math.PI * 2);
-        ctx.fillStyle = item.color;
-        ctx.fill();
-
-        // 分类名称
-        ctx.fillStyle = textColor;
-        ctx.fillText(item.label, x + padding + dotRadius * 2 + 8, itemY + itemHeight / 2);
-      });
     }
 
     // ===== 动画主循环 =====
@@ -640,16 +685,7 @@ export default function KnowledgeGraph() {
       if (!canvas) return;
       const parent = canvas.parentElement;
       if (!parent) return;
-      const dpr = window.devicePixelRatio || 1;
       const rect = parent.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-      const ctx = canvas.getContext("2d");
-      if (ctx) ctx.scale(dpr, dpr);
-      // 调整 canvas 物理尺寸后以实际像素宽高存储，render 里使用 canvas.width/height
-      // 但为了坐标一致性，这里将宽高设为 CSS 像素值
       canvas.width = rect.width;
       canvas.height = rect.height;
       // 触发一轮模拟以重新居中
@@ -666,7 +702,7 @@ export default function KnowledgeGraph() {
     };
   }, []);
 
-  // ===== 鼠标交互：平移、缩放、悬停、点击 =====
+  // ===== 鼠标交互：平移、缩放、悬停、节点拖拽、点击 =====
 
   /**
    * 将屏幕坐标转换为图谱坐标（应用视图逆变换）
@@ -696,16 +732,43 @@ export default function KnowledgeGraph() {
     return null;
   }, []);
 
-  // 鼠标按下：开始拖拽平移
+  // 鼠标按下：检测是节点拖拽还是背景平移
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    dragStateRef.current = {
-      isDragging: true,
-      lastX: e.clientX,
-      lastY: e.clientY,
-    };
-  }, []);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  // 鼠标移动：拖拽平移 + 悬停检测
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const graphPos = screenToGraph(mouseX, mouseY);
+    const node = findNodeAt(graphPos.x, graphPos.y);
+
+    if (node) {
+      // 开始拖拽节点
+      dragStateRef.current = {
+        isDragging: false,
+        isDraggingNode: true,
+        draggedNode: node,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        hasMoved: false,
+      };
+      canvas.style.cursor = "grabbing";
+    } else {
+      // 开始平移背景
+      dragStateRef.current = {
+        isDragging: true,
+        isDraggingNode: false,
+        draggedNode: null,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        hasMoved: false,
+      };
+      canvas.style.cursor = "grabbing";
+    }
+  }, [screenToGraph, findNodeAt]);
+
+  // 鼠标移动：拖拽平移 + 节点拖拽 + 悬停检测
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
@@ -715,6 +778,20 @@ export default function KnowledgeGraph() {
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
+      if (dragStateRef.current.isDraggingNode && dragStateRef.current.draggedNode) {
+        // 拖拽节点：更新节点位置到鼠标所在图谱坐标
+        const graphPos = screenToGraph(mouseX, mouseY);
+        const node = dragStateRef.current.draggedNode;
+        node.x = graphPos.x;
+        node.y = graphPos.y;
+        node.vx = 0;
+        node.vy = 0;
+        dragStateRef.current.hasMoved = true;
+        // 拖拽时重新激活模拟让其他节点响应
+        simulationActiveRef.current = true;
+        return;
+      }
+
       if (dragStateRef.current.isDragging) {
         // 平移视图
         const dx = e.clientX - dragStateRef.current.lastX;
@@ -723,6 +800,7 @@ export default function KnowledgeGraph() {
         viewTransformRef.current.offsetY += dy;
         dragStateRef.current.lastX = e.clientX;
         dragStateRef.current.lastY = e.clientY;
+        dragStateRef.current.hasMoved = true;
         return;
       }
 
@@ -741,14 +819,38 @@ export default function KnowledgeGraph() {
     [screenToGraph, findNodeAt]
   );
 
-  // 鼠标释放：结束拖拽
+  // 鼠标释放：结束拖拽，固定被拖拽的节点
   const handleMouseUp = useCallback(() => {
+    if (dragStateRef.current.isDraggingNode && dragStateRef.current.draggedNode) {
+      // 固定被拖拽的节点
+      if (dragStateRef.current.hasMoved) {
+        dragStateRef.current.draggedNode.pinned = true;
+        dragStateRef.current.draggedNode.vx = 0;
+        dragStateRef.current.draggedNode.vy = 0;
+      }
+    }
     dragStateRef.current.isDragging = false;
+    dragStateRef.current.isDraggingNode = false;
+    dragStateRef.current.draggedNode = null;
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const hovered = hoveredNodeRef.current;
+      canvas.style.cursor = hovered ? "pointer" : "grab";
+    }
   }, []);
 
   // 鼠标离开画布：清除悬停和拖拽状态
   const handleMouseLeave = useCallback(() => {
+    if (dragStateRef.current.isDraggingNode && dragStateRef.current.draggedNode) {
+      if (dragStateRef.current.hasMoved) {
+        dragStateRef.current.draggedNode.pinned = true;
+        dragStateRef.current.draggedNode.vx = 0;
+        dragStateRef.current.draggedNode.vy = 0;
+      }
+    }
     dragStateRef.current.isDragging = false;
+    dragStateRef.current.isDraggingNode = false;
+    dragStateRef.current.draggedNode = null;
     hoveredNodeRef.current = null;
     setHoveredNodeId(null);
     const canvas = canvasRef.current;
@@ -776,13 +878,15 @@ export default function KnowledgeGraph() {
     transform.scale = newScale;
   }, []);
 
-  // 点击节点：导航到对应卡片
+  // 点击节点：导航到对应卡片（仅在未发生拖拽时触发）
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      // 如果发生了拖拽，不触发点击
+      if (dragStateRef.current.hasMoved) return;
+
       const canvas = canvasRef.current;
       if (!canvas) return;
 
-      // 如果发生了拖拽，不触发点击
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -803,6 +907,44 @@ export default function KnowledgeGraph() {
     },
     [projectTree, navigateToFile, setActiveCategory, screenToGraph, findNodeAt]
   );
+
+  // 双击节点：取消固定
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const graphPos = screenToGraph(mouseX, mouseY);
+      const node = findNodeAt(graphPos.x, graphPos.y);
+
+      if (node && node.pinned) {
+        node.pinned = false;
+        simulationActiveRef.current = true;
+      }
+    },
+    [screenToGraph, findNodeAt]
+  );
+
+  // 重置视图
+  const handleResetView = useCallback(() => {
+    viewTransformRef.current = { offsetX: 0, offsetY: 0, scale: 1 };
+    // 取消所有固定节点
+    for (const node of nodesRef.current) {
+      node.pinned = false;
+    }
+    simulationActiveRef.current = true;
+  }, []);
+
+  // ===== 图例数据 =====
+
+  const legendItems = [
+    { label: t("sidebar.characters"), color: "var(--fandex-primary)", category: "characters" as GraphCategory },
+    { label: t("sidebar.worldview"), color: "var(--fandex-secondary)", category: "worldview" as GraphCategory },
+    { label: t("sidebar.glossary"), color: "var(--fandex-tertiary)", category: "glossary" as GraphCategory },
+  ];
 
   // ===== 空状态与加载中状态 =====
 
@@ -879,7 +1021,180 @@ export default function KnowledgeGraph() {
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
       />
+
+      {/* HTML 覆盖层：左下角图例 */}
+      {nodes.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            left: 12,
+            bottom: 12,
+            zIndex: 20,
+            backgroundColor: "var(--fandex-bg)",
+            border: "1px solid var(--fandex-border)",
+            borderRadius: 8,
+            padding: "10px 14px",
+            opacity: 0.92,
+            pointerEvents: "none",
+            userSelect: "none",
+            minWidth: 130,
+          }}
+        >
+          {/* 图例标题 */}
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--fandex-text)",
+              marginBottom: 8,
+              letterSpacing: "0.03em",
+              fontFamily: '"Inter", "Noto Sans SC", system-ui, sans-serif',
+            }}
+          >
+            {t("knowledge.title")}
+          </div>
+
+          {/* 分类条目 */}
+          {legendItems.map((item) => (
+            <div
+              key={item.category}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 4,
+                fontFamily: '"Inter", "Noto Sans SC", system-ui, sans-serif',
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  backgroundColor: item.color,
+                  flexShrink: 0,
+                  boxShadow: `0 0 6px ${item.color}`,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--fandex-text)",
+                  opacity: 0.85,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {item.label}
+              </span>
+            </div>
+          ))}
+
+          {/* 统计信息 */}
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 6,
+              borderTop: "1px solid var(--fandex-border)",
+              fontSize: 10,
+              color: "var(--fandex-text)",
+              opacity: 0.5,
+              fontFamily: '"Inter", "Noto Sans SC", system-ui, sans-serif',
+            }}
+          >
+            {graphStats.nodeCount} nodes &middot; {graphStats.edgeCount} edges
+          </div>
+        </div>
+      )}
+
+      {/* HTML 覆盖层：右上角重置按钮 */}
+      {nodes.length > 0 && (
+        <button
+          onClick={handleResetView}
+          title="Reset view / Unpin all nodes"
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 20,
+            width: 32,
+            height: 32,
+            borderRadius: 6,
+            border: "1px solid var(--fandex-border)",
+            backgroundColor: "var(--fandex-bg)",
+            color: "var(--fandex-text)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: 0.8,
+            transition: "opacity 0.15s, background-color 0.15s",
+            padding: 0,
+            fontSize: 16,
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--fandex-border)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.opacity = "0.8";
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--fandex-bg)";
+          }}
+        >
+          {/* 简单重置图标 (SVG) */}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2 8a6 6 0 0 1 10.3-4.2L14 2v4h-4l1.7-1.7A4.5 4.5 0 1 0 12.5 8" />
+          </svg>
+        </button>
+      )}
+
+      {/* 悬停节点提示（HTML 覆盖层，跟随鼠标位置） */}
+      {hoveredNodeId && (
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 20,
+            backgroundColor: "var(--fandex-bg)",
+            border: "1px solid var(--fandex-border)",
+            borderRadius: 6,
+            padding: "4px 12px",
+            opacity: 0.9,
+            pointerEvents: "none",
+            userSelect: "none",
+            fontFamily: '"Inter", "Noto Sans SC", system-ui, sans-serif',
+            fontSize: 12,
+            color: "var(--fandex-text)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {(() => {
+            const node = nodesRef.current.find((n) => n.id === hoveredNodeId);
+            if (!node) return "";
+            const catLabel =
+              node.category === "characters"
+                ? t("sidebar.characters")
+                : node.category === "worldview"
+                ? t("sidebar.worldview")
+                : t("sidebar.glossary");
+            return `${node.label}  ·  ${catLabel}${node.pinned ? "  ·  pinned" : ""}`;
+          })()}
+        </div>
+      )}
     </div>
   );
 }

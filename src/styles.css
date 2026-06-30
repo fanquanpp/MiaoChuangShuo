@@ -452,19 +452,35 @@ select:focus-visible {
 /* ========== 诗歌/歌词排版样式 ========== */
 .ProseMirror .poetry-block {
   text-align: center;
-  line-height: 2.2;
-  margin: 0.8em 0;
+  line-height: 2.4;
+  margin: 1em 0;
+  padding: 1em 1.5em;
   font-style: italic;
   color: var(--fandex-text-secondary);
+  background: var(--fandex-bg-code);
+  border: 1px solid var(--fandex-border-light);
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.ProseMirror .poetry-block p {
+  margin: 0.2em 0;
 }
 
 .ProseMirror .lyrics-block {
   text-align: left;
-  line-height: 1.8;
-  margin: 0.5em 0;
+  line-height: 2;
+  margin: 0.8em 0;
+  padding: 0.8em 1.2em;
   padding-left: 2em;
-  border-left: 2px solid var(--fandex-secondary);
+  border-left: 3px solid var(--fandex-secondary);
   color: var(--fandex-text-secondary);
+  background: linear-gradient(to right, var(--fandex-bg-code), transparent);
+  border-radius: 0 4px 4px 0;
+}
+
+.ProseMirror .lyrics-block p {
+  margin: 0.15em 0;
 }
 
 .ProseMirror .lyrics-block + .lyrics-block {
@@ -545,10 +561,10 @@ select:focus-visible {
 
 /* 面板切换入场动画 */
 .animate-slide-up {
-  animation: slideUp 0.25s ease-out;
+  animation: slideUp 0.3s ease-out;
 }
 @keyframes slideUp {
-  0% { transform: translateY(8px); opacity: 0; }
+  0% { transform: translateY(10px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
 
@@ -568,7 +584,7 @@ input:focus, textarea:focus, select:focus {
   to { opacity: 1; }
 }
 .animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
+  animation: fadeIn 0.3s ease-out;
 }
 
 /* 对话框内容缩放入场 */
@@ -583,11 +599,11 @@ input:focus, textarea:focus, select:focus {
 /* 错误抖动 */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
 }
 .animate-shake {
-  animation: shake 0.3s ease-in-out;
+  animation: shake 0.4s ease-in-out;
 }
 
 /* ========== 精致入场动画 ========== */

@@ -24,8 +24,8 @@ import {
   Loader2,
   RefreshCw,
   X,
-  ChevronDown,
-  ChevronRight,
+  Sun,
+  Moon,
   FileText,
   BookMarked,
   ScrollText,
@@ -49,6 +49,8 @@ import ProjectCard, { type ProjectData } from "./ProjectCard";
 import CreateProjectDialog from "./CreateProjectDialog";
 import { ProjectGridSkeleton } from "./SkeletonComponents";
 import { useI18n } from "../lib/i18n";
+import { useThemeStore } from "../lib/themeStore";
+import { exists, mkdir } from "@tauri-apps/plugin-fs";
 import { useToast } from "../lib/toast";
 import ConfirmDialog from "./ConfirmDialog";
 
@@ -71,6 +73,8 @@ export default function Launcher() {
   const closeProject = useAppStore((s) => s.closeProject);
   const { t } = useI18n();
   const { showToast } = useToast();
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const [scanDir, setScanDir] = useState("");
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -85,6 +89,15 @@ export default function Launcher() {
     if (!scanDir) return;
     setLoading(true);
     try {
+      // 若目录不存在则自动创建
+      try {
+        const dirExists = await exists(scanDir);
+        if (!dirExists) {
+          await mkdir(scanDir, { recursive: true });
+        }
+      } catch {
+        // 目录检查/创建失败时静默继续，让 scanProjects 自行处理
+      }
       const list = await scanProjects(scanDir);
       setProjects(list);
       showToast("success", t("launcher.scanSuccess", { count: list.length }));
@@ -289,9 +302,9 @@ export default function Launcher() {
     }
   }, [openProject, t, showToast]);
 
-  // 点击"新建项目"按钮：展开类型选择面板
+  // 点击"新建项目"按钮：切换类型选择面板
   const handleNewProjectClick = useCallback(() => {
-    setTypePanelExpanded(true);
+    setTypePanelExpanded((prev) => !prev);
   }, []);
 
   // 选择文体类型后打开创建对话框
@@ -380,7 +393,7 @@ export default function Launcher() {
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="p-1.5 max-h-64 overflow-y-auto space-y-0.5">
+              <div className="p-1.5 max-h-96 overflow-y-auto space-y-0.5">
                 {PROJECT_TEMPLATES.map((tpl) => {
                   const Icon = TYPE_ICONS[tpl.id] || FileText;
                   return (
@@ -400,7 +413,9 @@ export default function Launcher() {
                           {tpl.desc}
                         </div>
                       </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity mt-1" />
+                      <span className="text-nf-text-tertiary opacity-0 group-hover:opacity-100 transition-all duration-fast text-sm font-bold mt-0.5 group-hover:rotate-90">
+                        &gt;
+                      </span>
                     </button>
                   );
                 })}
@@ -477,7 +492,7 @@ export default function Launcher() {
       </aside>
 
       {/* 右侧主区域 */}
-      <main className="flex-1 flex flex-col overflow-hidden relative z-10">
+      <main className="flex-1 flex flex-col overflow-hidden relative z-10 animate-fade-in">
         {/* 顶部搜索栏 */}
         <header className="flex items-center justify-between px-8 py-5 border-b border-nf-border-light bg-nf-bg/80 backdrop-blur-sm">
           <div>
@@ -485,27 +500,42 @@ export default function Launcher() {
               {t("launcher.welcome")}
             </h2>
             <p className="text-xs text-nf-text-tertiary mt-0.5">
-              {t("launcher.welcomeHint")}
+              {hasProjects && sortedProjects.length > 0
+                ? t("launcher.welcomeRecentHint", { name: sortedProjects[0].meta.name })
+                : t("launcher.welcomeHint")}
             </p>
           </div>
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nf-text-tertiary transition-colors duration-fast group-focus-within:text-fandex-primary" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("launcher.searchPlaceholder")}
-              className="w-72 bg-nf-bg-sidebar/80 border border-nf-border-light pl-10 pr-9 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 focus:bg-nf-bg transition-all duration-base ease-fandex"
-            />
-            {isSearching && (
-              <button
-                onClick={() => setSearchQuery("")}
-                title={t("launcher.clearSearch")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? t("sidebar.switchLight") : t("sidebar.switchDark")}
+              className="p-2 text-nf-text-tertiary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition duration-fast"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </button>
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nf-text-tertiary transition-colors duration-fast group-focus-within:text-fandex-primary" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t("launcher.searchPlaceholder")}
+                className="w-72 bg-nf-bg-sidebar/80 border border-nf-border-light pl-10 pr-9 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 focus:bg-nf-bg transition-all duration-base ease-fandex"
+              />
+              {isSearching && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  title={t("launcher.clearSearch")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         </header>
 
@@ -542,11 +572,11 @@ export default function Launcher() {
               </p>
             </div>
           ) : (
-            <section className="animate-slide-in-right">
+            <section className="animate-slide-up">
               <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-6">
                 {t("launcher.recentProjectsCount", { count: sortedProjects.length })}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {sortedProjects.map((p) => (
                   <ProjectCard
                     key={p.path}

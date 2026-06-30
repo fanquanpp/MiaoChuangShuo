@@ -19,7 +19,6 @@ import CardManager from "./CardManager";
 import TimelineManager from "./TimelineManager";
 import WritingStats from "./WritingStats";
 import GlobalSearch from "./GlobalSearch";
-import KnowledgeGraph from "./KnowledgeGraph";
 import VolumeManager from "./VolumeManager";
 import SettingsDialog from "./SettingsDialog";
 import CreateFileDialog from "./CreateFileDialog";
@@ -144,18 +143,25 @@ export default function Workspace() {
       ? `${currentProject.path}/${selectedFile.relative_path}`
       : null;
 
-  // 根据分类和设置生成文件初始内容（含自动章节编号）
+  // 判断正文目录是否为空（用于首次创建判断）
+  const isManuscriptEmpty = useMemo(() => {
+    if (activeCategory !== "manuscript") return false;
+    const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
+    const existingFiles = manuscriptDir?.children.filter((f) => !f.is_dir) || [];
+    return existingFiles.length === 0;
+  }, [activeCategory, projectTree]);
+
+  // 首次创建文件对话框状态
+  const [showFirstFileDialog, setShowFirstFileDialog] = useState(false);
+
+  // 根据分类和设置生成文件初始内容
   const getFileTemplate = useCallback(
     (fileName: string, category: SidebarCategory): string => {
       const title = fileName.replace(/\.txt$/i, "").trim();
       switch (category) {
         case "manuscript": {
-          // 从现有章节推算下一章序号
-          const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
-          const existingFiles = manuscriptDir?.children.filter((f) => !f.is_dir) || [];
-          const nextNum = getNextChapterNum(existingFiles);
-          const heading = formatChapterHeading(nextNum, bookTitle, chapterFormat, autoFillBookTitle);
-          return `${heading}\n\n`;
+          // 使用编号.标题作为文件内容标题
+          return `${title}\n\n`;
         }
         case "outline":
           if (autoOutlineSkeleton) {
@@ -168,26 +174,91 @@ export default function Workspace() {
           return `${title}\n\n`;
       }
     },
-    [projectTree, bookTitle, chapterFormat, autoFillBookTitle, autoOutlineSkeleton]
+    [autoOutlineSkeleton]
   );
 
-  // 处理新建文件确认
+  // 处理新建文件确认（正文自动编号）
   const handleCreateFile = useCallback(async (fileName: string) => {
     if (!currentProject) throw new Error("无当前项目");
     const dirName = getCategoryDir(activeCategory);
-    const relativePath = `${dirName}/${fileName}`;
-    const templateContent = getFileTemplate(fileName, activeCategory);
+
+    // shared_world 项目正文需要放入子目录（如 正文/第一部/）
+    let manuscriptSubDir = "";
+    if (activeCategory === "manuscript" && currentProject.meta.type === "shared_world") {
+      const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
+      const subDirs = manuscriptDir?.children.filter((f) => f.is_dir) || [];
+      if (subDirs.length > 0) {
+        manuscriptSubDir = subDirs[subDirs.length - 1].name;
+      } else {
+        manuscriptSubDir = "第一部";
+      }
+    }
+
+    let finalFileName = fileName;
+    if (activeCategory === "manuscript") {
+      // 自动推算编号并前缀
+      const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
+      const existingFiles = manuscriptDir?.children.filter((f) => !f.is_dir) || [];
+      const nextNum = getNextChapterNum(existingFiles);
+      // 去掉用户可能输入的编号前缀
+      const cleanName = fileName.replace(/^\d+[._\-\s]*/, "").trim();
+      finalFileName = `${nextNum}.${cleanName}`;
+      if (!finalFileName.endsWith(".txt")) finalFileName += ".txt";
+    }
+
+    const relativePath = manuscriptSubDir
+      ? `${dirName}/${manuscriptSubDir}/${finalFileName}`
+      : `${dirName}/${finalFileName}`;
+    const templateContent = getFileTemplate(finalFileName, activeCategory);
+    await createFile(currentProject.path, relativePath, templateContent);
+    const tree = await readProjectTree(currentProject.path);
+    setProjectTree(tree);
+    showToast("success", t("workspace.fileCreated", { name: finalFileName }));
+  }, [currentProject, activeCategory, projectTree, getFileTemplate, setProjectTree, showToast, t]);
+
+  // 首次创建：序章
+  const handleCreatePrologue = useCallback(async () => {
+    setShowFirstFileDialog(false);
+    if (!currentProject) return;
+    const dirName = getCategoryDir("manuscript");
+    const fileName = "序章.txt";
+    const templateContent = "序章\n\n";
+
+    // shared_world 项目正文需要放入子目录
+    let relativePath = `${dirName}/${fileName}`;
+    if (currentProject.meta.type === "shared_world") {
+      const manuscriptDir = findDirByName(projectTree, dirName);
+      const subDirs = manuscriptDir?.children.filter((f) => f.is_dir) || [];
+      const subDir = subDirs.length > 0 ? subDirs[subDirs.length - 1].name : "第一部";
+      relativePath = `${dirName}/${subDir}/${fileName}`;
+    }
+
     await createFile(currentProject.path, relativePath, templateContent);
     const tree = await readProjectTree(currentProject.path);
     setProjectTree(tree);
     showToast("success", t("workspace.fileCreated", { name: fileName }));
-  }, [currentProject, activeCategory, getFileTemplate, setProjectTree, showToast, t]);
+  }, [currentProject, projectTree, setProjectTree, showToast, t]);
+
+  // 首次创建：第一章
+  const handleCreateFirstChapter = useCallback(async () => {
+    setShowFirstFileDialog(false);
+    setCreateDialogOpen(true);
+  }, []);
 
   // 命令面板中触发新建文件
   const handleCommandCreateFile = useCallback((category: SidebarCategory) => {
     setActiveCategory(category);
     setCreateDialogOpen(true);
   }, [setActiveCategory]);
+
+  // 新建文件入口：正文首次创建时显示选择对话框
+  const handleNewFileRequest = useCallback(() => {
+    if (activeCategory === "manuscript" && isManuscriptEmpty) {
+      setShowFirstFileDialog(true);
+    } else {
+      setCreateDialogOpen(true);
+    }
+  }, [activeCategory, isManuscriptEmpty]);
 
   if (!currentProject) return null;
 
@@ -200,8 +271,6 @@ export default function Workspace() {
         return <WritingStats />;
       case "search":
         return <GlobalSearch />;
-      case "knowledge":
-        return <KnowledgeGraph />;
       case "volume":
         return <VolumeManager />;
       case "card-manager":
@@ -222,7 +291,7 @@ export default function Workspace() {
     <div className="h-screen w-screen flex bg-nf-bg overflow-hidden">
       {/* 聚焦模式下隐藏侧边栏 */}
       {!focusMode && (
-        <Sidebar onCreateFile={() => setCreateDialogOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
+        <Sidebar onCreateFile={handleNewFileRequest} onOpenSettings={() => setSettingsOpen(true)} />
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -235,7 +304,7 @@ export default function Workspace() {
 
       {/* 聚焦模式下隐藏文件列表 */}
       {!focusMode && showFileList && (
-        <FileList onCreateFile={() => setCreateDialogOpen(true)} />
+        <FileList onCreateFile={handleNewFileRequest} />
       )}
 
       <CreateFileDialog
@@ -255,6 +324,67 @@ export default function Workspace() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+
+      {/* 首次创建文件选择对话框 */}
+      {showFirstFileDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowFirstFileDialog(false); }}
+        >
+          <div className="w-full max-w-sm bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-nf-border-light">
+              <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text">
+                {t("workspace.firstFileTitle")}
+              </h3>
+              <p className="text-xs text-nf-text-tertiary mt-1">
+                {t("workspace.firstFileHint")}
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              <button
+                onClick={handleCreatePrologue}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left border border-nf-border-light hover:border-fandex-primary/50 hover:bg-fandex-primary/5 transition-all duration-fast group"
+              >
+                <div className="w-8 h-8 flex items-center justify-center bg-fandex-secondary/10 text-fandex-secondary text-sm font-bold">
+                  序
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-nf-text group-hover:text-fandex-primary transition-colors">
+                    {t("workspace.createPrologue")}
+                  </div>
+                  <div className="text-xs text-nf-text-tertiary">
+                    {t("workspace.prologueHint")}
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={handleCreateFirstChapter}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left border border-nf-border-light hover:border-fandex-primary/50 hover:bg-fandex-primary/5 transition-all duration-fast group"
+              >
+                <div className="w-8 h-8 flex items-center justify-center bg-fandex-primary/10 text-fandex-primary text-sm font-bold">
+                  1
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-nf-text group-hover:text-fandex-primary transition-colors">
+                    {t("workspace.createFirstChapter")}
+                  </div>
+                  <div className="text-xs text-nf-text-tertiary">
+                    {t("workspace.firstChapterHint")}
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div className="flex justify-end px-5 py-3 border-t border-nf-border-light">
+              <button
+                onClick={() => setShowFirstFileDialog(false)}
+                className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
+              >
+                {t("app.cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

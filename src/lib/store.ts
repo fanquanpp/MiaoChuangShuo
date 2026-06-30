@@ -38,7 +38,7 @@ export type SidebarCategory =
 export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
   characters: "角色",
   worldview: "世界观",
-  glossary: "名词",
+  glossary: "术语",
   timeline: "时间线",
   manuscript: "正文",
   outline: "大纲",
@@ -53,7 +53,7 @@ export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
 export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
   characters: "角色",
   worldview: "世界观",
-  glossary: "名词",
+  glossary: "术语",
   timeline: "时间线",
   manuscript: "正文",
   outline: "大纲",
@@ -68,7 +68,7 @@ export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
 export const CATEGORY_ICONS: Record<SidebarCategory, string> = {
   characters: "Users",
   worldview: "Globe",
-  glossary: "BookMarked",
+  glossary: "Quote",
   timeline: "GitBranch",
   manuscript: "FileText",
   outline: "ListTree",

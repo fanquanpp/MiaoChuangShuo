@@ -10,7 +10,7 @@
 // 3. 持久化到 localStorage
 
 import { useCallback } from "react";
-import { X, Type, Save, BookOpen, FileText, Palette } from "lucide-react";
+import { X, Type, Save, BookOpen, FileText, Palette, Zap } from "lucide-react";
 import { useSettingsStore, type ChapterFormat } from "../lib/settingsStore";
 import { useThemeStore } from "../lib/themeStore";
 import { useI18n } from "../lib/i18n";
@@ -28,11 +28,19 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     chapterFormat,
     autoFillBookTitle,
     autoOutlineSkeleton,
+    diaryAutoDate,
+    weatherAutoFill,
+    autoNumbering,
+    autoTemplateFill,
     setFontSize,
     setAutoSaveInterval,
     setChapterFormat,
     setAutoFillBookTitle,
     setAutoOutlineSkeleton,
+    setDiaryAutoDate,
+    setWeatherAutoFill,
+    setAutoNumbering,
+    setAutoTemplateFill,
   } = useSettingsStore();
   const { theme, toggleTheme } = useThemeStore();
 
@@ -205,6 +213,90 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 </p>
               </div>
             </label>
+          </section>
+
+          {/* 自动化设置 */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              <h3 className="text-sm font-bold font-display text-nf-text">
+                自动化
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              {/* 日记自动添加日期 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={diaryAutoDate}
+                  onChange={(e) => setDiaryAutoDate(e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    日记自动添加日期
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    新建日记时自动添加本地日期
+                  </p>
+                </div>
+              </label>
+
+              {/* 天气自动填充 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={weatherAutoFill}
+                  onChange={(e) => setWeatherAutoFill(e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    天气自动填充
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    自动获取并填充天气信息
+                  </p>
+                </div>
+              </label>
+
+              {/* 章节自动编号 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={autoNumbering}
+                  onChange={(e) => setAutoNumbering(e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    章节自动编号
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    新建章节时自动编排章节序号
+                  </p>
+                </div>
+              </label>
+
+              {/* 模板自动填充 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={autoTemplateFill}
+                  onChange={(e) => setAutoTemplateFill(e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    模板自动填充
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    使用模板时自动填充默认内容
+                  </p>
+                </div>
+              </label>
+            </div>
           </section>
 
           {/* 外观设置 */}

@@ -25,6 +25,7 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
         { keys: "Ctrl + Z", desc: t("shortcuts.undo") },
         { keys: "Ctrl + Shift + Z", desc: t("shortcuts.redo") },
         { keys: "Ctrl + S", desc: t("shortcuts.save") },
+        { keys: "Ctrl + Q", desc: t("shortcuts.quickQuote") },
         { keys: "Tab", desc: t("shortcuts.scriptMode") },
       ],
     },
