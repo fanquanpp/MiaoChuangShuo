@@ -11,7 +11,7 @@
 // 3. 根据分类切换中间内容面板
 // 4. 管理新建文件对话框、命令面板、聚焦模式、专注计时器
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Sidebar from "./Sidebar";
 import FileList from "./FileList";
 import NovelEditor from "./NovelEditor";
@@ -20,14 +20,19 @@ import TimelineManager from "./TimelineManager";
 import WritingStats from "./WritingStats";
 import GlobalSearch from "./GlobalSearch";
 import KnowledgeGraph from "./KnowledgeGraph";
+import VolumeManager from "./VolumeManager";
+import SettingsDialog from "./SettingsDialog";
 import CreateFileDialog from "./CreateFileDialog";
 import CommandPalette from "./CommandPalette";
 import { FocusTimer } from "./FocusTimer";
 import { useAppStore, getCategoryDir, getCategoryName, type SidebarCategory } from "../lib/store";
 import { readProjectTree, createFile } from "../lib/api";
+import type { FileNode } from "../lib/api";
 import { getCategoryConfig } from "../lib/categoryRegistry";
+import { useSettingsStore, formatChapterHeading, getNextChapterNum } from "../lib/settingsStore";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import { findDirByName } from "../lib/fileTreeUtils";
 
 /** Alt+数字键 → 侧边栏分类映射 */
 const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
@@ -53,8 +58,20 @@ export default function Workspace() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [showFocusTimer, setShowFocusTimer] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { showToast } = useToast();
   const { t } = useI18n();
+  const projectTree = useAppStore((s) => s.projectTree);
+  const chapterFormat = useSettingsStore((s) => s.chapterFormat);
+  const autoFillBookTitle = useSettingsStore((s) => s.autoFillBookTitle);
+  const autoOutlineSkeleton = useSettingsStore((s) => s.autoOutlineSkeleton);
+  const bookTitle = currentProject?.meta?.name || "";
+
+  // 是否为分卷类型
+  const isVolumeType = useMemo(() => {
+    const type = currentProject?.meta?.type;
+    return type === "multi_volume" || type === "standard" || type === "shared_world";
+  }, [currentProject]);
 
   // 加载项目目录树
   useEffect(() => {
@@ -127,22 +144,31 @@ export default function Workspace() {
       ? `${currentProject.path}/${selectedFile.relative_path}`
       : null;
 
-  // 根据分类生成文件初始内容
+  // 根据分类和设置生成文件初始内容（含自动章节编号）
   const getFileTemplate = useCallback(
     (fileName: string, category: SidebarCategory): string => {
       const title = fileName.replace(/\.txt$/i, "").trim();
       switch (category) {
-        case "manuscript":
-          return `${title}\n\n`;
+        case "manuscript": {
+          // 从现有章节推算下一章序号
+          const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
+          const existingFiles = manuscriptDir?.children.filter((f) => !f.is_dir) || [];
+          const nextNum = getNextChapterNum(existingFiles);
+          const heading = formatChapterHeading(nextNum, bookTitle, chapterFormat, autoFillBookTitle);
+          return `${heading}\n\n`;
+        }
         case "outline":
-          return `${title}\n\n一、\n二、\n三、\n四、\n五、\n\n`;
+          if (autoOutlineSkeleton) {
+            return `${title}\n\n一、\n二、\n三、\n四、\n五、\n\n`;
+          }
+          return `${title}\n\n`;
         case "materials":
           return `${title}\n\n`;
         default:
           return `${title}\n\n`;
       }
     },
-    []
+    [projectTree, bookTitle, chapterFormat, autoFillBookTitle, autoOutlineSkeleton]
   );
 
   // 处理新建文件确认
@@ -176,6 +202,8 @@ export default function Workspace() {
         return <GlobalSearch />;
       case "knowledge":
         return <KnowledgeGraph />;
+      case "volume":
+        return <VolumeManager />;
       case "card-manager":
         return <CardManager categoryLabel={getCategoryName(activeCategory)} />;
       default:
@@ -194,7 +222,7 @@ export default function Workspace() {
     <div className="h-screen w-screen flex bg-nf-bg overflow-hidden">
       {/* 聚焦模式下隐藏侧边栏 */}
       {!focusMode && (
-        <Sidebar onCreateFile={() => setCreateDialogOpen(true)} />
+        <Sidebar onCreateFile={() => setCreateDialogOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -221,6 +249,11 @@ export default function Workspace() {
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
         onCreateFile={handleCommandCreateFile}
+      />
+
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
       />
     </div>
   );

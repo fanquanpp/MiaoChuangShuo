@@ -21,10 +21,16 @@ import Text from "@tiptap/extension-text";
 import Bold from "@tiptap/extension-bold";
 import Italic from "@tiptap/extension-italic";
 import History from "@tiptap/extension-history";
+import Underline from "@tiptap/extension-underline";
+import Strike from "@tiptap/extension-strike";
+import Code from "@tiptap/extension-code";
+import CodeBlock from "@tiptap/extension-code-block";
+import Blockquote from "@tiptap/extension-blockquote";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { readFile, writeFile } from "../lib/api";
 import { useAppStore } from "../lib/store";
+import { useSettingsStore } from "../lib/settingsStore";
 import { CharacterMention } from "../lib/characterMention";
 import { IndentParagraph } from "../lib/indentParagraph";
 import { PoetryFormat } from "../lib/poetryFormat";
@@ -33,6 +39,7 @@ import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import EditorToolbar from "./EditorToolbar";
+import OutlineView from "./OutlineView";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -53,8 +60,10 @@ export default function NovelEditor({
   const { showToast } = useToast();
 
   const projectType = currentProject?.meta?.type || "standard";
-  const isScript = projectType === "script";
-  const isEssay = projectType === "essay";
+  const isScript = projectType === "script" || projectType === "screenplay";
+  const isEssay = projectType === "diary";
+  const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
+  const [showOutline, setShowOutline] = useState(false);
 
   // 加载剧本角色名列表
   useEffect(() => {
@@ -83,7 +92,7 @@ export default function NovelEditor({
       });
   }, [isScript, currentProject]);
 
-  // 构建 TipTap 纯文本扩展列表（无 Markdown 相关扩展）
+  // 构建 TipTap 扩展列表（纯文本 + 新增格式化扩展）
   const extensions: Extensions = useMemo(() => {
     const exts: Extensions = [
       Document,
@@ -91,6 +100,11 @@ export default function NovelEditor({
       Text,
       Bold,
       Italic,
+      Underline,
+      Strike,
+      Code,
+      CodeBlock,
+      Blockquote,
       History,
       Placeholder.configure({ placeholder: t("editor.placeholder") }),
     ];
@@ -293,16 +307,16 @@ export default function NovelEditor({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSave, editor]);
 
-  // 自动保存: 30 秒（竞态保护：不在手动保存时触发）
+  // 自动保存: 使用用户设置的间隔（0=禁用）
   useEffect(() => {
-    if (!filePath || !dirty) return;
+    if (!filePath || !dirty || autoSaveInterval === 0) return;
     const timer = setTimeout(() => {
       if (!savingRef.current) {
         handleSave();
       }
-    }, 30000);
+    }, autoSaveInterval * 1000);
     return () => clearTimeout(timer);
-  }, [filePath, dirty, handleSave]);
+  }, [filePath, dirty, handleSave, autoSaveInterval]);
 
   // 注册/注销编辑器保存回调
   useEffect(() => {
@@ -366,6 +380,8 @@ export default function NovelEditor({
         onSave={handleSave}
         onExportTxt={handleExportTxt}
         focusMode={focusMode}
+        showOutline={showOutline}
+        onToggleOutline={() => setShowOutline((prev) => !prev)}
       />
 
       {isScript && characters.length > 0 && (
@@ -388,6 +404,9 @@ export default function NovelEditor({
 
       <div className="flex-1 overflow-y-auto relative">
         <EditorContent editor={editor} />
+        {showOutline && editor && (
+          <OutlineView htmlContent={editor.getText()} />
+        )}
       </div>
     </div>
   );

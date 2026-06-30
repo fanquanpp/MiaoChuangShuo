@@ -29,6 +29,7 @@ export type SidebarCategory =
   | "manuscript"
   | "outline"
   | "materials"
+  | "volumes"
   | "stats"
   | "search"
   | "knowledge";
@@ -42,6 +43,7 @@ export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
   manuscript: "正文",
   outline: "大纲",
   materials: "素材",
+  volumes: "分卷",
   stats: "统计",
   search: "搜索",
   knowledge: "知识图谱",
@@ -56,6 +58,7 @@ export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
   manuscript: "正文",
   outline: "大纲",
   materials: "素材",
+  volumes: "卷宗",
   stats: "",
   search: "",
   knowledge: "",
@@ -70,6 +73,7 @@ export const CATEGORY_ICONS: Record<SidebarCategory, string> = {
   manuscript: "FileText",
   outline: "ListTree",
   materials: "FolderOpen",
+  volumes: "BookOpen",
   stats: "BarChart3",
   search: "Search",
   knowledge: "Network",

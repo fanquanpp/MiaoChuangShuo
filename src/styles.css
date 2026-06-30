@@ -249,7 +249,7 @@ select:focus-visible {
 .ProseMirror {
   color: var(--fandex-text);
   font-family: var(--fandex-font-body);
-  font-size: 1.0625rem;
+  font-size: var(--fandex-editor-font-size, 1.0625rem);
   line-height: 1.85;
   outline: none;
   text-align: justify;
@@ -394,6 +394,17 @@ select:focus-visible {
 
 .ProseMirror em {
   font-style: italic;
+}
+
+.ProseMirror s {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+.ProseMirror u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--fandex-primary);
 }
 
 /* 行内代码: bg-code + 1px 边框 + 3px 圆角 */

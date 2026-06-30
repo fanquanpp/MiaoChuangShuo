@@ -1,0 +1,248 @@
+// 设置对话框组件
+//
+// 功能概述：
+// 提供应用级设置的统一配置入口，包括编辑器字号、自动保存间隔、
+// 章节标题格式、主题切换等。采用 FANDEX 暗色主题模态框风格。
+//
+// 模块职责：
+// 1. 渲染设置面板（分区展示各设置项）
+// 2. 实时预览设置变更
+// 3. 持久化到 localStorage
+
+import { useCallback } from "react";
+import { X, Type, Save, BookOpen, FileText, Palette } from "lucide-react";
+import { useSettingsStore, type ChapterFormat } from "../lib/settingsStore";
+import { useThemeStore } from "../lib/themeStore";
+import { useI18n } from "../lib/i18n";
+
+interface SettingsDialogProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
+  const { t } = useI18n();
+  const {
+    fontSize,
+    autoSaveInterval,
+    chapterFormat,
+    autoFillBookTitle,
+    autoOutlineSkeleton,
+    setFontSize,
+    setAutoSaveInterval,
+    setChapterFormat,
+    setAutoFillBookTitle,
+    setAutoOutlineSkeleton,
+  } = useSettingsStore();
+  const { theme, toggleTheme } = useThemeStore();
+
+  const handleOverlayClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) onClose();
+    },
+    [onClose]
+  );
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={handleOverlayClick}
+    >
+      <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-2xl max-h-[85vh] flex flex-col">
+        {/* 头部 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light flex-shrink-0">
+          <h2 className="fandex-bar-left text-base font-bold font-display text-nf-text">
+            {t("settings.title")}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
+            title={t("app.close")}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* 内容区 */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+          {/* 编辑器设置 */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Type className="w-4 h-4 text-fandex-primary" />
+              <h3 className="text-sm font-bold font-display text-nf-text">
+                {t("settings.editorSection")}
+              </h3>
+            </div>
+
+            {/* 字号 */}
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-nf-text-secondary">{t("settings.fontSize")}</label>
+                <span className="text-xs text-nf-text-tertiary font-mono">{fontSize}px</span>
+              </div>
+              <input
+                type="range"
+                min={12}
+                max={28}
+                step={1}
+                value={fontSize}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+                className="w-full h-1.5 bg-nf-bg-hover accent-fandex-primary cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-nf-text-tertiary">
+                <span>12px</span>
+                <span>28px</span>
+              </div>
+              {/* 预览 */}
+              <div
+                className="p-3 bg-nf-bg border border-nf-border-light text-nf-text-secondary leading-relaxed"
+                style={{ fontSize: `${fontSize}px` }}
+              >
+                {t("settings.fontPreview")}
+              </div>
+            </div>
+
+            {/* 自动保存间隔 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-nf-text-secondary">{t("settings.autoSave")}</label>
+                <span className="text-xs text-nf-text-tertiary font-mono">
+                  {autoSaveInterval === 0
+                    ? t("settings.autoSaveOff")
+                    : `${autoSaveInterval}${t("settings.secondsUnit")}`}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                {[0, 15, 30, 60, 120].map((val) => (
+                  <button
+                    key={val}
+                    onClick={() => setAutoSaveInterval(val)}
+                    className={`flex-1 py-1.5 text-xs border transition-all duration-fast ${
+                      autoSaveInterval === val
+                        ? "bg-fandex-primary/10 border-fandex-primary/40 text-fandex-primary"
+                        : "border-nf-border-light text-nf-text-tertiary hover:border-nf-border hover:text-nf-text-secondary"
+                    }`}
+                  >
+                    {val === 0 ? t("settings.off") : `${val}s`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* 章节标题设置 */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <BookOpen className="w-4 h-4 text-fandex-secondary" />
+              <h3 className="text-sm font-bold font-display text-nf-text">
+                {t("settings.chapterSection")}
+              </h3>
+            </div>
+
+            {/* 章节格式 */}
+            <div className="space-y-2 mb-4">
+              <label className="text-xs text-nf-text-secondary">{t("settings.chapterFormat")}</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: "chinese" as ChapterFormat, label: t("settings.formatChinese"), preview: "第三章：书名" },
+                  { value: "arabic" as ChapterFormat, label: t("settings.formatArabic"), preview: "03：书名" },
+                  { value: "english" as ChapterFormat, label: t("settings.formatEnglish"), preview: "Chapter 3: Title" },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setChapterFormat(opt.value)}
+                    className={`p-2.5 text-left border transition-all duration-fast ${
+                      chapterFormat === opt.value
+                        ? "bg-fandex-secondary/10 border-fandex-secondary/40"
+                        : "border-nf-border-light hover:border-nf-border"
+                    }`}
+                  >
+                    <div className={`text-xs font-medium mb-1 ${
+                      chapterFormat === opt.value ? "text-fandex-secondary" : "text-nf-text-secondary"
+                    }`}>
+                      {opt.label}
+                    </div>
+                    <div className="text-[10px] text-nf-text-tertiary font-mono">{opt.preview}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 自动填充书名 */}
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={autoFillBookTitle}
+                onChange={(e) => setAutoFillBookTitle(e.target.checked)}
+                className="w-4 h-4 accent-fandex-primary cursor-pointer"
+              />
+              <div>
+                <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                  {t("settings.autoFillTitle")}
+                </span>
+                <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                  {t("settings.autoFillTitleHint")}
+                </p>
+              </div>
+            </label>
+
+            {/* 大纲自动生成骨架 */}
+            <label className="flex items-center gap-3 cursor-pointer group mt-3">
+              <input
+                type="checkbox"
+                checked={autoOutlineSkeleton}
+                onChange={(e) => setAutoOutlineSkeleton(e.target.checked)}
+                className="w-4 h-4 accent-fandex-primary cursor-pointer"
+              />
+              <div>
+                <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                  {t("settings.autoOutline")}
+                </span>
+                <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                  {t("settings.autoOutlineHint")}
+                </p>
+              </div>
+            </label>
+          </section>
+
+          {/* 外观设置 */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Palette className="w-4 h-4 text-fandex-tertiary" />
+              <h3 className="text-sm font-bold font-display text-nf-text">
+                {t("settings.appearanceSection")}
+              </h3>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs text-nf-text-secondary">{t("settings.theme")}</span>
+                <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                  {theme === "dark" ? t("settings.themeDark") : t("settings.themeLight")}
+                </p>
+              </div>
+              <button
+                onClick={toggleTheme}
+                className="px-3 py-1.5 text-xs border border-nf-border-light hover:border-fandex-tertiary/60 text-nf-text-secondary hover:text-fandex-tertiary transition-all duration-fast"
+              >
+                {theme === "dark" ? t("settings.switchLight") : t("settings.switchDark")}
+              </button>
+            </div>
+          </section>
+        </div>
+
+        {/* 底部 */}
+        <div className="flex items-center justify-end px-6 py-3 border-t border-nf-border-light flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast"
+          >
+            {t("app.confirm")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

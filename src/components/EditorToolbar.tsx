@@ -15,6 +15,10 @@ import type { Editor } from "@tiptap/core";
 import {
   Bold,
   Italic,
+  Underline as UnderlineIcon,
+  Strikethrough,
+  Code as CodeIcon,
+  Quote,
   Undo,
   Redo,
   Save,
@@ -22,7 +26,7 @@ import {
   Download,
   Music,
   Pilcrow,
-  Quote,
+  ListTree,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
@@ -76,9 +80,11 @@ interface EditorToolbarProps {
   onSave: () => void;
   onExportTxt: () => void;
   focusMode?: boolean;
+  showOutline?: boolean;
+  onToggleOutline?: () => void;
 }
 
-// 编辑器工具栏组件（纯文本模式）
+// 编辑器工具栏组件（纯文本模式 + 格式扩展）
 export default function EditorToolbar({
   editor,
   wordCount,
@@ -87,6 +93,8 @@ export default function EditorToolbar({
   onSave,
   onExportTxt,
   focusMode = false,
+  showOutline = false,
+  onToggleOutline,
 }: EditorToolbarProps) {
   const { t } = useI18n();
 
@@ -140,6 +148,27 @@ export default function EditorToolbar({
               <Italic className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleUnderline().run()}
+              active={editor?.isActive("underline") || false}
+              title={t("editor.underline")}
+            >
+              <UnderlineIcon className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleStrike().run()}
+              active={editor?.isActive("strike") || false}
+              title={t("editor.strikethrough")}
+            >
+              <Strikethrough className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleCode().run()}
+              active={editor?.isActive("code") || false}
+              title={t("editor.inlineCode")}
+            >
+              <CodeIcon className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
               onClick={handleQuickQuote}
               active={false}
               title={t("editor.quickQuote")}
@@ -164,9 +193,16 @@ export default function EditorToolbar({
             >
               <Music className="w-4 h-4" />
             </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+              active={editor?.isActive("blockquote") || false}
+              title={t("editor.blockquote")}
+            >
+              <Quote className="w-4 h-4 rotate-180" />
+            </ToolbarButton>
           </div>
           <Divider />
-          {/* 操作历史组 */}
+          {/* 操作历史组 + 大纲切换 */}
           <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
             <ToolbarButton
               onClick={() => editor?.chain().focus().undo().run()}
@@ -182,6 +218,13 @@ export default function EditorToolbar({
             >
               <Redo className="w-4 h-4" />
             </ToolbarButton>
+            <ToolbarButton
+              onClick={() => onToggleOutline?.()}
+              active={showOutline}
+              title={t("outline.title")}
+            >
+              <ListTree className="w-4 h-4" />
+            </ToolbarButton>
           </div>
         </>
       )}
@@ -189,7 +232,7 @@ export default function EditorToolbar({
       {/* 右侧状态区 */}
       <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary">
         <span className="tabular-nums">{t("editor.wordCount", { count: wordCount })}</span>
-        {/* 保存状态指示器 - 更清晰的视觉反馈 */}
+        {/* 保存状态指示器 */}
         {dirty && (
           <span className="flex items-center gap-1 px-1.5 py-0.5 bg-fandex-tertiary/10 text-fandex-tertiary border border-fandex-tertiary/20">
             <span className="w-1.5 h-1.5 bg-fandex-tertiary animate-pulse" />

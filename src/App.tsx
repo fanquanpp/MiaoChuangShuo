@@ -18,6 +18,7 @@ import ShortcutPanel from "./components/ShortcutPanel";
 import { setSkeletonI18n } from "./components/SkeletonComponents";
 import { useAppStore } from "./lib/store";
 import { useThemeStore } from "./lib/themeStore";
+import { useSettingsStore } from "./lib/settingsStore";
 import { ToastProvider } from "./lib/toast";
 import { I18nProvider, useI18n } from "./lib/i18n";
 import { useWindowCloseGuard } from "./hooks/useAutoSaveOnExit";
@@ -35,11 +36,13 @@ function I18nWiring() {
 function App() {
   const viewMode = useAppStore((s) => s.viewMode);
   const initTheme = useThemeStore((s) => s.initTheme);
+  const initSettings = useSettingsStore((s) => s.initSettings);
   const setupCloseGuard = useWindowCloseGuard();
 
   useEffect(() => {
     initTheme();
-  }, [initTheme]);
+    initSettings();
+  }, [initTheme, initSettings]);
 
   // 注册 Tauri 窗口关闭事件（退出前自动保存）
   useEffect(() => {

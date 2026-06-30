@@ -441,6 +441,62 @@ const zhCN: TranslationDict = {
 
   // ── 角色提及（characterMention 扩展） ──
   "characterMention.placeholder": "自定义角色名…",
+
+  // ── 编辑器扩展格式 ──
+  "editor.strikethrough": "删除线",
+  "editor.inlineCode": "行内代码",
+
+  // ── 侧边栏扩展 ──
+  "sidebar.volumes": "分卷",
+  "sidebar.settings": "设置",
+
+  // ── 设置对话框 ──
+  "settings.title": "设置",
+  "settings.editorSection": "编辑器",
+  "settings.fontSize": "字体大小",
+  "settings.fontPreview": "这是一段预览文字，展示当前字号效果。",
+  "settings.autoSave": "自动保存间隔",
+  "settings.autoSaveOff": "已关闭",
+  "settings.secondsUnit": "秒",
+  "settings.off": "关闭",
+  "settings.chapterSection": "章节标题",
+  "settings.chapterFormat": "新建章节时的标题格式",
+  "settings.formatChinese": "中文",
+  "settings.formatArabic": "数字",
+  "settings.formatEnglish": "英文",
+  "settings.autoFillTitle": "自动填充书名",
+  "settings.autoFillTitleHint": "新建章节时自动在标题后附加书名",
+  "settings.autoOutline": "大纲自动骨架",
+  "settings.autoOutlineHint": "新建大纲文件时自动生成一、二、三…骨架",
+  "settings.appearanceSection": "外观",
+  "settings.theme": "主题",
+  "settings.themeDark": "当前为暗色主题",
+  "settings.themeLight": "当前为亮色主题",
+  "settings.switchLight": "切换亮色",
+  "settings.switchDark": "切换暗色",
+
+  // ── 分卷管理 ──
+  "volume.title": "分卷管理",
+  "volume.unit": "卷",
+  "volume.chapterUnit": "章",
+  "volume.addVolume": "新建卷",
+  "volume.newVolumeName": "第{num}卷",
+  "volume.empty": "暂无分卷",
+  "volume.emptyHint": "点击右上角「新建卷」创建第一个分卷",
+  "volume.noChapters": "暂无归属章节",
+  "volume.addChapter": "添加章节到此卷",
+  "volume.removeChapter": "移除此章节",
+  "volume.unassigned": "未归卷章节",
+  "volume.allAssigned": "所有章节已归卷",
+  "volume.rename": "重命名",
+  "volume.confirmDelete": "删除卷「{name}」",
+  "volume.confirmDeleteMsg": "确定删除卷「{name}」吗？章节文件不会被删除。",
+  "volume.saved": "分卷数据已保存",
+  "volume.saveFailed": "保存失败：{error}",
+  "volume.loadFailed": "加载失败：{error}",
+  "volume.save": "保存",
+  "volume.saving": "保存中…",
+  "volume.unsaved": "未保存",
 };
 
 // 英文翻译
@@ -866,6 +922,62 @@ const enUS: TranslationDict = {
 
   // ── Character Mention extension ──
   "characterMention.placeholder": "Custom character name…",
+
+  // ── Editor extended formats ──
+  "editor.strikethrough": "Strikethrough",
+  "editor.inlineCode": "Inline Code",
+
+  // ── Sidebar extensions ──
+  "sidebar.volumes": "Volumes",
+  "sidebar.settings": "Settings",
+
+  // ── Settings Dialog ──
+  "settings.title": "Settings",
+  "settings.editorSection": "Editor",
+  "settings.fontSize": "Font Size",
+  "settings.fontPreview": "This is a preview text showing the current font size.",
+  "settings.autoSave": "Auto-save Interval",
+  "settings.autoSaveOff": "Off",
+  "settings.secondsUnit": "s",
+  "settings.off": "Off",
+  "settings.chapterSection": "Chapter Headings",
+  "settings.chapterFormat": "Heading format for new chapters",
+  "settings.formatChinese": "Chinese",
+  "settings.formatArabic": "Numeric",
+  "settings.formatEnglish": "English",
+  "settings.autoFillTitle": "Auto-fill Book Title",
+  "settings.autoFillTitleHint": "Append book title after chapter heading",
+  "settings.autoOutline": "Auto Outline Skeleton",
+  "settings.autoOutlineHint": "Generate I, II, III… skeleton in new outline files",
+  "settings.appearanceSection": "Appearance",
+  "settings.theme": "Theme",
+  "settings.themeDark": "Currently using dark theme",
+  "settings.themeLight": "Currently using light theme",
+  "settings.switchLight": "Switch to Light",
+  "settings.switchDark": "Switch to Dark",
+
+  // ── Volume Manager ──
+  "volume.title": "Volume Manager",
+  "volume.unit": "volumes",
+  "volume.chapterUnit": "ch",
+  "volume.addVolume": "New Volume",
+  "volume.newVolumeName": "Volume {num}",
+  "volume.empty": "No volumes yet",
+  "volume.emptyHint": "Click \"New Volume\" to create your first volume",
+  "volume.noChapters": "No chapters assigned",
+  "volume.addChapter": "Add chapter to this volume",
+  "volume.removeChapter": "Remove from volume",
+  "volume.unassigned": "Unassigned Chapters",
+  "volume.allAssigned": "All chapters assigned",
+  "volume.rename": "Rename",
+  "volume.confirmDelete": "Delete volume \"{name}\"",
+  "volume.confirmDeleteMsg": "Delete volume \"{name}\"? Chapter files will not be deleted.",
+  "volume.saved": "Volume data saved",
+  "volume.saveFailed": "Save failed: {error}",
+  "volume.loadFailed": "Load failed: {error}",
+  "volume.save": "Save",
+  "volume.saving": "Saving…",
+  "volume.unsaved": "Unsaved",
 };
 
 const translations: Record<Locale, TranslationDict> = {

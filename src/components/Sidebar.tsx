@@ -28,6 +28,8 @@ import {
   Search,
   Layers,
   Network,
+  Settings,
+  BookOpen,
 } from "lucide-react";
 import {
   useAppStore,
@@ -50,6 +52,7 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   stats: BarChart3,
   search: Search,
   knowledge: Network,
+  volumes: BookOpen,
 };
 
 // 内容分类列表(按显示顺序)
@@ -69,6 +72,7 @@ const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search", "knowledge"];
 // 左侧导航栏属性接口
 interface SidebarProps {
   onCreateFile: () => void;
+  onOpenSettings?: () => void;
 }
 
 // 左侧导航栏组件
@@ -78,7 +82,7 @@ interface SidebarProps {
 //   1. 顶部显示项目名称与返回按钮
 //   2. 中间显示分类列表
 //   3. 底部显示主题切换与新建文件按钮
-export default function Sidebar({ onCreateFile }: SidebarProps) {
+export default function Sidebar({ onCreateFile, onOpenSettings }: SidebarProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const activeCategory = useAppStore((s) => s.activeCategory);
   const setActiveCategory = useAppStore((s) => s.setActiveCategory);
@@ -86,6 +90,12 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
   const { theme, toggleTheme } = useThemeStore();
   const { t } = useI18n();
   const { handleBackToLauncher } = useAutoSaveOnExit();
+
+  // 是否为分卷类型（决定是否显示分卷入口）
+  const showVolumeEntry = useMemo(() => {
+    const type = currentProject?.meta?.type;
+    return type === "multi_volume" || type === "standard" || type === "shared_world";
+  }, [currentProject]);
 
   // 根据项目类型获取专属目录列表
   const typeSpecificDirs = useMemo(() => {
@@ -155,6 +165,30 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         {/* 分隔线 */}
         <div className="mx-3 my-2 border-t border-nf-border-light/60" />
 
+        {/* 分卷管理入口（仅对分卷类型项目显示） */}
+        {showVolumeEntry && (
+          <>
+            <button
+              onClick={() => setActiveCategory("volumes" as SidebarCategory)}
+              title={t("sidebar.volumes")}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                activeCategory === "volumes"
+                  ? "bg-fandex-tertiary/10 text-fandex-tertiary"
+                  : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+              }`}
+            >
+              <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-tertiary transition-all duration-base ease-fandex ${
+                activeCategory === "volumes" ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
+              }`} style={{ transformOrigin: 'center' }} />
+              <BookOpen className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                activeCategory === "volumes" ? 'scale-110' : 'group-hover:scale-105'
+              }`} />
+              <span className="truncate">{t("sidebar.volumes")}</span>
+            </button>
+            <div className="mx-3 my-2 border-t border-nf-border-light/60" />
+          </>
+        )}
+
         {/* 类型专属目录（模板扩展） */}
         {typeSpecificDirs.length > 0 && (
           <>
@@ -221,20 +255,29 @@ export default function Sidebar({ onCreateFile }: SidebarProps) {
         })}
       </div>
 
-      {/* 底部: 主题切换与新建文件按钮 - FANDEX 直角 */}
+      {/* 底部: 主题切换、设置与新建文件按钮 - FANDEX 直角 */}
       <div className="px-2 py-2 border-t border-nf-border-light space-y-1">
-        <button
-          onClick={toggleTheme}
-          title={theme === "dark" ? t("sidebar.switchLight") : t("sidebar.switchDark")}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex"
-        >
-          {theme === "dark" ? (
-            <Sun className="w-3.5 h-3.5 transition-transform duration-fast hover:rotate-45" />
-          ) : (
-            <Moon className="w-3.5 h-3.5" />
-          )}
-          {theme === "dark" ? t("sidebar.light") : t("sidebar.dark")}
-        </button>
+        <div className="flex gap-1">
+          <button
+            onClick={toggleTheme}
+            title={theme === "dark" ? t("sidebar.switchLight") : t("sidebar.switchDark")}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex"
+          >
+            {theme === "dark" ? (
+              <Sun className="w-3.5 h-3.5 transition-transform duration-fast hover:rotate-45" />
+            ) : (
+              <Moon className="w-3.5 h-3.5" />
+            )}
+            {theme === "dark" ? t("sidebar.light") : t("sidebar.dark")}
+          </button>
+          <button
+            onClick={onOpenSettings}
+            title={t("sidebar.settings")}
+            className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+        </div>
         <button
           onClick={onCreateFile}
           className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/60 hover:bg-fandex-primary/5 transition-all duration-base ease-fandex"
