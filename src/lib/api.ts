@@ -476,3 +476,66 @@ export async function getSnapshotStats(
 ): Promise<SnapshotStats> {
   return invoke<SnapshotStats>("get_snapshot_stats", { projectPath });
 }
+
+// ===== 角色联动 API =====
+
+// 角色出场统计 - 单个文件维度
+export interface CharacterAppearanceFile {
+  // 相对项目根的路径
+  path: string;
+  // 该文件中出现次数
+  count: number;
+  // 是否位于正文目录
+  is_manuscript: boolean;
+}
+
+// 角色出场统计 - 单个角色汇总
+export interface CharacterAppearance {
+  // 角色名
+  name: string;
+  // 总出现次数
+  total_count: number;
+  // 出现在的文件数
+  file_count: number;
+  // 出现的文件列表（按出现次数降序）
+  files: CharacterAppearanceFile[];
+}
+
+// 全局改名结果
+export interface RenameResult {
+  // 修改的文件数
+  files_modified: number;
+  // 替换的总次数
+  occurrences: number;
+  // 修改的文件相对路径列表
+  renamed_files: string[];
+}
+
+// 统计角色在项目所有 .txt 文件中的出场情况
+// 输入: projectPath 项目路径, names 角色名列表
+// 输出: Promise<CharacterAppearance[]> 每个角色的出场统计（按总次数降序）
+export async function countCharacterAppearances(
+  projectPath: string,
+  names: string[]
+): Promise<CharacterAppearance[]> {
+  return invoke<CharacterAppearance[]>("count_character_appearances", {
+    projectPath,
+    names,
+  });
+}
+
+// 在项目所有 .txt 文件中全局替换角色名
+// 输入: projectPath 项目路径, oldName 旧角色名, newName 新角色名
+// 输出: Promise<RenameResult> 修改文件数与替换次数
+// 注意: 简单字符串替换，存在子串误伤风险，建议改名前先创建快照
+export async function renameCharacterInProject(
+  projectPath: string,
+  oldName: string,
+  newName: string
+): Promise<RenameResult> {
+  return invoke<RenameResult>("rename_character_in_project", {
+    projectPath,
+    oldName,
+    newName,
+  });
+}

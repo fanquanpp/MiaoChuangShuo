@@ -504,6 +504,31 @@ const zhCN: TranslationDict = {
   // ── 角色提及（characterMention 扩展） ──
   "characterMention.placeholder": "自定义角色名…",
 
+  // ── 角色联动（出场统计 / 全局改名） ──
+  "characterLinkage.appearanceBtn": "出场统计",
+  "characterLinkage.renameBtn": "全局改名",
+  "characterLinkage.appearanceTitle": "角色出场统计",
+  "characterLinkage.appearanceSubtitle": "查看角色在全项目中的出现分布",
+  "characterLinkage.loading": "正在统计角色出场数据...",
+  "characterLinkage.noChars": "暂无角色数据，请先创建角色卡片",
+  "characterLinkage.totalChars": "角色总数",
+  "characterLinkage.activeChars": "有出场",
+  "characterLinkage.totalOccurrences": "总出场次数",
+  "characterLinkage.inFiles": "出现于 {count} 个文件",
+  "characterLinkage.manuscript": "正文",
+  "characterLinkage.statsHint": "统计范围包括项目内所有 .txt 文件（不含元数据目录）",
+  "characterLinkage.statsError": "统计失败：",
+  "characterLinkage.renameTitle": "全局角色改名",
+  "characterLinkage.oldName": "原角色名",
+  "characterLinkage.newName": "新角色名",
+  "characterLinkage.oldNamePlaceholder": "输入要替换的角色名",
+  "characterLinkage.newNamePlaceholder": "输入新的角色名",
+  "characterLinkage.renameWarning": "改名为简单字符串替换，可能误伤包含该名的其他词汇（如\"林\"会误伤\"林中\"）。建议改名前已通过自动保存保留可回滚版本。",
+  "characterLinkage.executeRename": "执行改名",
+  "characterLinkage.renameSuccess": "已完成：修改 {files} 个文件，替换 {occurrences} 处",
+  "characterLinkage.renameError": "改名失败：",
+  "characterLinkage.renameResult": "已修改 {files} 个文件，共替换 {occurrences} 处",
+
   // ── 编辑器扩展格式 ──
   "editor.strikethrough": "删除线",
   "editor.inlineCode": "行内代码",
@@ -1130,6 +1155,31 @@ const enUS: TranslationDict = {
 
   // ── Character Mention extension ──
   "characterMention.placeholder": "Custom character name…",
+
+  // ── Character Linkage (appearance stats / global rename) ──
+  "characterLinkage.appearanceBtn": "Appearance Stats",
+  "characterLinkage.renameBtn": "Global Rename",
+  "characterLinkage.appearanceTitle": "Character Appearance Stats",
+  "characterLinkage.appearanceSubtitle": "View character appearance distribution across the project",
+  "characterLinkage.loading": "Analyzing character appearances...",
+  "characterLinkage.noChars": "No character data yet. Please create character cards first.",
+  "characterLinkage.totalChars": "Total Characters",
+  "characterLinkage.activeChars": "Active",
+  "characterLinkage.totalOccurrences": "Total Occurrences",
+  "characterLinkage.inFiles": "in {count} files",
+  "characterLinkage.manuscript": "Manuscript",
+  "characterLinkage.statsHint": "Stats cover all .txt files in the project (excluding metadata directories).",
+  "characterLinkage.statsError": "Stats failed: ",
+  "characterLinkage.renameTitle": "Global Character Rename",
+  "characterLinkage.oldName": "Old Name",
+  "characterLinkage.newName": "New Name",
+  "characterLinkage.oldNamePlaceholder": "Enter the character name to replace",
+  "characterLinkage.newNamePlaceholder": "Enter the new character name",
+  "characterLinkage.renameWarning": "Rename uses simple string replacement and may affect other words containing the name (e.g. renaming \"Lin\" would also change \"forest\"). Auto-save snapshots are recommended before renaming.",
+  "characterLinkage.executeRename": "Execute Rename",
+  "characterLinkage.renameSuccess": "Done: modified {files} files, replaced {occurrences} occurrences",
+  "characterLinkage.renameError": "Rename failed: ",
+  "characterLinkage.renameResult": "Modified {files} files, replaced {occurrences} occurrences",
 
   // ── Editor extended formats ──
   "editor.strikethrough": "Strikethrough",

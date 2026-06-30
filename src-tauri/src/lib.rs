@@ -13,6 +13,7 @@
 mod fs_commands;
 mod project_template;
 mod snapshot_commands;
+mod character_commands;
 
 /// 应用入口函数
 /// 输入: 无
@@ -58,6 +59,9 @@ pub fn run() {
             snapshot_commands::delete_snapshot,
             snapshot_commands::clear_snapshots,
             snapshot_commands::get_snapshot_stats,
+            // 角色联动命令
+            character_commands::count_character_appearances,
+            character_commands::rename_character_in_project,
         ])
         .setup(|_app| {
             Ok(())

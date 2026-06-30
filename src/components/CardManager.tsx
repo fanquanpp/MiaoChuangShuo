@@ -20,7 +20,7 @@ import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Plus, Trash2, ChevronLeft, Save, FileText, Loader2, Users, Globe, Quote, X, Download, Settings } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, Save, FileText, Loader2, Users, Globe, Quote, X, Download, Settings, BarChart3, RotateCcw } from "lucide-react";
 import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
 import { readProjectTree, createFile, deletePath, readFile, writeFile, scanProjects } from "../lib/api";
 import type { FileNode, ProjectInfo as ProjectInfoType } from "../lib/api";
@@ -29,6 +29,7 @@ import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import ConfirmDialog from "./ConfirmDialog";
 import { SkeletonBlock } from "./SkeletonComponents";
+import { CharacterAppearancePanel, CharacterRenameDialog } from "./CharacterLinkage";
 
 // 卡片管理属性接口
 interface CardManagerProps {
@@ -532,6 +533,11 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
 
   // 模板编辑器状态
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+
+  // 角色联动状态（仅角色分类使用）
+  const [showAppearancePanel, setShowAppearancePanel] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renameDefaultName, setRenameDefaultName] = useState("");
   const [templateEditorTab, setTemplateEditorTab] = useState(0);
   const [templateEditorFields, setTemplateEditorFields] = useState<CustomPresetField[]>([]);
   const [newFieldLabel, setNewFieldLabel] = useState("");
@@ -1150,6 +1156,32 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
             <h2 className="fandex-bar-left text-lg font-bold font-display text-nf-text">{categoryLabel}</h2>
           </div>
           <div className="flex items-center gap-2">
+            {activeCategory === "characters" && (
+              <>
+                <button
+                  onClick={() => {
+                    setRenameDefaultName("");
+                    setShowAppearancePanel(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition duration-fast"
+                  title={t("characterLinkage.appearanceBtn")}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  {t("characterLinkage.appearanceBtn")}
+                </button>
+                <button
+                  onClick={() => {
+                    setRenameDefaultName("");
+                    setShowRenameDialog(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-fandex-tertiary/40 hover:bg-nf-bg-hover transition duration-fast"
+                  title={t("characterLinkage.renameBtn")}
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {t("characterLinkage.renameBtn")}
+                </button>
+              </>
+            )}
             <button
               onClick={handleOpenImportDialog}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition duration-fast"
@@ -1421,6 +1453,24 @@ export default function CardManager({ categoryLabel }: CardManagerProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 角色联动：出场统计面板 */}
+      {showAppearancePanel && (
+        <CharacterAppearancePanel
+          characterNames={cards.map((c) => c.title)}
+          onClose={() => setShowAppearancePanel(false)}
+          onRefresh={loadCards}
+        />
+      )}
+
+      {/* 角色联动：全局改名对话框 */}
+      {showRenameDialog && (
+        <CharacterRenameDialog
+          defaultOldName={renameDefaultName}
+          onClose={() => setShowRenameDialog(false)}
+          onRenamed={loadCards}
+        />
       )}
     </>
   );
