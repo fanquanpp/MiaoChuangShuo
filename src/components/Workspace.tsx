@@ -163,8 +163,18 @@ export default function Workspace() {
           const projectType = currentProject?.meta?.type;
           const isNovelType = projectType === "standard" || projectType === "multi_volume" || projectType === "short_story";
           if (chapterNum !== undefined && isNovelType) {
-            const heading = formatChapterHeading(chapterNum, bookTitle, chapterFormat, autoFillBookTitle);
-            return `${heading}\n\n`;
+            // 基础章节标题（不自动填充书名，由下方手动拼接章节名）
+            const heading = formatChapterHeading(chapterNum, "", chapterFormat, false);
+            let line = heading;
+            // 拼接章节名称（来自文件名）
+            if (title) {
+              line += `：${title}`;
+            }
+            // 若设置开启了自动填充书名，追加书名
+            if (autoFillBookTitle && bookTitle) {
+              line += ` - ${bookTitle}`;
+            }
+            return `${line}\n\n`;
           }
           // 非小说类型或无编号时直接用标题
           return `${title}\n\n`;
