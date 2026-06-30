@@ -100,7 +100,6 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
   const currentProject = useAppStore((s) => s.currentProject);
   const activeCategory = useAppStore((s) => s.activeCategory);
   const setActiveCategory = useAppStore((s) => s.setActiveCategory);
-  const closeProject = useAppStore((s) => s.closeProject);
   const { theme, toggleTheme } = useThemeStore();
   const { t } = useI18n();
   const { handleBackToLauncher } = useAutoSaveOnExit();

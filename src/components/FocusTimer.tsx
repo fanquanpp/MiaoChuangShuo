@@ -28,12 +28,10 @@ export function FocusTimer({
   const [targetMinutes, setTargetMinutes] = useState(25);
   const [remainingSeconds, setRemainingSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
   const [showPresets, setShowPresets] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
 
   const total = targetMinutes * 60;
-  const progress = total > 0 ? ((total - remainingSeconds) / total) * 100 : 0;
 
   const startTimeRef = useRef<number>(0);
 
@@ -46,7 +44,6 @@ export function FocusTimer({
       const elapsedSec = Math.floor(elapsedMs / 1000);
       const remainingSec = Math.max(0, total - elapsedSec);
       setRemainingSeconds(remainingSec);
-      setElapsed(elapsedSec);
       if (remainingSec <= 0) {
         setRunning(false);
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -63,14 +60,12 @@ export function FocusTimer({
   const resetTimer = useCallback(() => {
     pauseTimer();
     setRemainingSeconds(targetMinutes * 60);
-    setElapsed(0);
   }, [pauseTimer, targetMinutes]);
 
   const setDuration = useCallback(
     (min: number) => {
       setTargetMinutes(min);
       setRemainingSeconds(min * 60);
-      setElapsed(0);
     },
     []
   );

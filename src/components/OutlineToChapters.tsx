@@ -28,7 +28,6 @@ import {
 import { readProjectTree, readFile, createFile } from "../lib/api";
 import type { FileNode } from "../lib/api";
 import { useAppStore } from "../lib/store";
-import { useSettingsStore, formatChapterHeading, getNextChapterNum } from "../lib/settingsStore";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 
@@ -108,9 +107,6 @@ export default function OutlineToChapters({
   const projectTree = useAppStore((s) => s.projectTree);
   const { showToast } = useToast();
   const { t } = useI18n();
-  const chapterFormat = useSettingsStore((s) => s.chapterFormat);
-  const autoFillBookTitle = useSettingsStore((s) => s.autoFillBookTitle);
-  const bookTitle = currentProject?.meta?.name || "";
 
   const [loading, setLoading] = useState(true);
   const [chapters, setChapters] = useState<ParsedChapter[]>([]);

@@ -111,12 +111,6 @@ export default function Workspace() {
     [saveBeforeSwitch]
   );
 
-  // 是否为分卷类型
-  const isVolumeType = useMemo(() => {
-    const type = currentProject?.meta?.type;
-    return type === "multi_volume" || type === "standard" || type === "shared_world";
-  }, [currentProject]);
-
   // 加载项目目录树
   useEffect(() => {
     if (!currentProject) return;

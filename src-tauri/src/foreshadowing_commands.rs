@@ -136,8 +136,8 @@ fn extract_multiline_field(content: &str, field_names: &[&str]) -> String {
                 if !first_val.is_empty() {
                     parts.push(first_val);
                 }
-                for j in (i + 1)..lines.len() {
-                    let next = lines[j].trim();
+                for next_raw in lines[i + 1..].iter() {
+                    let next = next_raw.trim();
                     if next.is_empty() {
                         break;
                     }

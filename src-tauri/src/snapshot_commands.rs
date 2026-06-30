@@ -115,7 +115,7 @@ fn read_snapshot_index(file_snapshot_dir: &Path) -> Result<Vec<SnapshotMeta>, St
     let mut entries: Vec<SnapshotMeta> = serde_json::from_str(&content)
         .unwrap_or_default();
     // 按时间戳倒序
-    entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.timestamp));
     Ok(entries)
 }
 

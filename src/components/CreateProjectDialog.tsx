@@ -13,7 +13,7 @@
 // 5. 创建成功后触发回调
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, FolderOpen, Loader2, ChevronDown, ChevronRight, Layers } from "lucide-react";
+import { X, FolderOpen, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { createProject, pickDirectory, PROJECT_TEMPLATES, NOVEL_GENRES, type ProjectType, type CustomTemplate } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 

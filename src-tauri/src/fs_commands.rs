@@ -828,7 +828,7 @@ fn search_in_file(
 
                 // 找到 start 位置最近的 UTF-8 字符边界（向前扫描）
                 let start = {
-                    let s = if match_pos > 40 { match_pos - 40 } else { 0 };
+                    let s = match_pos.saturating_sub(40);
                     let mut p = s;
                     while p < match_pos && !line.is_char_boundary(p) {
                         p += 1;
@@ -909,7 +909,7 @@ pub fn get_writing_stats(project_path: String) -> Result<WritingStats, String> {
         collect_chapter_stats(&manuscript_dir, &root, &mut manuscript_words, &mut chapter_words);
     }
     // 按字数降序排序
-    chapter_words.sort_by(|a, b| b.word_count.cmp(&a.word_count));
+    chapter_words.sort_by_key(|c| std::cmp::Reverse(c.word_count));
 
     // 统计设定文件字数(角色/世界观/名词/时间线)
     let mut setting_words: u64 = 0;
@@ -1090,39 +1090,50 @@ pub fn replace_in_project(
         return Err("查找内容与替换内容相同，无需替换".to_string());
     }
     let root = validate_project_path(&project_path)?;
-    let mut files = Vec::new();
-    let mut total_replacements: u64 = 0;
-    let mut files_modified: u64 = 0;
-    replace_recursive(&root, &root, &query, &replacement, case_sensitive, &mut files, &mut total_replacements, &mut files_modified);
+    let mut ctx = ReplaceContext {
+        root: root.clone(),
+        query,
+        replacement,
+        case_sensitive,
+        files: Vec::new(),
+        total_replacements: 0,
+        files_modified: 0,
+    };
+    replace_recursive(&root, &mut ctx);
     Ok(ReplaceResult {
-        files_modified,
-        total_replacements,
-        files,
+        files_modified: ctx.files_modified,
+        total_replacements: ctx.total_replacements,
+        files: ctx.files,
     })
+}
+
+/// 替换上下文结构体：封装递归替换过程中的配置与结果累加器
+/// 设计目的：避免 replace_recursive 函数参数过多（>7）导致 clippy 警告
+struct ReplaceContext {
+    /// 项目根路径
+    root: PathBuf,
+    /// 查找词
+    query: String,
+    /// 替换字符串
+    replacement: String,
+    /// 是否区分大小写
+    case_sensitive: bool,
+    /// 文件结果集合
+    files: Vec<ReplaceFileResult>,
+    /// 总替换次数累加器
+    total_replacements: u64,
+    /// 修改文件数累加器
+    files_modified: u64,
 }
 
 /// 递归执行替换
 /// 输入:
 ///   current 当前路径
 ///   root 项目根路径
-///   query 查找词
-///   replacement 替换字符串
-///   case_sensitive 区分大小写
-///   files 文件结果集合
-///   total_replacements 总替换次数累加器
-///   files_modified 修改文件数累加器
+///   ctx 替换上下文（含配置与结果累加器）
 /// 输出: 无
 /// 流程: 遍历目录，对每个 .txt 文件执行替换并写回
-fn replace_recursive(
-    current: &Path,
-    root: &Path,
-    query: &str,
-    replacement: &str,
-    case_sensitive: bool,
-    files: &mut Vec<ReplaceFileResult>,
-    total_replacements: &mut u64,
-    files_modified: &mut u64,
-) {
+fn replace_recursive(current: &Path, ctx: &mut ReplaceContext) {
     if let Ok(entries) = fs::read_dir(current) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -1132,12 +1143,12 @@ fn replace_recursive(
                 continue;
             }
             if path.is_dir() {
-                replace_recursive(&path, root, query, replacement, case_sensitive, files, total_replacements, files_modified);
+                replace_recursive(&path, ctx);
             } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
-                let count = replace_in_file(&path, root, query, replacement, case_sensitive, files);
+                let count = replace_in_file(&path, ctx);
                 if count > 0 {
-                    *total_replacements += count;
-                    *files_modified += 1;
+                    ctx.total_replacements += count;
+                    ctx.files_modified += 1;
                 }
             }
         }
@@ -1147,40 +1158,29 @@ fn replace_recursive(
 /// 在单个文件中执行替换并写回
 /// 输入:
 ///   file_path 文件路径
-///   root 项目根路径
-///   query 查找词
-///   replacement 替换字符串
-///   case_sensitive 区分大小写
-///   files 文件结果集合
+///   ctx 替换上下文（含配置与结果集合）
 /// 输出: u64 替换次数
 /// 流程:
 ///   1. 读取文件内容
 ///   2. 先统计匹配次数（避免替换后无法定位）
 ///   3. 执行替换生成新内容
 ///   4. 仅当有替换发生时写回文件
-///   5. 记录文件结果到 files
-fn replace_in_file(
-    file_path: &Path,
-    root: &Path,
-    query: &str,
-    replacement: &str,
-    case_sensitive: bool,
-    files: &mut Vec<ReplaceFileResult>,
-) -> u64 {
+///   5. 记录文件结果到 ctx.files
+fn replace_in_file(file_path: &Path, ctx: &mut ReplaceContext) -> u64 {
     let content = match fs::read_to_string(file_path) {
         Ok(c) => c,
         Err(_) => return 0,
     };
     // 先统计原始内容中的匹配次数
-    let count = count_matches(&content, query, case_sensitive);
+    let count = count_matches(&content, &ctx.query, ctx.case_sensitive);
     if count == 0 {
         return 0;
     }
     // 执行替换
-    let new_content = if case_sensitive {
-        content.replace(query, replacement)
+    let new_content = if ctx.case_sensitive {
+        content.replace(&ctx.query, &ctx.replacement)
     } else {
-        case_insensitive_replace(&content, query, replacement)
+        case_insensitive_replace(&content, &ctx.query, &ctx.replacement)
     };
     // 仅当内容确实变化时写回（避免无意义的磁盘写入）
     if new_content == content {
@@ -1188,14 +1188,14 @@ fn replace_in_file(
     }
     let _ = fs::write(file_path, &new_content);
     let relative_path = file_path
-        .strip_prefix(root)
+        .strip_prefix(&ctx.root)
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
     let file_name = file_path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    files.push(ReplaceFileResult {
+    ctx.files.push(ReplaceFileResult {
         relative_path,
         file_name,
         replacements: count,
@@ -1381,8 +1381,8 @@ pub fn generate_volume_chapters(
     // 卷首语
     if with_prologue {
         let title = format_volume_prelude(volume_num, true);
-        let file_name = format!("卷首语.txt");
-        let file_path = volume_dir.join(&file_name);
+        let file_name = "卷首语.txt";
+        let file_path = volume_dir.join(file_name);
         let rel = relative_path_from(&file_path, &root);
         let already_exists = file_path.exists();
         if !already_exists {
@@ -1410,7 +1410,7 @@ pub fn generate_volume_chapters(
         // 文件名：去重非法字符
         let safe_title = sanitize_filename(&title);
         let file_name = format!("{}.txt", safe_title);
-        let file_path = volume_dir.join(&file_name);
+        let file_path = volume_dir.join(file_name);
         let rel = relative_path_from(&file_path, &root);
         let already_exists = file_path.exists();
         if !already_exists {
@@ -1434,8 +1434,8 @@ pub fn generate_volume_chapters(
     // 卷尾语
     if with_epilogue {
         let title = format_volume_prelude(volume_num, false);
-        let file_name = format!("卷尾语.txt");
-        let file_path = volume_dir.join(&file_name);
+        let file_name = "卷尾语.txt";
+        let file_path = volume_dir.join(file_name);
         let rel = relative_path_from(&file_path, &root);
         let already_exists = file_path.exists();
         if !already_exists {

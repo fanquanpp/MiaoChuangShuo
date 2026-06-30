@@ -5,7 +5,7 @@
 // 左侧渐变色条 + 右侧信息区的横向布局。
 // 支持键盘导航和删除操作。
 
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback } from "react";
 import { Clock, BarChart3, BookOpen, Trash2 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import type { ProjectInfo } from "../lib/api";

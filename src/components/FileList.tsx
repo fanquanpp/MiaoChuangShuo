@@ -32,13 +32,12 @@ import {
   ClipboardCopy,
   Files,
 } from "lucide-react";
-import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
+import { useAppStore, getCategoryDir } from "../lib/store";
 import type { FileNode } from "../lib/api";
 import { deletePath, readProjectTree, renamePath, copyFile } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
-import { extractChapterNum } from "../lib/settingsStore";
 import ConfirmDialog from "./ConfirmDialog";
 import OutlineToChapters from "./OutlineToChapters";
 import VolumeChapterGenerator from "./VolumeChapterGenerator";

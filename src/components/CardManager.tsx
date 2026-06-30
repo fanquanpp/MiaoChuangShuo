@@ -21,7 +21,7 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Plus, Trash2, ChevronLeft, Save, FileText, Loader2, Users, Globe, Quote, X, Download, Settings, BarChart3, RotateCcw } from "lucide-react";
-import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
+import { useAppStore, getCategoryDir } from "../lib/store";
 import { readProjectTree, createFile, deletePath, readFile, writeFile, scanProjects } from "../lib/api";
 import type { FileNode, ProjectInfo as ProjectInfoType } from "../lib/api";
 import { findDirByName } from "../lib/fileTreeUtils";

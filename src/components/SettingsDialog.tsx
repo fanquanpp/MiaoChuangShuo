@@ -10,7 +10,7 @@
 // 3. 持久化到 localStorage
 
 import { useCallback } from "react";
-import { X, Type, Save, BookOpen, FileText, Palette, Zap } from "lucide-react";
+import { X, Type, BookOpen, FileText, Palette, Zap } from "lucide-react";
 import { useSettingsStore, type ChapterFormat } from "../lib/settingsStore";
 import { useThemeStore } from "../lib/themeStore";
 import { useI18n } from "../lib/i18n";

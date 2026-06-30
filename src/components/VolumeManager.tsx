@@ -28,7 +28,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAppStore, getCategoryDir } from "../lib/store";
-import { readProjectTree, readFile, writeFile, createFile, deletePath } from "../lib/api";
+import { readProjectTree, readFile, writeFile, createFile } from "../lib/api";
 import type { FileNode } from "../lib/api";
 import { findDirByName } from "../lib/fileTreeUtils";
 import { useToast } from "../lib/toast";
@@ -106,49 +106,6 @@ export default function VolumeManager() {
     if (type === "standard") return "卷宗";
     return "卷宗";
   }, [currentProject]);
-
-  // 加载卷宗数据和正文文件列表
-  const loadData = useCallback(async () => {
-    if (!currentProject) return;
-    setLoading(true);
-    try {
-      const tree = await readProjectTree(currentProject.path);
-
-      // 读取正文章节
-      const manuscriptDir = findDirByName(tree, getCategoryDir("manuscript"));
-      const files = manuscriptDir?.children.filter((f) => !f.is_dir) || [];
-      // 按章节号排序
-      files.sort((a, b) => {
-        const numA = extractChapterNum(a.name);
-        const numB = extractChapterNum(b.name);
-        return numA - numB;
-      });
-      setManuscriptFiles(files);
-
-      // 读取卷宗数据文件
-      const volumeDir = findDirByName(tree, volumeDirName);
-      const volumeFile = volumeDir?.children.find(
-        (f) => !f.is_dir && f.name === "分卷规划.txt"
-      );
-
-      if (volumeFile) {
-        const content = await readFile(
-          `${currentProject.path}/${volumeFile.relative_path}`,
-          currentProject.path
-        );
-        const parsed = parseVolumeData(content);
-        setVolumes(parsed);
-        // 默认展开所有卷
-        setExpandedVolumes(new Set(parsed.map((v) => v.id)));
-      } else {
-        setVolumes([]);
-      }
-    } catch (e) {
-      showToast("error", t("volume.loadFailed", { error: String(e) }));
-    } finally {
-      setLoading(false);
-    }
-  }, [currentProject, volumeDirName, showToast, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -393,7 +350,7 @@ export default function VolumeManager() {
               </p>
             </div>
           ) : (
-            volumes.map((vol, idx) => {
+            volumes.map((vol) => {
               const isExpanded = expandedVolumes.has(vol.id);
               const isEditing = editingVolumeId === vol.id;
 
@@ -471,7 +428,7 @@ export default function VolumeManager() {
                           {t("volume.noChapters")}
                         </p>
                       ) : (
-                        vol.chapters.map((ch, chIdx) => (
+                        vol.chapters.map((ch) => (
                           <div
                             key={ch}
                             className="flex items-center gap-2 px-2 py-1.5 group hover:bg-nf-bg-hover/50 transition-colors"

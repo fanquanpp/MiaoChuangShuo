@@ -171,11 +171,11 @@ pub fn count_character_appearances(
 
     // 每个角色的文件列表按出现次数降序
     for app in &mut appearances {
-        app.files.sort_by(|a, b| b.count.cmp(&a.count));
+        app.files.sort_by_key(|f| std::cmp::Reverse(f.count));
     }
 
     // 角色按总出场次数降序
-    appearances.sort_by(|a, b| b.total_count.cmp(&a.total_count));
+    appearances.sort_by_key(|a| std::cmp::Reverse(a.total_count));
 
     Ok(appearances)
 }

@@ -91,7 +91,7 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
           init() {
             return { active: false, query: "", selectedIndex: 0, rect: null as DOMRect | null };
           },
-          apply(tr, prev) {
+          apply(_tr, prev) {
             return prev;
           },
         },

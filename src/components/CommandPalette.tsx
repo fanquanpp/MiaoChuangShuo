@@ -30,7 +30,6 @@ import {
   Target,
   Save,
   Sparkles,
-  BookCopy,
   RotateCcw,
   History,
   Download,
