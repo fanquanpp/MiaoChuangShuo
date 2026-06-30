@@ -35,3 +35,7 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# Git 提交消息临时文件
+_commitmsg.tmp
+
