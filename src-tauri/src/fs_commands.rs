@@ -232,6 +232,8 @@ pub fn create_project(
         author: author.clone(),
         date: now.format("%Y-%m-%d").to_string(),
         time: now.format("%H:%M").to_string(),
+        year: now.format("%Y").to_string(),
+        month: now.format("%m").to_string(),
         project_type_label: project_type_label(&project_type).to_string(),
         genre: genre.clone(),
         description: description.clone(),
