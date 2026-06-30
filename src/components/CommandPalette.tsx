@@ -32,6 +32,20 @@ interface CommandPaletteProps {
   onSwitchCategory?: (category: SidebarCategory) => void;
 }
 
+/**
+ * 全局命令面板组件
+ * 输入:
+ *   open 是否打开
+ *   onClose 关闭回调
+ *   onCreateFile 新建文件回调（按分类触发）
+ *   onSwitchCategory 切换分类回调（带保存检查）
+ * 输出: JSX 浮层面板（未打开时返回 null）
+ * 流程:
+ *   1. 构建命令列表：分类切换、新建文件、全局搜索、导出、主题切换
+ *   2. 根据用户输入进行模糊搜索（匹配 label 与 keywords）
+ *   3. 键盘导航：↑↓ 选择、Enter 执行、Escape 关闭
+ *   4. 执行命令后自动关闭面板并清空查询
+ */
 export default function CommandPalette({
   open,
   onClose,

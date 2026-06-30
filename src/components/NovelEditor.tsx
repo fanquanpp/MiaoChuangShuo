@@ -34,6 +34,10 @@ import { useSettingsStore } from "../lib/settingsStore";
 import { CharacterMention } from "../lib/characterMention";
 import { IndentParagraph } from "../lib/indentParagraph";
 import { PoetryFormat } from "../lib/poetryFormat";
+import { VSShortcuts } from "../lib/vscodeShortcuts";
+import { AutoPair } from "../lib/autoPair";
+import { LineHighlight } from "../lib/lineHighlight";
+import { SmartTab } from "../lib/smartTab";
 import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
@@ -46,6 +50,44 @@ interface NovelEditorProps {
   focusMode?: boolean;
 }
 
+/**
+ * 验证字符串是否为有效的角色名
+ * 输入: name 待验证的字符串
+ * 输出: boolean 是否有效
+ * 流程:
+ *   1. 非空且长度 <= 20
+ *   2. 不包含冒号（:或：）—— 排除字段行如"姓名:张三"
+ *   3. 不以常见标签词开头（角色/姓名/声线/外貌/性格/背景等）
+ *   4. 不全是数字或纯符号
+ */
+function isValidCharacterName(name: string): boolean {
+  if (!name || name.length === 0 || name.length > 20) return false;
+  // 包含冒号的行视为字段而非角色名
+  if (name.includes(":") || name.includes("：")) return false;
+  // 以常见标签词开头的行视为字段标签
+  const labelPrefixes = ["角色", "姓名", "声线", "外貌", "性格", "背景", "动机", "关系", "语言", "口头禅"];
+  for (const prefix of labelPrefixes) {
+    if (name.startsWith(prefix)) return false;
+  }
+  // 不允许纯数字或纯符号
+  if (/^[\d\s\p{P}]+$/u.test(name)) return false;
+  return true;
+}
+
+/**
+ * TipTap 纯文本编辑器组件
+ * 输入:
+ *   filePath 当前打开的文件路径（null 时显示空状态）
+ *   focusMode 是否启用聚焦模式（隐藏工具栏装饰）
+ * 输出: JSX 编辑器界面（工具栏 + 编辑区 + 可选大纲视图）
+ * 流程:
+ *   1. 根据 projectType 判断文体（剧本/对话/散文）并构建扩展列表
+ *   2. 扫描角色目录提取角色名（剧本/对话体用于 CharacterMention）
+ *   3. 加载文件内容：纯文本直读，转 ProseMirror JSON 结构
+ *   4. 自动保存：基于 dirty 状态与用户设置的间隔触发
+ *   5. 冲突检测：保存前比对磁盘内容与上次保存内容
+ *   6. 导出 TXT：Blob 下载，文件名沿用原文件名
+ */
 export default function NovelEditor({
   filePath,
   focusMode = false,
@@ -61,8 +103,12 @@ export default function NovelEditor({
 
   const projectType = currentProject?.meta?.type || "standard";
   const isScript = projectType === "script" || projectType === "screenplay";
-  const isEssay = projectType === "diary";
   const isDialogue = projectType === "dialogue";
+  // 散文类文体：包含标准长篇、短篇、日记、分卷、同世界观、诗歌等
+  // 剧本式与对话体不启用首行缩进（它们有专属的格式化逻辑）
+  const isProse = !isScript && !isDialogue;
+  // 兼容旧代码：日记体仍保留 isEssay 标识用于日期自动填充等场景
+  const isEssay = projectType === "diary";
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
   const diaryAutoDate = useSettingsStore((s) => s.diaryAutoDate);
   const indentEnabled = useSettingsStore((s) => s.indentEnabled);
@@ -70,6 +116,8 @@ export default function NovelEditor({
   const [showOutline, setShowOutline] = useState(false);
 
   // 从角色目录自动提取角色名（扫描每个 .txt 文件首行）
+  // 文件格式约定：第一行为角色名（纯文本，不含冒号、不以分隔符开头）
+  // 过滤规则：跳过模板文件（文件名包含"模板"/"名册"/"template"/"roster"）
   // 回退方案：读取 角色名册.txt（手动维护的花名册）
   useEffect(() => {
     let cancelled = false;
@@ -90,14 +138,22 @@ export default function NovelEditor({
           const names: string[] = [];
           for (const child of charDir.children) {
             if (child.is_dir || !child.name.endsWith(".txt")) continue;
+            // 过滤模板文件和名册文件（这些不是单个角色的设定文件）
+            const lowerName = child.name.toLowerCase();
+            if (lowerName.includes("模板") || lowerName.includes("名册") ||
+                lowerName.includes("template") || lowerName.includes("roster") ||
+                lowerName.includes("readme")) {
+              continue;
+            }
             try {
               const filePath = `${charDirPath}/${child.name}`;
               const content = await readFile(filePath, currentProject.path);
               const firstLine = content
                 .split(/\r?\n/)
                 .map((l) => l.trim())
-                .find((l) => l && !l.startsWith("#") && !l.startsWith("---"));
-              if (firstLine && firstLine.length <= 20) {
+                .find((l) => l && !l.startsWith("#") && !l.startsWith("---") && !l.startsWith("==="));
+              // 验证首行是否为有效角色名
+              if (firstLine && isValidCharacterName(firstLine)) {
                 names.push(firstLine);
               }
             } catch {
@@ -127,7 +183,8 @@ export default function NovelEditor({
               !line.startsWith(">") &&
               !line.startsWith("-") &&
               !/^[-=]{3,}$/.test(line)
-          );
+          )
+          .filter(isValidCharacterName);
         if (!cancelled) setCharacters(names);
       } catch {
         if (!cancelled) setCharacters([]);
@@ -153,9 +210,19 @@ export default function NovelEditor({
       Blockquote,
       History,
       Placeholder.configure({ placeholder: t("editor.placeholder") }),
+      // VSCode 风格段落级快捷键（所有文体通用）
+      VSShortcuts.configure({ enabled: true }),
+      // VSCode 风格自动配对括号引号（所有文体通用）
+      AutoPair.configure({ enabled: true }),
+      // VSCode 风格当前段落高亮（所有文体通用）
+      LineHighlight.configure({ enabled: true, className: "current-paragraph" }),
+      // VSCode 风格智能选中缩进（Tab/Shift+Tab 批量缩进多段）
+      SmartTab.configure({ enabled: true, indentChar: "\u3000" }),
     ];
 
-    if (isEssay) {
+    // 散文类文体启用首行缩进（标准长篇/短篇/日记/分卷/同世界观/诗歌等）
+    // 剧本式与对话体不启用，它们有专属格式化逻辑
+    if (isProse) {
       exts.push(IndentParagraph.configure({ enabled: indentEnabled, indentWidth }));
     }
 
@@ -177,7 +244,7 @@ export default function NovelEditor({
 
     exts.push(PoetryFormat.configure({ enabled: true }));
     return exts;
-  }, [isEssay, isScript, isDialogue, characters, t, indentEnabled, indentWidth]);
+  }, [isProse, isScript, isDialogue, characters, t, indentEnabled, indentWidth]);
 
   // 创建编辑器实例（纯文本模式）
   const editor = useEditor({

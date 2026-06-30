@@ -78,13 +78,21 @@ interface SidebarProps {
   onSwitchCategory?: (category: SidebarCategory) => void;
 }
 
-// 左侧导航栏组件
-// 输入: onCreateFile 新建文件回调
-// 输出: 渲染导航栏
-// 流程:
-//   1. 顶部显示项目名称与返回按钮
-//   2. 中间显示分类列表
-//   3. 底部显示主题切换与新建文件按钮
+/**
+ * 左侧导航栏组件
+ * 输入:
+ *   onCreateFile 新建文件回调
+ *   onOpenSettings 打开设置回调（可选）
+ *   onSwitchCategory 切换分类回调（可选，带保存检查）
+ * 输出: JSX 侧边栏界面（项目信息 + 分类导航 + 最近文件 + 工具区）
+ * 流程:
+ *   1. 渲染项目信息头：项目名、作者、返回启动器按钮
+ *   2. 渲染分类导航列表：角色/世界观/名词/时间线/正文/大纲/素材
+ *   3. 渲染工具分类：统计、全局搜索
+ *   4. 渲染最近打开文件列表（最多5项，按时间倒序）
+ *   5. 高亮当前选中分类，点击触发 onSwitchCategory
+ *   6. 底部工具区：主题切换、新建文件、设置入口
+ */
 export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory }: SidebarProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const activeCategory = useAppStore((s) => s.activeCategory);

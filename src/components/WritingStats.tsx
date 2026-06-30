@@ -27,6 +27,12 @@ import { useAppStore } from "../lib/store";
 import { getWritingStats, type WritingStats as WritingStatsType } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
+/**
+ * 根据文件相对路径识别所属分类
+ * 输入: relativePath 文件相对路径（如 "正文/第一章.txt"）
+ * 输出: 分类标识字符串（manuscript/outline/characters 等）
+ * 流程: 取路径首段目录名，映射到分类标识，未匹配则回退为 manuscript
+ */
 function detectCategoryFromPath(relativePath: string): string {
   const firstDir = relativePath.split(/[\\/]/)[0] || "";
   const categoryMap: Record<string, string> = {
@@ -41,6 +47,17 @@ function detectCategoryFromPath(relativePath: string): string {
   return categoryMap[firstDir] || "manuscript";
 }
 
+/**
+ * 写作统计仪表盘组件
+ * 输入: 无（从 useAppStore 获取当前项目）
+ * 输出: JSX 统计面板
+ * 流程:
+ *   1. 项目切换时调用后端 API 获取统计数据
+ *   2. 渲染统计卡片网格（总字数/章节数/文件数/创作天数）
+ *   3. 渲染分类字数分布比例条（正文/设定/大纲/素材）
+ *   4. 渲染章节字数排行榜，支持点击跳转编辑
+ *   5. 加载中显示骨架屏，失败显示错误信息
+ */
 export default function WritingStats() {
   const currentProject = useAppStore((s) => s.currentProject);
   const navigateToFile = useAppStore((s) => s.navigateToFile);

@@ -1,18 +1,20 @@
 // 剧本角色名自动选择 TipTap 扩展
 //
 // 功能概述：
-// 为舞台剧本/对话体类型项目提供台词前的角色名自动选择功能。
+// 为舞台剧本/对话体类型项目提供台词前的角色名自动选择与填充功能。
 // 功能1: 在空行按 Tab 键弹出角色名选择浮层
-// 功能2: 换行自动延续 —— 当上一行以"角色名: "开头时，新行自动填充相同角色名前缀
+// 功能2: 换行自动轮换 —— 当上一行以"角色名: "开头时，新行自动填充下一个角色名前缀
+// 功能3: 选中文本后按 Ctrl+Shift+N，在选中段落最前端弹出角色名选择器
 //
 // 模块职责：
 // 1. 监听编辑器输入，检测台词行起始位置
 // 2. Tab 键弹出角色名选择浮层
 // 3. 选中后自动插入角色名前缀
-// 4. Enter 键自动延续角色名对话模式
+// 4. Enter 键自动轮换到下一个角色名（基于角色列表顺序循环）
 // 5. 支持自定义角色名输入
 // 6. 键盘导航（ArrowUp/ArrowDown/Enter/Escape）
 // 7. ARIA 无障碍标注
+// 8. Ctrl+Shift+N 快捷键在选中文本前插入角色名
 
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
@@ -33,7 +35,9 @@ export interface CharacterMentionOptions {
 
 /**
  * 从文本中提取开头的角色名（匹配 "角色名: " 或 "角色名： " 模式）
- * 返回匹配到的角色名，未匹配返回 null
+ * 输入: text 行文本, characters 角色名列表
+ * 输出: 匹配到的角色名，未匹配返回 null
+ * 流程: 遍历角色名列表，检查文本是否以"角色名:"或"角色名："开头
  */
 function extractCharacterPrefix(text: string, characters: string[]): string | null {
   for (const name of characters) {
@@ -43,6 +47,26 @@ function extractCharacterPrefix(text: string, characters: string[]): string | nu
     }
   }
   return null;
+}
+
+/**
+ * 获取下一个角色名（基于角色列表顺序循环轮换）
+ * 输入: currentName 当前角色名, characters 角色名列表
+ * 输出: 下一个角色名
+ * 流程:
+ *   1. 在角色列表中查找当前角色名的位置
+ *   2. 返回下一个角色名（循环到列表末尾时回到第一个）
+ *   3. 若当前角色名不在列表中，返回列表第一个角色名
+ */
+function getNextCharacterName(currentName: string, characters: string[]): string {
+  const idx = characters.indexOf(currentName);
+  if (idx < 0) {
+    // 当前角色名不在列表中，默认返回第一个
+    return characters[0];
+  }
+  // 循环轮换：末尾的下一个是开头
+  const nextIdx = (idx + 1) % characters.length;
+  return characters[nextIdx];
 }
 
 export const CharacterMention = Extension.create<CharacterMentionOptions>({
@@ -72,10 +96,12 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
           },
         },
 
-        // 换行自动延续：检测新段落是否应自动填充角色名前缀
+        // 换行自动轮换：检测新段落是否应自动填充下一个角色名前缀
+        // 当上一行以"角色名: "开头时，新行自动填充角色列表中的下一个角色名
+        // 实现两人对话的自动交替（A→B→A→B）或多角色循环（A→B→C→A→B→C）
         appendTransaction: (
           transactions: readonly Transaction[],
-          oldState: EditorState,
+          _oldState: EditorState,
           newState: EditorState
         ): Transaction | null => {
           if (!options.characters.length) return null;
@@ -110,15 +136,19 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
           const charName = extractCharacterPrefix(prevText, options.characters);
           if (!charName) return null;
 
-          // 在新段落中自动插入角色名前缀
+          // 轮换到下一个角色名（非延续同一角色名）
+          const nextName = getNextCharacterName(charName, options.characters);
+
+          // 在新段落中自动插入下一个角色名前缀
           const tr = newState.tr;
           const insertPos = paragraphPos + 1;
-          tr.insertText(`${charName}: `, insertPos);
+          tr.insertText(`${nextName}: `, insertPos);
           return tr;
         },
 
         props: {
           handleKeyDown(view, event) {
+            // Tab 键：在空行或行首弹出角色名选择浮层
             if (event.key === "Tab") {
               const { state } = view;
               const { selection } = state;
@@ -146,6 +176,39 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
                 return true;
               }
             }
+
+            // Ctrl+Shift+N：选中文本后，在选中段落最前端弹出角色名选择器
+            // 用于在已写好的对话前快速补充角色名前缀
+            if ((event.ctrlKey || event.metaKey) && event.shiftKey && (event.key === "n" || event.key === "N")) {
+              const { state } = view;
+              const { selection } = state;
+              // 仅在有选中文本时触发
+              if (selection.empty) return false;
+              if (!options.characters.length) return false;
+
+              // 定位选中区域的起始位置
+              const start = selection.$from;
+              const paragraphPos = start.before(start.depth);
+              if (paragraphPos < 0) return false;
+
+              // 在选中段落起始位置弹出角色名选择器
+              const coords = view.coordsAtPos(paragraphPos + 1);
+              const rect = new DOMRect(
+                coords.left,
+                coords.top,
+                0,
+                coords.bottom - coords.top
+              );
+              showCharacterPicker(rect, options.characters, (name) => {
+                // 在段落起始处插入角色名前缀
+                const tr = view.state.tr.insertText(`${name}: `, paragraphPos + 1);
+                view.dispatch(tr);
+                options.onSelect(name);
+              }, options.labels || {});
+              event.preventDefault();
+              return true;
+            }
+
             return false;
           },
         },

@@ -45,6 +45,18 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "7": "stats",
 };
 
+/**
+ * 工作台主容器组件
+ * 输入: 无（通过 useAppStore 获取当前项目状态）
+ * 输出: JSX 三栏布局界面
+ * 流程:
+ *   1. 从全局 store 读取当前项目与选中文件
+ *   2. 加载项目目录树（含失败重试与空状态处理）
+ *   3. 渲染三栏布局：左侧 Sidebar + 中间内容区 + 右侧 FileList
+ *   4. 根据 activeCategory 切换中间内容（编辑器/卡片管理器/统计/搜索/卷宗）
+ *   5. 管理对话框层：新建文件、命令面板、设置、聚焦模式、专注计时器
+ *   6. 注册全局快捷键：Alt+数字切换分类、Ctrl+K 命令面板、? 快捷键参考、F11 聚焦
+ */
 export default function Workspace() {
   const currentProject = useAppStore((s) => s.currentProject);
   const selectedFile = useAppStore((s) => s.selectedFile);

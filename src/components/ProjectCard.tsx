@@ -12,6 +12,7 @@ import type { ProjectInfo } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
 
+/** 项目卡片展示数据（由上层从 ProjectInfo 转换而来） */
 export interface ProjectData {
   id: string;
   name: string;
@@ -23,16 +24,30 @@ export interface ProjectData {
   gradient: string;
 }
 
+/** ProjectCard 组件属性 */
 export interface ProjectCardProps {
   project: ProjectData;
   projectInfo?: ProjectInfo;
   onDelete?: (project: ProjectInfo) => void;
 }
 
+/**
+ * 项目卡片实现组件
+ * 输入:
+ *   - project: 卡片展示数据（名称、类型、字数等）
+ *   - projectInfo: 原始项目信息（用于打开/删除操作）
+ *   - onDelete: 删除回调（可选）
+ * 输出: JSX 卡片元素
+ * 流程:
+ *   1. 点击卡片时，若当前已有打开项目则走切换流程，否则直接打开
+ *   2. 支持键盘 Enter/Space 触发点击（无障碍）
+ *   3. 删除按钮悬浮显示，阻止事件冒泡避免触发卡片点击
+ */
 function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
   const { handleSwitchProject } = useAutoSaveOnExit();
   const { t } = useI18n();
 
+  /** 卡片点击：打开项目或切换项目 */
   const handleClick = useCallback(() => {
     if (!projectInfo) return;
     const currentProject = useAppStore.getState().currentProject;
@@ -43,6 +58,7 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
     }
   }, [handleSwitchProject, projectInfo]);
 
+  /** 键盘事件：Enter/Space 触发点击 */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -53,6 +69,7 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
     [handleClick]
   );
 
+  /** 删除按钮点击：阻止冒泡并触发 onDelete 回调 */
   const handleDeleteClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -63,6 +80,7 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
     [projectInfo, onDelete]
   );
 
+  /** 删除按钮键盘事件：Enter/Space 触发删除 */
   const handleDeleteKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {

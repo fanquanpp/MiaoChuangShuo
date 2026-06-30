@@ -3,16 +3,29 @@
 // 功能概述：
 // 按 `?` 键弹出快捷键参考面板，展示所有可用快捷键及其功能描述。
 // 采用 FANDEX 直角美学，分类展示编辑器、全局、侧边栏快捷键。
+//
+// 模块职责：
+// 1. 首次使用时自动弹出一次（localStorage 标记）
+// 2. 全局监听 `?` 键切换显示/隐藏
+// 3. 分类渲染快捷键列表，支持键盘 Caps Lock 样式键帽
+// 4. 点击遮罩或 Escape 关闭面板
 
 import { useEffect, useState, useCallback } from "react";
 import { X, Keyboard } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
+/** 快捷键分组结构 */
 interface ShortcutGroup {
   title: string;
   shortcuts: { keys: string; desc: string }[];
 }
 
+/**
+ * 构建快捷键分组数据
+ * 输入: t i18n 翻译函数
+ * 输出: ShortcutGroup[] 按编辑器/段落操作/自动行为/全局/侧边栏分组的快捷键列表
+ * 流程: 静态枚举五组快捷键，通过 t 函数本地化描述文案
+ */
 function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
   return [
     {
@@ -27,6 +40,30 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
         { keys: "Ctrl + S", desc: t("shortcuts.save") },
         { keys: "Ctrl + Q", desc: t("shortcuts.quickQuote") },
         { keys: "Tab", desc: t("shortcuts.scriptMode") },
+      ],
+    },
+    {
+      title: t("shortcuts.paragraphOps"),
+      shortcuts: [
+        { keys: "Ctrl + L", desc: t("shortcuts.selectParagraph") },
+        { keys: "Ctrl + Shift + K", desc: t("shortcuts.deleteParagraph") },
+        { keys: "Ctrl + Enter", desc: t("shortcuts.insertParagraph") },
+        { keys: "Shift + Alt + Down", desc: t("shortcuts.duplicateParagraph") },
+        { keys: "Alt + Up", desc: t("shortcuts.moveUp") },
+        { keys: "Alt + Down", desc: t("shortcuts.moveDown") },
+        { keys: "Ctrl + ]", desc: t("shortcuts.increaseIndent") },
+        { keys: "Ctrl + [", desc: t("shortcuts.decreaseIndent") },
+        { keys: "Tab", desc: t("shortcuts.indentSelection") },
+        { keys: "Shift + Tab", desc: t("shortcuts.outdentSelection") },
+      ],
+    },
+    {
+      title: t("shortcuts.autoBehaviors"),
+      shortcuts: [
+        { keys: "( ) [ ]", desc: t("shortcuts.autoPair") },
+        { keys: "\" '", desc: t("shortcuts.smartQuote") },
+        { keys: "Backspace", desc: t("shortcuts.deletePair") },
+        { keys: "—", desc: t("shortcuts.lineHighlight") },
       ],
     },
     {
@@ -56,6 +93,16 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
 
 const STORAGE_KEY = "novelforge-shortcuts-seen";
 
+/**
+ * 快捷键参考面板组件
+ * 输入: 无
+ * 输出: JSX 浮层面板（未打开时返回 null）
+ * 流程:
+ *   1. 首次使用时延迟 1 秒自动弹出，并在 localStorage 标记已展示
+ *   2. 监听全局 `?` 键切换面板开关，Escape 关闭
+ *   3. 输入框/文本域/可编辑元素中按 `?` 不触发面板
+ *   4. 渲染三组快捷键：编辑器、全局、侧边栏导航
+ */
 export default function ShortcutPanel() {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);

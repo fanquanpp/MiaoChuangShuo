@@ -2,7 +2,7 @@
 //
 // 功能概述：
 // 提供项目目录树的通用查找与路径拼接函数，消除 FileList / CardManager /
-// TimelineManager / WritingStats 等组件中的重复代码。
+// WritingStats 等组件中的重复代码。
 //
 // 模块职责：
 // 1. 按目录名递归查找目录节点

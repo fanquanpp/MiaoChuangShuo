@@ -405,6 +405,26 @@ const zhCN: TranslationDict = {
   "shortcuts.navMaterials": "素材",
   "shortcuts.navStats": "统计",
 
+  // 快捷键 - 段落操作（VSCode 风格）
+  "shortcuts.paragraphOps": "段落操作",
+  "shortcuts.selectParagraph": "选中当前段落",
+  "shortcuts.deleteParagraph": "删除当前段落",
+  "shortcuts.insertParagraph": "下方插入新段落",
+  "shortcuts.duplicateParagraph": "向下复制段落",
+  "shortcuts.moveUp": "段落上移",
+  "shortcuts.moveDown": "段落下移",
+  "shortcuts.increaseIndent": "增加缩进",
+  "shortcuts.decreaseIndent": "减少缩进",
+  "shortcuts.indentSelection": "选中段落批量缩进",
+  "shortcuts.outdentSelection": "选中段落批量减少缩进",
+
+  // 快捷键 - 自动行为（VSCode 风格）
+  "shortcuts.autoBehaviors": "自动行为",
+  "shortcuts.autoPair": "输入括号自动配对（半角/全角）",
+  "shortcuts.smartQuote": "输入引号智能识别开闭（中文引号）",
+  "shortcuts.deletePair": "删除配对字符（光标在配对之间）",
+  "shortcuts.lineHighlight": "当前段落高亮显示",
+
   // ── 大纲视图 ──
   "outline.open": "打开大纲",
   "outline.collapse": "收起大纲",
@@ -977,6 +997,24 @@ const enUS: TranslationDict = {
   "shortcuts.navOutline": "Outline",
   "shortcuts.navMaterials": "Materials",
   "shortcuts.navStats": "Statistics",
+  "shortcuts.paragraphOps": "Paragraph Operations",
+  "shortcuts.selectParagraph": "Select Current Paragraph",
+  "shortcuts.deleteParagraph": "Delete Current Paragraph",
+  "shortcuts.insertParagraph": "Insert Paragraph Below",
+  "shortcuts.duplicateParagraph": "Duplicate Paragraph Down",
+  "shortcuts.moveUp": "Move Paragraph Up",
+  "shortcuts.moveDown": "Move Paragraph Down",
+  "shortcuts.increaseIndent": "Increase Indent",
+  "shortcuts.decreaseIndent": "Decrease Indent",
+  "shortcuts.indentSelection": "Indent Selected Paragraphs",
+  "shortcuts.outdentSelection": "Outdent Selected Paragraphs",
+
+  // Shortcuts - Auto Behaviors (VSCode style)
+  "shortcuts.autoBehaviors": "Auto Behaviors",
+  "shortcuts.autoPair": "Auto-pair brackets (half/full width)",
+  "shortcuts.smartQuote": "Smart quote open/close (Chinese quotes)",
+  "shortcuts.deletePair": "Delete paired chars (cursor inside pair)",
+  "shortcuts.lineHighlight": "Current paragraph highlight",
 
   // ── Outline View ──
   "outline.open": "Open Outline",

@@ -214,78 +214,298 @@ function generatePresetTemplate(name: string, preset: CharacterPreset, t: (key: 
   return `${name}\n\n---\n\n${fieldText}\n`;
 }
 
-// 从内容中提取字段预览（支持多种格式）
-// 格式支持：
-//   【外貌】：金发碧眼  /  [外貌] 金发碧眼  /  外貌：金发碧眼  /  外貌: 金发碧眼
-function extractFields(content: string, fieldKeys: string[], t: (key: string) => string): { label: string; value: string }[] {
-  const fields: { label: string; value: string }[] = [];
-  const lines = content.split("\n");
+// ===== 卡片字段解析模块 =====
+//
+// 设计目标：
+//   1. 支持多种标签格式（括号、冒号、纯标签行）
+//   2. 支持多行值（值可跨越多行直到下一个标签或分隔线）
+//   3. 自动跳过卡片名称（第一个非标签的非空行）
+//   4. 已知标签优先匹配，未知标签作为回退
+//   5. 容错性强：用户改格式、删括号、换分隔符均能识别
+//
+// 支持的标签格式：
+//   【外貌】值          - 全角括号包裹标签，同行值
+//   [外貌] 值           - 半角括号包裹标签，同行值
+//   【外貌】：值        - 括号 + 冒号 + 值
+//   外貌：值            - 纯标签 + 全角冒号 + 值
+//   外貌: 值            - 纯标签 + 半角冒号 + 值
+//   【外貌】            - 括号标签单独成行，值在后续行
+//   外貌                - 已知纯标签单独成行，值在后续行
+//
+// 模板文件示例（generatePresetTemplate 生成）：
+//   张三
+//
+//   ---
+//
+//   【外貌】
+//
+//   【性格】
+//
+//   【背景】
+//
+// 用户填充后的示例：
+//   张三
+//
+//   ---
+//
+//   【外貌】
+//   英俊潇洒
+//   身材高大
+//
+//   【性格】
+//   开朗外向
 
-  for (const key of fieldKeys) {
-    const label = t(key).trim();
-    // 去掉括号和冒号后缀，提取纯标签名
-    const labelPrefix = label
-      .replace(/：$/, "").replace(/:$/, "")
-      .replace(/^[\[【]/, "").replace(/[\]】]$/, "")
-      .trim();
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line) continue;
-
-      // 匹配多种格式
-      let value = "";
-
-      // 1. 【字段】：值 或 【字段】值
-      const bracketMatch = line.match(/^[【\[]\s*([^】\]]+)\s*[】\]]\s*[:：]?\s*(.*)/);
-      if (bracketMatch) {
-        const bracketLabel = bracketMatch[1].trim();
-        if (bracketLabel === labelPrefix || bracketLabel.includes(labelPrefix)) {
-          value = bracketMatch[2].trim();
-        }
-      }
-
-      // 2. 字段：值 或 字段: 值 或 字段 值
-      if (!value) {
-        // 精确匹配：行以标签名开头，后跟冒号或空格
-        const escapedPrefix = labelPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const plainMatch = line.match(new RegExp(`^${escapedPrefix}\\s*[:：]\\s*(.*)`));
-        if (plainMatch) {
-          value = plainMatch[1].trim();
-        }
-      }
-
-      if (value) {
-        fields.push({ label: labelPrefix, value: value.slice(0, 30) + (value.length > 30 ? "…" : "") });
-        break;
-      }
-    }
-  }
-
-  // 如果标准字段没找到，尝试提取任意 key-value 行作为预览
-  if (fields.length === 0) {
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("---") || line.startsWith("===")) continue;
-      // 跳过第一行（通常是卡片名称）
-      if (lines.indexOf(rawLine) === 0) continue;
-
-      // 匹配 "xxx：yyy" 或 "xxx: yyy" 或 "【xxx】yyy"
-      const kvMatch = line.match(/^(?:[【\[]\s*([^】\]]+)\s*[】\]]|([^:：\s]+))\s*[:：]\s*(.+)/);
-      if (kvMatch) {
-        const label = (kvMatch[1] || kvMatch[2] || "").trim();
-        const value = (kvMatch[3] || "").trim();
-        if (label && value && label.length <= 20) {
-          fields.push({ label, value: value.slice(0, 30) + (value.length > 30 ? "…" : "") });
-          if (fields.length >= 3) break;
-        }
-      }
-    }
-  }
-
-  return fields.slice(0, 3); // 最多显示 3 个字段
+/**
+ * 验证字符串是否为有效的字段标签
+ * 输入: label 待验证的字符串
+ * 输出: boolean 是否有效
+ * 流程:
+ *   1. 非空且长度 1-20（过长的标签视为正文）
+ *   2. 不包含换行符
+ *   3. 不全是数字或纯标点（排除 "123"、"---" 等）
+ */
+function isValidFieldLabel(label: string): boolean {
+  if (!label || label.length === 0 || label.length > 20) return false;
+  if (label.includes("\n")) return false;
+  // 纯数字或纯标点不算标签
+  if (/^[\d\s\p{P}]+$/u.test(label)) return false;
+  return true;
 }
 
+/**
+ * 从原始标签文本中提取纯标签名（去括号、去冒号、去空白）
+ * 输入: rawLabel 原始标签文本（如 "【外貌】"、"外貌："、"外貌"）
+ * 输出: string 纯标签名（如 "外貌"）
+ */
+function normalizeLabel(rawLabel: string): string {
+  return rawLabel
+    .trim()
+    .replace(/^[【\[]/, "")
+    .replace(/[】\]]$/, "")
+    .replace(/[：:]$/, "")
+    .trim();
+}
+
+/**
+ * 截断字段值用于预览显示
+ * 输入: value 原始值（可能多行）
+ * 输出: string 截断后的预览值（单行，最多 30 字符）
+ * 流程:
+ *   1. 取第一行非空内容作为预览
+ *   2. 超过 30 字符则截断并添加省略号
+ */
+function truncateFieldValue(value: string): string {
+  const firstLine = value
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l) || "";
+  if (firstLine.length <= 30) return firstLine;
+  return firstLine.slice(0, 30) + "…";
+}
+
+/**
+ * 解析后的字段结构
+ */
+interface ParsedField {
+  /** 字段标签（纯文本，如 "外貌"） */
+  label: string;
+  /** 字段值（可能包含多行） */
+  value: string;
+}
+
+/**
+ * 解析卡片内容为结构化字段列表
+ * 输入:
+ *   - content: 卡片文件内容
+ *   - knownLabels: 已知标签列表（已规范化的纯标签名，如 ["外貌", "性格"]）
+ * 输出:
+ *   - ParsedField[] 解析后的字段数组（按出现顺序）
+ * 流程:
+ *   1. 逐行扫描，跳过空行和分隔线
+ *   2. 第一个非标签的非空行视为卡片名称，跳过
+ *   3. 检测标签行（括号格式、冒号格式、已知标签单独成行）
+ *   4. 标签行后的非标签行作为该字段值的延续（多行值）
+ *   5. 遇到下一个标签或分隔线时结束当前字段
+ */
+function parseCardFields(content: string, knownLabels: string[]): ParsedField[] {
+  const lines = content.split(/\r?\n/);
+  const fields: ParsedField[] = [];
+
+  // 构建已知标签的小写集合（用于无冒号匹配）
+  const knownLabelsLower = new Set(
+    knownLabels.map((l) => l.toLowerCase()).filter((l) => l.length > 0)
+  );
+
+  // 标签检测正则
+  // 模式1: 【label】value 或 [label]value（可选冒号）
+  const bracketPattern = /^[【\[]\s*([^】\]\n]+?)\s*[】\]]\s*[:：]?\s*(.*)$/;
+  // 模式2: label：value 或 label: value（label 1-20 字符，不含冒号、换行、括号起始符）
+  const colonPattern = /^([^：:\n【\[]{1,20})\s*[：:]\s*(.*)$/;
+
+  let currentField: ParsedField | null = null;
+  // 是否已跳过卡片名称（遇到第一个标签或分隔线后置为 true）
+  let cardNameSkipped = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    // 空行：跳过（不影响当前字段，多行值中的空行由后续逻辑处理）
+    if (trimmed === "") continue;
+
+    // 分隔线（--- 或 ===）：结束当前字段
+    if (/^[-=]{3,}$/.test(trimmed)) {
+      if (currentField && currentField.value.trim()) {
+        fields.push(currentField);
+      }
+      currentField = null;
+      cardNameSkipped = true;
+      continue;
+    }
+
+    // 检测是否为标签行
+    let isLabel = false;
+    let newLabel = "";
+    let newValue = "";
+
+    // 尝试模式1: 括号包裹的标签
+    const bracketMatch = trimmed.match(bracketPattern);
+    if (bracketMatch) {
+      const label = bracketMatch[1].trim();
+      if (isValidFieldLabel(label)) {
+        isLabel = true;
+        newLabel = label;
+        newValue = bracketMatch[2].trim();
+      }
+    }
+
+    // 尝试模式2: 冒号分隔的标签
+    if (!isLabel) {
+      const colonMatch = trimmed.match(colonPattern);
+      if (colonMatch) {
+        const label = colonMatch[1].trim();
+        if (isValidFieldLabel(label)) {
+          isLabel = true;
+          newLabel = label;
+          newValue = colonMatch[2].trim();
+        }
+      }
+    }
+
+    // 尝试模式3: 已知标签单独成行（仅在卡片名已跳过后生效，避免误判卡片名）
+    if (!isLabel && cardNameSkipped && knownLabelsLower.has(trimmed.toLowerCase())) {
+      isLabel = true;
+      newLabel = trimmed;
+      newValue = "";
+    }
+
+    if (isLabel) {
+      // 保存上一个字段
+      if (currentField && currentField.value.trim()) {
+        fields.push(currentField);
+      }
+      currentField = { label: newLabel, value: newValue };
+      cardNameSkipped = true;
+    } else {
+      // 当前行不是标签
+      if (!cardNameSkipped) {
+        // 第一个非标签的非空行视为卡片名称，跳过
+        cardNameSkipped = true;
+        continue;
+      }
+      // 作为当前字段值的延续（支持多行值）
+      if (currentField) {
+        if (currentField.value) {
+          currentField.value += "\n" + trimmed;
+        } else {
+          currentField.value = trimmed;
+        }
+      }
+      // 若无当前字段，忽略该行（孤立内容，如卡片名后的说明文字）
+    }
+  }
+
+  // 保存最后一个字段
+  if (currentField && currentField.value.trim()) {
+    fields.push(currentField);
+  }
+
+  return fields;
+}
+
+/**
+ * 从卡片内容中提取字段预览（用于卡片列表展示）
+ * 输入:
+ *   - content: 卡片文件内容
+ *   - fieldKeys: i18n 字段键列表（如 ["card.characterAppearance", ...]）
+ *   - t: 翻译函数
+ * 输出:
+ *   - { label: string; value: string }[] 字段预览数组（最多 3 个）
+ * 流程:
+ *   1. 规范化已知标签列表（提取纯标签名）
+ *   2. 调用 parseCardFields 解析所有字段
+ *   3. 第一轮：按 fieldKeys 顺序匹配已知字段
+ *   4. 第二轮：若已知字段均未匹配，回退到任意检测到的字段
+ *   5. 截断值为单行 30 字符预览
+ */
+function extractFields(
+  content: string,
+  fieldKeys: string[],
+  t: (key: string) => string
+): { label: string; value: string }[] {
+  // 规范化已知标签列表
+  const knownLabels = fieldKeys.map((key) => normalizeLabel(t(key)));
+
+  // 解析内容
+  const parsedFields = parseCardFields(content, knownLabels);
+
+  if (parsedFields.length === 0) return [];
+
+  const result: { label: string; value: string }[] = [];
+
+  // 第一轮：按 fieldKeys 顺序匹配已知字段
+  for (const knownLabel of knownLabels) {
+    if (!knownLabel) continue;
+    const matched = parsedFields.find(
+      (f) => f.label.toLowerCase() === knownLabel.toLowerCase()
+    );
+    if (matched && matched.value) {
+      result.push({
+        label: knownLabel,
+        value: truncateFieldValue(matched.value),
+      });
+    }
+    if (result.length >= 3) break;
+  }
+
+  // 第二轮：若已知字段均未匹配，回退到任意检测到的字段
+  if (result.length === 0) {
+    for (const f of parsedFields) {
+      if (f.value) {
+        result.push({
+          label: f.label,
+          value: truncateFieldValue(f.value),
+        });
+        if (result.length >= 3) break;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 卡片管理组件
+ * 输入:
+ *   categoryLabel 分类显示名称（角色/世界观/名词等）
+ * 输出: JSX 卡片列表与编辑界面
+ * 流程:
+ *   1. 读取当前项目目录树，过滤目标分类下的 .txt 文件
+ *   2. 解析每个卡片文件的标题、预览、字段（支持7种标签格式）
+ *   3. 渲染卡片网格列表（按分类应用差异化主题色与图标）
+ *   4. 新建卡片：角色分类提供4种预设模板选择，其他分类使用默认模板
+ *   5. 点击卡片进入编辑模式：TipTap 编辑器 + 自动保存 + 未保存提示
+ *   6. 支持删除（带确认对话框）、导入其他项目卡片
+ */
 export default function CardManager({ categoryLabel }: CardManagerProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const activeCategory = useAppStore((s) => s.activeCategory);

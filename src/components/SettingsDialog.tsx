@@ -20,6 +20,18 @@ interface SettingsDialogProps {
   onClose: () => void;
 }
 
+/**
+ * 设置对话框组件
+ * 输入:
+ *   - open: 对话框显示状态
+ *   - onClose: 关闭回调
+ * 输出: JSX 模态框（open=false 时返回 null）
+ * 流程:
+ *   1. 从 settingsStore 读取所有配置项
+ *   2. 渲染五大设置分区：编辑器、章节、自动化、首行缩进、主题
+ *   3. 每个设置项变更立即写回 store 并持久化到 localStorage
+ *   4. 点击遮罩或关闭按钮触发 onClose
+ */
 export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const { t } = useI18n();
   const {

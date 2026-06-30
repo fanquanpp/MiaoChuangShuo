@@ -73,6 +73,18 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   poetry: Feather,
 };
 
+/**
+ * 启动器主组件
+ * 输入: 无
+ * 输出: JSX 启动器页面
+ * 流程:
+ *   1. 挂载时从 localStorage 恢复扫描目录并自动扫描
+ *   2. 调用后端 scanProjects 获取项目列表，渲染卡片网格
+ *   3. 支持创建项目（文体类型选择 → 创建对话框）
+ *   4. 支持导入本地项目（选择目录 → 调用 importProject）
+ *   5. 支持搜索过滤、删除项目（带确认对话框）
+ *   6. 支持自定义模板管理与使用
+ */
 export default function Launcher() {
   const openProject = useAppStore((s) => s.openProject);
   const closeProject = useAppStore((s) => s.closeProject);

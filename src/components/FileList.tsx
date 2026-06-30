@@ -364,6 +364,20 @@ function TreeNodeGrid({
   );
 }
 
+/**
+ * 右侧文件列表组件
+ * 输入:
+ *   onCreateFile 新建文件回调
+ *   onSelectFile 文件选择回调（可选）
+ * 输出: JSX 文件列表界面（卡片视图或列表视图）
+ * 流程:
+ *   1. 从全局 store 读取项目目录树与当前分类
+ *   2. 通过 findDirByName 定位分类目录，过滤 .txt 文件
+ *   3. 渲染卡片网格或列表视图（支持子文件夹展开/折叠）
+ *   4. 处理文件操作：选择、重命名（含非法字符校验）、删除（带确认）
+ *   5. 正文分类特殊功能：拖拽排序、批量重编号
+ *   6. 视图切换：卡片/列表，记忆用户偏好
+ */
 export default function FileList({ onCreateFile, onSelectFile }: FileListProps) {
   const projectTree = useAppStore((s) => s.projectTree);
   const activeCategory = useAppStore((s) => s.activeCategory);

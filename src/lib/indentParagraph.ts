@@ -1,15 +1,16 @@
 // 散文类型自动首行缩进 TipTap 扩展
 //
 // 功能概述：
-// 为散文随笔类型项目提供段落首行自动缩进功能。
-// 当用户在段落起始位置输入文字时，自动在段首插入指定数量的全角空格作为缩进。
+// 为散文类项目（标准长篇/短篇/日记/分卷/同世界观/诗歌等）提供段落首行自动缩进功能。
+// 当用户在新段落起始位置输入文字时，自动在段首插入指定数量的全角空格作为缩进。
 // 缩进宽度可通过 indentWidth 配置（1-4 个全角空格）。
 //
 // 模块职责：
-// 1. 监听编辑器输入事件
-// 2. 检测段落起始位置
+// 1. 监听编辑器文本输入事务
+// 2. 检测光标是否位于段首附近
 // 3. 自动插入全角空格缩进
-// 4. 防止重复插入
+// 4. 防止重复插入（段落已以全角空格开头则跳过）
+// 5. 跳过空行分隔符（前一段落为空时不缩进，避免段落间空行被缩进）
 
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
@@ -24,7 +25,7 @@ export interface IndentParagraphOptions {
   indentWidth: number;
 }
 
-// 根据宽度生成缩进文本（全角空格重复）
+// 根据宽度生成缩进文本（全角空格重复，限制在 1-4 之间）
 function getIndentText(width: number): string {
   return "\u3000".repeat(Math.max(1, Math.min(4, width)));
 }
@@ -33,10 +34,12 @@ function getIndentText(width: number): string {
 // 输入: enabled 是否启用, indentWidth 缩进宽度
 // 输出: TipTap Extension 实例
 // 流程:
-//   1. 监听编辑器事务
-//   2. 检测新段落起始输入
-//   3. 自动插入指定宽度的全角空格
-//   4. 防止重复插入
+//   1. 监听编辑器事务，过滤非文本输入事务
+//   2. 定位光标所在段落
+//   3. 检查段落是否已有缩进（以全角空格开头则跳过）
+//   4. 检查光标是否在段首附近（偏移量 <= 缩进宽度 + 容差）
+//   5. 检查前一段落是否有内容（空行作为段落分隔符不缩进）
+//   6. 插入指定宽度的全角空格缩进
 export const IndentParagraph = Extension.create<IndentParagraphOptions>({
   name: "indentParagraph",
 
@@ -65,7 +68,8 @@ export const IndentParagraph = Extension.create<IndentParagraphOptions>({
           const docChanged = transactions.some((tr) => tr.docChanged);
           if (!docChanged) return null;
 
-          // 检查是否有文本输入事务
+          // 检查是否有文本输入事务（insertText 或 paste）
+          // 注：ProseMirror 的 Enter 键产生 splitBlock，不会触发此分支
           const hasTextInput = transactions.some(
             (tr) =>
               tr.getMeta("inputType") === "insertText" ||
@@ -73,11 +77,7 @@ export const IndentParagraph = Extension.create<IndentParagraphOptions>({
           );
           if (!hasTextInput) return null;
 
-          const tr = newState.tr;
-          let modified = false;
           const { selection } = newState;
-
-          // 检查光标所在段落
           const $head = selection.$head;
           const paragraphPos = $head.before($head.depth);
 
@@ -88,25 +88,34 @@ export const IndentParagraph = Extension.create<IndentParagraphOptions>({
             return null;
           }
 
-          // 根据配置生成缩进文本
-          const indentText = getIndentText(options.indentWidth);
+          const text = paragraphNode.textContent;
 
           // 检查段落是否已有缩进（以至少一个全角空格开头即视为已缩进）
-          const text = paragraphNode.textContent;
           if (text.startsWith("\u3000")) return null;
 
-          // 检查光标是否在段首附近（缩进字符数内）
+          // 检查光标是否在段首附近（偏移量 <= 缩进宽度 + 2 容差）
+          // 容差用于支持用户快速输入少量字符后仍能触发缩进
           const offsetInParagraph = $head.parentOffset;
-          if (offsetInParagraph > options.indentWidth) return null;
+          const tolerance = options.indentWidth + 2;
+          if (offsetInParagraph > tolerance) return null;
 
-          // 检查段落是否为空或刚输入少量字符
-          if (text.length > options.indentWidth) return null;
+          // 检查前一段落是否有内容
+          // 若前一段落为空（段落间空行分隔符），则当前段落不缩进
+          // 这样保持段落间空行的视觉整洁
+          if (paragraphPos > 0) {
+            const prevNode = newState.doc.nodeAt(paragraphPos - 1);
+            if (prevNode && prevNode.type.name === "paragraph") {
+              const prevText = prevNode.textContent;
+              // 前一段落为空（空行分隔符），当前段落不缩进
+              if (prevText.trim() === "") return null;
+            }
+          }
 
-          // 插入缩进
+          // 根据配置生成缩进文本并插入到段首
+          const indentText = getIndentText(options.indentWidth);
+          const tr = newState.tr;
           tr.insertText(indentText, paragraphPos + 1);
-          modified = true;
-
-          return modified ? tr : null;
+          return tr;
         },
       }),
     ];

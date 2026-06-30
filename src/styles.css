@@ -449,6 +449,21 @@ select:focus-visible {
   outline: none;
 }
 
+/* ========== 当前段落高亮（VSCode 风格当前行高亮） ========== */
+.ProseMirror p.current-paragraph {
+  background: rgba(124, 158, 255, 0.06);
+  border-left: 2px solid var(--fandex-primary);
+  padding-left: 0.75em;
+  margin-left: -0.85em;
+  border-radius: 2px;
+  transition: background 0.15s ease-out, border-color 0.15s ease-out;
+}
+
+/* 亮色主题下的当前段落高亮 */
+.light .ProseMirror p.current-paragraph {
+  background: rgba(68, 102, 221, 0.08);
+}
+
 /* ========== 诗歌/歌词排版样式 ========== */
 .ProseMirror .poetry-block {
   text-align: center;

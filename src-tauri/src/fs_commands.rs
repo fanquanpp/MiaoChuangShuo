@@ -46,9 +46,15 @@ fn get_templates_dir() -> Result<PathBuf, String> {
 }
 
 /// 路径沙箱校验：确保目标路径在项目根目录内
-/// 输入: target_path 目标路径, project_root 项目根目录
+/// 输入: target 目标路径, project_root 项目根目录
 /// 输出: Result<PathBuf, String> 规范化后的目标路径或错误
-/// 流程: 规范化两个路径并验证包含关系，防止目录穿越攻击
+/// 流程:
+///   1. canonicalize 项目根路径（Windows 下返回带 \\?\ 前缀的绝对路径）
+///   2. 归一化目标路径分隔符，处理前端传入的混合分隔符
+///   3. 目标路径存在时直接 canonicalize
+///   4. 目标路径不存在时 canonicalize 父目录后拼接文件名
+///   5. 父目录也不存在时做纯词法检查，返回与根路径格式一致的路径
+///   6. 统一使用规范化字符串比较包含关系，避免 Path::starts_with 在前缀差异下的误判
 fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf, String> {
     let root_path = PathBuf::from(project_root)
         .canonicalize()
@@ -79,24 +85,31 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
                 .ok_or_else(|| "无效的文件路径".to_string())?;
             canonical_parent.join(filename)
         } else {
-            // 父目录也不存在，做词法检查（路径归一化后比较前缀）
-            // 关键：去掉 \\?\ 长路径前缀后再比较，防止误判
-            let target_str = strip_verbatim_prefix(&target_path.to_string_lossy()).replace('\\', "/");
-            let root_str = strip_verbatim_prefix(&root_path.to_string_lossy()).replace('\\', "/");
-            if target_str.starts_with(&root_str) {
-                target_path.clone()
-            } else {
+            // 父目录也不存在，做纯词法检查
+            // 统一格式：去掉 \\?\ 前缀 + 正斜杠 + 小写（Windows 不区分大小写）
+            let target_norm = normalize_for_compare(&target_path.to_string_lossy());
+            let root_norm = normalize_for_compare(&root_path.to_string_lossy());
+            if !target_norm.starts_with(&root_norm) {
                 return Err(format!(
                     "路径越界: 不允许访问项目目录外的路径 ({} 不在 {} 内)",
                     target_path.display(),
                     root_path.display()
                 ));
             }
+            // 返回与 root_path 格式一致的路径（拼接相对部分），保证带 \\?\ 前缀
+            // 这样后续 starts_with 比较才能与 root_path 匹配
+            let relative = target_path
+                .strip_prefix(&root_path)
+                .unwrap_or(&target_path);
+            root_path.join(relative)
         }
     };
 
-    // 检查目标路径是否以项目根目录开头
-    if !canonical.starts_with(&root_path) {
+    // 统一使用规范化字符串比较包含关系
+    // 避免 Path::starts_with 在 \\?\ 前缀差异下误判（Windows 关键修复点）
+    let canonical_norm = normalize_for_compare(&canonical.to_string_lossy());
+    let root_norm = normalize_for_compare(&root_path.to_string_lossy());
+    if !canonical_norm.starts_with(&root_norm) {
         return Err(format!(
             "路径越界: 不允许访问项目目录外的路径 ({} 不在 {} 内)",
             canonical.display(),
@@ -105,6 +118,16 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
     }
 
     Ok(canonical)
+}
+
+/// 路径规范化比较函数
+/// 输入: 路径字符串
+/// 输出: 规范化后的字符串（去前缀 + 正斜杠 + 小写）
+/// 流程: 去掉 \\?\ 前缀，统一为正斜杠，小写化以支持 Windows 大小写不敏感比较
+fn normalize_for_compare(path: &str) -> String {
+    strip_verbatim_prefix(path)
+        .replace('\\', "/")
+        .to_lowercase()
 }
 
 /// 去掉 Windows 长路径前缀 \\?\ 或 //?/
