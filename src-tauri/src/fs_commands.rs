@@ -1006,6 +1006,209 @@ fn count_files_recursive(dir: &Path, total: &mut u64) {
     }
 }
 
+// ===== 全局替换命令 =====
+
+/// 单个文件替换结果项
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ReplaceFileResult {
+    /// 相对路径
+    pub relative_path: String,
+    /// 文件名
+    pub file_name: String,
+    /// 替换次数
+    pub replacements: u64,
+}
+
+/// 全局替换结果
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ReplaceResult {
+    /// 修改的文件数
+    pub files_modified: u64,
+    /// 总替换次数
+    pub total_replacements: u64,
+    /// 各文件替换详情
+    pub files: Vec<ReplaceFileResult>,
+}
+
+/// 全局替换项目内文本内容
+/// 输入:
+///   project_path 项目路径
+///   query 查找词（非空）
+///   replacement 替换字符串
+///   case_sensitive 是否区分大小写
+/// 输出: Result<ReplaceResult, String> 替换结果统计
+/// 流程:
+///   1. 校验项目路径与查找词非空
+///   2. 递归遍历项目内所有 .txt 文件（跳过 .开头目录）
+///   3. 逐文件读取内容，按行执行替换（保留原始换行符）
+///   4. 仅当内容有变化时写回文件
+///   5. 统计修改文件数与替换次数
+/// 安全: 仅 .txt 文件可被修改，所有路径经沙箱校验
+#[tauri::command]
+pub fn replace_in_project(
+    project_path: String,
+    query: String,
+    replacement: String,
+    case_sensitive: bool,
+) -> Result<ReplaceResult, String> {
+    if query.trim().is_empty() {
+        return Err("查找内容不能为空".to_string());
+    }
+    if query == replacement {
+        return Err("查找内容与替换内容相同，无需替换".to_string());
+    }
+    let root = validate_project_path(&project_path)?;
+    let mut files = Vec::new();
+    let mut total_replacements: u64 = 0;
+    let mut files_modified: u64 = 0;
+    replace_recursive(&root, &root, &query, &replacement, case_sensitive, &mut files, &mut total_replacements, &mut files_modified);
+    Ok(ReplaceResult {
+        files_modified,
+        total_replacements,
+        files,
+    })
+}
+
+/// 递归执行替换
+/// 输入:
+///   current 当前路径
+///   root 项目根路径
+///   query 查找词
+///   replacement 替换字符串
+///   case_sensitive 区分大小写
+///   files 文件结果集合
+///   total_replacements 总替换次数累加器
+///   files_modified 修改文件数累加器
+/// 输出: 无
+/// 流程: 遍历目录，对每个 .txt 文件执行替换并写回
+fn replace_recursive(
+    current: &Path,
+    root: &Path,
+    query: &str,
+    replacement: &str,
+    case_sensitive: bool,
+    files: &mut Vec<ReplaceFileResult>,
+    total_replacements: &mut u64,
+    files_modified: &mut u64,
+) {
+    if let Ok(entries) = fs::read_dir(current) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            // 跳过隐藏目录（.novelforge 等）
+            if name.starts_with('.') {
+                continue;
+            }
+            if path.is_dir() {
+                replace_recursive(&path, root, query, replacement, case_sensitive, files, total_replacements, files_modified);
+            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
+                let count = replace_in_file(&path, root, query, replacement, case_sensitive, files);
+                if count > 0 {
+                    *total_replacements += count;
+                    *files_modified += 1;
+                }
+            }
+        }
+    }
+}
+
+/// 在单个文件中执行替换并写回
+/// 输入:
+///   file_path 文件路径
+///   root 项目根路径
+///   query 查找词
+///   replacement 替换字符串
+///   case_sensitive 区分大小写
+///   files 文件结果集合
+/// 输出: u64 替换次数
+/// 流程:
+///   1. 读取文件内容
+///   2. 先统计匹配次数（避免替换后无法定位）
+///   3. 执行替换生成新内容
+///   4. 仅当有替换发生时写回文件
+///   5. 记录文件结果到 files
+fn replace_in_file(
+    file_path: &Path,
+    root: &Path,
+    query: &str,
+    replacement: &str,
+    case_sensitive: bool,
+    files: &mut Vec<ReplaceFileResult>,
+) -> u64 {
+    let content = match fs::read_to_string(file_path) {
+        Ok(c) => c,
+        Err(_) => return 0,
+    };
+    // 先统计原始内容中的匹配次数
+    let count = count_matches(&content, query, case_sensitive);
+    if count == 0 {
+        return 0;
+    }
+    // 执行替换
+    let new_content = if case_sensitive {
+        content.replace(query, replacement)
+    } else {
+        case_insensitive_replace(&content, query, replacement)
+    };
+    // 仅当内容确实变化时写回（避免无意义的磁盘写入）
+    if new_content == content {
+        return 0;
+    }
+    let _ = fs::write(file_path, &new_content);
+    let relative_path = file_path
+        .strip_prefix(root)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let file_name = file_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    files.push(ReplaceFileResult {
+        relative_path,
+        file_name,
+        replacements: count,
+    });
+    count
+}
+
+/// 统计字符串中匹配次数
+/// 输入: content 原文, query 查找词, case_sensitive 区分大小写
+/// 输出: u64 匹配次数
+fn count_matches(content: &str, query: &str, case_sensitive: bool) -> u64 {
+    if case_sensitive {
+        content.matches(query).count() as u64
+    } else {
+        content
+            .to_lowercase()
+            .matches(&query.to_lowercase())
+            .count() as u64
+    }
+}
+
+/// 不区分大小写的替换（保留原始大小写）
+/// 输入: content 原文, query 查找词, replacement 替换字符串
+/// 输出: String 替换后的内容
+/// 流程: 通过 to_lowercase 比对定位匹配位置，逐个替换并保留原文其余部分
+fn case_insensitive_replace(content: &str, query: &str, replacement: &str) -> String {
+    let content_lower = content.to_lowercase();
+    let query_lower = query.to_lowercase();
+    let mut result = String::with_capacity(content.len());
+    let mut remaining = content;
+    let mut remaining_lower = content_lower.as_str();
+    while let Some(pos) = remaining_lower.find(&query_lower) {
+        // 保留匹配前的原文
+        result.push_str(&remaining[..pos]);
+        // 追加替换内容
+        result.push_str(replacement);
+        // 跳过已处理部分
+        let skip = pos + query_lower.len();
+        remaining = &remaining[skip..];
+        remaining_lower = &remaining_lower[skip..];
+    }
+    result.push_str(remaining);
+    result
+}
+
 // ===== 自定义模板管理命令 =====
 
 /// 列出所有自定义模板

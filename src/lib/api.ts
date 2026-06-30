@@ -284,6 +284,48 @@ export async function searchInProject(
   });
 }
 
+// 单个文件替换结果项
+export interface ReplaceFileResult {
+  /** 相对路径 */
+  relative_path: string;
+  /** 文件名 */
+  file_name: string;
+  /** 替换次数 */
+  replacements: number;
+}
+
+// 全局替换结果
+export interface ReplaceResult {
+  /** 修改的文件数 */
+  files_modified: number;
+  /** 总替换次数 */
+  total_replacements: number;
+  /** 各文件替换详情 */
+  files: ReplaceFileResult[];
+}
+
+// 全局替换项目内容
+// 输入:
+//   projectPath 项目路径
+//   query 查找词
+//   replacement 替换字符串
+//   caseSensitive 区分大小写
+// 输出: Promise<ReplaceResult> 替换结果统计
+// 流程: 调用 Rust 后端 replace_in_project 命令，递归遍历 .txt 文件执行替换
+export async function replaceInProject(
+  projectPath: string,
+  query: string,
+  replacement: string,
+  caseSensitive: boolean
+): Promise<ReplaceResult> {
+  return invoke<ReplaceResult>("replace_in_project", {
+    projectPath,
+    query,
+    replacement,
+    caseSensitive,
+  });
+}
+
 // 获取项目写作统计
 // 输入: projectPath 项目路径
 // 输出: Promise<WritingStats> 统计信息
