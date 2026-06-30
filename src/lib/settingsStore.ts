@@ -34,6 +34,10 @@ interface SettingsState {
   autoNumbering: boolean;
   /** 模板自动填充 */
   autoTemplateFill: boolean;
+  /** 首行缩进开关 */
+  indentEnabled: boolean;
+  /** 首行缩进宽度（全角空格数，1-4） */
+  indentWidth: number;
 
   // Actions
   setFontSize: (size: number) => void;
@@ -45,6 +49,8 @@ interface SettingsState {
   setWeatherAutoFill: (enabled: boolean) => void;
   setAutoNumbering: (enabled: boolean) => void;
   setAutoTemplateFill: (enabled: boolean) => void;
+  setIndentEnabled: (enabled: boolean) => void;
+  setIndentWidth: (width: number) => void;
   /** 从 localStorage 加载并应用 */
   initSettings: () => void;
 }
@@ -62,6 +68,8 @@ interface SettingsData {
   weatherAutoFill: boolean;
   autoNumbering: boolean;
   autoTemplateFill: boolean;
+  indentEnabled: boolean;
+  indentWidth: number;
 }
 
 // 默认设置
@@ -75,6 +83,8 @@ const DEFAULT_SETTINGS: SettingsData = {
   weatherAutoFill: false,
   autoNumbering: true,
   autoTemplateFill: true,
+  indentEnabled: true,
+  indentWidth: 2,
 };
 
 function loadSettings(): SettingsData {
@@ -160,6 +170,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const data = { ...get(), autoTemplateFill: enabled };
     saveSettings(data);
     set({ autoTemplateFill: enabled });
+  },
+
+  setIndentEnabled: (enabled) => {
+    const data = { ...get(), indentEnabled: enabled };
+    saveSettings(data);
+    set({ indentEnabled: enabled });
+  },
+
+  setIndentWidth: (width) => {
+    const clamped = Math.max(1, Math.min(4, width));
+    const data = { ...get(), indentWidth: clamped };
+    saveSettings(data);
+    set({ indentWidth: clamped });
   },
 
   initSettings: () => {

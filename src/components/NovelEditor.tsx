@@ -28,7 +28,7 @@ import CodeBlock from "@tiptap/extension-code-block";
 import Blockquote from "@tiptap/extension-blockquote";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { readFile, writeFile } from "../lib/api";
+import { readFile, writeFile, readProjectTree } from "../lib/api";
 import { useAppStore } from "../lib/store";
 import { useSettingsStore } from "../lib/settingsStore";
 import { CharacterMention } from "../lib/characterMention";
@@ -65,18 +65,58 @@ export default function NovelEditor({
   const isDialogue = projectType === "dialogue";
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
   const diaryAutoDate = useSettingsStore((s) => s.diaryAutoDate);
+  const indentEnabled = useSettingsStore((s) => s.indentEnabled);
+  const indentWidth = useSettingsStore((s) => s.indentWidth);
   const [showOutline, setShowOutline] = useState(false);
 
-  // 加载剧本/对话体角色名列表
+  // 从角色目录自动提取角色名（扫描每个 .txt 文件首行）
+  // 回退方案：读取 角色名册.txt（手动维护的花名册）
   useEffect(() => {
     let cancelled = false;
     if ((!isScript && !isDialogue) || !currentProject) {
       setCharacters([]);
       return;
     }
-    const rosterPath = `${currentProject.path}/角色/角色名册.txt`;
-    readFile(rosterPath, currentProject.path)
-      .then((content) => {
+
+    const extractNames = async () => {
+      try {
+        // 优先方案：扫描角色目录，从每个 .txt 文件首行提取角色名
+        const charDirPath = `${currentProject.path}/角色`;
+        const tree = await readProjectTree(currentProject.path);
+        const charDir = tree.find(
+          (n) => n.is_dir && n.name === "角色"
+        );
+        if (charDir?.children) {
+          const names: string[] = [];
+          for (const child of charDir.children) {
+            if (child.is_dir || !child.name.endsWith(".txt")) continue;
+            try {
+              const filePath = `${charDirPath}/${child.name}`;
+              const content = await readFile(filePath, currentProject.path);
+              const firstLine = content
+                .split(/\r?\n/)
+                .map((l) => l.trim())
+                .find((l) => l && !l.startsWith("#") && !l.startsWith("---"));
+              if (firstLine && firstLine.length <= 20) {
+                names.push(firstLine);
+              }
+            } catch {
+              // 单个文件读取失败，跳过
+            }
+          }
+          if (!cancelled && names.length > 0) {
+            setCharacters(names);
+            return;
+          }
+        }
+      } catch {
+        // 目录扫描失败，回退到角色名册
+      }
+
+      // 回退方案：读取 角色名册.txt
+      const rosterPath = `${currentProject.path}/角色/角色名册.txt`;
+      try {
+        const content = await readFile(rosterPath, currentProject.path);
         const names = content
           .split(/\r?\n/)
           .map((line) => line.trim())
@@ -88,13 +128,13 @@ export default function NovelEditor({
               !line.startsWith("-") &&
               !/^[-=]{3,}$/.test(line)
           );
-        if (cancelled) return;
-        setCharacters(names);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCharacters([]);
-      });
+        if (!cancelled) setCharacters(names);
+      } catch {
+        if (!cancelled) setCharacters([]);
+      }
+    };
+
+    extractNames();
     return () => { cancelled = true; };
   }, [isScript, isDialogue, currentProject]);
 
@@ -116,7 +156,7 @@ export default function NovelEditor({
     ];
 
     if (isEssay) {
-      exts.push(IndentParagraph.configure({ enabled: true }));
+      exts.push(IndentParagraph.configure({ enabled: indentEnabled, indentWidth }));
     }
 
     if (isScript || isDialogue) {
@@ -137,7 +177,7 @@ export default function NovelEditor({
 
     exts.push(PoetryFormat.configure({ enabled: true }));
     return exts;
-  }, [isEssay, isScript, isDialogue, characters, t]);
+  }, [isEssay, isScript, isDialogue, characters, t, indentEnabled, indentWidth]);
 
   // 创建编辑器实例（纯文本模式）
   const editor = useEditor({
@@ -426,7 +466,7 @@ export default function NovelEditor({
           <span className="text-fandex-primary font-medium">{t("editor.dialogueMode")}</span>
           <span>·</span>
           <span>
-            {t("editor.dialogueCharHint")}
+            {t("editor.dialogueAutoFillHint")}
           </span>
           <span>·</span>
           <span>

@@ -32,6 +32,8 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     weatherAutoFill,
     autoNumbering,
     autoTemplateFill,
+    indentEnabled,
+    indentWidth,
     setFontSize,
     setAutoSaveInterval,
     setChapterFormat,
@@ -41,6 +43,8 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     setWeatherAutoFill,
     setAutoNumbering,
     setAutoTemplateFill,
+    setIndentEnabled,
+    setIndentWidth,
   } = useSettingsStore();
   const { theme, toggleTheme } = useThemeStore();
 
@@ -296,6 +300,56 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   </p>
                 </div>
               </label>
+            </div>
+          </section>
+
+          {/* 首行缩进设置 */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="w-4 h-4 text-green-500" />
+              <h3 className="text-sm font-bold font-display text-nf-text">
+                {t("settings.indentSection")}
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              {/* 启用缩进 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={indentEnabled}
+                  onChange={(e) => setIndentEnabled(e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("settings.indentEnabled")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("settings.indentEnabledHint")}
+                  </p>
+                </div>
+              </label>
+
+              {/* 缩进宽度 */}
+              <div className="space-y-2">
+                <label className="text-xs text-nf-text-secondary">{t("settings.indentWidth")}</label>
+                <div className="flex gap-2">
+                  {([1, 2, 3, 4] as const).map((val) => (
+                    <button
+                      key={val}
+                      onClick={() => setIndentWidth(val)}
+                      className={`flex-1 py-1.5 text-xs border transition-all duration-fast ${
+                        indentWidth === val
+                          ? "bg-green-500/10 border-green-500/40 text-green-500"
+                          : "border-nf-border-light text-nf-text-tertiary hover:border-nf-border hover:text-nf-text-secondary"
+                      }`}
+                    >
+                      {t(`settings.indentWidth${val}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 

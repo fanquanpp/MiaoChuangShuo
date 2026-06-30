@@ -1814,7 +1814,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "novelforge"
-version = "2.4.0"
+version = "2.5.0"
 dependencies = [
  "chrono",
  "serde",

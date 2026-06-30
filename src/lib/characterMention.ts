@@ -1,20 +1,22 @@
 // 剧本角色名自动选择 TipTap 扩展
 //
 // 功能概述：
-// 为舞台剧本类型项目提供台词前的角色名自动选择功能。
-// 当用户在空行输入或按 Tab 键时，弹出角色名选择浮层，
-// 用户可从预设角色名中选择，也可自定义输入。
+// 为舞台剧本/对话体类型项目提供台词前的角色名自动选择功能。
+// 功能1: 在空行按 Tab 键弹出角色名选择浮层
+// 功能2: 换行自动延续 —— 当上一行以"角色名: "开头时，新行自动填充相同角色名前缀
 //
 // 模块职责：
 // 1. 监听编辑器输入，检测台词行起始位置
-// 2. 弹出角色名选择浮层
+// 2. Tab 键弹出角色名选择浮层
 // 3. 选中后自动插入角色名前缀
-// 4. 支持自定义角色名输入
-// 5. 键盘导航（ArrowUp/ArrowDown/Enter/Escape）
-// 6. ARIA 无障碍标注
+// 4. Enter 键自动延续角色名对话模式
+// 5. 支持自定义角色名输入
+// 6. 键盘导航（ArrowUp/ArrowDown/Enter/Escape）
+// 7. ARIA 无障碍标注
 
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { EditorState, Transaction } from "@tiptap/pm/state";
 
 // 角色名选择扩展的配置选项
 export interface CharacterMentionOptions {
@@ -27,6 +29,20 @@ export interface CharacterMentionOptions {
     customInputPlaceholder?: string;
     hintText?: string;
   };
+}
+
+/**
+ * 从文本中提取开头的角色名（匹配 "角色名: " 或 "角色名： " 模式）
+ * 返回匹配到的角色名，未匹配返回 null
+ */
+function extractCharacterPrefix(text: string, characters: string[]): string | null {
+  for (const name of characters) {
+    if (text.startsWith(`${name}: `) || text.startsWith(`${name}： `) ||
+        text.startsWith(`${name}:`) || text.startsWith(`${name}：`)) {
+      return name;
+    }
+  }
+  return null;
 }
 
 export const CharacterMention = Extension.create<CharacterMentionOptions>({
@@ -55,6 +71,52 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
             return prev;
           },
         },
+
+        // 换行自动延续：检测新段落是否应自动填充角色名前缀
+        appendTransaction: (
+          transactions: readonly Transaction[],
+          oldState: EditorState,
+          newState: EditorState
+        ): Transaction | null => {
+          if (!options.characters.length) return null;
+
+          const docChanged = transactions.some((tr) => tr.docChanged);
+          if (!docChanged) return null;
+
+          // 仅处理文本输入（Enter 键会产生 insertText 事务）
+          const hasTextInput = transactions.some(
+            (tr) =>
+              tr.getMeta("inputType") === "insertText" ||
+              tr.getMeta("paste") === true
+          );
+          if (!hasTextInput) return null;
+
+          const { selection } = newState;
+          const $head = selection.$head;
+
+          // 当前段落必须是空段落（刚按 Enter 产生的新行）
+          const currentText = $head.parent.textContent;
+          if (currentText.trim() !== "") return null;
+
+          const paragraphPos = $head.before($head.depth);
+          if (paragraphPos <= 0) return null;
+
+          // 查找上一个段落
+          const prevPos = newState.doc.resolve(paragraphPos - 1);
+          const prevNode = prevPos.nodeAfter || newState.doc.nodeAt(prevPos.before(prevPos.depth));
+          if (!prevNode || prevNode.type.name !== "paragraph") return null;
+
+          const prevText = prevNode.textContent;
+          const charName = extractCharacterPrefix(prevText, options.characters);
+          if (!charName) return null;
+
+          // 在新段落中自动插入角色名前缀
+          const tr = newState.tr;
+          const insertPos = paragraphPos + 1;
+          tr.insertText(`${charName}: `, insertPos);
+          return tr;
+        },
+
         props: {
           handleKeyDown(view, event) {
             if (event.key === "Tab") {

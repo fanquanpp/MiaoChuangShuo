@@ -550,6 +550,23 @@ const zhCN: TranslationDict = {
 
   // ── 工作台 - 共享世界 ──
   "workspace.sharedWorldHint": "在卷宗下创建章节文件",
+
+  // ── 首行缩进设置 ──
+  "settings.indentSection": "首行缩进",
+  "settings.indentEnabled": "启用首行缩进",
+  "settings.indentEnabledHint": "散文模式下段落首行自动缩进",
+  "settings.indentWidth": "缩进宽度",
+  "settings.indentWidth1": "1 字",
+  "settings.indentWidth2": "2 字",
+  "settings.indentWidth3": "3 字",
+  "settings.indentWidth4": "4 字",
+
+  // ── 文件列表 - 批量重编号 ──
+  "filelist.batchRenumber": "重新编号",
+  "filelist.renumbered": "章节已重新编号",
+
+  // ── 对话自动延续 ──
+  "editor.dialogueAutoFillHint": "换行自动延续上一行的角色名",
 };
 
 // 英文翻译
@@ -1084,6 +1101,23 @@ const enUS: TranslationDict = {
 
   // ── Workspace - Shared World ──
   "workspace.sharedWorldHint": "Create chapter files under volumes",
+
+  // ── Indent Settings ──
+  "settings.indentSection": "First-line Indent",
+  "settings.indentEnabled": "Enable first-line indent",
+  "settings.indentEnabledHint": "Auto-indent first line in essay mode",
+  "settings.indentWidth": "Indent width",
+  "settings.indentWidth1": "1 char",
+  "settings.indentWidth2": "2 chars",
+  "settings.indentWidth3": "3 chars",
+  "settings.indentWidth4": "4 chars",
+
+  // ── File List - Batch Renumber ──
+  "filelist.batchRenumber": "Renumber",
+  "filelist.renumbered": "Chapters renumbered",
+
+  // ── Dialogue Auto-fill ──
+  "editor.dialogueAutoFillHint": "Auto-continue character name on new line",
 };
 
 const translations: Record<Locale, TranslationDict> = {

@@ -3,14 +3,16 @@
 // 功能概述：
 // 显示当前分类下的文件列表，支持卡片视图与列表视图切换，
 // 支持子文件夹展开/折叠导航。
+// 正文分类支持拖拽排序和批量重编号。
 // 采用 FANDEX 美术风格：直角、左侧色条标题、1px 边框。
 //
 // 模块职责：
 // 1. 从项目目录树中过滤当前分类的文件
 // 2. 渲染卡片网格或列表（含子文件夹展开/折叠）
 // 3. 处理文件选择、重命名与删除
+// 4. 正文分类拖拽排序 + 批量重编号
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   FileText,
   Trash2,
@@ -22,6 +24,8 @@ import {
   Folder,
   ChevronRight,
   ChevronDown,
+  GripVertical,
+  RefreshCw,
 } from "lucide-react";
 import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
 import type { FileNode } from "../lib/api";
@@ -29,6 +33,7 @@ import { deletePath, readProjectTree, renamePath } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
+import { extractChapterNum } from "../lib/settingsStore";
 import ConfirmDialog from "./ConfirmDialog";
 
 interface FileListProps {
@@ -45,7 +50,6 @@ function formatSize(bytes: number): string {
 
 // 从文件名中提取章节序号，用于正文文件自动排序
 function extractChapterNumber(name: string): number {
-  // Match patterns: 第X章, 第X节, 第X回, Chapter X, or leading numbers like "01.", "1."
   const patterns = [
     /第(\d+)章/,
     /第(\d+)节/,
@@ -60,6 +64,14 @@ function extractChapterNumber(name: string): number {
   return Infinity; // non-chapter files sort last
 }
 
+// 从文件名中去除编号前缀，保留纯名称
+function stripNumberPrefix(name: string): string {
+  return name
+    .replace(/^\d+[._\-\s]*/, "")
+    .replace(/\.txt$/i, "")
+    .trim();
+}
+
 // 递归渲染文件树节点（列表视图）
 function TreeNodeList({
   node,
@@ -70,6 +82,13 @@ function TreeNodeList({
   onDelete,
   t,
   activeFileWordCount,
+  isDraggable,
+  isDragOver,
+  isDragging,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   node: FileNode;
   depth: number;
@@ -79,6 +98,13 @@ function TreeNodeList({
   onDelete: (node: FileNode, e: React.MouseEvent) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   activeFileWordCount?: number;
+  isDraggable?: boolean;
+  isDragOver?: boolean;
+  isDragging?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -146,13 +172,25 @@ function TreeNodeList({
     <div
       onClick={() => onSelect(node)}
       style={{ paddingLeft: `${12 + depth * 16}px` }}
+      draggable={isDraggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition duration-fast border ${
-        isSelected
-          ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
-          : "text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text border-transparent"
+        isDragging
+          ? "opacity-40 border-fandex-primary/40"
+          : isDragOver
+            ? "border-t-2 border-t-fandex-primary"
+            : isSelected
+              ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
+              : "text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text border-transparent"
       }`}
     >
-      <span className="w-3.5 flex-shrink-0" />
+      {isDraggable && (
+        <GripVertical className="w-3.5 h-3.5 flex-shrink-0 text-nf-text-tertiary opacity-0 group-hover:opacity-60 cursor-grab" />
+      )}
+      {!isDraggable && <span className="w-3.5 flex-shrink-0" />}
       <FileText className="w-4 h-4 flex-shrink-0" />
       <span className="flex-1 text-sm truncate">{node.name}</span>
       <span className="text-xs text-nf-text-tertiary whitespace-nowrap">
@@ -189,6 +227,13 @@ function TreeNodeGrid({
   onDelete,
   activeFileWordCount,
   t,
+  isDraggable,
+  isDragOver,
+  isDragging,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   node: FileNode;
   depth: number;
@@ -198,6 +243,13 @@ function TreeNodeGrid({
   onDelete: (node: FileNode, e: React.MouseEvent) => void;
   activeFileWordCount?: number;
   t: (key: string, params?: Record<string, string | number>) => string;
+  isDraggable?: boolean;
+  isDragOver?: boolean;
+  isDragging?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -241,7 +293,7 @@ function TreeNodeGrid({
           </button>
         </div>
         {expanded && (
-          <div className="grid grid-cols-2 gap-1 bg-nf-border-light border border-nf-border-light pl-2">
+          <div className="grid grid-cols-2 gap-1 bg-nf-bg border border-nf-border-light pl-2">
             {node.children?.map((child) => (
               <TreeNodeGrid
                 key={child.relative_path}
@@ -266,12 +318,24 @@ function TreeNodeGrid({
   return (
     <div
       onClick={() => onSelect(node)}
+      draggable={isDraggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       className={`group relative p-3 cursor-pointer transition duration-fast bg-nf-bg ${
-        isSelected
-          ? "bg-fandex-primary/10 border-fandex-primary"
-          : "hover:bg-nf-bg-hover"
+        isDragging
+          ? "opacity-40 ring-1 ring-fandex-primary/40"
+          : isDragOver
+            ? "ring-t-2 ring-t-fandex-primary"
+            : isSelected
+              ? "bg-fandex-primary/10 border-fandex-primary"
+              : "hover:bg-nf-bg-hover"
       }`}
     >
+      {isDraggable && (
+        <GripVertical className="w-3.5 h-3.5 absolute top-1 left-1 text-nf-text-tertiary opacity-0 group-hover:opacity-60 cursor-grab" />
+      )}
       <FileText className="w-5 h-5 text-fandex-primary mb-2" />
       <div className="text-xs font-medium font-display text-nf-text truncate">
         {node.name}
@@ -312,22 +376,151 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
   const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
   const [renameTarget, setRenameTarget] = useState<FileNode | null>(null);
 
+  // 拖拽排序状态（仅正文分类有效）
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isRenumbering, setIsRenumbering] = useState(false);
+
   // 文件选择：优先使用外部传入的保存后切换回调
   const handleFileSelect = onSelectFile || setSelectedFile;
 
   const dirName = getCategoryDir(activeCategory);
+  const isManuscript = activeCategory === "manuscript";
 
   const children = useMemo(() => {
     const dir = findDirByName(projectTree, dirName);
     const items = dir?.children ? [...dir.children] : [];
     // 正文分类按章节序号自动排序
-    if (activeCategory === "manuscript") {
+    if (isManuscript) {
       items.sort(
         (a, b) => extractChapterNumber(a.name) - extractChapterNumber(b.name)
       );
     }
     return items;
-  }, [projectTree, dirName, activeCategory]);
+  }, [projectTree, dirName, isManuscript]);
+
+  // ── 拖拽排序处理 ──
+  const handleDragStart = useCallback((index: number) => (e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+    setDragIndex(index);
+  }, []);
+
+  const handleDragOver = useCallback((index: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverIndex(index);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverIndex(null);
+  }, []);
+
+  const handleDrop = useCallback((targetIndex: number) => async (e: React.DragEvent) => {
+    e.preventDefault();
+    const sourceIndex = dragIndex;
+    setDragIndex(null);
+    setDragOverIndex(null);
+
+    if (sourceIndex === null || sourceIndex === targetIndex) return;
+    if (!isManuscript) return;
+
+    // 构建新顺序
+    const newOrder = [...children];
+    const [moved] = newOrder.splice(sourceIndex, 1);
+    newOrder.splice(targetIndex, 0, moved);
+
+    // 批量重命名：按新顺序重新编号
+    const { currentProject } = useAppStore.getState();
+    if (!currentProject) return;
+
+    setIsRenumbering(true);
+    try {
+      // 先全部改为临时名称（避免名称冲突）
+      const tempNames: string[] = [];
+      for (let i = 0; i < newOrder.length; i++) {
+        const node = newOrder[i];
+        if (node.is_dir) continue;
+        const cleanName = stripNumberPrefix(node.name);
+        const tempName = `__tmp_${i}_${cleanName}.txt`;
+        const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
+        const newRelPath = dirPath + tempName;
+        await renamePath(currentProject.path, node.relative_path, newRelPath);
+        tempNames.push(newRelPath);
+      }
+
+      // 再从临时名称改为正式编号名称
+      let fileIdx = 0;
+      for (let i = 0; i < newOrder.length; i++) {
+        const node = newOrder[i];
+        if (node.is_dir) continue;
+        const cleanName = stripNumberPrefix(node.name);
+        const newName = `${i + 1}.${cleanName}.txt`;
+        const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
+        const newRelPath = dirPath + newName;
+        await renamePath(currentProject.path, tempNames[fileIdx], newRelPath);
+        fileIdx++;
+      }
+
+      // 刷新项目树
+      const tree = await readProjectTree(currentProject.path);
+      useAppStore.getState().setProjectTree(tree);
+      showToast("success", t("filelist.renumbered"));
+    } catch (e) {
+      showToast("error", t("filelist.renameFailed", { error: String(e) }));
+      // 刷新以恢复正确状态
+      const tree = await readProjectTree(currentProject.path);
+      useAppStore.getState().setProjectTree(tree);
+    } finally {
+      setIsRenumbering(false);
+    }
+  }, [dragIndex, children, isManuscript, showToast, t]);
+
+  // ── 批量重编号 ──
+  const handleBatchRenumber = useCallback(async () => {
+    if (!isManuscript || children.length === 0) return;
+    const { currentProject } = useAppStore.getState();
+    if (!currentProject) return;
+
+    setIsRenumbering(true);
+    try {
+      // 先全部改为临时名称
+      const tempNames: string[] = [];
+      for (let i = 0; i < children.length; i++) {
+        const node = children[i];
+        if (node.is_dir) continue;
+        const cleanName = stripNumberPrefix(node.name);
+        const tempName = `__tmp_${i}_${cleanName}.txt`;
+        const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
+        const newRelPath = dirPath + tempName;
+        await renamePath(currentProject.path, node.relative_path, newRelPath);
+        tempNames.push(newRelPath);
+      }
+
+      // 再从临时名称改为正式编号名称
+      let fileIdx = 0;
+      for (let i = 0; i < children.length; i++) {
+        const node = children[i];
+        if (node.is_dir) continue;
+        const cleanName = stripNumberPrefix(node.name);
+        const newName = `${i + 1}.${cleanName}.txt`;
+        const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
+        const newRelPath = dirPath + newName;
+        await renamePath(currentProject.path, tempNames[fileIdx], newRelPath);
+        fileIdx++;
+      }
+
+      const tree = await readProjectTree(currentProject.path);
+      useAppStore.getState().setProjectTree(tree);
+      showToast("success", t("filelist.renumbered"));
+    } catch (e) {
+      showToast("error", t("filelist.renameFailed", { error: String(e) }));
+      const tree = await readProjectTree(currentProject.path);
+      useAppStore.getState().setProjectTree(tree);
+    } finally {
+      setIsRenumbering(false);
+    }
+  }, [isManuscript, children, showToast, t]);
 
   const handleDelete = (node: FileNode, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -389,6 +582,20 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
     }
   };
 
+  // 判断某个文件节点是否正在被拖拽或作为拖拽目标
+  const getFileDragProps = (node: FileNode, index: number) => {
+    if (!isManuscript || node.is_dir) return {};
+    return {
+      isDraggable: true,
+      isDragOver: dragOverIndex === index,
+      isDragging: dragIndex === index,
+      onDragStart: handleDragStart(index),
+      onDragOver: handleDragOver(index),
+      onDragLeave: handleDragLeave,
+      onDrop: handleDrop(index),
+    };
+  };
+
   return (
     <div className="w-72 min-w-[260px] border-l border-nf-border-light bg-nf-bg flex flex-col">
       {/* 顶部: 标题与视图切换 */}
@@ -397,15 +604,25 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
           {dirName}
         </h2>
         <div className="flex items-center gap-1">
-          {activeCategory === "manuscript" && (
-            <button
-              onClick={onCreateFile}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition duration-fast"
-              title={t("filelist.newChapter")}
-            >
-              <FilePlus className="w-3.5 h-3.5" />
-              <span>{t("filelist.newChapter")}</span>
-            </button>
+          {isManuscript && (
+            <>
+              <button
+                onClick={onCreateFile}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition duration-fast"
+                title={t("filelist.newChapter")}
+              >
+                <FilePlus className="w-3.5 h-3.5" />
+                <span>{t("filelist.newChapter")}</span>
+              </button>
+              <button
+                onClick={handleBatchRenumber}
+                disabled={isRenumbering || children.filter(c => !c.is_dir).length < 2}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-nf-text-secondary border border-nf-border-light hover:border-fandex-secondary/60 hover:text-fandex-secondary transition duration-fast disabled:opacity-40 disabled:cursor-not-allowed"
+                title={t("filelist.batchRenumber")}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRenumbering ? "animate-spin" : ""}`} />
+              </button>
+            </>
           )}
           <button
             onClick={() => setViewMode("grid")}
@@ -448,7 +665,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 gap-1 bg-nf-border-light border border-nf-border-light">
-            {children.map((node) => (
+            {children.map((node, index) => (
               <TreeNodeGrid
                 key={node.relative_path}
                 node={node}
@@ -459,12 +676,13 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
                 onDelete={handleDelete}
                 activeFileWordCount={activeFileWordCount}
                 t={t}
+                {...getFileDragProps(node, index)}
               />
             ))}
           </div>
         ) : (
           <div className="space-y-1">
-            {children.map((node) => (
+            {children.map((node, index) => (
               <TreeNodeList
                 key={node.relative_path}
                 node={node}
@@ -475,6 +693,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
                 onDelete={handleDelete}
                 t={t}
                 activeFileWordCount={activeFileWordCount}
+                {...getFileDragProps(node, index)}
               />
             ))}
           </div>
