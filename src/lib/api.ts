@@ -11,6 +11,18 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+/**
+ * 路径安全校验：确保文件路径在项目目录内
+ * 防止目录遍历攻击的前端防护层（后端 Rust 也有校验）
+ */
+function validatePathInProject(filePath: string, projectPath: string): void {
+  const normalizedFile = filePath.replace(/\\/g, '/');
+  const normalizedProject = projectPath.replace(/\\/g, '/');
+  if (!normalizedFile.startsWith(normalizedProject)) {
+    throw new Error(`路径越界: 文件路径不在项目目录内`);
+  }
+}
+
 // 项目文体类型（按文体体裁分类）
 export type ProjectType =
   | "short_story"
@@ -166,6 +178,7 @@ export async function readProjectTree(projectPath: string): Promise<FileNode[]> 
 // 输出: Promise<string> 文件内容
 // 流程: 调用 Rust 后端 read_file 命令（后端校验路径在项目内）
 export async function readFile(filePath: string, projectPath: string): Promise<string> {
+  validatePathInProject(filePath, projectPath);
   return invoke<string>("read_file", { filePath, projectPath });
 }
 
@@ -174,6 +187,7 @@ export async function readFile(filePath: string, projectPath: string): Promise<s
 // 输出: Promise<void>
 // 流程: 调用 Rust 后端 write_file 命令（后端校验路径并写入）
 export async function writeFile(filePath: string, content: string, projectPath: string): Promise<void> {
+  validatePathInProject(filePath, projectPath);
   return invoke<void>("write_file", { filePath, content, projectPath });
 }
 
@@ -186,6 +200,7 @@ export async function createFile(
   relativePath: string,
   content: string
 ): Promise<string> {
+  validatePathInProject(`${projectPath}/${relativePath}`, projectPath);
   return invoke<string>("create_file", {
     projectPath,
     relativePath,
@@ -198,6 +213,7 @@ export async function createFile(
 // 输出: Promise<void>
 // 流程: 调用 Rust 后端 delete_path 命令（后端校验路径后删除）
 export async function deletePath(path: string, projectPath: string): Promise<void> {
+  validatePathInProject(path, projectPath);
   return invoke<void>("delete_path", { path, projectPath });
 }
 
@@ -285,6 +301,9 @@ export async function renamePath(
   // 跨平台路径拼接（使用正斜杠，后端 Rust PathBuf 自动适配）
   const oldAbs = `${projectPath}/${oldRelPath}`;
   const newAbs = `${projectPath}/${newRelPath}`;
+
+  validatePathInProject(oldAbs, projectPath);
+  validatePathInProject(newAbs, projectPath);
 
   return invoke<void>("rename_path", {
     oldPath: oldAbs,

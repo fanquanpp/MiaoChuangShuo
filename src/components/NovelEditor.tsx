@@ -69,6 +69,7 @@ export default function NovelEditor({
 
   // 加载剧本/对话体角色名列表
   useEffect(() => {
+    let cancelled = false;
     if ((!isScript && !isDialogue) || !currentProject) {
       setCharacters([]);
       return;
@@ -87,11 +88,14 @@ export default function NovelEditor({
               !line.startsWith("-") &&
               !/^[-=]{3,}$/.test(line)
           );
+        if (cancelled) return;
         setCharacters(names);
       })
       .catch(() => {
+        if (cancelled) return;
         setCharacters([]);
       });
+    return () => { cancelled = true; };
   }, [isScript, isDialogue, currentProject]);
 
   // 构建 TipTap 扩展列表（纯文本 + 新增格式化扩展）
@@ -158,6 +162,7 @@ export default function NovelEditor({
 
   // 加载文件内容（纯文本直读，无 MD→HTML 转换）
   useEffect(() => {
+    let cancelled = false;
     if (!editor || !filePath) {
       editor?.commands.clearContent();
       setWordCount(0);
@@ -168,6 +173,7 @@ export default function NovelEditor({
     setLoadError("");
     readFile(filePath, currentProject?.path || "")
       .then((content) => {
+        if (cancelled) return;
         // 日记模式：新建空文件时自动添加当天日期
         let finalContent = content;
         if (projectType === "diary" && diaryAutoDate && content.trim() === "") {
@@ -186,6 +192,7 @@ export default function NovelEditor({
           type: "doc",
           content: docContent.length > 0 ? docContent : [{ type: "paragraph" }],
         });
+        if (cancelled) return;
         setDirty(false);
         lastSavedContentRef.current = finalContent;
         setWordCount(countWords(editor.getText()));
@@ -203,8 +210,10 @@ export default function NovelEditor({
         });
       })
       .catch((e) => {
+        if (cancelled) return;
         setLoadError(t("editor.loadFailed", { error: String(e) }));
       });
+    return () => { cancelled = true; };
   }, [filePath, editor, currentProject, t, projectType, diaryAutoDate]);
 
   // 保存文件（纯文本直写，无 HTML→MD 转换；含竞态保护）

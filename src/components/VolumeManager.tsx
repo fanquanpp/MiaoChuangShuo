@@ -151,8 +151,54 @@ export default function VolumeManager() {
   }, [currentProject, volumeDirName, showToast, t]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    let cancelled = false;
+    if (!currentProject) return;
+    setLoading(true);
+    (async () => {
+      try {
+        const tree = await readProjectTree(currentProject.path);
+
+        // 读取正文章节
+        const manuscriptDir = findDirByName(tree, getCategoryDir("manuscript"));
+        const files = manuscriptDir?.children.filter((f) => !f.is_dir) || [];
+        // 按章节号排序
+        files.sort((a, b) => {
+          const numA = extractChapterNum(a.name);
+          const numB = extractChapterNum(b.name);
+          return numA - numB;
+        });
+        if (cancelled) return;
+        setManuscriptFiles(files);
+
+        // 读取卷宗数据文件
+        const volumeDir = findDirByName(tree, volumeDirName);
+        const volumeFile = volumeDir?.children.find(
+          (f) => !f.is_dir && f.name === "分卷规划.txt"
+        );
+
+        if (volumeFile) {
+          const content = await readFile(
+            `${currentProject.path}/${volumeFile.relative_path}`,
+            currentProject.path
+          );
+          if (cancelled) return;
+          const parsed = parseVolumeData(content);
+          setVolumes(parsed);
+          // 默认展开所有卷
+          setExpandedVolumes(new Set(parsed.map((v) => v.id)));
+        } else {
+          if (cancelled) return;
+          setVolumes([]);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        showToast("error", t("volume.loadFailed", { error: String(e) }));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentProject, volumeDirName, showToast, t]);
 
   // 保存卷宗数据
   const handleSave = useCallback(async () => {

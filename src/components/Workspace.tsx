@@ -22,6 +22,7 @@ import VolumeManager from "./VolumeManager";
 import SettingsDialog from "./SettingsDialog";
 import CreateFileDialog from "./CreateFileDialog";
 import CommandPalette from "./CommandPalette";
+import ErrorBoundary from "./ErrorBoundary";
 import { FocusTimer } from "./FocusTimer";
 import { useAppStore, getCategoryDir, getCategoryName, type SidebarCategory } from "../lib/store";
 import { getEditorSaveFn } from "../lib/stores/viewSlice";
@@ -103,14 +104,23 @@ export default function Workspace() {
   // 加载项目目录树
   useEffect(() => {
     if (!currentProject) return;
+    let cancelled = false;
     setLoading(true);
     readProjectTree(currentProject.path)
-      .then((tree) => setProjectTree(tree))
+      .then((tree) => {
+        if (cancelled) return;
+        setProjectTree(tree);
+      })
       .catch((e) => {
         console.error("加载目录树失败:", e);
+        if (cancelled) return;
         showToast("error", t("cardmanager.loadFailedShort"));
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [currentProject, setProjectTree, setLoading, showToast, t]);
 
   // 全局快捷键监听
@@ -345,7 +355,9 @@ export default function Workspace() {
         {showFocusTimer && (
           <FocusTimer onClose={() => setShowFocusTimer(false)} />
         )}
-        <div className="flex-1 flex min-h-0">{renderMiddlePanel()}</div>
+        <div className="flex-1 flex min-h-0">
+          <ErrorBoundary>{renderMiddlePanel()}</ErrorBoundary>
+        </div>
       </div>
 
       {/* 聚焦模式下隐藏文件列表 */}

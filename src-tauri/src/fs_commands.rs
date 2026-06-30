@@ -80,6 +80,18 @@ fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf,
     Ok(canonical)
 }
 
+/// 项目路径校验：确保路径是有效的项目根目录
+/// 用于 scan_projects/import_project/delete_project/read_project_tree 等接受项目路径的命令
+fn validate_project_path(project_path: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(project_path)
+        .canonicalize()
+        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+    if !path.is_dir() {
+        return Err("项目路径不是目录".to_string());
+    }
+    Ok(path)
+}
+
 /// 创建小说项目命令
 /// 输入: name 项目名称, type_str 文体类型, genre 题材(可选), author 作者, description 描述, parent_path 父目录
 /// 输出: Result<String, String> 项目根目录路径或错误
@@ -181,10 +193,15 @@ pub fn create_project(
 ///   3. 解析元数据并返回项目列表
 #[tauri::command]
 pub fn scan_projects(parent_path: String) -> Result<Vec<ProjectInfo>, String> {
-    let parent = PathBuf::from(&parent_path);
-    if !parent.exists() {
-        return Ok(vec![]);
-    }
+    let parent = validate_project_path(&parent_path).or_else(|_| {
+        // scan_projects 接受非项目目录（如用户选择的上层目录），仅做基本校验
+        let p = PathBuf::from(&parent_path);
+        if p.exists() && p.is_dir() {
+            Ok(p)
+        } else {
+            Err(format!("目录不存在: {}", parent_path))
+        }
+    })?;
 
     let mut projects = Vec::new();
     let entries = fs::read_dir(&parent).map_err(|e| format!("读取目录失败: {}", e))?;
@@ -358,13 +375,7 @@ pub async fn pick_directory(app: AppHandle) -> Result<Option<String>, String> {
 /// 流程: 校验目录是否为有效 NovelForge 项目并返回信息
 #[tauri::command]
 pub fn import_project(project_path: String) -> Result<ProjectInfo, String> {
-    let path = PathBuf::from(&project_path);
-    if !path.exists() {
-        return Err("路径不存在".to_string());
-    }
-    if !path.is_dir() {
-        return Err("路径不是目录".to_string());
-    }
+    let path = validate_project_path(&project_path)?;
     let meta_path = path.join(".novelforge").join("project.json");
     if !meta_path.exists() {
         return Err("不是有效的 NovelForge 项目(缺少元数据文件)".to_string());
@@ -386,10 +397,7 @@ pub fn import_project(project_path: String) -> Result<ProjectInfo, String> {
 /// 流程: 递归读取目录结构并返回树形数据
 #[tauri::command]
 pub fn read_project_tree(project_path: String) -> Result<Vec<FileNode>, String> {
-    let path = PathBuf::from(&project_path);
-    if !path.exists() {
-        return Err("项目路径不存在".to_string());
-    }
+    let path = validate_project_path(&project_path)?;
     read_dir_recursive(&path, &path)
 }
 
@@ -477,6 +485,13 @@ fn read_dir_recursive(current: &Path, root: &Path) -> Result<Vec<FileNode>, Stri
 #[tauri::command]
 pub fn read_file(file_path: String, project_path: String) -> Result<String, String> {
     let validated = validate_path_in_project(&file_path, &project_path)?;
+    // 文件大小限制: 50MB，防止内存溢出
+    const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024;
+    if let Ok(metadata) = fs::metadata(&validated) {
+        if metadata.len() > MAX_FILE_SIZE {
+            return Err(format!("文件过大 ({}MB)，超过限制 (50MB)", metadata.len() / 1024 / 1024));
+        }
+    }
     fs::read_to_string(&validated).map_err(|e| format!("读取文件失败: {}", e))
 }
 
@@ -573,13 +588,7 @@ pub fn rename_path(
 /// 注意: 前端在调用前应显示确认对话框
 #[tauri::command]
 pub fn delete_project(project_path: String) -> Result<(), String> {
-    let path = PathBuf::from(&project_path);
-    if !path.exists() {
-        return Err("项目路径不存在".to_string());
-    }
-    if !path.is_dir() {
-        return Err("路径不是目录".to_string());
-    }
+    let path = validate_project_path(&project_path)?;
     // 验证是有效的 NovelForge 项目（防止误删非项目目录）
     let meta_path = path.join(".novelforge").join("project.json");
     if !meta_path.exists() {
@@ -618,10 +627,7 @@ pub fn search_in_project(
     if query.trim().is_empty() {
         return Ok(vec![]);
     }
-    let root = PathBuf::from(&project_path);
-    if !root.exists() {
-        return Err("项目路径不存在".to_string());
-    }
+    let root = validate_project_path(&project_path)?;
     let mut results = Vec::new();
     let search_query = if case_sensitive {
         query.clone()
@@ -766,10 +772,7 @@ pub struct ChapterWordCount {
 /// 流程: 遍历项目各目录统计字数与文件数
 #[tauri::command]
 pub fn get_writing_stats(project_path: String) -> Result<WritingStats, String> {
-    let root = PathBuf::from(&project_path);
-    if !root.exists() {
-        return Err("项目路径不存在".to_string());
-    }
+    let root = validate_project_path(&project_path)?;
 
     // 统计正文字数与章节列表
     let manuscript_dir = root.join("正文");

@@ -64,8 +64,24 @@ export default function WritingStats() {
   }, [currentProject, t]);
 
   useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+    let cancelled = false;
+    if (!currentProject) return;
+    setLoading(true);
+    setError("");
+    (async () => {
+      try {
+        const data = await getWritingStats(currentProject.path);
+        if (cancelled) return;
+        setStats(data);
+      } catch (e) {
+        if (cancelled) return;
+        setError(t("stats.loadFailed", { error: String(e) }));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentProject, t]);
 
   const handleJumpToChapter = (relativePath: string) => {
     if (!currentProject) return;

@@ -150,7 +150,7 @@ export default function Launcher() {
       .then((pkg) => {
         if (pkg.version) setAppVersion(pkg.version);
       })
-      .catch(() => {});
+      .catch((e) => console.warn("读取版本号失败:", e));
   }, []);
 
   // 从 localStorage 恢复扫描目录并自动扫描
