@@ -120,7 +120,7 @@ export const NOVEL_GENRES: string[] = [
 // 输入: CreateProjectParams 参数对象
 // 输出: Promise<string> 项目根目录路径
 // 流程: 调用 Rust 后端 create_project 命令
-export async function createProject(params: CreateProjectParams): Promise<string> {
+export async function createProject(params: CreateProjectParams, customDirs?: string[]): Promise<string> {
   return invoke<string>("create_project", {
     name: params.name,
     typeStr: params.type_str,
@@ -128,6 +128,7 @@ export async function createProject(params: CreateProjectParams): Promise<string
     author: params.author,
     description: params.description,
     parentPath: params.parent_path,
+    customDirs: customDirs || null,
   });
 }
 
@@ -315,4 +316,30 @@ export async function renamePath(
     newPath: newAbs,
     projectPath: projectPath,
   });
+}
+
+// ===== 自定义模板 API =====
+
+// 自定义模板接口
+export interface CustomTemplate {
+  id: string;
+  name: string;
+  description: string;
+  directories: string[];
+  created_at: string;
+}
+
+// 列出所有自定义模板
+export async function listCustomTemplates(): Promise<CustomTemplate[]> {
+  return invoke<CustomTemplate[]>("list_custom_templates");
+}
+
+// 保存自定义模板
+export async function saveCustomTemplate(template: CustomTemplate): Promise<void> {
+  return invoke<void>("save_custom_template", { template });
+}
+
+// 删除自定义模板
+export async function deleteCustomTemplate(id: string): Promise<void> {
+  return invoke<void>("delete_custom_template", { id });
 }

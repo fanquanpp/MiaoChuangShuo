@@ -43,6 +43,10 @@ pub fn run() {
             // 搜索与统计命令
             fs_commands::search_in_project,
             fs_commands::get_writing_stats,
+            // 自定义模板管理命令
+            fs_commands::list_custom_templates,
+            fs_commands::save_custom_template,
+            fs_commands::delete_custom_template,
         ])
         .setup(|_app| {
             Ok(())

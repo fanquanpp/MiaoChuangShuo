@@ -11,7 +11,7 @@
 // 4. 高亮当前选中分类
 // 5. 触发分类切换
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Users,
   Globe,
@@ -29,15 +29,19 @@ import {
   Layers,
   Settings,
   BookOpen,
+  Folder,
 } from "lucide-react";
 import {
   useAppStore,
   type SidebarCategory,
+  CATEGORY_DIRS,
 } from "../lib/store";
 import { useThemeStore } from "../lib/themeStore";
 import { getTypeSpecificDirs } from "../lib/templateRegistry";
 import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
+import { readProjectTree } from "../lib/api";
+import type { FileNode } from "../lib/api";
 
 // 图标映射
 const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string }>> = {
@@ -104,6 +108,34 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
     if (!currentProject) return [];
     return getTypeSpecificDirs(currentProject.meta.type);
   }, [currentProject]);
+
+  // 读取项目目录树，找出不在标准分类和类型专属目录中的额外目录
+  const [extraDirs, setExtraDirs] = useState<string[]>([]);
+  useEffect(() => {
+    if (!currentProject) { setExtraDirs([]); return; }
+    (async () => {
+      try {
+        const tree = await readProjectTree(currentProject.path);
+        // 收集所有已知目录名（标准分类 + 类型专属）
+        const knownDirs = new Set<string>();
+        // 标准分类目录
+        for (const dir of Object.values(CATEGORY_DIRS)) {
+          if (dir) knownDirs.add(dir);
+        }
+        // 类型专属目录
+        for (const d of typeSpecificDirs) knownDirs.add(d);
+        // 隐藏目录
+        knownDirs.add(".novelforge");
+        // 找出额外的顶层目录
+        const extras = tree
+          .filter((n: FileNode) => n.is_dir && !knownDirs.has(n.name))
+          .map((n: FileNode) => n.name);
+        setExtraDirs(extras);
+      } catch {
+        setExtraDirs([]);
+      }
+    })();
+  }, [currentProject, typeSpecificDirs]);
 
   return (
     <div className="w-40 min-w-[150px] border-r border-nf-border-light bg-nf-bg-sidebar flex flex-col relative">
@@ -222,6 +254,39 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
             })}
 
             {/* 分隔线 */}
+            <div className="mx-3 my-2 border-t border-nf-border-light/60" />
+          </>
+        )}
+
+        {/* 项目自定义目录（非预设的额外目录） */}
+        {extraDirs.length > 0 && (
+          <>
+            <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+              {t("sidebar.customSection")}
+            </div>
+            {extraDirs.map((dirName) => {
+              const isActive = activeCategory === dirName;
+              return (
+                <button
+                  key={dirName}
+                  onClick={() => switchTo(dirName as SidebarCategory)}
+                  title={dirName}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                    isActive
+                      ? "bg-fandex-primary/10 text-fandex-primary"
+                      : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                  }`}
+                >
+                  <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-base ease-fandex ${
+                    isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
+                  }`} style={{ transformOrigin: 'center' }} />
+                  <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                    isActive ? 'scale-110' : 'group-hover:scale-105'
+                  }`} />
+                  <span className="truncate">{dirName}</span>
+                </button>
+              );
+            })}
             <div className="mx-3 my-2 border-t border-nf-border-light/60" />
           </>
         )}

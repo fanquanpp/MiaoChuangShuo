@@ -13,13 +13,14 @@
 // 5. 创建成功后触发回调
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, FolderOpen, Loader2, ChevronDown, ChevronRight } from "lucide-react";
-import { createProject, pickDirectory, PROJECT_TEMPLATES, NOVEL_GENRES, type ProjectType } from "../lib/api";
+import { X, FolderOpen, Loader2, ChevronDown, ChevronRight, Layers } from "lucide-react";
+import { createProject, pickDirectory, PROJECT_TEMPLATES, NOVEL_GENRES, type ProjectType, type CustomTemplate } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
 // 组件属性接口
 interface CreateProjectDialogProps {
   defaultType?: ProjectType;
+  customTemplate?: CustomTemplate | null;
   onClose: () => void;
   onSuccess: (projectPath: string) => void;
 }
@@ -27,6 +28,7 @@ interface CreateProjectDialogProps {
 // 创建项目对话框组件
 export default function CreateProjectDialog({
   defaultType = "standard",
+  customTemplate = null,
   onClose,
   onSuccess,
 }: CreateProjectDialogProps) {
@@ -43,8 +45,10 @@ export default function CreateProjectDialog({
 
   const handleCreateRef = useRef<() => void>(() => {});
 
-  // 获取当前选中类型的模板信息
-  const currentTemplate = PROJECT_TEMPLATES.find((tpl) => tpl.id === type) || PROJECT_TEMPLATES[0];
+  // 获取当前选中类型的模板信息（自定义模板优先）
+  const currentTemplate = customTemplate
+    ? { id: "custom" as ProjectType, name: customTemplate.name, desc: customTemplate.description || customTemplate.directories.join("、") }
+    : PROJECT_TEMPLATES.find((tpl) => tpl.id === type) || PROJECT_TEMPLATES[0];
 
   // Esc 关闭, Enter 提交
   const handleKeyDown = useCallback(
@@ -95,14 +99,17 @@ export default function CreateProjectDialog({
     setCreating(true);
     setError("");
     try {
-      const projectPath = await createProject({
-        name: name.trim(),
-        type_str: type,
-        genre: genre,
-        author: author.trim(),
-        description: description.trim(),
-        parent_path: parentPath,
-      });
+      const projectPath = await createProject(
+        {
+          name: name.trim(),
+          type_str: type,
+          genre: genre,
+          author: author.trim(),
+          description: description.trim(),
+          parent_path: parentPath,
+        },
+        customTemplate?.directories || undefined
+      );
       onSuccess(projectPath);
     } catch (e) {
       setError(t("project.createFailed", { error: String(e) }));

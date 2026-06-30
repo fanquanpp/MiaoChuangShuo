@@ -39,6 +39,7 @@ const zhCN: TranslationDict = {
   "app.close": "关闭",
   "app.browse": "浏览",
   "app.creating": "创建中…",
+  "app.done": "完成",
   "common.loading": "加载中…",
 
   // ── 启动器 ──
@@ -437,6 +438,26 @@ const zhCN: TranslationDict = {
   // ── 题材模板 ──
   "template.selectTitle": "选择文体类型",
   "template.chooseArch": "选择文体类型",
+  "template.managerTitle": "自定义模板管理",
+  "template.name": "模板名称",
+  "template.namePlaceholder": "输入模板名称",
+  "template.nameRequired": "请输入模板名称",
+  "template.description": "模板描述",
+  "template.descriptionPlaceholder": "简要描述此模板的用途",
+  "template.directories": "目录结构",
+  "template.directoriesHint": "添加项目创建时自动生成的自定义目录",
+  "template.dirPlaceholder": "输入目录名称",
+  "template.dirsRequired": "请至少添加一个目录",
+  "template.addDir": "添加",
+  "template.save": "保存模板",
+  "template.created": "模板「{name}」已创建",
+  "template.createFailed": "创建模板失败: {error}",
+  "template.deleted": "模板「{name}」已删除",
+  "template.deleteFailed": "删除模板失败: {error}",
+  "template.noTemplates": "暂无自定义模板",
+  "template.noTemplatesHint": "点击「新建模板」创建第一个自定义模板",
+  "template.createNew": "新建模板",
+  "template.manageTemplates": "管理自定义模板",
 
   // ── 错误边界 ──
   "error.renderError": "页面渲染异常",
@@ -470,6 +491,7 @@ const zhCN: TranslationDict = {
   // ── 侧边栏扩展 ──
   "sidebar.volumes": "分卷",
   "sidebar.settings": "设置",
+  "sidebar.customSection": "自定义",
 
   // ── 设置对话框 ──
   "settings.title": "设置",
@@ -590,6 +612,7 @@ const enUS: TranslationDict = {
   "app.close": "Close",
   "app.browse": "Browse",
   "app.creating": "Creating…",
+  "app.done": "Done",
   "common.loading": "Loading…",
 
   // ── Launcher ──
@@ -988,6 +1011,26 @@ const enUS: TranslationDict = {
   // ── Template Selector ──
   "template.selectTitle": "Choose a Literary Form",
   "template.chooseArch": "Choose a Literary Form",
+  "template.managerTitle": "Custom Template Manager",
+  "template.name": "Template Name",
+  "template.namePlaceholder": "Enter template name",
+  "template.nameRequired": "Please enter a template name",
+  "template.description": "Description",
+  "template.descriptionPlaceholder": "Brief description of this template",
+  "template.directories": "Directory Structure",
+  "template.directoriesHint": "Add custom directories that will be created when a project is created",
+  "template.dirPlaceholder": "Enter directory name",
+  "template.dirsRequired": "Please add at least one directory",
+  "template.addDir": "Add",
+  "template.save": "Save Template",
+  "template.created": "Template '{name}' created",
+  "template.createFailed": "Failed to create template: {error}",
+  "template.deleted": "Template '{name}' deleted",
+  "template.deleteFailed": "Failed to delete template: {error}",
+  "template.noTemplates": "No custom templates",
+  "template.noTemplatesHint": "Click 'New Template' to create your first custom template",
+  "template.createNew": "New Template",
+  "template.manageTemplates": "Manage Custom Templates",
 
   // ── Error Boundary ──
   "error.renderError": "Rendering Error",
@@ -1021,6 +1064,7 @@ const enUS: TranslationDict = {
   // ── Sidebar extensions ──
   "sidebar.volumes": "Volumes",
   "sidebar.settings": "Settings",
+  "sidebar.customSection": "Custom",
 
   // ── Settings Dialog ──
   "settings.title": "Settings",

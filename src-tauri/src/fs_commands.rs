@@ -13,6 +13,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
@@ -20,6 +21,29 @@ use crate::project_template::{
     common_directories, common_files, create_project_meta, initial_manuscript_file,
     type_specific_directories, type_specific_files, ProjectMeta, ProjectType,
 };
+
+/// 自定义模板结构
+/// 存储在应用配置目录 templates/ 下
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomTemplate {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub directories: Vec<String>,
+    pub created_at: String,
+}
+
+/// 获取自定义模板存储目录
+fn get_templates_dir() -> Result<PathBuf, String> {
+    let config_dir = dirs::config_dir()
+        .ok_or_else(|| "无法获取配置目录".to_string())?;
+    let templates_dir = config_dir.join("novelforge").join("templates");
+    if !templates_dir.exists() {
+        fs::create_dir_all(&templates_dir)
+            .map_err(|e| format!("创建模板目录失败: {}", e))?;
+    }
+    Ok(templates_dir)
+}
 
 /// 路径沙箱校验：确保目标路径在项目根目录内
 /// 输入: target_path 目标路径, project_root 项目根目录
@@ -129,6 +153,7 @@ pub fn create_project(
     author: String,
     description: String,
     parent_path: String,
+    custom_dirs: Option<Vec<String>>,
 ) -> Result<String, String> {
     // 校验项目名称: 不允许空值或特殊字符
     if name.trim().is_empty() {
@@ -161,6 +186,18 @@ pub fn create_project(
     for dir in type_specific_directories(&project_type) {
         let dir_path = project_root.join(dir);
         fs::create_dir_all(&dir_path).map_err(|e| format!("创建专属目录失败 {}: {}", dir, e))?;
+    }
+
+    // 创建自定义模板目录（如果有）
+    if let Some(ref dirs_list) = custom_dirs {
+        for dir in dirs_list {
+            // 跳过与通用目录或专属目录重名的目录
+            let dir_path = project_root.join(dir);
+            if !dir_path.exists() {
+                fs::create_dir_all(&dir_path)
+                    .map_err(|e| format!("创建自定义目录失败 {}: {}", dir, e))?;
+            }
+        }
     }
 
     // 写入通用预设文件
@@ -929,4 +966,57 @@ fn count_files_recursive(dir: &Path, total: &mut u64) {
             }
         }
     }
+}
+
+// ===== 自定义模板管理命令 =====
+
+/// 列出所有自定义模板
+/// 输出: Result<Vec<CustomTemplate>, String> 模板列表
+#[tauri::command]
+pub fn list_custom_templates() -> Result<Vec<CustomTemplate>, String> {
+    let templates_dir = get_templates_dir()?;
+    let mut templates = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(&templates_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().map(|e| e == "json").unwrap_or(false) {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    if let Ok(tpl) = serde_json::from_str::<CustomTemplate>(&content) {
+                        templates.push(tpl);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(templates)
+}
+
+/// 保存自定义模板
+/// 输入: template 模板结构
+/// 输出: Result<(), String>
+#[tauri::command]
+pub fn save_custom_template(template: CustomTemplate) -> Result<(), String> {
+    let templates_dir = get_templates_dir()?;
+    let file_path = templates_dir.join(format!("{}.json", template.id));
+    let json = serde_json::to_string_pretty(&template)
+        .map_err(|e| format!("序列化模板失败: {}", e))?;
+    fs::write(&file_path, json)
+        .map_err(|e| format!("写入模板文件失败: {}", e))?;
+    Ok(())
+}
+
+/// 删除自定义模板
+/// 输入: id 模板 ID
+/// 输出: Result<(), String>
+#[tauri::command]
+pub fn delete_custom_template(id: String) -> Result<(), String> {
+    let templates_dir = get_templates_dir()?;
+    let file_path = templates_dir.join(format!("{}.json", id));
+    if file_path.exists() {
+        fs::remove_file(&file_path)
+            .map_err(|e| format!("删除模板文件失败: {}", e))?;
+    }
+    Ok(())
 }

@@ -214,19 +214,71 @@ function generatePresetTemplate(name: string, preset: CharacterPreset, t: (key: 
   return `${name}\n\n---\n\n${fieldText}\n`;
 }
 
-// 从内容中提取字段预览
+// 从内容中提取字段预览（支持多种格式）
+// 格式支持：
+//   【外貌】：金发碧眼  /  [外貌] 金发碧眼  /  外貌：金发碧眼  /  外貌: 金发碧眼
 function extractFields(content: string, fieldKeys: string[], t: (key: string) => string): { label: string; value: string }[] {
   const fields: { label: string; value: string }[] = [];
   const lines = content.split("\n");
 
   for (const key of fieldKeys) {
     const label = t(key).trim();
-    const labelPrefix = label.replace(/：$/, "").replace(/:$/, "").replace(/^[\[【]/, "").replace(/[\]】]$/, "");
-    const line = lines.find((l) => l.trim().startsWith(labelPrefix));
-    if (line) {
-      const value = line.replace(new RegExp(`^${labelPrefix}[：:]?\\s*`), "").trim();
+    // 去掉括号和冒号后缀，提取纯标签名
+    const labelPrefix = label
+      .replace(/：$/, "").replace(/:$/, "")
+      .replace(/^[\[【]/, "").replace(/[\]】]$/, "")
+      .trim();
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      // 匹配多种格式
+      let value = "";
+
+      // 1. 【字段】：值 或 【字段】值
+      const bracketMatch = line.match(/^[【\[]\s*([^】\]]+)\s*[】\]]\s*[:：]?\s*(.*)/);
+      if (bracketMatch) {
+        const bracketLabel = bracketMatch[1].trim();
+        if (bracketLabel === labelPrefix || bracketLabel.includes(labelPrefix)) {
+          value = bracketMatch[2].trim();
+        }
+      }
+
+      // 2. 字段：值 或 字段: 值 或 字段 值
+      if (!value) {
+        // 精确匹配：行以标签名开头，后跟冒号或空格
+        const escapedPrefix = labelPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const plainMatch = line.match(new RegExp(`^${escapedPrefix}\\s*[:：]\\s*(.*)`));
+        if (plainMatch) {
+          value = plainMatch[1].trim();
+        }
+      }
+
       if (value) {
         fields.push({ label: labelPrefix, value: value.slice(0, 30) + (value.length > 30 ? "…" : "") });
+        break;
+      }
+    }
+  }
+
+  // 如果标准字段没找到，尝试提取任意 key-value 行作为预览
+  if (fields.length === 0) {
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("---") || line.startsWith("===")) continue;
+      // 跳过第一行（通常是卡片名称）
+      if (lines.indexOf(rawLine) === 0) continue;
+
+      // 匹配 "xxx：yyy" 或 "xxx: yyy" 或 "【xxx】yyy"
+      const kvMatch = line.match(/^(?:[【\[]\s*([^】\]]+)\s*[】\]]|([^:：\s]+))\s*[:：]\s*(.+)/);
+      if (kvMatch) {
+        const label = (kvMatch[1] || kvMatch[2] || "").trim();
+        const value = (kvMatch[3] || "").trim();
+        if (label && value && label.length <= 20) {
+          fields.push({ label, value: value.slice(0, 30) + (value.length > 30 ? "…" : "") });
+          if (fields.length >= 3) break;
+        }
       }
     }
   }

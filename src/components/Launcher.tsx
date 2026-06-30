@@ -34,6 +34,8 @@ import {
   Globe2,
   Clapperboard,
   Feather,
+  Layers,
+  Settings,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import {
@@ -42,11 +44,14 @@ import {
   pickDirectory,
   deleteProject,
   PROJECT_TEMPLATES,
+  listCustomTemplates,
   type ProjectInfo,
   type ProjectType,
+  type CustomTemplate,
 } from "../lib/api";
 import ProjectCard, { type ProjectData } from "./ProjectCard";
 import CreateProjectDialog from "./CreateProjectDialog";
+import TemplateManager from "./TemplateManager";
 import { ProjectGridSkeleton } from "./SkeletonComponents";
 import { useI18n } from "../lib/i18n";
 import { useThemeStore } from "../lib/themeStore";
@@ -84,6 +89,9 @@ export default function Launcher() {
   const [searchQuery, setSearchQuery] = useState("");
   const [appVersion, setAppVersion] = useState("1.4.0");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
+  const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [selectedCustomTemplate, setSelectedCustomTemplate] = useState<CustomTemplate | null>(null);
 
   const handleScan = useCallback(async () => {
     if (!scanDir) return;
@@ -171,6 +179,20 @@ export default function Launcher() {
       })();
     }
   }, []);
+
+  // 加载自定义模板
+  const loadCustomTemplates = useCallback(async () => {
+    try {
+      const list = await listCustomTemplates();
+      setCustomTemplates(list);
+    } catch {
+      // 静默失败
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCustomTemplates();
+  }, [loadCustomTemplates]);
 
   // 持久化扫描目录
   useEffect(() => {
@@ -284,6 +306,7 @@ export default function Launcher() {
   const handleCreateSuccess = useCallback(async (projectPath: string) => {
     setShowCreateDialog(false);
     setTypePanelExpanded(false);
+    setSelectedCustomTemplate(null);
     try {
       const project = await importProject(projectPath);
       setProjects((prev) => {
@@ -310,6 +333,14 @@ export default function Launcher() {
   // 选择文体类型后打开创建对话框
   const handleTypeSelect = useCallback((typeId: ProjectType) => {
     setSelectedType(typeId);
+    setSelectedCustomTemplate(null);
+    setShowCreateDialog(true);
+  }, []);
+
+  // 选择自定义模板后打开创建对话框
+  const handleCustomTemplateSelect = useCallback((template: CustomTemplate) => {
+    setSelectedCustomTemplate(template);
+    setSelectedType("standard"); // 自定义模板基于 standard 类型
     setShowCreateDialog(true);
   }, []);
 
@@ -419,6 +450,47 @@ export default function Launcher() {
                     </button>
                   );
                 })}
+
+                {/* 自定义模板分隔线 */}
+                {customTemplates.length > 0 && (
+                  <div className="mx-1 my-1.5 border-t border-nf-border-light/40" />
+                )}
+
+                {/* 自定义模板列表 */}
+                {customTemplates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    onClick={() => handleCustomTemplateSelect(tpl)}
+                    className="w-full flex items-start gap-2.5 px-2.5 py-2 text-left transition-all duration-fast hover:bg-fandex-secondary/10 group"
+                  >
+                    <Layers className="w-4 h-4 text-fandex-secondary/70 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium font-display text-nf-text group-hover:text-fandex-secondary transition-colors">
+                        {tpl.name}
+                      </div>
+                      <div className="text-[11px] text-nf-text-tertiary mt-0.5 line-clamp-2 leading-relaxed">
+                        {tpl.description || tpl.directories.join("、")}
+                      </div>
+                    </div>
+                    <span className="text-nf-text-tertiary opacity-0 group-hover:opacity-100 transition-all duration-fast text-sm font-bold mt-0.5 group-hover:rotate-90">
+                      &gt;
+                    </span>
+                  </button>
+                ))}
+
+                {/* 管理自定义模板按钮 */}
+                <div className="mx-1 my-1.5 border-t border-nf-border-light/40" />
+                <button
+                  onClick={() => setShowTemplateManager(true)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left transition-all duration-fast hover:bg-nf-bg-hover group"
+                >
+                  <Settings className="w-4 h-4 text-nf-text-tertiary mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-nf-text-tertiary group-hover:text-nf-text-secondary transition-colors">
+                      {t("template.manageTemplates")}
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
@@ -591,12 +663,23 @@ export default function Launcher() {
         </div>
       </main>
 
-      {/* 创建项目对话框 - 传入预选类型 */}
+      {/* 创建项目对话框 - 传入预选类型或自定义模板 */}
       {showCreateDialog && (
         <CreateProjectDialog
           defaultType={selectedType}
-          onClose={() => setShowCreateDialog(false)}
+          customTemplate={selectedCustomTemplate}
+          onClose={() => { setShowCreateDialog(false); setSelectedCustomTemplate(null); }}
           onSuccess={handleCreateSuccess}
+        />
+      )}
+
+      {/* 自定义模板管理对话框 */}
+      {showTemplateManager && (
+        <TemplateManager
+          onClose={() => {
+            setShowTemplateManager(false);
+            loadCustomTemplates();
+          }}
         />
       )}
 
