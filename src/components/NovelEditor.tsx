@@ -28,7 +28,7 @@ import CodeBlock from "@tiptap/extension-code-block";
 import Blockquote from "@tiptap/extension-blockquote";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { readFile, writeFile, readProjectTree } from "../lib/api";
+import { readFile, writeFile, readProjectTree, createSnapshot } from "../lib/api";
 import { useAppStore } from "../lib/store";
 import { useSettingsStore } from "../lib/settingsStore";
 import { CharacterMention } from "../lib/characterMention";
@@ -47,6 +47,7 @@ import { useI18n } from "../lib/i18n";
 import { useWritingSession } from "../hooks/useWritingSession";
 import EditorToolbar from "./EditorToolbar";
 import OutlineView from "./OutlineView";
+import SnapshotHistory from "./SnapshotHistory";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -119,7 +120,14 @@ export default function NovelEditor({
   const typewriterMode = useSettingsStore((s) => s.typewriterMode);
   const focusDim = useSettingsStore((s) => s.focusDim);
   const focusDimOpacity = useSettingsStore((s) => s.focusDimOpacity);
+  const snapshotEnabled = useSettingsStore((s) => s.snapshotEnabled);
+  const snapshotMinInterval = useSettingsStore((s) => s.snapshotMinInterval);
   const [showOutline, setShowOutline] = useState(false);
+  const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
+  // 文件重载触发器：恢复快照后递增以强制重新加载文件内容
+  const [reloadKey, setReloadKey] = useState(0);
+  // 上次自动创建快照的时间戳（毫秒），用于控制最小间隔，避免高频保存产生重复快照
+  const lastSnapshotTimeRef = useRef(0);
 
   // 写作会话追踪：记录本次会话字数、时长、WPM
   const session = useWritingSession(wordCount, filePath);
@@ -334,7 +342,7 @@ export default function NovelEditor({
         setLoadError(t("editor.loadFailed", { error: String(e) }));
       });
     return () => { cancelled = true; };
-  }, [filePath, editor, currentProject, t, projectType, diaryAutoDate]);
+  }, [filePath, editor, currentProject, t, projectType, diaryAutoDate, reloadKey]);
 
   // 保存文件（纯文本直写，无 HTML→MD 转换；含竞态保护）
   const savingRef = useRef(false);
@@ -375,6 +383,21 @@ export default function NovelEditor({
       useAppStore.getState().setEditorDirty(false);
       showToast("success", t("editor.saved"));
       useAppStore.getState().refreshProjectTree();
+
+      // 版本快照：保存成功后自动创建快照（作者完全无感）
+      // 受 snapshotEnabled 开关控制，并按 snapshotMinInterval 节流避免高频重复
+      if (snapshotEnabled && currentProject?.path) {
+        const now = Date.now();
+        const elapsed = now - lastSnapshotTimeRef.current;
+        if (elapsed >= snapshotMinInterval * 1000) {
+          lastSnapshotTimeRef.current = now;
+          // 异步创建快照，不阻塞保存流程，失败静默处理（不打扰作者）
+          createSnapshot(filePath, currentProject.path, text, "auto").catch(() => {
+            // 快照创建失败不影响保存成功状态，仅回退时间戳以便下次重试
+            lastSnapshotTimeRef.current = 0;
+          });
+        }
+      }
       return true;
     } catch (e) {
       showToast("error", t("editor.saveFailed", { error: String(e) }));
@@ -389,7 +412,7 @@ export default function NovelEditor({
         setTimeout(() => handleSave(), 100);
       }
     }
-  }, [editor, filePath, dirty, showToast, t, currentProject]);
+  }, [editor, filePath, dirty, showToast, t, currentProject, snapshotEnabled, snapshotMinInterval]);
 
   // 导出 TXT
   const handleExportTxt = useCallback(async () => {
@@ -532,6 +555,8 @@ export default function NovelEditor({
         focusDim={focusDim}
         onToggleTypewriter={() => useSettingsStore.getState().setTypewriterMode(!typewriterMode)}
         onToggleFocusDim={() => useSettingsStore.getState().setFocusDim(!focusDim)}
+        showSnapshotHistory={showSnapshotHistory}
+        onToggleSnapshotHistory={() => setShowSnapshotHistory((prev) => !prev)}
       />
 
       {isScript && characters.length > 0 && (
@@ -566,10 +591,21 @@ export default function NovelEditor({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto relative">
-        <EditorContent editor={editor} />
-        {showOutline && editor && (
-          <OutlineView htmlContent={editor.getText()} />
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div className="flex-1 overflow-y-auto relative">
+          <EditorContent editor={editor} />
+          {showOutline && editor && (
+            <OutlineView htmlContent={editor.getText()} />
+          )}
+        </div>
+        {showSnapshotHistory && filePath && currentProject?.path && (
+          <SnapshotHistory
+            filePath={filePath}
+            projectPath={currentProject.path}
+            currentContent={editor?.getText() || ""}
+            onClose={() => setShowSnapshotHistory(false)}
+            onRestored={() => setReloadKey((n) => n + 1)}
+          />
         )}
       </div>
     </div>

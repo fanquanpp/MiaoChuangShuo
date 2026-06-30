@@ -34,6 +34,7 @@ import {
   Pause,
   Play,
   Target,
+  History,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
@@ -200,6 +201,9 @@ interface EditorToolbarProps {
   focusDim: boolean;
   onToggleTypewriter: () => void;
   onToggleFocusDim: () => void;
+  // 版本快照历史
+  showSnapshotHistory?: boolean;
+  onToggleSnapshotHistory?: () => void;
 }
 
 // 编辑器工具栏组件（纯文本模式 + 格式扩展）
@@ -224,6 +228,8 @@ export default function EditorToolbar({
   focusDim,
   onToggleTypewriter,
   onToggleFocusDim,
+  showSnapshotHistory = false,
+  onToggleSnapshotHistory,
 }: EditorToolbarProps) {
   const { t } = useI18n();
 
@@ -389,6 +395,13 @@ export default function EditorToolbar({
               title={t("outline.title")}
             >
               <ListTree className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => onToggleSnapshotHistory?.()}
+              active={showSnapshotHistory}
+              title={t("snapshot.toggleHistory")}
+            >
+              <History className="w-4 h-4" />
             </ToolbarButton>
           </div>
         </>

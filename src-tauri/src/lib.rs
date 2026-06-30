@@ -1,16 +1,18 @@
 // NovelForge 应用入口模块
 //
 // 功能概述：
-// 初始化 Tauri 应用，注册文件系统插件与项目管理命令。
+// 初始化 Tauri 应用，注册文件系统插件、项目管理命令与版本快照命令。
 //
 // 模块职责：
 // 1. 声明子模块
 // 2. 注册 Tauri 插件(dialog/fs/shell)
 // 3. 注册文件系统命令
-// 4. 启动应用
+// 4. 注册版本快照命令
+// 5. 启动应用
 
 mod fs_commands;
 mod project_template;
+mod snapshot_commands;
 
 /// 应用入口函数
 /// 输入: 无
@@ -19,7 +21,8 @@ mod project_template;
 ///   1. 创建 Tauri 应用构建器
 ///   2. 注册 dialog/fs/shell 插件
 ///   3. 注册文件系统命令
-///   4. 启动应用
+///   4. 注册版本快照命令
+///   5. 启动应用
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -47,6 +50,14 @@ pub fn run() {
             fs_commands::list_custom_templates,
             fs_commands::save_custom_template,
             fs_commands::delete_custom_template,
+            // 版本快照命令
+            snapshot_commands::create_snapshot,
+            snapshot_commands::list_snapshots,
+            snapshot_commands::read_snapshot,
+            snapshot_commands::restore_snapshot,
+            snapshot_commands::delete_snapshot,
+            snapshot_commands::clear_snapshots,
+            snapshot_commands::get_snapshot_stats,
         ])
         .setup(|_app| {
             Ok(())

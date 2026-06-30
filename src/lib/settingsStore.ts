@@ -48,6 +48,10 @@ interface SettingsState {
   typingSound: boolean;
   /** 字数目标（本次会话，0=未设定） */
   sessionWordTarget: number;
+  /** 版本快照开关（每次保存自动创建快照） */
+  snapshotEnabled: boolean;
+  /** 快照最小间隔（秒，避免高频保存产生重复快照） */
+  snapshotMinInterval: number;
 
   // Actions
   setFontSize: (size: number) => void;
@@ -66,6 +70,8 @@ interface SettingsState {
   setFocusDimOpacity: (opacity: number) => void;
   setTypingSound: (enabled: boolean) => void;
   setSessionWordTarget: (target: number) => void;
+  setSnapshotEnabled: (enabled: boolean) => void;
+  setSnapshotMinInterval: (seconds: number) => void;
   /** 从 localStorage 加载并应用 */
   initSettings: () => void;
 }
@@ -90,6 +96,8 @@ interface SettingsData {
   focusDimOpacity: number;
   typingSound: boolean;
   sessionWordTarget: number;
+  snapshotEnabled: boolean;
+  snapshotMinInterval: number;
 }
 
 // 默认设置
@@ -110,6 +118,8 @@ const DEFAULT_SETTINGS: SettingsData = {
   focusDimOpacity: 0.35,
   typingSound: false,
   sessionWordTarget: 0,
+  snapshotEnabled: true,
+  snapshotMinInterval: 60,
 };
 
 function loadSettings(): SettingsData {
@@ -240,6 +250,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const data = { ...get(), sessionWordTarget: clamped };
     saveSettings(data);
     set({ sessionWordTarget: clamped });
+  },
+
+  setSnapshotEnabled: (enabled) => {
+    const data = { ...get(), snapshotEnabled: enabled };
+    saveSettings(data);
+    set({ snapshotEnabled: enabled });
+  },
+
+  setSnapshotMinInterval: (seconds) => {
+    const clamped = Math.max(0, Math.min(3600, Math.floor(seconds)));
+    const data = { ...get(), snapshotMinInterval: clamped };
+    saveSettings(data);
+    set({ snapshotMinInterval: clamped });
   },
 
   initSettings: () => {

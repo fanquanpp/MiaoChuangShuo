@@ -55,7 +55,7 @@ fn get_templates_dir() -> Result<PathBuf, String> {
 ///   4. 目标路径不存在时 canonicalize 父目录后拼接文件名
 ///   5. 父目录也不存在时做纯词法检查，返回与根路径格式一致的路径
 ///   6. 统一使用规范化字符串比较包含关系，避免 Path::starts_with 在前缀差异下的误判
-fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf, String> {
+pub(crate) fn validate_path_in_project(target: &str, project_root: &str) -> Result<PathBuf, String> {
     let root_path = PathBuf::from(project_root)
         .canonicalize()
         .map_err(|e| format!("无法解析项目路径: {}", e))?;
