@@ -14,11 +14,9 @@ mod fs_commands;
 mod project_template;
 mod snapshot_commands;
 mod character_commands;
-mod foreshadowing_commands;
 mod template_schema;
 mod codex_commands;
 mod scene_commands;
-mod ai_commands;
 
 /// 应用入口函数
 /// 输入: 无
@@ -75,8 +73,6 @@ pub fn run() {
             character_commands::count_character_appearances,
             character_commands::rename_character_in_project,
             character_commands::read_character_summary,
-            // 伏笔追踪命令
-            foreshadowing_commands::scan_foreshadowing,
             // 模块化模板系统命令
             template_schema::get_templates,
             template_schema::render_template,
@@ -91,15 +87,6 @@ pub fn run() {
             scene_commands::save_scenes,
             scene_commands::update_scene_field,
             scene_commands::list_scene_files,
-            // AI 辅助创作命令（接口预留，不实装）
-            ai_commands::ai_continue_writing,
-            ai_commands::ai_summarize,
-            ai_commands::ai_polish,
-            ai_commands::ai_generate_outline,
-            ai_commands::ai_character_suggest,
-            ai_commands::ai_check_consistency,
-            ai_commands::get_ai_config,
-            ai_commands::save_ai_config,
         ])
         .setup(|_app| {
             Ok(())

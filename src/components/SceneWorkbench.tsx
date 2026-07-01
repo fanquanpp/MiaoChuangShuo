@@ -171,7 +171,7 @@ export default function SceneWorkbench({ filePath }: { filePath: string | null }
                 return (
                   <div
                     key={scene.id}
-                    className="border border-nf-border-light rounded-lg overflow-hidden bg-nf-bg-sidebar"
+                    className="border border-nf-border-light overflow-hidden bg-nf-bg-sidebar"
                   >
                     {/* 场景头 */}
                     <button

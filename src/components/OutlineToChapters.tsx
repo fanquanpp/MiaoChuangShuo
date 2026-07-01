@@ -266,13 +266,13 @@ export default function OutlineToChapters({
       aria-label={t("outlineToChapters.title")}
     >
       <div
-        className="nf-glass-panel w-full max-w-lg bg-nf-bg border border-nf-border-light rounded-xl shadow-2xl flex flex-col max-h-[80vh]"
+        className="nf-glass-panel w-full max-w-lg bg-nf-bg border border-nf-border-light shadow-2xl flex flex-col max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
         <header className="flex items-center justify-between px-5 py-4 border-b border-nf-border-light">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-fandex-primary/10 rounded-md">
+            <div className="p-2 bg-fandex-primary/10">
               <ListTree className="w-5 h-5 text-fandex-primary" />
             </div>
             <div>

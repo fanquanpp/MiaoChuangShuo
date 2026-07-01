@@ -181,7 +181,7 @@ pub struct TemplateSchema {
     pub id: String,
     /// 模板显示名
     pub name: String,
-    /// 模板所属分类（character/worldview/glossary/outline/foreshadowing）
+    /// 模板所属分类（character/worldview/glossary/outline）
     pub category: String,
     /// 模板描述
     pub description: String,

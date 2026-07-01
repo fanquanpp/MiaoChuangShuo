@@ -264,9 +264,9 @@ export default function CodexPanel() {
   }, [mentions]);
 
   return (
-    <div className="flex flex-row-reverse h-full bg-nf-bg-panel">
-      {/* 最右侧：实体列表（作为右侧导航栏，与其它分类的文件列表位置一致） */}
-      <div className="w-72 min-w-[260px] border-l border-nf-border-light flex flex-col bg-nf-bg-sidebar flex-shrink-0">
+    <div className="flex h-full bg-nf-bg-panel">
+      {/* 左侧：实体列表（固定宽度，作为设定库导航栏） */}
+      <div className="w-72 min-w-[260px] border-r border-nf-border-light flex flex-col bg-nf-bg-sidebar flex-shrink-0">
         {/* 头部：标题 + 新增 + 刷新（固定项，禁止压缩） */}
         <div className="flex-shrink-0 px-4 py-3 border-b border-nf-border-light flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -461,7 +461,7 @@ export default function CodexPanel() {
                     <button
                       key={`${mention.file_path}-${idx}`}
                       onClick={() => handleJumpToFile(mention)}
-                      className="w-full text-left p-3 rounded-lg border border-nf-border-light bg-nf-bg-panel hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition-all duration-150 group"
+                      className="w-full text-left p-3 border border-nf-border-light bg-nf-bg-panel hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition-all duration-150 group"
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2 min-w-0">

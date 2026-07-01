@@ -20,11 +20,13 @@ import {
   FileText,
   Sparkles,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import { generateVolumeChapters, type VolumeChapterResult } from "../lib/api";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface VolumeChapterGeneratorProps {
   /** 关闭对话框回调 */
@@ -176,6 +178,8 @@ export default function VolumeChapterGenerator({
   const [format, setFormat] = useState<TitleFormat>("chinese");
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
+  // 二次确认对话框可见状态:点击"创建空白骨架"后先弹出确认,避免用户误操作
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // 预览列表
   const preview = useMemo(() => {
@@ -203,20 +207,13 @@ export default function VolumeChapterGenerator({
   }, [currentProject, volumeName, chapterCount, startNum, generating]);
 
   /**
-   * 执行生成
-   * 流程: 调用后端 generateVolumeChapters，成功后刷新项目树
+   * 执行真正的生成逻辑(内部函数)
+   * 流程: 调用后端 generateVolumeChapters,成功后刷新项目树并关闭对话框
+   * 注意: 本函数不做参数校验,校验由 handleGenerateClick 完成
    */
-  const handleGenerate = useCallback(async () => {
+  const doGenerate = useCallback(async () => {
     if (!currentProject) {
       showToast("error", t("volumeGen.noProject"));
-      return;
-    }
-    if (!volumeName.trim()) {
-      showToast("error", t("volumeGen.nameRequired"));
-      return;
-    }
-    if (chapterCount <= 0) {
-      showToast("error", t("volumeGen.countInvalid"));
       return;
     }
     setGenerating(true);
@@ -244,6 +241,8 @@ export default function VolumeChapterGenerator({
       );
       await refreshProjectTree?.();
       onCreated?.();
+      // 生成成功后自动关闭对话框,避免用户误以为操作未完成
+      onClose();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast("error", t("volumeGen.failed") + ": " + msg);
@@ -262,7 +261,37 @@ export default function VolumeChapterGenerator({
     t,
     refreshProjectTree,
     onCreated,
+    onClose,
   ]);
+
+  /**
+   * 点击"创建空白骨架"按钮:先校验参数,通过后弹出二次确认对话框
+   * 流程: 参数校验 -> 弹出确认对话框(告知将创建N个空白文件)
+   */
+  const handleGenerateClick = useCallback(() => {
+    if (!currentProject) {
+      showToast("error", t("volumeGen.noProject"));
+      return;
+    }
+    if (!volumeName.trim()) {
+      showToast("error", t("volumeGen.nameRequired"));
+      return;
+    }
+    if (chapterCount <= 0) {
+      showToast("error", t("volumeGen.countInvalid"));
+      return;
+    }
+    // 弹出二次确认,避免用户误以为此功能会整理现有章节
+    setShowConfirm(true);
+  }, [currentProject, volumeName, chapterCount, showToast, t]);
+
+  /**
+   * 确认对话框:用户点击"确认创建"后执行真正的生成逻辑
+   */
+  const handleConfirmGenerate = useCallback(() => {
+    setShowConfirm(false);
+    void doGenerate();
+  }, [doGenerate]);
 
   // 快捷章节数选项
   const quickCounts = [5, 10, 20, 30, 50];
@@ -299,6 +328,19 @@ export default function VolumeChapterGenerator({
             <X className="w-5 h-5" />
           </button>
         </header>
+
+        {/* 功能说明警告横幅:明确告知此功能预创建空白文件,非整理现有章节 */}
+        <div className="flex items-start gap-2 px-5 py-2.5 bg-fandex-tertiary/10 border-b border-fandex-tertiary/30 flex-shrink-0">
+          <Info className="w-4 h-4 text-fandex-tertiary flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-fandex-tertiary mb-0.5">
+              {t("volumeGen.warningTitle")}
+            </div>
+            <p className="text-[11px] text-nf-text-secondary leading-relaxed">
+              {t("volumeGen.warningText")}
+            </p>
+          </div>
+        </div>
 
         {/* 内容区 */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
@@ -483,7 +525,7 @@ export default function VolumeChapterGenerator({
               {t("app.close")}
             </button>
             <button
-              onClick={handleGenerate}
+              onClick={handleGenerateClick}
               disabled={!canGenerate}
               className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-nf-text-inverse bg-fandex-primary hover:bg-fandex-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition duration-fast"
             >
@@ -497,6 +539,20 @@ export default function VolumeChapterGenerator({
           </div>
         </footer>
       </div>
+
+      {/* 二次确认对话框:明确告知将创建N个空白文件,防止用户误操作 */}
+      <ConfirmDialog
+        open={showConfirm}
+        title={t("volumeGen.confirmTitle")}
+        message={t("volumeGen.confirmMsg", {
+          volume: volumeName.trim(),
+          count: preview.length,
+        })}
+        type="confirm"
+        confirmLabel={t("volumeGen.confirmOk")}
+        onConfirm={handleConfirmGenerate}
+        onCancel={() => setShowConfirm(false)}
+      />
     </div>
   );
 }

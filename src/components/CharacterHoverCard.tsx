@@ -111,7 +111,7 @@ export default function CharacterHoverCard({
   return (
     <div
       ref={cardRef}
-      className="nf-glass-panel fixed z-[200] w-72 max-w-[90vw] bg-nf-bg-card border border-nf-border-light shadow-2xl rounded-lg overflow-hidden"
+      className="nf-glass-panel fixed z-[200] w-72 max-w-[90vw] bg-nf-bg-card border border-nf-border-light shadow-2xl overflow-hidden"
       style={{ left: adjustedPos.x, top: adjustedPos.y }}
       role="tooltip"
     >

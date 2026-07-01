@@ -85,12 +85,12 @@ export interface TemplateInfo {
 
 // 可用的项目文体模板列表（按文体体裁分类）
 export const PROJECT_TEMPLATES: TemplateInfo[] = [
-  { id: "standard", name: "标准长篇", desc: "通用长篇小说架构，分卷管理、伏笔追踪、人物关系图" },
+  { id: "standard", name: "标准长篇", desc: "通用长篇小说架构，分卷管理、人物关系图" },
   { id: "short_story", name: "短篇小说", desc: "单篇精炼结构，灵感笔记与人物速写模板" },
   { id: "diary", name: "日记体", desc: "日期驱动叙事，心理轨迹追踪、日记模板" },
   { id: "dialogue", name: "对话体", desc: "对话推动叙事，角色声线设定、场景模板" },
-  { id: "multi_volume", name: "长篇分卷", desc: "多卷深度架构，分卷大纲、卷间关联、伏笔跨卷追踪" },
-  { id: "shared_world", name: "同世界观系列", desc: "多作品共享世界观，系列规划、跨作品伏笔、人物档案库" },
+  { id: "multi_volume", name: "长篇分卷", desc: "多卷深度架构，分卷大纲、卷间关联、人物关系图" },
+  { id: "shared_world", name: "同世界观系列", desc: "多作品共享世界观，系列规划、跨作品人物档案库" },
   { id: "screenplay", name: "剧本式", desc: "幕次结构叙事，场景设定、道具清单、分幕大纲" },
   { id: "poetry", name: "诗歌体", desc: "诗意叙事，诗稿模板、韵律笔记、意象集" },
 ];
@@ -690,50 +690,6 @@ export async function readCharacterSummary(
     projectPath,
     characterName,
   });
-}
-
-// ===== 伏笔追踪 API =====
-
-// 单个伏笔项接口
-export interface ForeshadowingItem {
-  /** 伏笔名称 */
-  name: string;
-  /** 文件相对路径 */
-  file_path: string;
-  /** 状态：未回收 / 已回收 / 已废弃 */
-  status: string;
-  /** 埋设位置描述 */
-  plant_location: string;
-  /** 回收位置描述 */
-  payoff_location: string;
-  /** 重要度：高 / 中 / 低 */
-  importance: string;
-  /** 备注 */
-  notes: string;
-}
-
-// 伏笔追踪汇总接口
-export interface ForeshadowingSummary {
-  /** 伏笔总数 */
-  total: number;
-  /** 未回收数 */
-  pending: number;
-  /** 已回收数 */
-  resolved: number;
-  /** 已废弃数 */
-  abandoned: number;
-  /** 所有伏笔项列表（按状态与重要度排序） */
-  items: ForeshadowingItem[];
-}
-
-// 扫描项目伏笔目录
-// 输入: projectPath 项目路径
-// 输出: Promise<ForeshadowingSummary> 伏笔追踪汇总
-// 流程: 调用 Rust 后端 scan_foreshadowing 命令，扫描伏笔目录并解析结构化数据
-export async function scanForeshadowing(
-  projectPath: string
-): Promise<ForeshadowingSummary> {
-  return invoke<ForeshadowingSummary>("scan_foreshadowing", { projectPath });
 }
 
 // ===== 项目导入导出 API =====

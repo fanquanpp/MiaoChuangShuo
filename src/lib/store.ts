@@ -25,7 +25,6 @@ export type SidebarCategory =
   | "manuscript"
   | "outline"
   | "codex"
-  | "foreshadowing"
   | "volumes"
   | "stats"
   | "search";
@@ -35,7 +34,6 @@ export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
   manuscript: "正文",
   outline: "大纲",
   codex: "设定库",
-  foreshadowing: "伏笔",
   volumes: "分卷",
   stats: "统计",
   search: "搜索",
@@ -46,7 +44,6 @@ export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
   manuscript: "正文",
   outline: "大纲",
   codex: "",
-  foreshadowing: "伏笔记录",
   volumes: "卷宗",
   stats: "",
   search: "",
@@ -57,7 +54,6 @@ export const CATEGORY_ICONS: Record<SidebarCategory, string> = {
   manuscript: "FileText",
   outline: "ListTree",
   codex: "Library",
-  foreshadowing: "Eye",
   volumes: "BookOpen",
   stats: "BarChart3",
   search: "Search",

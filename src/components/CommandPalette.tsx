@@ -19,7 +19,6 @@ import {
   FileText,
   ListTree,
   Library,
-  Eye,
   BookOpen,
   BarChart3,
   Search as SearchIcon,
@@ -165,7 +164,6 @@ export default function CommandPalette({
       { id: "cat-manuscript", label: CATEGORY_NAMES["manuscript"], category: t("command.categoryNav"), keywords: ["正文", "manuscript", "章节"], action: () => switchTo("manuscript"), icon: FileText },
       { id: "cat-outline", label: CATEGORY_NAMES["outline"], category: t("command.categoryNav"), keywords: ["大纲", "outline"], action: () => switchTo("outline"), icon: ListTree },
       { id: "cat-codex", label: CATEGORY_NAMES["codex"], category: t("command.categoryNav"), keywords: ["设定", "设定库", "角色", "世界观", "术语", "codex"], action: () => switchTo("codex"), icon: Library },
-      { id: "cat-foreshadowing", label: CATEGORY_NAMES["foreshadowing"], category: t("command.categoryNav"), keywords: ["伏笔", "foreshadowing"], action: () => switchTo("foreshadowing"), icon: Eye },
       { id: "cat-volumes", label: CATEGORY_NAMES["volumes"], category: t("command.categoryNav"), keywords: ["分卷", "卷宗", "volumes"], action: () => switchTo("volumes"), icon: BookOpen },
       { id: "cat-stats", label: CATEGORY_NAMES["stats"], category: t("command.categoryNav"), keywords: ["统计", "stats", "字数"], action: () => switchTo("stats"), icon: BarChart3 },
       { id: "cat-search", label: CATEGORY_NAMES["search"], category: t("command.categoryNav"), keywords: ["搜索", "search", "查找"], action: () => switchTo("search"), icon: SearchIcon },
@@ -242,7 +240,7 @@ export default function CommandPalette({
   // 新建文件命令（按分类动态生成）
   const createFileCommands: Command[] = useMemo(() => {
     if (!onCreateFile) return [];
-    const categories: SidebarCategory[] = ["manuscript", "outline", "codex", "foreshadowing", "volumes"];
+    const categories: SidebarCategory[] = ["manuscript", "outline", "codex", "volumes"];
     return categories.map((cat) => ({
       id: `new-file-${cat}`,
       label: t("command.newFile", { category: CATEGORY_NAMES[cat] }),

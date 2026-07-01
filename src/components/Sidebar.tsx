@@ -27,7 +27,6 @@ import {
   Settings,
   BookOpen,
   Folder,
-  Eye,
   PanelLeft,
   PanelLeftClose,
 } from "lucide-react";
@@ -47,7 +46,6 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   manuscript: FileText,
   outline: ListTree,
   codex: Library,
-  foreshadowing: Eye,
   stats: BarChart3,
   search: Search,
   volumes: BookOpen,
@@ -57,7 +55,7 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
 const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline"];
 
 // 设定类分类：统一设定库入口（替代原 characters/worldview/glossary/materials 分散入口）
-const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex", "foreshadowing"];
+const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex"];
 
 // 工具分类列表
 const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
@@ -151,13 +149,14 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
       }} />
 
       {/* 顶部: 项目名称与返回 - FANDEX 左侧色条 */}
-      <div className="px-3 py-3 border-b border-nf-border-light relative overflow-hidden flex-shrink-0">
+      {/* 折叠态增加顶部内边距,为居中的折叠按钮预留空间,避免与返回按钮重叠 */}
+      <div className={`px-3 py-3 border-b border-nf-border-light relative overflow-hidden flex-shrink-0 ${collapsed ? "pt-9" : ""}`}>
         {/* 微妙的背景渐变 */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
           background: 'linear-gradient(135deg, var(--fandex-primary), var(--fandex-secondary))',
         }} />
         {/* 折叠/展开切换按钮:固定右上角,提升 z 层级避免被相邻元素覆盖,
-            折叠态下居中显示为顶部唯一可见控件 */}
+            折叠态下居中显示为顶部控件 */}
         <button
           onClick={() => setCollapsed((v) => !v)}
           title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
@@ -165,16 +164,15 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         >
           {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
-        {/* 返回启动器按钮:折叠时隐藏 */}
-        {!collapsed && (
-          <button
-            onClick={handleBackToLauncher}
-            className="relative flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition-all duration-base ease-fandex mb-1.5 group"
-          >
-            <ChevronLeft className="w-3.5 h-3.5 transition-transform duration-fast group-hover:-translate-x-0.5" />
-            {t("app.back")}
-          </button>
-        )}
+        {/* 返回启动器按钮:始终显示,折叠时仅图标居中,保证用户随时可返回 */}
+        <button
+          onClick={handleBackToLauncher}
+          title={t("app.back")}
+          className={`relative flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition-all duration-base ease-fandex mb-1.5 group ${collapsed ? "justify-center w-full" : ""}`}
+        >
+          <ChevronLeft className="w-3.5 h-3.5 transition-transform duration-fast group-hover:-translate-x-0.5" />
+          {!collapsed && t("app.back")}
+        </button>
         {/* 项目名:折叠时隐藏 */}
         {!collapsed && (
           <h1 className="relative fandex-bar-left text-sm font-bold font-display text-nf-text truncate leading-snug pr-8" title={currentProject?.meta.name}>
@@ -205,18 +203,14 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
               key={cat}
               onClick={() => switchTo(cat)}
               title={t(`sidebar.${cat}`)}
-              className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
+              className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
                 isActive
-                  ? "bg-fandex-primary/10 text-fandex-primary"
+                  ? `nf-active bg-fandex-primary/10 text-fandex-primary`
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
               }`}
             >
-              {/* FANDEX 左侧色条激活指示器 - 带过渡动画 */}
-              <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-base ease-fandex ${
-                isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
-              }`} style={{ transformOrigin: 'center' }} />
               <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                isActive ? 'scale-110' : 'group-hover:scale-105'
+                isActive ? 'scale-110' : 'group-hover:scale-110'
               }`} />
               {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
             </button>
@@ -252,17 +246,14 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                 key={cat}
                 onClick={() => switchTo(cat)}
                 title={t(`sidebar.${cat}`)}
-                className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
                   isActive
-                    ? "bg-fandex-primary/10 text-fandex-primary"
+                    ? `nf-active bg-fandex-primary/10 text-fandex-primary`
                     : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
                 }`}
               >
-                <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-base ease-fandex ${
-                  isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
-                }`} style={{ transformOrigin: 'center' }} />
                 <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                  isActive ? 'scale-110' : 'group-hover:scale-105'
+                  isActive ? 'scale-110' : 'group-hover:scale-110'
                 }`} />
                 {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
               </button>
@@ -279,17 +270,14 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
             <button
               onClick={() => switchTo("volumes" as SidebarCategory)}
               title={t("sidebar.volumes")}
-              className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
+              className={`nf-sidebar-item nf-sidebar-tertiary w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
                 activeCategory === "volumes"
-                  ? "bg-fandex-tertiary/10 text-fandex-tertiary"
+                  ? `nf-active bg-fandex-tertiary/10 text-fandex-tertiary`
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
               }`}
             >
-              <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-tertiary transition-all duration-base ease-fandex ${
-                activeCategory === "volumes" ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
-              }`} style={{ transformOrigin: 'center' }} />
               <BookOpen className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                activeCategory === "volumes" ? 'scale-110' : 'group-hover:scale-105'
+                activeCategory === "volumes" ? 'scale-110' : 'group-hover:scale-110'
               }`} />
               {!collapsed && <span className="truncate">{t("sidebar.volumes")}</span>}
             </button>
@@ -312,17 +300,14 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                   key={dirName}
                   onClick={() => switchTo(dirName as SidebarCategory)}
                   title={dirName}
-                  className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                  className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
                     isActive
-                      ? "bg-fandex-primary/10 text-fandex-primary"
+                      ? `nf-active bg-fandex-primary/10 text-fandex-primary`
                       : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
                   }`}
                 >
-                  <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-base ease-fandex ${
-                    isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
-                  }`} style={{ transformOrigin: 'center' }} />
                   <Layers className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                    isActive ? 'scale-110' : 'group-hover:scale-105'
+                    isActive ? 'scale-110' : 'group-hover:scale-110'
                   }`} />
                   {!collapsed && <span className="truncate">{dirName}</span>}
                 </button>
@@ -349,17 +334,14 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                   key={dirName}
                   onClick={() => switchTo(dirName as SidebarCategory)}
                   title={dirName}
-                  className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                  className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
                     isActive
-                      ? "bg-fandex-primary/10 text-fandex-primary"
+                      ? `nf-active bg-fandex-primary/10 text-fandex-primary`
                       : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
                   }`}
                 >
-                  <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-base ease-fandex ${
-                    isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
-                  }`} style={{ transformOrigin: 'center' }} />
                   <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                    isActive ? 'scale-110' : 'group-hover:scale-105'
+                    isActive ? 'scale-110' : 'group-hover:scale-110'
                   }`} />
                   {!collapsed && <span className="truncate">{dirName}</span>}
                 </button>
@@ -383,18 +365,14 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
               key={cat}
               onClick={() => switchTo(cat)}
               title={t(`sidebar.${cat}`)}
-              className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
+              className={`nf-sidebar-item nf-sidebar-tertiary w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
                 isActive
-                  ? "bg-fandex-tertiary/10 text-fandex-tertiary"
+                  ? `nf-active bg-fandex-tertiary/10 text-fandex-tertiary`
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
               }`}
             >
-              {/* FANDEX 左侧色条激活指示器(工具类用 tertiary 色) */}
-              <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-tertiary transition-all duration-base ease-fandex ${
-                isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
-              }`} style={{ transformOrigin: 'center' }} />
               <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                isActive ? 'scale-110' : 'group-hover:scale-105'
+                isActive ? 'scale-110' : 'group-hover:scale-110'
               }`} />
               {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
             </button>

@@ -86,10 +86,9 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
         { keys: "Alt + 1", desc: t("shortcuts.navManuscript") },
         { keys: "Alt + 2", desc: t("shortcuts.navOutline") },
         { keys: "Alt + 3", desc: t("shortcuts.navCodex") },
-        { keys: "Alt + 4", desc: t("shortcuts.navForeshadowing") },
-        { keys: "Alt + 5", desc: t("shortcuts.navStats") },
-        { keys: "Alt + 6", desc: t("shortcuts.navSearch") },
-        { keys: "Alt + 7", desc: t("shortcuts.navVolumes") },
+        { keys: "Alt + 4", desc: t("shortcuts.navStats") },
+        { keys: "Alt + 5", desc: t("shortcuts.navSearch") },
+        { keys: "Alt + 6", desc: t("shortcuts.navVolumes") },
       ],
     },
   ];
@@ -149,6 +148,14 @@ export default function ShortcutPanel() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
+
+  // 监听外部打开事件:主页快捷键入口按钮派发 nf:open-shortcuts
+  // 复用本面板作为"介绍页面",避免重复实现功能介绍内容
+  useEffect(() => {
+    const handleOpen = () => setOpen(true);
+    window.addEventListener("nf:open-shortcuts", handleOpen);
+    return () => window.removeEventListener("nf:open-shortcuts", handleOpen);
+  }, []);
 
   if (!open) return null;
 

@@ -37,7 +37,12 @@ import {
   Settings,
   FileArchive,
   Sparkles,
+  Maximize2,
+  Minimize2,
+  Power,
+  Keyboard,
 } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppStore } from "../lib/store";
 import {
   scanProjects,
@@ -92,7 +97,6 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
  *   6. 支持自定义模板管理与使用
  */
 export default function Launcher() {
-  const openProject = useAppStore((s) => s.openProject);
   const closeProject = useAppStore((s) => s.closeProject);
   const { t } = useI18n();
   const { showToast } = useToast();
@@ -103,7 +107,7 @@ export default function Launcher() {
   const [selectedType, setSelectedType] = useState<ProjectType>("standard");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("26.7.4");
+  const [appVersion, setAppVersion] = useState("26.7.5");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
@@ -115,6 +119,8 @@ export default function Launcher() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // 设置对话框打开时定位的分区:外观入口按钮传入 appearance,普通设置入口为 undefined
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection | undefined>(undefined);
+  // 全屏状态:跟踪当前窗口是否处于 OS 全屏模式,用于切换按钮图标与提示
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   /**
    * 打开设置对话框
@@ -126,6 +132,76 @@ export default function Launcher() {
   const handleOpenSettings = useCallback((section?: SettingsSection) => {
     setSettingsInitialSection(section);
     setSettingsOpen(true);
+  }, []);
+
+  /**
+   * 切换 OS 全屏模式
+   * 输入: 无
+   * 输出: 无
+   * 流程: 调用 Tauri 窗口 API 反转全屏状态,同步本地 state
+   *      非 Tauri 环境(浏览器开发)静默忽略
+   */
+  const handleToggleFullscreen = useCallback(async () => {
+    try {
+      const appWindow = getCurrentWindow();
+      const next = !isFullscreen;
+      await appWindow.setFullscreen(next);
+      setIsFullscreen(next);
+    } catch {
+      // 非 Tauri 环境静默忽略
+    }
+  }, [isFullscreen]);
+
+  /**
+   * 退出软件
+   * 输入: 无
+   * 输出: 无
+   * 流程: 调用 Tauri 窗口 close(),触发已注册的 onCloseRequested 守卫
+   *      守卫内部处理未保存修改确认与自动保存,保证退出前数据安全
+   */
+  const handleExitApp = useCallback(async () => {
+    try {
+      const appWindow = getCurrentWindow();
+      await appWindow.close();
+    } catch {
+      // 非 Tauri 环境回退到浏览器关闭
+      window.close();
+    }
+  }, []);
+
+  /**
+   * 打开快捷键参考面板(介绍页面)
+   * 输入: 无
+   * 输出: 无
+   * 流程: 派发自定义事件 nf:open-shortcuts,由 ShortcutPanel 监听并打开
+   *      复用全局已有的快捷键面板,避免重复实现介绍内容
+   */
+  const handleOpenShortcuts = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("nf:open-shortcuts"));
+  }, []);
+
+  // 监听 Tauri 窗口全屏状态变化,同步本地 state
+  // 用户通过 OS 快捷键(如 F11/Win+Up)切换全屏时,按钮图标保持同步
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    try {
+      const appWindow = getCurrentWindow();
+      appWindow.onResized(async () => {
+        try {
+          const fs = await appWindow.isFullscreen();
+          setIsFullscreen(fs);
+        } catch {
+          // 静默忽略
+        }
+      }).then((fn) => {
+        unlisten = fn;
+      });
+    } catch {
+      // 非 Tauri 环境静默忽略
+    }
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   // ===== 启动时自动检查更新 =====
@@ -453,6 +529,8 @@ export default function Launcher() {
     setTypePanelExpanded(false);
     setSelectedCustomTemplate(null);
     try {
+      // 创建成功后将项目导入列表,但不自动跳转工作台
+      // 用户停留在主页,通过点击项目卡片主动进入,符合"先创建后选择"的交互预期
       const project = await importProject(projectPath);
       setProjects((prev) => {
         const idx = prev.findIndex((p) => p.path === projectPath);
@@ -464,11 +542,10 @@ export default function Launcher() {
         return [project, ...prev];
       });
       showToast("success", t("launcher.createSuccess"));
-      openProject(project);
     } catch (e) {
       showToast("error", t("launcher.importFailed", { error: String(e) }));
     }
-  }, [openProject, t, showToast]);
+  }, [t, showToast]);
 
   // 点击"新建项目"按钮：切换类型选择面板
   const handleNewProjectClick = useCallback(() => {
@@ -515,6 +592,8 @@ export default function Launcher() {
     <div className="flex h-screen bg-nf-bg overflow-hidden relative">
       {/* 全局舒缓柔光背景层:替代单一渐变,提升空间感 */}
       <div className="nf-ambient-bg" />
+      {/* 小米护眼模式纸质感纹理层:暖色染色 + 纤维颗粒,强化纸质感指示感 */}
+      <div className="nf-paper-grain" />
       {/* 背景装饰渐变(保留原主区域光斑) */}
       <div className="absolute inset-0 pointer-events-none" style={{
         background: 'radial-gradient(ellipse 80% 60% at 70% 20%, rgba(124, 158, 255, 0.04), transparent)',
@@ -528,10 +607,10 @@ export default function Launcher() {
         }} />
 
         {/* 品牌区域 - 入口按钮(点击展开创建面板) + 小点装饰 */}
-        <div className="px-6 pt-8 pb-6">
-          <div className="flex items-center gap-2.5 mb-1.5">
+        <div className="px-6 pt-8 pb-6 relative overflow-hidden">
+          <div className="flex items-center gap-2.5 mb-1.5 relative z-[2]">
             {/* 品牌图标容器:右上角小点装饰 */}
-            <div className="relative p-2 bg-fandex-primary/10 rounded-md">
+            <div className="relative p-2 bg-fandex-primary/10">
               <PenLine className="w-5 h-5 text-fandex-primary" />
               {/* 小点装饰图案:不占位,绝对定位右上角 */}
               <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-fandex-secondary" />
@@ -548,6 +627,34 @@ export default function Launcher() {
               </p>
             </div>
           </div>
+          {/* logo 右侧空白装饰图案:呼应品牌笔与点,不影响文字排版
+           * 由斜线矩阵 + 渐变小点构成,极低透明度,纯视觉点缀 */}
+          <svg
+            className="nf-logo-decor"
+            viewBox="0 0 90 60"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            {/* 斜线矩阵:精致科技感,呼应品牌几何美学 */}
+            {Array.from({ length: 5 }).map((_, i) => (
+              <line
+                key={i}
+                x1={20 + i * 14}
+                y1={10}
+                x2={10 + i * 14}
+                y2={50}
+                stroke="currentColor"
+                strokeWidth="0.6"
+                className="text-fandex-primary"
+                opacity={0.5 - i * 0.08}
+              />
+            ))}
+            {/* 渐变小点:星光点缀,呼应品牌图标右上角小点 */}
+            <circle cx="78" cy="14" r="1.5" className="text-fandex-secondary" fill="currentColor" />
+            <circle cx="84" cy="22" r="1" className="text-fandex-tertiary" fill="currentColor" opacity="0.7" />
+            <circle cx="80" cy="32" r="0.8" className="text-fandex-primary" fill="currentColor" opacity="0.5" />
+          </svg>
         </div>
 
         {/* 新建项目按钮 + 类型选择面板 */}
@@ -736,6 +843,22 @@ export default function Launcher() {
 
       {/* 右侧主区域 */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-10 animate-fade-in">
+        {/* 主区域背景装饰图案:不影响功能与显示,极低透明度
+         * 右上角网格点阵 + 左下角同心圆,营造空间纵深感与质感统一 */}
+        <div className="nf-bg-grid-dots" aria-hidden="true" />
+        <svg
+          className="nf-bg-rings"
+          viewBox="0 0 320 320"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          {/* 同心圆装饰:层次递进,呼应项目卡片同心圆图案 */}
+          <circle cx="60" cy="260" r="140" stroke="currentColor" strokeWidth="0.6" className="text-fandex-primary" opacity="0.3" />
+          <circle cx="60" cy="260" r="100" stroke="currentColor" strokeWidth="0.5" className="text-fandex-secondary" opacity="0.4" />
+          <circle cx="60" cy="260" r="64" stroke="currentColor" strokeWidth="0.5" className="text-fandex-tertiary" opacity="0.5" />
+          <circle cx="60" cy="260" r="32" stroke="currentColor" strokeWidth="0.4" className="text-fandex-primary" opacity="0.4" />
+        </svg>
         {/* 顶部搜索栏 */}
         <header className="flex items-center justify-between px-8 py-5 border-b border-nf-border-light bg-nf-bg/80 backdrop-blur-sm">
           <div>
@@ -777,6 +900,15 @@ export default function Launcher() {
               <Settings className="w-3.5 h-3.5" />
               {t("launcher.openSettings")}
             </button>
+            {/* 快捷键参考入口(介绍页面):复用全局 ShortcutPanel,弥补主界面无入口 */}
+            <button
+              onClick={handleOpenShortcuts}
+              title={t("launcher.openShortcuts")}
+              className="nf-icon-slide nf-border-glow flex items-center gap-1.5 px-3 py-2 text-xs text-nf-text-secondary hover:text-fandex-secondary border border-nf-border-light hover:border-fandex-secondary/40 hover:bg-nf-bg-hover transition duration-fast"
+            >
+              <Keyboard className="w-3.5 h-3.5" />
+              {t("launcher.openShortcuts")}
+            </button>
             <div className="relative group">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nf-text-tertiary transition-colors duration-fast group-focus-within:text-fandex-primary" />
               <input
@@ -796,6 +928,25 @@ export default function Launcher() {
                 </button>
               )}
             </div>
+            {/* 窗口控制组:全屏切换 + 退出软件,独立成组置于最右 */}
+            <div className="flex items-center gap-1.5 ml-1 pl-3 border-l border-nf-border-light">
+              <button
+                onClick={handleToggleFullscreen}
+                title={isFullscreen ? t("launcher.exitFullscreen") : t("launcher.enterFullscreen")}
+                aria-label={isFullscreen ? t("launcher.exitFullscreen") : t("launcher.enterFullscreen")}
+                className="nf-win-ctrl"
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={handleExitApp}
+                title={t("launcher.exitApp")}
+                aria-label={t("launcher.exitApp")}
+                className="nf-win-ctrl nf-win-danger"
+              >
+                <Power className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -805,7 +956,7 @@ export default function Launcher() {
             <ProjectGridSkeleton count={6} />
           ) : !hasProjects && !isSearching ? (
             <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in">
-              <div className="w-20 h-20 mb-5 rounded-lg bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
+              <div className="w-20 h-20 mb-5 bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
                 <BookOpen className="w-9 h-9 text-nf-border" />
               </div>
               <p className="text-nf-text-secondary font-medium text-base mb-2">
@@ -818,7 +969,7 @@ export default function Launcher() {
             </div>
           ) : isSearching && !hasSearchResults ? (
             <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in">
-              <div className="w-20 h-20 mb-5 rounded-lg bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
+              <div className="w-20 h-20 mb-5 bg-nf-bg-card border border-nf-border-light flex items-center justify-center">
                 <Search className="w-9 h-9 text-nf-border" />
               </div>
               <p className="text-nf-text-secondary font-medium text-base mb-2">

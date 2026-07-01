@@ -1095,3 +1095,205 @@ input:focus, textarea:focus, select:focus {
 .light .nf-card-dots::before {
   background-image: radial-gradient(circle, rgba(68, 102, 221, 0.1) 1px, transparent 1px);
 }
+
+/* ========== 小米护眼模式纸质感纹理层 ==========
+ * 设计依据:小米护眼模式通过削减蓝光使屏幕偏暖黄(红绿叠加呈黄),
+ * 叠加纸张纤维颗粒形成"纸质指示感"。本层在暗色基底上复刻该质感:
+ *   1. 暖色调染色:rgba 暖棕琥珀色叠加,中和冷蓝底色,模拟护眼暖光
+ *   2. 纸张纤维颗粒:SVG feTurbulence 分形噪声生成不规则纤维纹理,
+ *      透明度提升至 0.12,强化"指示感"让纸质感清晰可辨(越强越好)
+ *   3. 细微横纹:repeating-linear-gradient 模拟纸张纤维走向
+ * 用法:作为全局背景叠加层,pointer-events:none 不影响交互
+ */
+.nf-paper-grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  /* 暖色染色层:琥珀+棕调,中和冷底,模拟护眼模式暖光 */
+  background:
+    linear-gradient(180deg, rgba(180, 140, 80, 0.06), rgba(150, 110, 60, 0.04)),
+    radial-gradient(ellipse 70% 50% at 30% 20%, rgba(200, 160, 100, 0.05), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 75% 80%, rgba(170, 130, 70, 0.045), transparent 70%);
+}
+
+/* 纸张纤维颗粒层:SVG 噪声,独立分层避免与暖色层互相干扰
+ * baseFrequency 0.85 生成细密颗粒,numOctaves 4 增加层次细节
+ * opacity 0.12 保证纸质感清晰可见(指示感强)但不过曝 */
+.nf-paper-grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='nfPaperNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.78  0 0 0 0 0.62  0 0 0 0 0.38  0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23nfPaperNoise)'/%3E%3C/svg%3E");
+  opacity: 0.12;
+  mix-blend-mode: overlay;
+}
+
+/* 纸张纤维走向纹:极细横纹模拟纸纤维方向 */
+.nf-paper-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 3px,
+    rgba(200, 165, 100, 0.012) 3px,
+    rgba(200, 165, 100, 0.012) 4px
+  );
+  opacity: 0.6;
+}
+
+/* 亮色主题下纸质感适配:加深暖色与颗粒,在亮底保持可辨 */
+.light .nf-paper-grain {
+  background:
+    linear-gradient(180deg, rgba(190, 150, 90, 0.10), rgba(160, 120, 70, 0.07)),
+    radial-gradient(ellipse 70% 50% at 30% 20%, rgba(210, 170, 110, 0.08), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 75% 80%, rgba(180, 140, 80, 0.07), transparent 70%);
+}
+.light .nf-paper-grain::before {
+  opacity: 0.15;
+  mix-blend-mode: multiply;
+}
+
+/* ========== 侧边栏统一悬停泛光 ==========
+ * 统一所有侧边栏导航项的悬停视觉:左侧色条 + 背景柔光 + 图标微动
+ * 替代各按钮散乱的 hover 类,保证全栏悬停反馈一致
+ * 用法:加在侧边栏导航按钮上,配合 group 使用
+ */
+.nf-sidebar-item {
+  position: relative;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    padding-left 0.2s ease;
+}
+.nf-sidebar-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 60%;
+  background: var(--fandex-primary);
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+  transition: transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.22s ease;
+}
+.nf-sidebar-item:hover::before {
+  transform: translateY(-50%) scaleY(1);
+  opacity: 0.5;
+}
+/* 悬停时右侧柔光泛起:模拟光源从左照入 */
+.nf-sidebar-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(124, 158, 255, 0.08), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.nf-sidebar-item:hover::after {
+  opacity: 1;
+}
+/* 激活态:色条全显 + 持续柔光 */
+.nf-sidebar-item.nf-active::before {
+  transform: translateY(-50%) scaleY(1);
+  opacity: 1;
+}
+.nf-sidebar-item.nf-active::after {
+  opacity: 0.6;
+}
+/* 工具类用 tertiary 色调 */
+.nf-sidebar-item.nf-sidebar-tertiary::before {
+  background: var(--fandex-tertiary);
+}
+.nf-sidebar-item.nf-sidebar-tertiary::after {
+  background: linear-gradient(90deg, rgba(255, 158, 122, 0.08), transparent 60%);
+}
+/* 次级分类用 secondary 色调 */
+.nf-sidebar-item.nf-sidebar-secondary::before {
+  background: var(--fandex-secondary);
+}
+.nf-sidebar-item.nf-sidebar-secondary::after {
+  background: linear-gradient(90deg, rgba(78, 230, 176, 0.08), transparent 60%);
+}
+
+/* ========== 主区域背景装饰图案(不影响功能与显示) ==========
+ * 在主区域空白处叠加极低透明度的几何与点阵图案,提升质感
+ * pointer-events:none + z-index:0 确保不拦截交互、不遮挡内容
+ */
+
+/* 主区域右上角网格点阵装饰:呼应卡片点阵,形成视觉统一 */
+.nf-bg-grid-dots {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 280px;
+  height: 280px;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(124, 158, 255, 0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity: 0.5;
+  z-index: 0;
+  mask-image: radial-gradient(ellipse 80% 80% at 70% 30%, black 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 70% 30%, black 30%, transparent 80%);
+}
+
+/* 主区域左下角同心圆装饰:空间纵深感 */
+.nf-bg-rings {
+  position: absolute;
+  bottom: -60px;
+  left: -60px;
+  width: 320px;
+  height: 320px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+}
+
+/* 品牌 logo 区右侧空白装饰:呼应品牌图标的笔与点 */
+.nf-logo-decor {
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  transform: translateY(-50%);
+  width: 90px;
+  height: 60px;
+  pointer-events: none;
+  opacity: 0.12;
+  z-index: 0;
+}
+
+/* ========== 窗口控制按钮(全屏/退出)统一样式 ========== */
+.nf-win-ctrl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--fandex-border-light);
+  color: var(--fandex-text-secondary);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.12s ease;
+}
+.nf-win-ctrl:hover {
+  background: var(--fandex-bg-hover);
+  color: var(--fandex-text);
+  border-color: var(--fandex-border);
+  box-shadow: 0 0 0 1px rgba(124, 158, 255, 0.18), 0 4px 12px -4px rgba(124, 158, 255, 0.22);
+}
+.nf-win-ctrl:active {
+  transform: scale(0.94);
+}
+.nf-win-ctrl.nf-win-danger:hover {
+  color: #ff7a6a;
+  border-color: rgba(255, 100, 80, 0.4);
+  box-shadow: 0 0 0 1px rgba(255, 100, 80, 0.2), 0 4px 12px -4px rgba(255, 100, 80, 0.25);
+}

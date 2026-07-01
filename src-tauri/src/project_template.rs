@@ -168,7 +168,6 @@ pub fn common_directories() -> Vec<&'static str> {
         "正文",        // 正文内容
         "大纲",        // 大纲与构思
         "素材",        // 参考资料
-        "伏笔记录",    // 伏笔追踪系统
         ".novelforge", // 应用元数据目录
     ]
 }
@@ -639,7 +638,6 @@ pub fn type_specific_directories(project_type: &ProjectType) -> Vec<&'static str
         ProjectType::MultiVolume => vec![
             "卷宗",           // 分卷管理
             "章节存档",       // 废弃章节
-            "伏笔记录",       // 伏笔追踪
             "人物关系图",     // 人物关系
             "分卷大纲",       // 各卷大纲
         ],
@@ -648,7 +646,6 @@ pub fn type_specific_directories(project_type: &ProjectType) -> Vec<&'static str
             "世界观总览",   // 共享世界观
             "时间线总览",   // 系列时间线
             "人物档案库",   // 跨作品人物
-            "系列伏笔",     // 跨作品伏笔
         ],
         ProjectType::Screenplay => vec![
             "场景设定",   // 场景布景
@@ -664,7 +661,6 @@ pub fn type_specific_directories(project_type: &ProjectType) -> Vec<&'static str
         ProjectType::Standard => vec![
             "卷宗",         // 分卷管理
             "章节存档",     // 废弃章节
-            "伏笔记录",     // 伏笔追踪
             "人物关系图",   // 人物关系
         ],
     }
@@ -813,23 +809,6 @@ pub fn type_specific_files(project_type: &ProjectType) -> Vec<(&'static str, Str
                  第三卷\n核心主线:\n预计字数:\n关键事件:\n".to_string(),
             ),
             (
-                "伏笔记录/伏笔追踪.txt",
-                "伏笔追踪表\n\n\
-                 编号 / 伏笔内容 / 埋设卷章 / 揭示卷章 / 状态\n\
-                 F001 / / / / 待埋设\n\
-                 F002 / / / / 待埋设\n".to_string(),
-            ),
-            (
-                "伏笔记录/_伏笔模板.txt",
-                "新伏笔\n\
-                 状态：未回收\n\
-                 埋设：\n\
-                 回收：\n\
-                 重要度：中\n\
-                 备注：\n\
-                 在此填写伏笔的详细描述...\n".to_string(),
-            ),
-            (
                 "分卷大纲/卷间关联.txt",
                 "卷间关联\n\n\
                  卷与卷之间的主线衔接、角色发展、伏笔传承\n\n\
@@ -892,13 +871,6 @@ pub fn type_specific_files(project_type: &ProjectType) -> Vec<(&'static str, Str
                  作品 / 时间节点 / 关键事件 / 影响\n\n\
                  [作品1] / / / \n\
                  [作品2] / / / \n".to_string(),
-            ),
-            (
-                "系列伏笔/跨作品伏笔.txt",
-                "跨作品伏笔追踪\n\n\
-                 编号 / 伏笔内容 / 埋设作品 / 揭示作品 / 状态\n\
-                 X001 / / / / 待埋设\n\
-                 X002 / / / / 待埋设\n".to_string(),
             ),
             (
                 "人物档案库/角色档案.txt",
@@ -1067,39 +1039,6 @@ pub fn type_specific_files(project_type: &ProjectType) -> Vec<(&'static str, Str
             ),
         ],
         ProjectType::Standard => vec![
-            (
-                "伏笔记录/伏笔追踪.txt",
-                "伏笔追踪表\n\n\
-                 编号 / 伏笔内容 / 埋设章节 / 揭示章节 / 状态\n\
-                 F001 / / / / 待埋设\n".to_string(),
-            ),
-            (
-                "伏笔记录/伏笔清单.txt",
-                "伏笔清单\n\n\
-                 按重要性分类管理伏笔，便于全局把控\n\n\
-                 【主线伏笔】（影响主线走向）\n\
-                 编号 | 伏笔内容 | 埋设 | 揭示 | 状态\n\
-                 --- | --- | --- | --- | ---\n\
-                 M001 | | | | \n\n\
-                 【支线伏笔】（丰富剧情层次）\n\
-                 编号 | 伏笔内容 | 埋设 | 揭示 | 状态\n\
-                 --- | --- | --- | --- | ---\n\
-                 S001 | | | | \n\n\
-                 【彩蛋伏笔】（可选，增强重读价值）\n\
-                 编号 | 伏笔内容 | 埋设 | 揭示 | 状态\n\
-                 --- | --- | --- | --- | ---\n\
-                 E001 | | | | \n".to_string(),
-            ),
-            (
-                "伏笔记录/_伏笔模板.txt",
-                "新伏笔\n\
-                 状态：未回收\n\
-                 埋设：\n\
-                 回收：\n\
-                 重要度：中\n\
-                 备注：\n\
-                 在此填写伏笔的详细描述...\n".to_string(),
-            ),
             (
                 "卷宗/分卷规划.txt",
                 "分卷规划\n\n\

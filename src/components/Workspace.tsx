@@ -35,7 +35,6 @@ import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import { isTemplateSupported, getTemplateCategory } from "../lib/templateSchema";
 import { findDirByName } from "../lib/fileTreeUtils";
-import ForeshadowingPanel from "./ForeshadowingPanel";
 import CodexPanel from "./CodexPanel";
 
 /** Alt+数字键 → 侧边栏分类映射 */
@@ -43,10 +42,9 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "1": "manuscript",
   "2": "outline",
   "3": "codex",
-  "4": "foreshadowing",
-  "5": "stats",
-  "6": "search",
-  "7": "volumes",
+  "4": "stats",
+  "5": "search",
+  "6": "volumes",
 };
 
 /**
@@ -380,8 +378,6 @@ export default function Workspace() {
         return <GlobalSearch />;
       case "volume":
         return <VolumeManager />;
-      case "foreshadowing":
-        return <ForeshadowingPanel />;
       case "codex":
         return <CodexPanel />;
       default:

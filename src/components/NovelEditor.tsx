@@ -72,7 +72,6 @@ import SnapshotHistory from "./SnapshotHistory";
 import CharacterHoverCard from "./CharacterHoverCard";
 import FindReplace from "./FindReplace";
 import SceneWorkbench from "./SceneWorkbench";
-import AiAssistantPanel from "./AiAssistantPanel";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -201,7 +200,6 @@ export default function NovelEditor({
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   // 查找替换面板可见性（Ctrl+F / Ctrl+H 触发）
   const [showFindReplace, setShowFindReplace] = useState(false);
-  const [showAiAssistant, setShowAiAssistant] = useState(false);
   // 查找替换初始模式：'find' 仅查找 / 'replace' 查找并替换
   const [findReplaceMode, setFindReplaceMode] = useState<"find" | "replace">("find");
   // 文件重载触发器：恢复快照后递增以强制重新加载文件内容
@@ -854,7 +852,6 @@ export default function NovelEditor({
         onToggleSnapshotHistory={() => setShowSnapshotHistory((prev) => !prev)}
         showFindReplace={showFindReplace}
         onToggleFindReplace={() => setShowFindReplace((prev) => !prev)}
-        onToggleAiAssistant={() => setShowAiAssistant(true)}
       />
 
       {isScript && characters.length > 0 && (
@@ -929,12 +926,6 @@ export default function NovelEditor({
 
       {/* 场景化叙事工作台：编辑器底部可折叠面板，管理场景字段元数据 */}
       <SceneWorkbench filePath={filePath} />
-
-      {/* AI 辅助创作中心：接口预留，点击工具栏 Sparkles 按钮触发 */}
-      <AiAssistantPanel
-        open={showAiAssistant}
-        onClose={() => setShowAiAssistant(false)}
-      />
     </div>
   );
 }

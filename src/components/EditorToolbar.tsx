@@ -47,7 +47,6 @@ import {
   Minus,
   Search,
   ChevronDown,
-  Sparkles,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -611,8 +610,6 @@ interface EditorToolbarProps {
   // 查找替换面板
   showFindReplace?: boolean;
   onToggleFindReplace?: () => void;
-  // AI 辅助创作中心
-  onToggleAiAssistant?: () => void;
 }
 
 // 编辑器工具栏组件（Office 级富文本模式）
@@ -642,7 +639,6 @@ export default function EditorToolbar({
   onToggleSnapshotHistory,
   showFindReplace = false,
   onToggleFindReplace,
-  onToggleAiAssistant,
 }: EditorToolbarProps) {
   const { t } = useI18n();
 
@@ -940,13 +936,6 @@ export default function EditorToolbar({
               title={t("editor.findReplace")}
             >
               <Search className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => onToggleAiAssistant?.()}
-              active={false}
-              title={t("ai.title")}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
             </ToolbarButton>
           </div>
           <Divider />

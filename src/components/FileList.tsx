@@ -3,14 +3,14 @@
 // 功能概述：
 // 显示当前分类下的文件列表，支持卡片视图与列表视图切换，
 // 支持子文件夹展开/折叠导航。
-// 正文分类支持拖拽排序和批量重编号。
+// 正文分类支持拖拽排序（拖拽后自动按新顺序重新编号）。
 // 采用 FANDEX 美术风格：直角、左侧色条标题、1px 边框。
 //
 // 模块职责：
 // 1. 从项目目录树中过滤当前分类的文件
 // 2. 渲染卡片网格或列表（含子文件夹展开/折叠）
 // 3. 处理文件选择、重命名与删除
-// 4. 正文分类拖拽排序 + 批量重编号
+// 4. 正文分类拖拽排序（拖拽后自动重新编号）
 
 import { useState, useMemo, useCallback } from "react";
 import {
@@ -25,7 +25,6 @@ import {
   ChevronRight,
   ChevronDown,
   GripVertical,
-  RefreshCw,
   ListTree,
   BookCopy,
   Copy,
@@ -530,7 +529,6 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
   // 拖拽排序状态（仅正文分类有效）
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const [isRenumbering, setIsRenumbering] = useState(false);
   // 大纲生成章节对话框状态（仅正文分类有效）
   const [showOutlineToChapters, setShowOutlineToChapters] = useState(false);
   const [showVolumeGenerator, setShowVolumeGenerator] = useState(false);
@@ -588,7 +586,6 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
     const { currentProject } = useAppStore.getState();
     if (!currentProject) return;
 
-    setIsRenumbering(true);
     try {
       // 先全部改为临时名称（避免名称冲突）
       const tempNames: string[] = [];
@@ -625,56 +622,8 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
       // 刷新以恢复正确状态
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
-    } finally {
-      setIsRenumbering(false);
     }
   }, [dragIndex, children, isManuscript, showToast, t]);
-
-  // ── 批量重编号 ──
-  const handleBatchRenumber = useCallback(async () => {
-    if (!isManuscript || children.length === 0) return;
-    const { currentProject } = useAppStore.getState();
-    if (!currentProject) return;
-
-    setIsRenumbering(true);
-    try {
-      // 先全部改为临时名称
-      const tempNames: string[] = [];
-      for (let i = 0; i < children.length; i++) {
-        const node = children[i];
-        if (node.is_dir) continue;
-        const cleanName = stripNumberPrefix(node.name);
-        const tempName = `__tmp_${i}_${cleanName}.txt`;
-        const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
-        const newRelPath = dirPath + tempName;
-        await renamePath(currentProject.path, node.relative_path, newRelPath);
-        tempNames.push(newRelPath);
-      }
-
-      // 再从临时名称改为正式编号名称
-      let fileIdx = 0;
-      for (let i = 0; i < children.length; i++) {
-        const node = children[i];
-        if (node.is_dir) continue;
-        const cleanName = stripNumberPrefix(node.name);
-        const newName = `${i + 1}.${cleanName}.txt`;
-        const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
-        const newRelPath = dirPath + newName;
-        await renamePath(currentProject.path, tempNames[fileIdx], newRelPath);
-        fileIdx++;
-      }
-
-      const tree = await readProjectTree(currentProject.path);
-      useAppStore.getState().setProjectTree(tree);
-      showToast("success", t("filelist.renumbered"));
-    } catch (e) {
-      showToast("error", t("filelist.renameFailed", { error: String(e) }));
-      const tree = await readProjectTree(currentProject.path);
-      useAppStore.getState().setProjectTree(tree);
-    } finally {
-      setIsRenumbering(false);
-    }
-  }, [isManuscript, children, showToast, t]);
 
   const handleDelete = (node: FileNode, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -889,40 +838,32 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
             </button>
           </div>
         </div>
-        {/* 第二行:正文分类的快捷操作按钮 - flex-wrap 自适应换行 */}
+        {/* 第二行:正文分类的快捷操作按钮 - 三按钮均匀分布,主按钮突出 */}
         {isManuscript && (
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="grid grid-cols-3 gap-1">
             <button
               onClick={onCreateFile}
-              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-[11px] text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10"
+              className="nf-tool-btn flex items-center justify-center gap-1 px-1.5 py-1.5 text-[11px] text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition-all duration-fast"
               title={t("filelist.newChapter")}
             >
-              <FilePlus className="w-3 h-3" />
-              <span>{t("filelist.newChapter")}</span>
+              <FilePlus className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{t("filelist.newChapter")}</span>
             </button>
             <button
               onClick={() => setShowOutlineToChapters(true)}
-              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-[11px] text-fandex-tertiary border border-fandex-tertiary/50 hover:bg-fandex-tertiary/10"
+              className="nf-tool-btn flex items-center justify-center gap-1 px-1.5 py-1.5 text-[11px] text-fandex-tertiary border border-fandex-tertiary/50 hover:bg-fandex-tertiary/10 transition-all duration-fast"
               title={t("outlineToChapters.btnTitle")}
             >
-              <ListTree className="w-3 h-3" />
-              <span>{t("outlineToChapters.btn")}</span>
+              <ListTree className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{t("outlineToChapters.btn")}</span>
             </button>
             <button
               onClick={() => setShowVolumeGenerator(true)}
-              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-[11px] text-fandex-secondary border border-fandex-secondary/50 hover:bg-fandex-secondary/10"
+              className="nf-tool-btn flex items-center justify-center gap-1 px-1.5 py-1.5 text-[11px] text-fandex-secondary border border-fandex-secondary/50 hover:bg-fandex-secondary/10 transition-all duration-fast"
               title={t("volumeGen.title")}
             >
-              <BookCopy className="w-3 h-3" />
-              <span>{t("volumeGen.title")}</span>
-            </button>
-            <button
-              onClick={handleBatchRenumber}
-              disabled={isRenumbering || children.filter(c => !c.is_dir).length < 2}
-              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-[11px] text-nf-text-secondary border border-nf-border-light hover:border-fandex-secondary/60 hover:text-fandex-secondary disabled:opacity-40 disabled:cursor-not-allowed"
-              title={t("filelist.batchRenumber")}
-            >
-              <RefreshCw className={`w-3 h-3 ${isRenumbering ? "animate-spin" : ""}`} />
+              <BookCopy className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{t("volumeGen.title")}</span>
             </button>
           </div>
         )}

@@ -126,7 +126,7 @@ export default function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
           }} />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-fandex-primary/10 rounded-md">
+              <div className="p-2 bg-fandex-primary/10">
                 <PenLine className="w-5 h-5 text-fandex-primary" />
               </div>
               <div>
