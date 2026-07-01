@@ -106,7 +106,7 @@ export default function Launcher() {
   const [selectedType, setSelectedType] = useState<ProjectType>("standard");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("3.1.0");
+  const [appVersion, setAppVersion] = useState("26.7.1");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
@@ -351,6 +351,10 @@ export default function Launcher() {
       shared_world: t("launcher.typeSharedWorld"),
       screenplay: t("launcher.typeScreenplay"),
       poetry: t("launcher.typePoetry"),
+      // 兼容旧版 Rust 后端 format!("{:?}").to_lowercase() 产生的无下划线格式
+      shortstory: t("launcher.typeShortStory"),
+      multivolume: t("launcher.typeMultiVolume"),
+      sharedworld: t("launcher.typeSharedWorld"),
     };
     const typeColors: Record<string, string> = {
       epic: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
@@ -368,6 +372,10 @@ export default function Launcher() {
       shared_world: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
       screenplay: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
       poetry: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
+      // 兼容旧版无下划线格式
+      shortstory: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
+      multivolume: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
+      sharedworld: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
     };
     const gradients: Record<string, string> = {
       epic: "from-fandex-tertiary to-fandex-tertiary/40",
@@ -385,6 +393,10 @@ export default function Launcher() {
       shared_world: "from-fandex-secondary to-fandex-secondary/40",
       screenplay: "from-fandex-tertiary to-fandex-tertiary/40",
       poetry: "from-fandex-primary to-fandex-primary/40",
+      // 兼容旧版无下划线格式
+      shortstory: "from-fandex-primary to-fandex-primary/40",
+      multivolume: "from-fandex-primary to-fandex-primary/40",
+      sharedworld: "from-fandex-secondary to-fandex-secondary/40",
     };
     return {
       id: p.path,
@@ -502,7 +514,7 @@ export default function Launcher() {
         <div className="px-4 space-y-2 flex flex-col flex-1 min-h-0">
           <button
             onClick={handleNewProjectClick}
-            className="w-full flex items-center gap-2.5 px-4 py-3 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-all duration-base ease-fandex shadow-sm hover:shadow-md"
+            className="group w-full flex items-center gap-2.5 px-4 py-3 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-all duration-base ease-fandex shadow-sm hover:shadow-md"
           >
             <BookOpen className="w-4 h-4" />
             {t("launcher.createNew")}

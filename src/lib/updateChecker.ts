@@ -22,13 +22,13 @@ export const RELEASES_PAGE_URL =
   "https://github.com/fanquanpp/novelforge/releases";
 
 // 本地回退版本号（Tauri API 不可用时使用，需与 package.json/tauri.conf.json 保持同步）
-const FALLBACK_VERSION = "3.1.0";
+const FALLBACK_VERSION = "26.7.1";
 
 /**
  * 远程 Release 信息结构
  */
 export interface ReleaseInfo {
-  /** 版本号（已去除前缀 v，如 "3.1.0"） */
+  /** 版本号（已去除前缀 v，如 "26.7.1"） */
   version: string;
   /** 发布页面 URL */
   htmlUrl: string;
@@ -85,7 +85,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo> {
   }
 
   const data = await response.json();
-  // tag_name 通常为 "v3.1.0"，去除前缀 v 以便比较
+  // tag_name 通常为 "v26.7.1"，去除前缀 v 以便比较
   const tag: string = data.tag_name || "";
   const version = tag.startsWith("v") ? tag.slice(1) : tag;
 
@@ -108,7 +108,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo> {
  *
  * 输入:
  *   a 版本字符串（如 "3.0.0"）
- *   b 版本字符串（如 "3.1.0"）
+ *   b 版本字符串（如 "26.7.1"）
  * 输出:
  *   a > b 返回 1
  *   a < b 返回 -1

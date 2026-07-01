@@ -114,6 +114,22 @@ impl ProjectType {
             _ => ProjectType::Standard,
         }
     }
+
+    /// 将枚举转换为 snake_case 字符串,用于持久化存储到 project.json
+    /// 注意: format!("{:?}", variant).to_lowercase() 对多词变体会丢失下划线
+    /// (如 ShortStory -> "shortstory" 而非 "short_story"),因此必须显式映射
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            ProjectType::ShortStory => "short_story",
+            ProjectType::Diary => "diary",
+            ProjectType::Dialogue => "dialogue",
+            ProjectType::MultiVolume => "multi_volume",
+            ProjectType::SharedWorld => "shared_world",
+            ProjectType::Screenplay => "screenplay",
+            ProjectType::Poetry => "poetry",
+            ProjectType::Standard => "standard",
+        }
+    }
 }
 
 /// 项目元数据结构
@@ -1131,7 +1147,7 @@ pub fn create_project_meta(
     let now = chrono_now_iso();
     ProjectMeta {
         name: name.to_string(),
-        project_type: format!("{:?}", project_type).to_lowercase(),
+        project_type: project_type.to_str().to_string(),
         genre: genre.to_string(),
         created_at: now.clone(),
         updated_at: now,

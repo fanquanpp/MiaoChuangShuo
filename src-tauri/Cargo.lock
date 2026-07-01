@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "miaochuangshuo"
-version = "3.1.0"
+version = "26.7.1"
 dependencies = [
  "chrono",
  "dirs 5.0.1",

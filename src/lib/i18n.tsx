@@ -111,6 +111,8 @@ const zhCN: TranslationDict = {
   "projectcard.openProject": "打开项目",
   "projectcard.deleteProject": "删除项目",
   "projectcard.deleteTooltip": "删除项目",
+  "projectcard.authorLabel": "作者",
+  "projectcard.genreLabel": "题材",
 
   // ── 项目对话框 ──
   "project.createTitle": "创建新项目",
@@ -1129,6 +1131,8 @@ const enUS: TranslationDict = {
   "projectcard.openProject": "Open Project",
   "projectcard.deleteProject": "Delete Project",
   "projectcard.deleteTooltip": "Delete project",
+  "projectcard.authorLabel": "Author",
+  "projectcard.genreLabel": "Genre",
 
   // ── Project Dialog ──
   "project.createTitle": "New Project",

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "喵创说",
-  "version": "3.1.0",
+  "productName": "MiaoChuangShuo",
+  "version": "26.7.1",
   "identifier": "com.miaochuangshuo.app",
   "build": {
     "beforeDevCommand": "npm run dev",

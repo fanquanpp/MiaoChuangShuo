@@ -152,14 +152,16 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
           <div className="flex items-center gap-2 text-[11px] text-nf-text-tertiary/80">
             {project.author && (
               <span className="truncate">
-                {t("project.author")}: {project.author}
+                {t("projectcard.authorLabel")}: {project.author}
               </span>
             )}
             {project.author && project.genre && (
               <span className="text-nf-text-tertiary/40">·</span>
             )}
             {project.genre && (
-              <span className="truncate">{project.genre}</span>
+              <span className="truncate">
+                {t("projectcard.genreLabel")}: {project.genre}
+              </span>
             )}
           </div>
         )}
