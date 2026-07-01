@@ -264,7 +264,7 @@ export default function CodexPanel() {
   }, [mentions]);
 
   return (
-    <div className="flex h-full bg-nf-bg-panel">
+    <div className="flex h-full w-full flex-1 bg-nf-bg-panel min-w-0">
       {/* 左侧：实体列表（固定宽度，作为设定库导航栏） */}
       <div className="w-72 min-w-[260px] border-r border-nf-border-light flex flex-col bg-nf-bg-sidebar flex-shrink-0">
         {/* 头部：标题 + 新增 + 刷新（固定项，禁止压缩） */}

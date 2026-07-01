@@ -9,6 +9,7 @@
 // 2. 提供主题切换方法
 // 3. 持久化主题到 localStorage
 // 4. 应用主题到 DOM 根元素
+// 5. 主题切换时联动 settingsStore 重新应用背景预设，确保亮/暗主题与背景色协同
 
 import { create } from "zustand";
 
@@ -64,6 +65,22 @@ function saveThemeToStorage(theme: ThemeMode): void {
   localStorage.setItem(THEME_STORAGE_KEY, theme);
 }
 
+// 主题切换后联动 settingsStore 重新应用背景预设
+// 输入: 无
+// 输出: 无
+// 流程: 动态导入 settingsStore 并调用 setBackgroundPreset 触发重新应用
+//       避免静态导入导致循环依赖
+function syncBackgroundWithTheme(): void {
+  // 使用动态 import 避免循环依赖
+  import("./settingsStore").then(({ useSettingsStore }) => {
+    const state = useSettingsStore.getState();
+    // 重新应用当前预设，applyBackgroundTheme 会根据当前主题模式决定是否注入背景色
+    state.setBackgroundPreset(state.backgroundPreset);
+  }).catch(() => {
+    // 静默处理，主题切换本身已生效
+  });
+}
+
 // 创建主题状态 store
 // 输入: 无
 // 输出: Zustand store 实例
@@ -77,17 +94,22 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     applyThemeToDom(next);
     saveThemeToStorage(next);
     set({ theme: next });
+    // 主题切换后联动重新应用背景预设，确保亮色主题下不被深色内联样式覆盖
+    syncBackgroundWithTheme();
   },
 
   setTheme: (theme) => {
     applyThemeToDom(theme);
     saveThemeToStorage(theme);
     set({ theme });
+    syncBackgroundWithTheme();
   },
 
   initTheme: () => {
     const stored = loadThemeFromStorage();
     applyThemeToDom(stored);
     set({ theme: stored });
+    // 初始化时也同步一次，确保背景预设与主题一致
+    syncBackgroundWithTheme();
   },
 }));

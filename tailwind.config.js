@@ -23,6 +23,7 @@ export default {
           hover: 'var(--fandex-bg-hover)',
           sidebar: 'var(--fandex-bg-sidebar)',
           nav: 'var(--fandex-bg-nav)',
+          panel: 'var(--fandex-bg-card)',
         },
         // FANDEX 文字色系 - 使用 nf-text 避免与 Tailwind 内置 text-* 冲突
         'nf-text': {

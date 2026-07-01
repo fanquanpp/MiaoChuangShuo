@@ -92,8 +92,12 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
   const { t } = useI18n();
   const { handleBackToLauncher } = useAutoSaveOnExit();
 
-  // 设定组折叠状态：默认展开，用户可点击折叠以聚焦写作
+  // 各分组折叠状态：默认展开，用户可点击分组标题折叠以聚焦特定模块
+  const [writingExpanded, setWritingExpanded] = useState(true);
   const [settingsExpanded, setSettingsExpanded] = useState(true);
+  const [extensionExpanded, setExtensionExpanded] = useState(true);
+  const [customExpanded, setCustomExpanded] = useState(true);
+  const [toolExpanded, setToolExpanded] = useState(true);
 
   // 侧边栏整体折叠状态：折叠后仅显示图标列，单次会话内有效，不做持久化
   const [collapsed, setCollapsed] = useState(false);
@@ -189,33 +193,48 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
 
       {/* 中间: 分类导航 - FANDEX 左侧色条激活态 */}
       <div className="flex-1 overflow-y-auto py-2">
-        {/* 写作主分类组：正文、大纲 - 常驻显示，聚焦核心写作 */}
+        {/* 写作主分类组：正文、大纲 - 可折叠，聚焦核心写作 */}
         {!collapsed && (
-          <div className="px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+          <button
+            onClick={() => setWritingExpanded((v) => !v)}
+            title={writingExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
+            className="w-full flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
+          >
+            {writingExpanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
             {t("sidebar.writingSection")}
-          </div>
+          </button>
         )}
-        {PRIMARY_CATEGORIES.map((cat) => {
-          const Icon = ICON_MAP[cat];
-          const isActive = activeCategory === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => switchTo(cat)}
-              title={t(`sidebar.${cat}`)}
-              className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
-                isActive
-                  ? `nf-active bg-fandex-primary/10 text-fandex-primary`
-                  : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
-              }`}
-            >
-              <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                isActive ? 'scale-110' : 'group-hover:scale-110'
-              }`} />
-              {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
-            </button>
-          );
-        })}
+        {/* 折叠容器:使用 max-height + opacity 实现舒缓展开/关闭 */}
+        {/* 整体折叠时强制展开以显示图标列 */}
+        <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
+          (collapsed || writingExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          {PRIMARY_CATEGORIES.map((cat) => {
+            const Icon = ICON_MAP[cat];
+            const isActive = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => switchTo(cat)}
+                title={t(`sidebar.${cat}`)}
+                className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
+                  isActive
+                    ? `nf-active bg-fandex-primary/10 text-fandex-primary`
+                    : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                }`}
+              >
+                <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                  isActive ? 'scale-110' : 'group-hover:scale-110'
+                }`} />
+                {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
+              </button>
+            );
+          })}
+        </div>
 
         {/* 设定类分组：可折叠，避免辅助功能干扰写作焦点 */}
         {/* 整体折叠时隐藏分组折叠按钮(已是最简形态) */}
@@ -285,99 +304,138 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
           </>
         )}
 
-        {/* 类型专属目录（模板扩展） */}
+        {/* 类型专属目录（模板扩展）- 可折叠 */}
         {typeSpecificDirs.length > 0 && (
           <>
             {!collapsed && (
-              <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+              <button
+                onClick={() => setExtensionExpanded((v) => !v)}
+                title={extensionExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
+                className="w-full flex items-center gap-1.5 px-3 mt-1 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
+              >
+                {extensionExpanded ? (
+                  <ChevronDown className="w-3 h-3" />
+                ) : (
+                  <ChevronRight className="w-3 h-3" />
+                )}
                 {t("sidebar.extensionSection")}
-              </div>
+              </button>
             )}
-            {typeSpecificDirs.map((dirName) => {
-              const isActive = activeCategory === dirName;
-              return (
-                <button
-                  key={dirName}
-                  onClick={() => switchTo(dirName as SidebarCategory)}
-                  title={dirName}
-                  className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
-                    isActive
-                      ? `nf-active bg-fandex-primary/10 text-fandex-primary`
-                      : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
-                  }`}
-                >
-                  <Layers className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                    isActive ? 'scale-110' : 'group-hover:scale-110'
-                  }`} />
-                  {!collapsed && <span className="truncate">{dirName}</span>}
-                </button>
-              );
-            })}
+            <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
+              (collapsed || extensionExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            }`}>
+              {typeSpecificDirs.map((dirName) => {
+                const isActive = activeCategory === dirName;
+                return (
+                  <button
+                    key={dirName}
+                    onClick={() => switchTo(dirName as SidebarCategory)}
+                    title={dirName}
+                    className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
+                      isActive
+                        ? `nf-active bg-fandex-primary/10 text-fandex-primary`
+                        : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                    }`}
+                  >
+                    <Layers className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                      isActive ? 'scale-110' : 'group-hover:scale-110'
+                    }`} />
+                    {!collapsed && <span className="truncate">{dirName}</span>}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* 分隔线:折叠时隐藏 */}
             {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
           </>
         )}
 
-        {/* 项目自定义目录（非预设的额外目录） */}
+        {/* 项目自定义目录（非预设的额外目录）- 可折叠 */}
         {extraDirs.length > 0 && (
           <>
             {!collapsed && (
-              <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+              <button
+                onClick={() => setCustomExpanded((v) => !v)}
+                title={customExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
+                className="w-full flex items-center gap-1.5 px-3 mt-1 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
+              >
+                {customExpanded ? (
+                  <ChevronDown className="w-3 h-3" />
+                ) : (
+                  <ChevronRight className="w-3 h-3" />
+                )}
                 {t("sidebar.customSection")}
-              </div>
+              </button>
             )}
-            {extraDirs.map((dirName) => {
-              const isActive = activeCategory === dirName;
-              return (
-                <button
-                  key={dirName}
-                  onClick={() => switchTo(dirName as SidebarCategory)}
-                  title={dirName}
-                  className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
-                    isActive
-                      ? `nf-active bg-fandex-primary/10 text-fandex-primary`
-                      : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
-                  }`}
-                >
-                  <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                    isActive ? 'scale-110' : 'group-hover:scale-110'
-                  }`} />
-                  {!collapsed && <span className="truncate">{dirName}</span>}
-                </button>
-              );
-            })}
+            <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
+              (collapsed || customExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            }`}>
+              {extraDirs.map((dirName) => {
+                const isActive = activeCategory === dirName;
+                return (
+                  <button
+                    key={dirName}
+                    onClick={() => switchTo(dirName as SidebarCategory)}
+                    title={dirName}
+                    className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
+                      isActive
+                        ? `nf-active bg-fandex-primary/10 text-fandex-primary`
+                        : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                    }`}
+                  >
+                    <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                      isActive ? 'scale-110' : 'group-hover:scale-110'
+                    }`} />
+                    {!collapsed && <span className="truncate">{dirName}</span>}
+                  </button>
+                );
+              })}
+            </div>
             {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
           </>
         )}
 
-        {/* 工具分组 */}
+        {/* 工具分组 - 可折叠 */}
         {!collapsed && (
-          <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+          <button
+            onClick={() => setToolExpanded((v) => !v)}
+            title={toolExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
+            className="w-full flex items-center gap-1.5 px-3 mt-1 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
+          >
+            {toolExpanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
             {t("sidebar.toolSection")}
-          </div>
+          </button>
         )}
-        {TOOL_CATEGORIES.map((cat) => {
-          const Icon = ICON_MAP[cat];
-          const isActive = activeCategory === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => switchTo(cat)}
-              title={t(`sidebar.${cat}`)}
-              className={`nf-sidebar-item nf-sidebar-tertiary w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
-                isActive
-                  ? `nf-active bg-fandex-tertiary/10 text-fandex-tertiary`
-                  : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
-              }`}
-            >
-              <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                isActive ? 'scale-110' : 'group-hover:scale-110'
-              }`} />
-              {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
-            </button>
-          );
-        })}
+        <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
+          (collapsed || toolExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          {TOOL_CATEGORIES.map((cat) => {
+            const Icon = ICON_MAP[cat];
+            const isActive = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => switchTo(cat)}
+                title={t(`sidebar.${cat}`)}
+                className={`nf-sidebar-item nf-sidebar-tertiary w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
+                  isActive
+                    ? `nf-active bg-fandex-tertiary/10 text-fandex-tertiary`
+                    : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                }`}
+              >
+                <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                  isActive ? 'scale-110' : 'group-hover:scale-110'
+                }`} />
+                {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 底部: 主题设置入口、设置与新建文件按钮 - 统一大小,协调布局 */}

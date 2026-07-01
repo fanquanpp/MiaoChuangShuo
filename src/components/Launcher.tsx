@@ -107,7 +107,7 @@ export default function Launcher() {
   const [selectedType, setSelectedType] = useState<ProjectType>("standard");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("26.7.5");
+  const [appVersion, setAppVersion] = useState("26.7.6");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
@@ -842,7 +842,7 @@ export default function Launcher() {
       </aside>
 
       {/* 右侧主区域 */}
-      <main className="flex-1 flex flex-col overflow-hidden relative z-10 animate-fade-in">
+      <main className="flex-1 flex flex-col overflow-hidden relative z-10 animate-fade-in bg-nf-bg">
         {/* 主区域背景装饰图案:不影响功能与显示,极低透明度
          * 右上角网格点阵 + 左下角同心圆,营造空间纵深感与质感统一 */}
         <div className="nf-bg-grid-dots" aria-hidden="true" />

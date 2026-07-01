@@ -52,7 +52,7 @@ interface SettingsState {
   snapshotMinInterval: number;
   /** 上次创建项目使用的父目录（用于目录选择器记忆） */
   lastProjectPath: string;
-  /** 编辑器背景预设 ID：default/inkblue/parchment/forest/purple/custom */
+  /** 编辑器背景预设 ID：default/inkblue/midnight/forest/purple/custom */
   backgroundPreset: string;
   /** 自定义背景色（仅当 backgroundPreset='custom' 时使用，hex 格式） */
   customBackgroundColor: string;
@@ -85,7 +85,7 @@ interface SettingsState {
   setSnapshotMinInterval: (seconds: number) => void;
   /** 记忆上次创建项目使用的父目录 */
   setLastProjectPath: (path: string) => void;
-  /** 设置背景预设 ID（default/inkblue/parchment/forest/purple/custom） */
+  /** 设置背景预设 ID（default/inkblue/midnight/forest/purple/custom） */
   setBackgroundPreset: (preset: string) => void;
   /** 设置自定义背景色（hex 格式，仅 custom 预设生效） */
   setCustomBackgroundColor: (color: string) => void;
@@ -195,11 +195,12 @@ export interface BackgroundPreset {
   sidebarBg: string;
 }
 
-// 预设列表：default=深空黑、inkblue=墨水蓝、parchment=羊皮暖、forest=森林绿、purple=暗紫
+// 预设列表：default=深空黑、inkblue=墨水蓝、midnight=午夜蓝、forest=森林绿、purple=暗紫
+// 移除原 parchment 羊皮暖预设（褐色调与品牌蓝紫色调不统一）
 export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   { id: "default", bg: "#0c0d14", cardBg: "#161821", sidebarBg: "#101218" },
   { id: "inkblue", bg: "#0a1420", cardBg: "#0f1c2e", sidebarBg: "#08101a" },
-  { id: "parchment", bg: "#1a1612", cardBg: "#241f1a", sidebarBg: "#15110d" },
+  { id: "midnight", bg: "#0a0f1f", cardBg: "#101830", sidebarBg: "#080d1a" },
   { id: "forest", bg: "#0d1814", cardBg: "#13231c", sidebarBg: "#0a1410" },
   { id: "purple", bg: "#150a1a", cardBg: "#1f1228", sidebarBg: "#100815" },
 ];
@@ -227,10 +228,12 @@ function hexToRgbStr(hex: string): string {
  *   glassOpacity 毛玻璃透明度（0-1）
  * 输出: 无（副作用：修改 document.documentElement.style）
  * 流程:
- *   1. 根据预设解析出主背景色/卡片色/侧边栏色
- *   2. 若为 custom 预设，使用 customColor 作为主背景，自动派生卡片/侧边栏色
- *   3. 注入 CSS 变量：--fandex-bg、--fandex-bg-card、--fandex-bg-sidebar
- *   4. 注入毛玻璃变量：--nf-glass-opacity、--nf-bg-rgb（供 rgba 拼接使用）
+ *   1. 检测当前主题模式：若为 light 主题，仅注入毛玻璃相关变量，
+ *      背景色变量交由 .light 类的 CSS 变量接管，避免内联样式覆盖亮色主题
+ *   2. 暗色主题下根据预设解析出主背景色/卡片色/侧边栏色
+ *   3. 若为 custom 预设，使用 customColor 作为主背景，自动派生卡片/侧边栏色
+ *   4. 注入 CSS 变量：--fandex-bg、--fandex-bg-card、--fandex-bg-sidebar
+ *   5. 注入毛玻璃变量：--nf-glass-opacity、--nf-bg-rgb（供 rgba 拼接使用）
  */
 function applyBackgroundTheme(
   preset: string,
@@ -238,6 +241,18 @@ function applyBackgroundTheme(
   glassOpacity: number
 ): void {
   if (typeof document === "undefined") return;
+
+  const root = document.documentElement;
+  const isLightTheme = root.classList.contains("light");
+
+  // 亮色主题下不注入深色背景变量，让 .light 类的 CSS 变量接管
+  // 仅注入毛玻璃相关变量，确保毛玻璃效果在亮色主题下正常工作
+  if (isLightTheme) {
+    root.style.setProperty("--nf-glass-opacity", String(glassOpacity));
+    // 使用亮色主题的背景 RGB 值（对应 styles.css 中 .light 的 --fandex-bg: #f8f8fc）
+    root.style.setProperty("--nf-bg-rgb", "248, 248, 252");
+    return;
+  }
 
   let bg: string;
   let cardBg: string;
@@ -276,7 +291,6 @@ function applyBackgroundTheme(
     }
   }
 
-  const root = document.documentElement;
   root.style.setProperty("--fandex-bg", bg);
   root.style.setProperty("--fandex-bg-card", cardBg);
   root.style.setProperty("--fandex-bg-sidebar", sidebarBg);

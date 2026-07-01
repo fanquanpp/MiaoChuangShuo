@@ -5,8 +5,8 @@
 // 采用 FANDEX 直角美学，分类展示编辑器、全局、侧边栏快捷键。
 //
 // 模块职责：
-// 1. 首次使用时自动弹出一次（localStorage 标记）
-// 2. 全局监听 `?` 键切换显示/隐藏
+// 1. 全局监听 `?` 键切换显示/隐藏
+// 2. 监听外部 nf:open-shortcuts 事件打开面板
 // 3. 分类渲染快捷键列表，支持键盘 Caps Lock 样式键帽
 // 4. 点击遮罩或 Escape 关闭面板
 
@@ -94,34 +94,21 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
   ];
 }
 
-const STORAGE_KEY = "novelforge-shortcuts-seen";
-
 /**
  * 快捷键参考面板组件
  * 输入: 无
  * 输出: JSX 浮层面板（未打开时返回 null）
  * 流程:
- *   1. 首次使用时延迟 1 秒自动弹出，并在 localStorage 标记已展示
- *   2. 监听全局 `?` 键切换面板开关，Escape 关闭
- *   3. 输入框/文本域/可编辑元素中按 `?` 不触发面板
- *   4. 渲染三组快捷键：编辑器、全局、侧边栏导航
+ *   1. 监听全局 `?` 键切换面板开关，Escape 关闭
+ *   2. 输入框/文本域/可编辑元素中按 `?` 不触发面板
+ *   3. 监听外部 nf:open-shortcuts 事件打开面板
+ *   4. 渲染五组快捷键：编辑器、段落操作、自动行为、全局、侧边栏导航
  */
 export default function ShortcutPanel() {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
   const SHORTCUTS = buildShortcuts(t);
-
-  useEffect(() => {
-    const seen = localStorage.getItem(STORAGE_KEY);
-    if (!seen && typeof window !== "undefined") {
-      const timer = setTimeout(() => {
-        setOpen(true);
-        localStorage.setItem(STORAGE_KEY, "1");
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
