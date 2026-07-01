@@ -14,15 +14,16 @@ import { getVersion } from "@tauri-apps/api/app";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
 
 // GitHub 仓库 API 端点（获取最新正式 Release）
+// 仓库已重命名为 MiaoChuangShuo（与应用拼音 productName 保持一致）
 const GITHUB_LATEST_API =
-  "https://api.github.com/repos/fanquanpp/novelforge/releases/latest";
+  "https://api.github.com/repos/fanquanpp/MiaoChuangShuo/releases/latest";
 
 // GitHub Releases 页面（供用户手动下载）
 export const RELEASES_PAGE_URL =
-  "https://github.com/fanquanpp/novelforge/releases";
+  "https://github.com/fanquanpp/MiaoChuangShuo/releases";
 
 // 本地回退版本号（Tauri API 不可用时使用，需与 package.json/tauri.conf.json 保持同步）
-const FALLBACK_VERSION = "26.7.1";
+const FALLBACK_VERSION = "26.7.2";
 
 /**
  * 远程 Release 信息结构
