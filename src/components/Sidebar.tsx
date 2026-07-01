@@ -13,14 +13,12 @@
 
 import { useMemo, useState, useEffect } from "react";
 import {
-  Users,
-  Globe,
-  Quote,
-  GitBranch,
   FileText,
   ListTree,
-  FolderOpen,
+  Library,
   ChevronLeft,
+  ChevronDown,
+  ChevronRight,
   Plus,
   Sun,
   Moon,
@@ -46,30 +44,20 @@ import type { FileNode } from "../lib/api";
 
 // 图标映射
 const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string }>> = {
-  characters: Users,
-  worldview: Globe,
-  glossary: Quote,
-  timeline: GitBranch,
   manuscript: FileText,
   outline: ListTree,
-  materials: FolderOpen,
+  codex: Library,
+  foreshadowing: Eye,
   stats: BarChart3,
   search: Search,
-  knowledge: Search,
   volumes: BookOpen,
-  foreshadowing: Eye,
 };
 
-// 内容分类列表(按显示顺序)
-const CONTENT_CATEGORIES: SidebarCategory[] = [
-  "manuscript",
-  "characters",
-  "worldview",
-  "glossary",
-  "outline",
-  "materials",
-  "foreshadowing",
-];
+// 写作主分类：核心写作功能，常驻显示
+const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline"];
+
+// 设定类分类：统一设定库入口（替代原 characters/worldview/glossary/materials 分散入口）
+const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex", "foreshadowing"];
 
 // 工具分类列表
 const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
@@ -103,6 +91,9 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
   const { theme, toggleTheme } = useThemeStore();
   const { t } = useI18n();
   const { handleBackToLauncher } = useAutoSaveOnExit();
+
+  // 设定组折叠状态：默认展开，用户可点击折叠以聚焦写作
+  const [settingsExpanded, setSettingsExpanded] = useState(true);
 
   // 分类切换：优先使用外部传入的保存后切换回调
   const switchTo = onSwitchCategory || setActiveCategory;
@@ -177,10 +168,11 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
 
       {/* 中间: 分类导航 - FANDEX 左侧色条激活态 */}
       <div className="flex-1 overflow-y-auto py-2">
+        {/* 写作主分类组：正文、大纲 - 常驻显示，聚焦核心写作 */}
         <div className="px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
-          {t("sidebar.categorySection")}
+          {t("sidebar.writingSection")}
         </div>
-        {CONTENT_CATEGORIES.map((cat) => {
+        {PRIMARY_CATEGORIES.map((cat) => {
           const Icon = ICON_MAP[cat];
           const isActive = activeCategory === cat;
           return (
@@ -205,6 +197,45 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
             </button>
           );
         })}
+
+        {/* 设定类分组：可折叠，避免辅助功能干扰写作焦点 */}
+        <button
+          onClick={() => setSettingsExpanded((v) => !v)}
+          title={settingsExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
+          className="w-full flex items-center gap-1.5 px-3 mt-2 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
+        >
+          {settingsExpanded ? (
+            <ChevronDown className="w-3 h-3" />
+          ) : (
+            <ChevronRight className="w-3 h-3" />
+          )}
+          {t("sidebar.settingsGroup")}
+        </button>
+        {settingsExpanded &&
+          SETTINGS_CATEGORIES.map((cat) => {
+            const Icon = ICON_MAP[cat];
+            const isActive = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => switchTo(cat)}
+                title={t(`sidebar.${cat}`)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                  isActive
+                    ? "bg-fandex-primary/10 text-fandex-primary"
+                    : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                }`}
+              >
+                <span className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-base ease-fandex ${
+                  isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
+                }`} style={{ transformOrigin: 'center' }} />
+                <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                  isActive ? 'scale-110' : 'group-hover:scale-105'
+                }`} />
+                <span className="truncate">{t(`sidebar.${cat}`)}</span>
+              </button>
+            );
+          })}
 
         {/* 分隔线 */}
         <div className="mx-3 my-2 border-t border-nf-border-light/60" />

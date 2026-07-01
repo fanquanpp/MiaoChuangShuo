@@ -79,6 +79,32 @@ function stripNumberPrefix(name: string): string {
     .trim();
 }
 
+/**
+ * 将物理文件名转换为用户友好的显示标题
+ * 三段式章节元数据解耦：物理文件名 / 显示标题 / 章号
+ *
+ * 转换规则：
+ *   - "1.开端.txt" → "开端"（去除数字前缀和扩展名）
+ *   - "第一章 开端.txt" → "第一章 开端"（仅去除扩展名，保留章节号前缀）
+ *   - "序章.txt" → "序章"
+ *   - "角色档案.txt" → "角色档案"
+ *
+ * 输入: name 物理文件名（含扩展名）
+ * 输出: string 用户友好的显示标题
+ */
+function getDisplayTitle(name: string): string {
+  // 去除扩展名
+  let title = name.replace(/\.txt$/i, "").trim();
+  // 去除阿拉伯数字前缀（如 "1." / "1_" / "1-" / "1 "）
+  // 仅当文件名以 "数字.标题" 格式开头时去除，保留 "第一章" 等中文格式前缀
+  title = title.replace(/^\d+[._\-\s]+/, "").trim();
+  // 如果去除后为空（如文件名就是 "1.txt"），回退到原始名去扩展名
+  if (!title) {
+    title = name.replace(/\.txt$/i, "").trim();
+  }
+  return title;
+}
+
 // 递归渲染文件树节点（列表视图）
 function TreeNodeList({
   node,
@@ -141,7 +167,7 @@ function TreeNodeList({
           ) : (
             <Folder className="w-4 h-4 flex-shrink-0 text-fandex-secondary" />
           )}
-          <span className="flex-1 text-sm truncate">{node.name}</span>
+          <span className="flex-1 text-sm truncate">{getDisplayTitle(node.name)}</span>
           <span className="text-[10px] text-nf-text-tertiary">
             {node.children?.length || 0} {t("filelist.itemUnit")}
           </span>
@@ -204,7 +230,7 @@ function TreeNodeList({
       )}
       {!isDraggable && <span className="w-3.5 flex-shrink-0" />}
       <FileText className="w-4 h-4 flex-shrink-0" />
-      <span className="flex-1 text-sm truncate">{node.name}</span>
+      <span className="flex-1 text-sm truncate">{getDisplayTitle(node.name)}</span>
       <span className="text-xs text-nf-text-tertiary whitespace-nowrap">
         {formatSize(node.size)}
         {isSelected && activeFileWordCount !== undefined && activeFileWordCount > 0 && (
@@ -290,7 +316,7 @@ function TreeNodeGrid({
           ) : (
             <Folder className="w-4 h-4 flex-shrink-0 text-fandex-secondary" />
           )}
-          <span className="text-xs font-medium text-nf-text truncate">{node.name}</span>
+          <span className="text-xs font-medium text-nf-text truncate">{getDisplayTitle(node.name)}</span>
           <span className="text-[10px] text-nf-text-tertiary ml-auto">
             {node.children?.length || 0}
           </span>
@@ -355,7 +381,7 @@ function TreeNodeGrid({
       )}
       <FileText className="w-5 h-5 text-fandex-primary mb-2" />
       <div className="text-xs font-medium font-display text-nf-text truncate">
-        {node.name}
+        {getDisplayTitle(node.name)}
       </div>
       <div className="text-[10px] text-nf-text-tertiary mt-1">
         {formatSize(node.size)}
@@ -633,7 +659,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
     if (!node || node.is_dir || !currentProject) return;
     const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
     const baseName = node.name.replace(/\.txt$/i, "");
-    const newName = `副本_${baseName}.txt`;
+    const newName = `${t("filelist.copyPrefix")}${baseName}.txt`;
     const newRelPath = dirPath + newName;
     try {
       await copyFile(currentProject.path, node.relative_path, newRelPath);

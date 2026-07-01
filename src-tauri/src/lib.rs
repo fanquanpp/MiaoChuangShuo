@@ -16,6 +16,9 @@ mod snapshot_commands;
 mod character_commands;
 mod foreshadowing_commands;
 mod template_schema;
+mod codex_commands;
+mod scene_commands;
+mod ai_commands;
 
 /// 应用入口函数
 /// 输入: 无
@@ -77,6 +80,26 @@ pub fn run() {
             // 模块化模板系统命令
             template_schema::get_templates,
             template_schema::render_template,
+            template_schema::save_custom_file_template,
+            template_schema::delete_custom_file_template,
+            template_schema::list_custom_file_templates,
+            // 智能设定库（Codex）命令
+            codex_commands::scan_entity_mentions,
+            codex_commands::batch_scan_entities,
+            // 场景化叙事工作台命令
+            scene_commands::list_scenes,
+            scene_commands::save_scenes,
+            scene_commands::update_scene_field,
+            scene_commands::list_scene_files,
+            // AI 辅助创作命令（接口预留，不实装）
+            ai_commands::ai_continue_writing,
+            ai_commands::ai_summarize,
+            ai_commands::ai_polish,
+            ai_commands::ai_generate_outline,
+            ai_commands::ai_character_suggest,
+            ai_commands::ai_check_consistency,
+            ai_commands::get_ai_config,
+            ai_commands::save_ai_config,
         ])
         .setup(|_app| {
             Ok(())

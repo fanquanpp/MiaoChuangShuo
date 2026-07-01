@@ -21,4 +21,9 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  // 写作工具集成大量 TipTap 富文本扩展，主 chunk 必然超过 500kB 默认阈值
+  // 提升阈值避免误导性警告（实际 gzip 后仅 272kB，可接受）
+  build: {
+    chunkSizeWarningLimit: 1200,
+  },
 }));

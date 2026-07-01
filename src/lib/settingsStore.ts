@@ -295,10 +295,16 @@ export function toChineseNumber(n: number): string {
 
 /**
  * 根据设置生成章节标题
- * @param chapterNum 章节序号（从1开始）
- * @param bookTitle 书名（可选）
- * @param format 章节格式
- * @param autoFillTitle 是否自动填充书名
+ * 输入:
+ *   chapterNum 章节序号（从1开始）
+ *   bookTitle 书名（可选，当 autoFillTitle 为 true 时追加）
+ *   format 章节格式（chinese/arabic/english）
+ *   autoFillTitle 是否自动填充书名
+ * 输出:
+ *   章节标题字符串（如 "第一章"、"01"、"Chapter 1"）
+ * 流程:
+ *   1. 根据 format 生成基础章节号
+ *   2. 若 autoFillTitle 且有书名，用空格连接追加书名
  */
 export function formatChapterHeading(
   chapterNum: number,
@@ -320,8 +326,9 @@ export function formatChapterHeading(
     default:
       heading = `第${toChineseNumber(chapterNum)}章`;
   }
+  // 使用空格分隔（行业通行格式），不再使用全角冒号
   if (autoFillTitle && bookTitle) {
-    heading += `：${bookTitle}`;
+    heading += ` ${bookTitle}`;
   }
   return heading;
 }

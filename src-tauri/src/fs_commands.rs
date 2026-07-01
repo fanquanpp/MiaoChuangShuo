@@ -1305,8 +1305,12 @@ fn number_to_chinese(n: u64) -> String {
 ///   format_str 格式字符串: "chinese" | "arabic" | "english"
 /// 输出: 章节标题字符串
 fn format_chapter_title(chapter_num: u64, volume_num: Option<u64>, format_str: &str) -> String {
+    // 与前端 formatChapterHeading 保持一致：
+    //   chinese → "第一章"
+    //   arabic  → "01"（纯数字零填充）
+    //   english → "Chapter 1"
     let title = match format_str {
-        "arabic" => format!("第{}章", chapter_num),
+        "arabic" => format!("{:02}", chapter_num),
         "english" => format!("Chapter {}", chapter_num),
         _ => format!("第{}章", number_to_chinese(chapter_num)),
     };

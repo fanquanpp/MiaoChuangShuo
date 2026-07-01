@@ -11,9 +11,11 @@
 // 3. 定义可选模块结构（TemplateModule）
 // 4. 定义完整模板结构（TemplateSchema）
 // 5. 提供预设模板库（角色/世界观/术语/大纲等多分类多模板）
-// 6. 提供 get_templates 与 render_template_with_modules 命令
+// 6. 提供 get_templates / render_template / 自定义模板 CRUD 命令（内置+自定义模板合并查询）
 
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::fs;
 
 // ===== 字段类型系统 =====
 
@@ -214,19 +216,6 @@ pub fn get_all_templates() -> Vec<TemplateSchema> {
         outline_standard_template(),
         outline_chapter_template(),
     ]
-}
-
-/// 按分类获取模板
-pub fn get_templates_by_category(category: &str) -> Vec<TemplateSchema> {
-    get_all_templates()
-        .into_iter()
-        .filter(|t| t.category == category)
-        .collect()
-}
-
-/// 根据 ID 获取模板
-pub fn get_template_by_id(id: &str) -> Option<TemplateSchema> {
-    get_all_templates().into_iter().find(|t| t.id == id)
 }
 
 // ===== 角色模板预设 =====
@@ -712,27 +701,109 @@ fn outline_chapter_template() -> TemplateSchema {
     }
 }
 
-// ===== 模板渲染 =====
+// ===== 自定义模板管理（去硬编码：支持用户从文件系统加载/保存/删除模板）=====
 
-/**
- * 渲染模板文本：根据用户勾选的模块生成最终文本
- * 输入:
- *   template_id - 模板 ID
- *   enabled_module_ids - 用户启用的模块 ID 列表
- *   file_name - 文件名（用于标题）
- * 输出: 渲染后的模板文本字符串
- * 流程:
- *   1. 根据 template_id 查找模板
- *   2. 收集基础字段 + 启用模块的字段
- *   3. 按【模块名】\n字段：值\n 格式生成文本
- *   4. 确保字段分行分列、排版清晰
- */
-pub fn render_template_with_modules(
-    template_id: &str,
+/// 获取用户自定义模板目录
+/// 路径：~/.novelforge/templates/
+/// 输入: 无
+/// 输出: 自定义模板目录路径，目录不存在时自动创建
+/// 流程: 拼接用户主目录 + .novelforge/templates，若不存在则创建
+fn get_custom_templates_dir() -> Result<PathBuf, String> {
+    let home = dirs::home_dir().ok_or_else(|| "无法获取用户主目录".to_string())?;
+    let dir = home.join(".novelforge").join("templates");
+    if !dir.exists() {
+        fs::create_dir_all(&dir).map_err(|e| format!("创建模板目录失败: {}", e))?;
+    }
+    Ok(dir)
+}
+
+/// 从文件系统加载所有自定义模板
+/// 输入: 无
+/// 输出: 自定义模板列表（JSON 解析失败的单个文件会被跳过，不影响整体）
+/// 流程: 遍历 ~/.novelforge/templates/*.json，逐个反序列化为 TemplateSchema
+fn load_custom_templates() -> Vec<TemplateSchema> {
+    let dir = match get_custom_templates_dir() {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+
+    let entries = match fs::read_dir(&dir) {
+        Ok(e) => e,
+        Err(_) => return vec![],
+    };
+
+    let mut templates = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) == Some("json") {
+            if let Ok(content) = fs::read_to_string(&path) {
+                if let Ok(template) = serde_json::from_str::<TemplateSchema>(&content) {
+                    // 确保自定义模板 id 以 custom- 前缀标记，便于前端区分
+                    let mut t = template;
+                    if !t.id.starts_with("custom-") {
+                        t.id = format!("custom-{}", t.id);
+                    }
+                    templates.push(t);
+                }
+            }
+        }
+    }
+    templates
+}
+
+/// 合并内置模板与自定义模板
+/// 输入: 无
+/// 输出: 内置 + 自定义的完整模板列表
+pub fn get_all_templates_merged() -> Vec<TemplateSchema> {
+    let mut all = get_all_templates();
+    all.extend(load_custom_templates());
+    all
+}
+
+/// 按分类获取模板（合并内置与自定义）
+pub fn get_templates_by_category_merged(category: &str) -> Vec<TemplateSchema> {
+    get_all_templates_merged()
+        .into_iter()
+        .filter(|t| t.category == category)
+        .collect()
+}
+
+/// 根据 ID 获取模板（合并内置与自定义）
+pub fn get_template_by_id_merged(id: &str) -> Option<TemplateSchema> {
+    get_all_templates_merged().into_iter().find(|t| t.id == id)
+}
+
+// ===== Tauri 命令 =====
+
+/// 获取指定分类的模板列表（合并内置与自定义）
+#[tauri::command]
+pub fn get_templates(category: String) -> Vec<TemplateSchema> {
+    get_templates_by_category_merged(&category)
+}
+
+/// 渲染指定模板为文本内容（支持内置与自定义模板）
+#[tauri::command]
+pub fn render_template(
+    template_id: String,
+    enabled_module_ids: Vec<String>,
+    file_name: String,
+) -> Result<String, String> {
+    let template = get_template_by_id_merged(&template_id)
+        .ok_or_else(|| format!("未找到模板: {}", template_id))?;
+    render_template_with_modules_from_schema(&template, &enabled_module_ids, &file_name)
+}
+
+/// 根据模板结构体直接渲染文本（供自定义模板使用）
+/// 输入:
+///   template - 模板结构体
+///   enabled_module_ids - 用户启用的模块 ID 列表
+///   file_name - 文件名（用于标题）
+/// 输出: 渲染后的模板文本字符串
+fn render_template_with_modules_from_schema(
+    template: &TemplateSchema,
     enabled_module_ids: &[String],
     file_name: &str,
-) -> Option<String> {
-    let template = get_template_by_id(template_id)?;
+) -> Result<String, String> {
     let title = file_name.trim_end_matches(".txt").trim();
 
     let mut sections: Vec<(String, Vec<&FieldDef>)> = Vec::new();
@@ -759,7 +830,6 @@ pub fn render_template_with_modules(
         for field in fields {
             output.push_str(&field.label);
             output.push('：');
-            // 必填字段加占位提示
             if let Some(ref p) = field.placeholder {
                 output.push_str(p);
             }
@@ -768,24 +838,82 @@ pub fn render_template_with_modules(
         output.push('\n');
     }
 
-    Some(output)
+    Ok(output)
 }
 
-// ===== Tauri 命令 =====
-
-/// 获取指定分类的模板列表
+/// 保存自定义文件模板到文件系统
+/// 输入:
+///   template - 完整的模板结构体，id 不以 custom- 开头时会自动添加前缀
+/// 输出: 保存成功后的模板 ID
+/// 流程:
+///   1. 校验模板 id 和 name 非空
+///   2. 确保 id 以 custom- 前缀标记
+///   3. 序列化为 JSON 写入 ~/.novelforge/templates/{id}.json
 #[tauri::command]
-pub fn get_templates(category: String) -> Vec<TemplateSchema> {
-    get_templates_by_category(&category)
+pub fn save_custom_file_template(mut template: TemplateSchema) -> Result<String, String> {
+    if template.id.trim().is_empty() {
+        return Err("模板 ID 不能为空".to_string());
+    }
+    if template.name.trim().is_empty() {
+        return Err("模板名称不能为空".to_string());
+    }
+
+    // 确保自定义模板 id 以 custom- 前缀标记
+    if !template.id.starts_with("custom-") {
+        template.id = format!("custom-{}", template.id);
+    }
+
+    let dir = get_custom_templates_dir()?;
+    // 使用安全的文件名：去除前缀后只保留字母数字下划线连字符
+    let safe_name = template.id
+        .strip_prefix("custom-")
+        .unwrap_or(&template.id)
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect::<String>();
+    let file_path = dir.join(format!("{}.json", safe_name));
+
+    let json = serde_json::to_string_pretty(&template)
+        .map_err(|e| format!("序列化模板失败: {}", e))?;
+
+    fs::write(&file_path, json).map_err(|e| format!("写入模板文件失败: {}", e))?;
+
+    Ok(template.id)
 }
 
-/// 渲染指定模板为文本内容
+/// 删除自定义文件模板
+/// 输入:
+///   template_id - 要删除的模板 ID（必须以 custom- 开头）
+/// 输出: 成功返回被删除的模板 ID，失败返回错误信息
+/// 流程:
+///   1. 校验 id 以 custom- 开头（禁止删除内置模板）
+///   2. 拼接文件路径并删除
 #[tauri::command]
-pub fn render_template(
-    template_id: String,
-    enabled_module_ids: Vec<String>,
-    file_name: String,
-) -> Result<String, String> {
-    render_template_with_modules(&template_id, &enabled_module_ids, &file_name)
-        .ok_or_else(|| format!("未找到模板: {}", template_id))
+pub fn delete_custom_file_template(template_id: String) -> Result<String, String> {
+    if !template_id.starts_with("custom-") {
+        return Err("只能删除自定义模板（ID 必须以 custom- 开头）".to_string());
+    }
+
+    let dir = get_custom_templates_dir()?;
+    let safe_name = template_id
+        .strip_prefix("custom-")
+        .unwrap_or(&template_id)
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect::<String>();
+    let file_path = dir.join(format!("{}.json", safe_name));
+
+    if !file_path.exists() {
+        return Err(format!("模板文件不存在: {}", template_id));
+    }
+
+    fs::remove_file(&file_path).map_err(|e| format!("删除模板文件失败: {}", e))?;
+
+    Ok(template_id)
+}
+
+/// 获取所有自定义文件模板列表
+#[tauri::command]
+pub fn list_custom_file_templates() -> Vec<TemplateSchema> {
+    load_custom_templates()
 }

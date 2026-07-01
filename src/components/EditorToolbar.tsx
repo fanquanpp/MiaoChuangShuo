@@ -21,11 +21,6 @@
 import type { Editor } from "@tiptap/core";
 import { useState, useRef, useEffect } from "react";
 import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  Strikethrough,
-  Code as CodeIcon,
   Quote,
   Undo,
   Redo,
@@ -53,18 +48,13 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
-  Palette,
-  Highlighter,
-  Link as LinkIcon,
   Table as TableIcon,
   Minus,
-  Subscript as SubscriptIcon,
-  Superscript as SuperscriptIcon,
   Search,
   ChevronDown,
   Plus,
   Trash2,
-  X,
+  Sparkles,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
@@ -77,6 +67,7 @@ interface ToolbarButtonProps {
 }
 
 // 工具栏按钮 - FANDEX 直角风格（增强版）
+// 关键设计：tabIndex={-1} 防止 Tab 键焦点跳到工具栏按钮，保证写作时焦点常驻编辑器
 export function ToolbarButton({
   onClick,
   active,
@@ -85,8 +76,10 @@ export function ToolbarButton({
 }: ToolbarButtonProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
+      tabIndex={-1}
       className={`relative p-1.5 transition-all duration-base ease-fandex border group ${
         active
           ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/40"
@@ -109,21 +102,7 @@ export function Divider() {
   return <div className="w-px h-4 bg-nf-border-light/60 mx-1.5" />;
 }
 
-// 预设颜色板（FANDEX 风格 + 经典 Office 色）
-const COLOR_PRESETS: string[] = [
-  "#7c9eff", "#4ee6b0", "#ff9e7a", "#ffd166", "#ef476f",
-  "#06d6a0", "#118ab2", "#073b4c", "#e8e8f0", "#6e6e82",
-  "#ff5252", "#ffab40", "#69f0ae", "#40c4ff", "#b388ff",
-  "#ea80fc", "#ff8a80", "#ff80ab", "#8c9eff", "#80d8ff",
-];
-
-// 高亮预设色（柔和背景色，适合长篇阅读）
-const HIGHLIGHT_PRESETS: string[] = [
-  "#fff59d", "#ffe082", "#ffcc80", "#ef9a9a", "#ce93d8",
-  "#b39ddb", "#9fa8da", "#90caf9", "#80deea", "#a5d6a7",
-  "#c5e1a5", "#e6ee9c", "#fff9c4", "#d7ccc8", "#bcaaa4",
-  "#ffffff", "#f5f5f5", "#eeeeee", "#e0e0e0", "#bdbdbd",
-];
+// 注：COLOR_PRESETS 和 HIGHLIGHT_PRESETS 已移至 EditorBubbleMenu 组件
 
 // 下拉菜单通用属性
 interface DropdownProps {
@@ -166,8 +145,10 @@ function Dropdown({ trigger, children, panelWidth = "w-56", active = false, titl
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => setOpen((prev) => !prev)}
         title={title}
+        tabIndex={-1}
         className={`relative p-1.5 transition-all duration-base ease-fandex border flex items-center gap-0.5 ${
           active || open
             ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/40"
@@ -267,102 +248,7 @@ function HeadingDropdown({ editor }: HeadingDropdownProps) {
   );
 }
 
-// 颜色选择器属性
-interface ColorPickerProps {
-  editor: Editor | null;
-  /** 颜色类型：text 字体颜色 / highlight 高亮颜色 */
-  type: "text" | "highlight";
-}
-
-/**
- * 颜色选择器（字体颜色 / 高亮颜色）
- * 输入: editor 编辑器实例 / type 颜色类型
- * 输出: JSX 颜色选择下拉
- * 流程:
- *   1. 显示当前颜色（无颜色时显示默认图标）
- *   2. 点击色块应用颜色到选中文本
- *   3. 点击"清除颜色"移除颜色标记
- */
-function ColorPicker({ editor, type }: ColorPickerProps) {
-  const { t } = useI18n();
-  if (!editor) return null;
-
-  const presets = type === "text" ? COLOR_PRESETS : HIGHLIGHT_PRESETS;
-  const currentColor = type === "text"
-    ? (editor.getAttributes("textStyle").color as string | undefined)
-    : (editor.getAttributes("highlight").color as string | undefined);
-  const isActive = !!currentColor;
-  const title = type === "text" ? t("editor.textColor") : t("editor.highlightColor");
-
-  const applyColor = (color: string) => {
-    if (type === "text") {
-      editor.chain().focus().setColor(color).run();
-    } else {
-      editor.chain().focus().toggleHighlight({ color }).run();
-    }
-  };
-
-  const clearColor = () => {
-    if (type === "text") {
-      editor.chain().focus().unsetColor().run();
-    } else {
-      editor.chain().focus().unsetHighlight().run();
-    }
-  };
-
-  return (
-    <Dropdown
-      trigger={
-        type === "text" ? (
-          <div className="flex flex-col items-center gap-0.5">
-            <Palette className="w-3.5 h-3.5" />
-            <span
-              className="w-3.5 h-0.5"
-              style={{ background: currentColor || "currentColor" }}
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-0.5">
-            <Highlighter className="w-3.5 h-3.5" />
-            <span
-              className="w-3.5 h-0.5"
-              style={{ background: currentColor || "currentColor" }}
-            />
-          </div>
-        )
-      }
-      active={isActive}
-      title={title}
-      panelWidth="w-56"
-    >
-      <div className="p-2">
-        <div className="text-[10px] text-nf-text-tertiary mb-1.5 px-1">
-          {type === "text" ? t("editor.textColor") : t("editor.highlightColor")}
-        </div>
-        <div className="grid grid-cols-10 gap-1">
-          {presets.map((color) => (
-            <button
-              key={color}
-              onClick={() => applyColor(color)}
-              title={color}
-              className="w-4 h-4 border border-nf-border-light hover:scale-110 hover:border-fandex-primary transition duration-fast"
-              style={{ background: color }}
-            />
-          ))}
-        </div>
-        <div className="mt-2 pt-2 border-t border-nf-border-light">
-          <button
-            onClick={clearColor}
-            className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-nf-text-tertiary hover:text-fandex-tertiary hover:bg-nf-bg-hover transition duration-fast"
-          >
-            <X className="w-3 h-3" />
-            {t("editor.clearColor")}
-          </button>
-        </div>
-      </div>
-    </Dropdown>
-  );
-}
+// 注：ColorPicker 已移至 EditorBubbleMenu 组件，此处不再保留
 
 // 表格菜单属性
 interface TableMenuProps {
@@ -425,25 +311,7 @@ function TableMenu({ editor }: TableMenuProps) {
   );
 }
 
-/**
- * 插入链接对话框（简易版：使用 prompt）
- * 输入: editor 编辑器实例
- * 输出: void
- * 流程:
- *   1. 获取选中文本
- *   2. 弹出输入框获取 URL
- *   3. 应用 link 标记到选中文本
- */
-function handleInsertLink(editor: Editor | null) {
-  if (!editor) return;
-  const url = window.prompt("URL:", "https://");
-  if (url === null) return;
-  if (url.trim() === "") {
-    editor.chain().focus().unsetLink().run();
-    return;
-  }
-  editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
-}
+// 注：handleInsertLink 已移至 EditorBubbleMenu 组件，此处不再保留
 
 // 会话统计属性
 interface SessionStatsProps {
@@ -538,8 +406,10 @@ function SessionStats({
     <div className="flex items-center gap-2 text-xs">
       {/* 暂停/恢复按钮 */}
       <button
+        type="button"
         onClick={onTogglePause}
-        title={paused ? t("editor.sessionReset") : "暂停会话"}
+        title={paused ? t("editor.sessionResume") : t("editor.sessionPause")}
+        tabIndex={-1}
         className={`p-1 transition-all duration-base ease-fandex border ${
           paused
             ? "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/40"
@@ -559,13 +429,15 @@ function SessionStats({
       {/* WPM */}
       {wpm > 0 && (
         <span className="tabular-nums text-nf-text-tertiary">
-          {wpm} <span className="text-nf-text-tertiary/60">wpm</span>
+          {wpm} <span className="text-nf-text-tertiary/60">{t("editor.wordsPerMinuteUnit")}</span>
         </span>
       )}
       {/* 目标进度条（点击可设定/修改目标） */}
       <button
+        type="button"
         onClick={handleOpenDialog}
         title={t("editor.setTarget")}
+        tabIndex={-1}
         className={`flex items-center gap-1.5 px-1 py-0.5 transition-all duration-base ease-fandex border ${
           wordTarget > 0
             ? "bg-fandex-primary/10 border-fandex-primary/30 hover:bg-fandex-primary/15"
@@ -592,12 +464,14 @@ function SessionStats({
       {/* 重置会话按钮（仅当有目标或会话有数据时显示） */}
       {onResetSession && (wordTarget > 0 || sessionWords !== 0) && (
         <button
+          type="button"
           onClick={() => {
             if (window.confirm(t("editor.sessionResetConfirm"))) {
               onResetSession();
             }
           }}
           title={t("editor.sessionReset")}
+          tabIndex={-1}
           className="p-1 text-nf-text-tertiary hover:text-fandex-tertiary transition duration-fast"
         >
           <RotateCcw className="w-3 h-3" />
@@ -649,8 +523,10 @@ function SessionStats({
               <div className="flex flex-wrap gap-1.5">
                 {quickTargets.map((n) => (
                   <button
+                    type="button"
                     key={n}
                     onClick={() => setInputTarget(String(n))}
+                    tabIndex={-1}
                     className="px-2.5 py-1 text-xs text-nf-text-secondary bg-nf-bg border border-nf-border-light hover:border-fandex-primary/50 hover:text-fandex-primary transition duration-fast"
                   >
                     {n}
@@ -666,20 +542,26 @@ function SessionStats({
             </div>
             <div className="flex justify-between gap-2 px-5 py-3 border-t border-nf-border-light">
               <button
+                type="button"
                 onClick={handleClearTarget}
+                tabIndex={-1}
                 className="px-3 py-1.5 text-sm text-nf-text-tertiary hover:text-fandex-tertiary transition duration-fast"
               >
                 {t("editor.targetClear")}
               </button>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => setTargetDialogOpen(false)}
+                  tabIndex={-1}
                   className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
                 >
                   {t("editor.targetCancel")}
                 </button>
                 <button
+                  type="button"
                   onClick={handleConfirmTarget}
+                  tabIndex={-1}
                   className="px-3 py-1.5 text-sm font-medium text-nf-text-inverse bg-fandex-primary hover:bg-fandex-primary-hover transition duration-fast"
                 >
                   {t("editor.targetConfirm")}
@@ -726,6 +608,8 @@ interface EditorToolbarProps {
   // 查找替换面板
   showFindReplace?: boolean;
   onToggleFindReplace?: () => void;
+  // AI 辅助创作中心
+  onToggleAiAssistant?: () => void;
 }
 
 // 编辑器工具栏组件（Office 级富文本模式）
@@ -757,6 +641,7 @@ export default function EditorToolbar({
   onToggleSnapshotHistory,
   showFindReplace = false,
   onToggleFindReplace,
+  onToggleAiAssistant,
 }: EditorToolbarProps) {
   const { t } = useI18n();
 
@@ -807,70 +692,88 @@ export default function EditorToolbar({
   };
 
   return (
-    <div className="fandex-nav-blur flex items-center gap-1 px-4 py-2 border-b border-nf-border-light overflow-x-auto">
-      {/* 聚焦模式下隐藏格式化按钮，仅保留状态和保存 */}
+    <div className="fandex-nav-blur flex flex-col border-b border-nf-border-light">
+      {/* 顶栏：状态区 + 会话统计 + 保存（永不溢出，固定一行） */}
+      <div className="flex items-center gap-2 px-4 py-1.5 min-h-0">
+        {/* 写作会话统计 */}
+        <SessionStats
+          sessionWords={sessionWords}
+          sessionDuration={sessionDuration}
+          wpm={wpm}
+          wordTarget={wordTarget}
+          progress={progress}
+          paused={sessionPaused}
+          startedAt={sessionStartedAt}
+          onTogglePause={onToggleSessionPause}
+          onSetTarget={onSetSessionTarget}
+          onResetSession={onResetSession}
+        />
+        <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary flex-shrink-0">
+          {/* 专注模式快捷切换 */}
+          {!focusMode && (
+            <div className="flex items-center gap-0.5">
+              <ToolbarButton
+                onClick={onToggleTypewriter}
+                active={typewriterMode}
+                title={t("editor.typewriterMode")}
+              >
+                <Square className="w-3.5 h-3.5" />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={onToggleFocusDim}
+                active={focusDim}
+                title={t("editor.focusDim")}
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </ToolbarButton>
+            </div>
+          )}
+          <span className="tabular-nums">{t("editor.wordCount", { count: wordCount })}</span>
+          {/* 保存状态指示器 */}
+          {dirty && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-fandex-tertiary/10 text-fandex-tertiary border border-fandex-tertiary/20">
+              <span className="w-1.5 h-1.5 bg-fandex-tertiary animate-pulse" />
+              {t("editor.unsaved")}
+            </span>
+          )}
+          {!focusMode && (
+            <button
+              type="button"
+              onClick={onExportTxt}
+              title={t("editor.exportTxt")}
+              tabIndex={-1}
+              className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 transition-all duration-base ease-fandex"
+            >
+              <Download className="w-3.5 h-3.5" />
+              TXT
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!dirty || saving}
+            tabIndex={-1}
+            className={`flex items-center gap-1 px-2.5 py-1 transition-all duration-base ease-fandex disabled:opacity-30 disabled:cursor-not-allowed ${
+              dirty
+                ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm hover:shadow-md'
+                : 'bg-fandex-primary/40 text-nf-text-inverse/60'
+            }`}
+          >
+            {saving ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Save className="w-3.5 h-3.5" />
+            )}
+            {t("app.save")}
+          </button>
+        </div>
+      </div>
+
+      {/* 格式栏：分组容器 + flex-wrap 自动换行（无滚动条）
+          行内格式（粗体/斜体/下划线/删除线/代码/颜色/链接）已移至 EditorBubbleMenu，
+          此处仅保留段落级操作，大幅减少按钮数量，解决工具栏溢出问题 */}
       {!focusMode && (
-        <>
-          {/* 基础格式组：粗体/斜体/下划线/删除线/代码/上下标 */}
-          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
-            <ToolbarButton
-              onClick={() => editor?.chain().focus().toggleBold().run()}
-              active={editor?.isActive("bold") || false}
-              title={t("editor.bold")}
-            >
-              <Bold className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor?.chain().focus().toggleItalic().run()}
-              active={editor?.isActive("italic") || false}
-              title={t("editor.italic")}
-            >
-              <Italic className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor?.chain().focus().toggleUnderline().run()}
-              active={editor?.isActive("underline") || false}
-              title={t("editor.underline")}
-            >
-              <UnderlineIcon className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor?.chain().focus().toggleStrike().run()}
-              active={editor?.isActive("strike") || false}
-              title={t("editor.strikethrough")}
-            >
-              <Strikethrough className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor?.chain().focus().toggleCode().run()}
-              active={editor?.isActive("code") || false}
-              title={t("editor.inlineCode")}
-            >
-              <CodeIcon className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor?.chain().focus().toggleSubscript().run()}
-              active={editor?.isActive("subscript") || false}
-              title={t("editor.subscript")}
-            >
-              <SubscriptIcon className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor?.chain().focus().toggleSuperscript().run()}
-              active={editor?.isActive("superscript") || false}
-              title={t("editor.superscript")}
-            >
-              <SuperscriptIcon className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={handleQuickQuote}
-              active={false}
-              title={t("editor.quickQuote")}
-            >
-              <Quote className="w-4 h-4" />
-            </ToolbarButton>
-          </div>
-          <Divider />
+        <div className="flex flex-wrap items-center gap-1 px-4 py-1.5 border-t border-nf-border-light/50">
           {/* 标题段落组 */}
           <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
             <HeadingDropdown editor={editor} />
@@ -880,6 +783,13 @@ export default function EditorToolbar({
               title={t("editor.horizontalRule")}
             >
               <Minus className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={handleQuickQuote}
+              active={false}
+              title={t("editor.quickQuote")}
+            >
+              <Quote className="w-4 h-4" />
             </ToolbarButton>
           </div>
           <Divider />
@@ -940,21 +850,8 @@ export default function EditorToolbar({
             </ToolbarButton>
           </div>
           <Divider />
-          {/* 颜色组：字体颜色 + 高亮 */}
+          {/* 插入组：表格 / 引用块 / 诗歌 / 歌词（链接和颜色已移至 BubbleMenu） */}
           <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
-            <ColorPicker editor={editor} type="text" />
-            <ColorPicker editor={editor} type="highlight" />
-          </div>
-          <Divider />
-          {/* 插入组：链接 / 表格 / 引用块 / 诗歌 / 歌词 */}
-          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
-            <ToolbarButton
-              onClick={() => handleInsertLink(editor)}
-              active={editor?.isActive("link") || false}
-              title={t("editor.link")}
-            >
-              <LinkIcon className="w-4 h-4" />
-            </ToolbarButton>
             <TableMenu editor={editor} />
             <ToolbarButton
               onClick={() => editor?.chain().focus().toggleBlockquote().run()}
@@ -1016,80 +913,16 @@ export default function EditorToolbar({
             >
               <Search className="w-4 h-4" />
             </ToolbarButton>
+            <ToolbarButton
+              onClick={() => onToggleAiAssistant?.()}
+              active={false}
+              title={t("ai.title")}
+            >
+              <Sparkles className="w-4 h-4" />
+            </ToolbarButton>
           </div>
-        </>
+        </div>
       )}
-
-      {/* 右侧状态区 */}
-      <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary flex-shrink-0">
-        {/* 写作会话统计 */}
-        <SessionStats
-          sessionWords={sessionWords}
-          sessionDuration={sessionDuration}
-          wpm={wpm}
-          wordTarget={wordTarget}
-          progress={progress}
-          paused={sessionPaused}
-          startedAt={sessionStartedAt}
-          onTogglePause={onToggleSessionPause}
-          onSetTarget={onSetSessionTarget}
-          onResetSession={onResetSession}
-        />
-        <Divider />
-        {/* 专注模式快捷切换 */}
-        {!focusMode && (
-          <div className="flex items-center gap-0.5">
-            <ToolbarButton
-              onClick={onToggleTypewriter}
-              active={typewriterMode}
-              title={t("editor.typewriterMode") || "打字机模式"}
-            >
-              <Square className="w-3.5 h-3.5" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={onToggleFocusDim}
-              active={focusDim}
-              title={t("editor.focusDim") || "焦点暗化"}
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </ToolbarButton>
-          </div>
-        )}
-        <span className="tabular-nums">{t("editor.wordCount", { count: wordCount })}</span>
-        {/* 保存状态指示器 */}
-        {dirty && (
-          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-fandex-tertiary/10 text-fandex-tertiary border border-fandex-tertiary/20">
-            <span className="w-1.5 h-1.5 bg-fandex-tertiary animate-pulse" />
-            {t("editor.unsaved")}
-          </span>
-        )}
-        {!focusMode && (
-          <button
-            onClick={onExportTxt}
-            title={t("editor.exportTxt")}
-            className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 transition-all duration-base ease-fandex"
-          >
-            <Download className="w-3.5 h-3.5" />
-            TXT
-          </button>
-        )}
-        <button
-          onClick={onSave}
-          disabled={!dirty || saving}
-          className={`flex items-center gap-1 px-2.5 py-1 transition-all duration-base ease-fandex disabled:opacity-30 disabled:cursor-not-allowed ${
-            dirty
-              ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm hover:shadow-md'
-              : 'bg-fandex-primary/40 text-nf-text-inverse/60'
-          }`}
-        >
-          {saving ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Save className="w-3.5 h-3.5" />
-          )}
-          {t("app.save")}
-        </button>
-      </div>
     </div>
   );
 }

@@ -30,19 +30,24 @@ import { useI18n } from "../lib/i18n";
 /**
  * 根据文件相对路径识别所属分类
  * 输入: relativePath 文件相对路径（如 "正文/第一章.txt"）
- * 输出: 分类标识字符串（manuscript/outline/characters 等）
- * 流程: 取路径首段目录名，映射到分类标识，未匹配则回退为 manuscript
+ * 输出: 分类标识字符串（manuscript/outline/codex 等）
+ * 流程: 取路径首段目录名，映射到分类标识，设定类统一收敛为 codex，未匹配回退为 manuscript
  */
 function detectCategoryFromPath(relativePath: string): string {
   const firstDir = relativePath.split(/[\\/]/)[0] || "";
   const categoryMap: Record<string, string> = {
     "正文": "manuscript",
     "大纲": "outline",
-    "角色": "characters",
-    "世界观": "worldview",
-    "术语": "glossary",
-    "素材": "materials",
-    "时间线": "timeline",
+    // 设定类统一收敛到 Codex（角色/世界观/术语/素材/时间线/人物/设定/名词/资料）
+    "角色": "codex",
+    "人物": "codex",
+    "世界观": "codex",
+    "设定": "codex",
+    "术语": "codex",
+    "名词": "codex",
+    "素材": "codex",
+    "资料": "codex",
+    "时间线": "codex",
   };
   return categoryMap[firstDir] || "manuscript";
 }

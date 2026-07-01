@@ -41,11 +41,16 @@ function detectCategoryFromPath(relativePath: string): string {
   const categoryMap: Record<string, string> = {
     "正文": "manuscript",
     "大纲": "outline",
-    "角色": "characters",
-    "世界观": "worldview",
-    "术语": "glossary",
-    "素材": "materials",
-    "时间线": "timeline",
+    // 设定类统一收敛到 Codex
+    "角色": "codex",
+    "人物": "codex",
+    "世界观": "codex",
+    "设定": "codex",
+    "术语": "codex",
+    "名词": "codex",
+    "素材": "codex",
+    "资料": "codex",
+    "时间线": "codex",
   };
   return categoryMap[firstDir] || "manuscript";
 }

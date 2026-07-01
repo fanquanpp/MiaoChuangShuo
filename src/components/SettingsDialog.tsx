@@ -170,9 +170,9 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               <label className="text-xs text-nf-text-secondary">{t("settings.chapterFormat")}</label>
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { value: "chinese" as ChapterFormat, label: t("settings.formatChinese"), preview: "第三章：书名" },
-                  { value: "arabic" as ChapterFormat, label: t("settings.formatArabic"), preview: "03：书名" },
-                  { value: "english" as ChapterFormat, label: t("settings.formatEnglish"), preview: "Chapter 3: Title" },
+                  { value: "chinese" as ChapterFormat, label: t("settings.formatChinese"), preview: t("settings.previewChapterChinese") },
+                  { value: "arabic" as ChapterFormat, label: t("settings.formatArabic"), preview: t("settings.previewChapterArabic") },
+                  { value: "english" as ChapterFormat, label: t("settings.formatEnglish"), preview: t("settings.previewChapterEnglish") },
                 ]).map((opt) => (
                   <button
                     key={opt.value}
@@ -236,7 +236,7 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             <div className="flex items-center gap-2 mb-3">
               <Zap className="w-4 h-4 text-yellow-500" />
               <h3 className="text-sm font-bold font-display text-nf-text">
-                自动化
+                {t("settings.automationSection")}
               </h3>
             </div>
 
@@ -251,10 +251,10 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 />
                 <div>
                   <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
-                    日记自动添加日期
+                    {t("settings.diaryAutoDate")}
                   </span>
                   <p className="text-[10px] text-nf-text-tertiary mt-0.5">
-                    新建日记时自动添加本地日期
+                    {t("settings.diaryAutoDateDesc")}
                   </p>
                 </div>
               </label>
@@ -269,10 +269,10 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 />
                 <div>
                   <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
-                    天气自动填充
+                    {t("settings.weatherAutoFill")}
                   </span>
                   <p className="text-[10px] text-nf-text-tertiary mt-0.5">
-                    自动获取并填充天气信息
+                    {t("settings.weatherAutoFillDesc")}
                   </p>
                 </div>
               </label>
@@ -287,10 +287,10 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 />
                 <div>
                   <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
-                    章节自动编号
+                    {t("settings.chapterAutoNumber")}
                   </span>
                   <p className="text-[10px] text-nf-text-tertiary mt-0.5">
-                    新建章节时自动编排章节序号
+                    {t("settings.chapterAutoNumberDesc")}
                   </p>
                 </div>
               </label>
@@ -305,10 +305,10 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 />
                 <div>
                   <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
-                    模板自动填充
+                    {t("settings.templateAutoFill")}
                   </span>
                   <p className="text-[10px] text-nf-text-tertiary mt-0.5">
-                    使用模板时自动填充默认内容
+                    {t("settings.templateAutoFillDesc")}
                   </p>
                 </div>
               </label>

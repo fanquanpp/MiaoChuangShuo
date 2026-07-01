@@ -18,10 +18,9 @@ import {
   ArrowRight,
   FileText,
   ListTree,
-  Users,
-  Globe,
+  Library,
+  Eye,
   BookOpen,
-  Calendar,
   BarChart3,
   Search as SearchIcon,
   Sun,
@@ -166,11 +165,9 @@ export default function CommandPalette({
     () => [
       { id: "cat-manuscript", label: CATEGORY_NAMES["manuscript"], category: t("command.categoryNav"), keywords: ["正文", "manuscript", "章节"], action: () => switchTo("manuscript"), icon: FileText },
       { id: "cat-outline", label: CATEGORY_NAMES["outline"], category: t("command.categoryNav"), keywords: ["大纲", "outline"], action: () => switchTo("outline"), icon: ListTree },
-      { id: "cat-characters", label: CATEGORY_NAMES["characters"], category: t("command.categoryNav"), keywords: ["角色", "人物", "characters"], action: () => switchTo("characters"), icon: Users },
-      { id: "cat-worldview", label: CATEGORY_NAMES["worldview"], category: t("command.categoryNav"), keywords: ["世界观", "设定", "worldview"], action: () => switchTo("worldview"), icon: Globe },
-      { id: "cat-glossary", label: CATEGORY_NAMES["glossary"], category: t("command.categoryNav"), keywords: ["名词", "术语", "glossary"], action: () => switchTo("glossary"), icon: BookOpen },
-      { id: "cat-materials", label: CATEGORY_NAMES["materials"], category: t("command.categoryNav"), keywords: ["素材", "资料", "materials"], action: () => switchTo("materials"), icon: BookOpen },
-      { id: "cat-timeline", label: CATEGORY_NAMES["timeline"], category: t("command.categoryNav"), keywords: ["时间线", "timeline"], action: () => switchTo("timeline"), icon: Calendar },
+      { id: "cat-codex", label: CATEGORY_NAMES["codex"], category: t("command.categoryNav"), keywords: ["设定", "设定库", "角色", "世界观", "术语", "codex"], action: () => switchTo("codex"), icon: Library },
+      { id: "cat-foreshadowing", label: CATEGORY_NAMES["foreshadowing"], category: t("command.categoryNav"), keywords: ["伏笔", "foreshadowing"], action: () => switchTo("foreshadowing"), icon: Eye },
+      { id: "cat-volumes", label: CATEGORY_NAMES["volumes"], category: t("command.categoryNav"), keywords: ["分卷", "卷宗", "volumes"], action: () => switchTo("volumes"), icon: BookOpen },
       { id: "cat-stats", label: CATEGORY_NAMES["stats"], category: t("command.categoryNav"), keywords: ["统计", "stats", "字数"], action: () => switchTo("stats"), icon: BarChart3 },
       { id: "cat-search", label: CATEGORY_NAMES["search"], category: t("command.categoryNav"), keywords: ["搜索", "search", "查找"], action: () => switchTo("search"), icon: SearchIcon },
       ...typeSpecificCommands,
@@ -254,7 +251,7 @@ export default function CommandPalette({
   // 新建文件命令（按分类动态生成）
   const createFileCommands: Command[] = useMemo(() => {
     if (!onCreateFile) return [];
-    const categories: SidebarCategory[] = ["manuscript", "outline", "characters", "worldview", "glossary", "materials", "timeline"];
+    const categories: SidebarCategory[] = ["manuscript", "outline", "codex", "foreshadowing", "volumes"];
     return categories.map((cat) => ({
       id: `new-file-${cat}`,
       label: t("command.newFile", { category: CATEGORY_NAMES[cat] }),

@@ -2,7 +2,7 @@
 
 import type { SidebarCategory } from "./store";
 
-export type PanelType = "editor" | "card-manager" | "timeline" | "stats" | "search" | "knowledge" | "volume" | "foreshadowing";
+export type PanelType = "editor" | "codex" | "stats" | "search" | "volume" | "foreshadowing";
 
 export interface CategoryConfig {
   // 中间面板渲染类型
@@ -15,16 +15,11 @@ export interface CategoryConfig {
 const CATEGORY_CONFIG: Record<SidebarCategory, CategoryConfig> = {
   manuscript:    { panelType: "editor",        showFileList: true },
   outline:      { panelType: "editor",        showFileList: true },
-  characters:   { panelType: "card-manager",  showFileList: true },
-  worldview:    { panelType: "card-manager",  showFileList: true },
-  glossary:     { panelType: "card-manager",  showFileList: true },
-  materials:    { panelType: "editor",        showFileList: true },
+  codex:        { panelType: "codex",         showFileList: false },
+  foreshadowing: { panelType: "foreshadowing", showFileList: true },
   volumes:      { panelType: "volume",        showFileList: true },
-  timeline:     { panelType: "timeline",      showFileList: false },
   stats:        { panelType: "stats",         showFileList: false },
   search:       { panelType: "search",        showFileList: false },
-  knowledge:    { panelType: "knowledge",     showFileList: false },
-  foreshadowing: { panelType: "foreshadowing", showFileList: true },
 };
 
 /**

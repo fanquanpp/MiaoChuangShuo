@@ -70,10 +70,13 @@ import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import { useWritingSession } from "../hooks/useWritingSession";
 import EditorToolbar from "./EditorToolbar";
+import EditorBubbleMenu from "./EditorBubbleMenu";
 import OutlineView from "./OutlineView";
 import SnapshotHistory from "./SnapshotHistory";
 import CharacterHoverCard from "./CharacterHoverCard";
 import FindReplace from "./FindReplace";
+import SceneWorkbench from "./SceneWorkbench";
+import AiAssistantPanel from "./AiAssistantPanel";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -203,6 +206,7 @@ export default function NovelEditor({
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   // 查找替换面板可见性（Ctrl+F / Ctrl+H 触发）
   const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
   // 查找替换初始模式：'find' 仅查找 / 'replace' 查找并替换
   const [findReplaceMode, setFindReplaceMode] = useState<"find" | "replace">("find");
   // 文件重载触发器：恢复快照后递增以强制重新加载文件内容
@@ -458,6 +462,13 @@ export default function NovelEditor({
           project_name: currentProject?.meta?.name || "",
           project_path: currentProject?.path || "",
         });
+        // 焦点常驻：加载完成后立即聚焦编辑器，让用户可立即开始写作
+        // 使用 setTimeout 确保 DOM 已渲染完成
+        setTimeout(() => {
+          if (!cancelled && editor && !editor.isDestroyed) {
+            editor.commands.focus("end");
+          }
+        }, 0);
       })
       .catch((e) => {
         if (cancelled) return;
@@ -639,6 +650,47 @@ export default function NovelEditor({
     };
   }, []);
 
+  // 焦点常驻：关闭浮层（查找替换/快照历史/大纲）后自动恢复编辑器焦点
+  // 避免写作被打断后需鼠标点击才能继续输入
+  useEffect(() => {
+    if (showFindReplace || showSnapshotHistory || showOutline) return;
+    if (!editor || editor.isDestroyed) return;
+    // 延迟一帧让浮层卸载完成
+    const id = window.setTimeout(() => {
+      if (!editor.isDestroyed) {
+        editor.commands.focus();
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [showFindReplace, showSnapshotHistory, showOutline, editor]);
+
+  // 焦点常驻：Tauri 窗口重新获焦时恢复编辑器焦点
+  // 场景：用户切到其他应用查阅资料后切回，应能立即继续写作
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (!editor || editor.isDestroyed) return;
+      // 仅在所有浮层关闭时才抢焦点，避免打断用户在弹窗中的输入
+      if (showFindReplace || showSnapshotHistory || showOutline) return;
+      // 检查当前活动元素是否已在编辑器内，避免重复 focus 打断 IME
+      const active = document.activeElement;
+      if (active && editor.view.dom.contains(active)) return;
+      editor.commands.focus();
+    };
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+  }, [editor, showFindReplace, showSnapshotHistory, showOutline]);
+
+  // 焦点常驻：编辑器挂载后立即获焦
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const id = window.setTimeout(() => {
+      if (!editor.isDestroyed) {
+        editor.commands.focus();
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [editor]);
+
   // 角色悬停卡片：监听编辑器内光标移动，悬停在角色名上时延迟显示摘要卡片
   // 仅在剧本/对话体（已加载角色名列表）时启用
   // 交互逻辑：
@@ -813,6 +865,7 @@ export default function NovelEditor({
         onToggleSnapshotHistory={() => setShowSnapshotHistory((prev) => !prev)}
         showFindReplace={showFindReplace}
         onToggleFindReplace={() => setShowFindReplace((prev) => !prev)}
+        onToggleAiAssistant={() => setShowAiAssistant(true)}
       />
 
       {isScript && characters.length > 0 && (
@@ -850,6 +903,8 @@ export default function NovelEditor({
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto relative">
           <EditorContent editor={editor} />
+          {/* 选中文字时浮起的格式化工具栏：行内格式移到此处的 BubbleMenu，减少主工具栏按钮数量 */}
+          {editor && <EditorBubbleMenu editor={editor} />}
           {/* 查找替换面板：浮于编辑区顶部，Ctrl+F / Ctrl+H 触发 */}
           {showFindReplace && editor && (
             <FindReplace
@@ -881,6 +936,15 @@ export default function NovelEditor({
         y={hoverCard.y}
         characterName={hoverCard.name}
         projectPath={currentProject?.path || ""}
+      />
+
+      {/* 场景化叙事工作台：编辑器底部可折叠面板，管理场景字段元数据 */}
+      <SceneWorkbench filePath={filePath} />
+
+      {/* AI 辅助创作中心：接口预留，点击工具栏 Sparkles 按钮触发 */}
+      <AiAssistantPanel
+        open={showAiAssistant}
+        onClose={() => setShowAiAssistant(false)}
       />
     </div>
   );

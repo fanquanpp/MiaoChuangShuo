@@ -15,7 +15,6 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Sidebar from "./Sidebar";
 import FileList from "./FileList";
 import NovelEditor from "./NovelEditor";
-import CardManager from "./CardManager";
 import WritingStats from "./WritingStats";
 import GlobalSearch from "./GlobalSearch";
 import VolumeManager from "./VolumeManager";
@@ -26,7 +25,7 @@ import CommandPalette from "./CommandPalette";
 import ProjectArchiveDialog from "./ProjectArchiveDialog";
 import ErrorBoundary from "./ErrorBoundary";
 import { FocusTimer } from "./FocusTimer";
-import { useAppStore, getCategoryDir, getCategoryName, type SidebarCategory } from "../lib/store";
+import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
 import { getEditorSaveFn } from "../lib/stores/viewSlice";
 import { readProjectTree, createFile } from "../lib/api";
 import type { FileNode } from "../lib/api";
@@ -37,17 +36,17 @@ import { useI18n } from "../lib/i18n";
 import { isTemplateSupported, getTemplateCategory } from "../lib/templateSchema";
 import { findDirByName } from "../lib/fileTreeUtils";
 import ForeshadowingPanel from "./ForeshadowingPanel";
+import CodexPanel from "./CodexPanel";
 
 /** Alt+数字键 → 侧边栏分类映射 */
 const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "1": "manuscript",
   "2": "outline",
-  "3": "characters",
-  "4": "worldview",
-  "5": "glossary",
-  "6": "materials",
-  "7": "stats",
-  "8": "foreshadowing",
+  "3": "codex",
+  "4": "foreshadowing",
+  "5": "stats",
+  "6": "search",
+  "7": "volumes",
 };
 
 /**
@@ -82,9 +81,8 @@ export default function Workspace() {
   const { t } = useI18n();
   const projectTree = useAppStore((s) => s.projectTree);
   const chapterFormat = useSettingsStore((s) => s.chapterFormat);
-  const autoFillBookTitle = useSettingsStore((s) => s.autoFillBookTitle);
   const autoOutlineSkeleton = useSettingsStore((s) => s.autoOutlineSkeleton);
-  const bookTitle = currentProject?.meta?.name || "";
+  const autoNumbering = useSettingsStore((s) => s.autoNumbering);
 
   // 切换前自动保存编辑器脏内容，防止数据丢失
   const saveBeforeSwitch = useCallback(async () => {
@@ -207,30 +205,35 @@ export default function Workspace() {
   const [showFirstFileDialog, setShowFirstFileDialog] = useState(false);
 
   // 根据分类和设置生成文件初始内容
+  // 修复要点：
+  //   1. isNovelType 扩展支持 shared_world 类型，避免同世界观系列无法自动编号
+  //   2. 尊重 autoNumbering 设置，关闭时不生成章节号前缀和标题
+  //   3. 章节标题使用空格分隔（行业通用格式），不再使用全角冒号
+  //   4. 移除书名后缀（非标准做法，书名应保留在项目元数据中）
+  //   5. 非小说类型不再生成 N. 前缀文件名
   const getFileTemplate = useCallback(
     (fileName: string, category: SidebarCategory, chapterNum?: number): string => {
+      // 清洗文件名得到纯标题：去除 .txt 扩展名与可能的前导编号前缀
       const title = fileName.replace(/\.txt$/i, "").replace(/^\d+[._\-\s]*/, "").trim();
       switch (category) {
         case "manuscript": {
-          // 仅对小说类文体使用章节标题格式（中文/阿拉伯/英文）
-          // 其他类型（日记/诗歌/剧本等）直接使用文件标题作为正文首行
           const projectType = currentProject?.meta?.type;
-          const isNovelType = projectType === "standard" || projectType === "multi_volume" || projectType === "short_story";
-          if (chapterNum !== undefined && isNovelType) {
-            // 基础章节标题（不自动填充书名，由下方手动拼接章节名）
+          // 判定是否为小说类文体：standard/multi_volume/short_story/shared_world 均视为小说类
+          // diary/dialogue/screenplay/poetry 等非小说类型不生成章节号
+          const isNovelType =
+            projectType === "standard" ||
+            projectType === "multi_volume" ||
+            projectType === "short_story" ||
+            projectType === "shared_world";
+          // 同时满足：小说类文体 + 开启自动编号 + 已计算章节号
+          if (chapterNum !== undefined && isNovelType && autoNumbering) {
+            // 生成章节标题（第N章 / 01 / Chapter N），不追加书名
             const heading = formatChapterHeading(chapterNum, "", chapterFormat, false);
-            let line = heading;
-            // 拼接章节名称（来自文件名）
-            if (title) {
-              line += `：${title}`;
-            }
-            // 若设置开启了自动填充书名，追加书名
-            if (autoFillBookTitle && bookTitle) {
-              line += ` - ${bookTitle}`;
-            }
+            // 用空格连接章节号与章节名（番茄/起点通行格式）
+            const line = title ? `${heading} ${title}` : heading;
             return `${line}\n\n`;
           }
-          // 非小说类型或无编号时直接用标题
+          // 非小说类型或关闭自动编号时，仅使用标题作为正文首行
           return `${title}\n\n`;
         }
         case "outline":
@@ -238,43 +241,55 @@ export default function Workspace() {
             return `${title}\n\n一、\n二、\n三、\n四、\n五、\n\n`;
           }
           return `${title}\n\n`;
-        case "materials":
-          return `${title}\n\n`;
         default:
           return `${title}\n\n`;
       }
     },
-    [autoOutlineSkeleton, chapterFormat, autoFillBookTitle, bookTitle, currentProject]
+    [autoOutlineSkeleton, chapterFormat, autoNumbering, currentProject]
   );
 
   // 处理新建文件确认（正文自动编号）
+  // 修复要点：
+  //   1. 仅对小说类文体 + 开启自动编号时才添加 N. 前缀
+  //   2. 非小说类型或关闭自动编号时，文件名即为用户输入（补 .txt）
+  //   3. 避免文件名与正文标题不一致的问题
   const handleCreateFile = useCallback(async (fileName: string) => {
-    if (!currentProject) throw new Error("无当前项目");
+    if (!currentProject) throw new Error(t("error.noCurrentProject"));
     const dirName = getCategoryDir(activeCategory);
+    const projectType = currentProject.meta.type;
+    // 判定是否为小说类文体（与 getFileTemplate 保持一致）
+    const isNovelType =
+      projectType === "standard" ||
+      projectType === "multi_volume" ||
+      projectType === "short_story" ||
+      projectType === "shared_world";
 
     // shared_world 项目正文需要放入子目录（如 正文/第一部/）
     let manuscriptSubDir = "";
-    if (activeCategory === "manuscript" && currentProject.meta.type === "shared_world") {
+    if (activeCategory === "manuscript" && projectType === "shared_world") {
       const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
       const subDirs = manuscriptDir?.children.filter((f) => f.is_dir) || [];
       if (subDirs.length > 0) {
         manuscriptSubDir = subDirs[subDirs.length - 1].name;
       } else {
-        manuscriptSubDir = "第一部";
+        manuscriptSubDir = t("workspace.defaultVolumeName");
       }
     }
 
     let finalFileName = fileName;
     let chapterNum: number | undefined;
-    if (activeCategory === "manuscript") {
-      // 自动推算编号并前缀
+    if (activeCategory === "manuscript" && isNovelType && autoNumbering) {
+      // 仅小说类文体 + 开启自动编号时才推算章节号并添加前缀
       const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
       const existingFiles = manuscriptDir?.children.filter((f) => !f.is_dir) || [];
       const nextNum = getNextChapterNum(existingFiles);
       chapterNum = nextNum;
-      // 去掉用户可能输入的编号前缀
+      // 去掉用户可能输入的编号前缀，避免重复
       const cleanName = fileName.replace(/^\d+[._\-\s]*/, "").trim();
       finalFileName = `${nextNum}.${cleanName}`;
+      if (!finalFileName.endsWith(".txt")) finalFileName += ".txt";
+    } else {
+      // 非小说类型或关闭自动编号：直接使用用户输入的文件名
       if (!finalFileName.endsWith(".txt")) finalFileName += ".txt";
     }
 
@@ -286,12 +301,12 @@ export default function Workspace() {
     const tree = await readProjectTree(currentProject.path);
     setProjectTree(tree);
     showToast("success", t("workspace.fileCreated", { name: finalFileName }));
-  }, [currentProject, activeCategory, projectTree, getFileTemplate, setProjectTree, showToast, t]);
+  }, [currentProject, activeCategory, projectTree, autoNumbering, getFileTemplate, setProjectTree, showToast, t]);
 
   // 处理向导新建文件确认（接收已渲染的模板内容）
   // 用于角色/世界观/术语/大纲等模板化分类，内容由向导通过后端 render_template 生成
   const handleCreateFileWithContent = useCallback(async (fileName: string, content: string) => {
-    if (!currentProject) throw new Error("无当前项目");
+    if (!currentProject) throw new Error(t("error.noCurrentProject"));
     const dirName = getCategoryDir(activeCategory);
     const relativePath = `${dirName}/${fileName}`;
     await createFile(currentProject.path, relativePath, content);
@@ -305,15 +320,15 @@ export default function Workspace() {
     setShowFirstFileDialog(false);
     if (!currentProject) return;
     const dirName = getCategoryDir("manuscript");
-    const fileName = "序章.txt";
-    const templateContent = "序章\n\n";
+    const fileName = t("workspace.defaultIntroFileName");
+    const templateContent = `${t("workspace.defaultIntroContent")}\n\n`;
 
     // shared_world 项目正文需要放入子目录
     let relativePath = `${dirName}/${fileName}`;
     if (currentProject.meta.type === "shared_world") {
       const manuscriptDir = findDirByName(projectTree, dirName);
       const subDirs = manuscriptDir?.children.filter((f) => f.is_dir) || [];
-      const subDir = subDirs.length > 0 ? subDirs[subDirs.length - 1].name : "第一部";
+      const subDir = subDirs.length > 0 ? subDirs[subDirs.length - 1].name : t("workspace.defaultVolumeName");
       relativePath = `${dirName}/${subDir}/${fileName}`;
     }
 
@@ -365,8 +380,8 @@ export default function Workspace() {
         return <VolumeManager />;
       case "foreshadowing":
         return <ForeshadowingPanel />;
-      case "card-manager":
-        return <CardManager categoryLabel={getCategoryName(activeCategory)} />;
+      case "codex":
+        return <CodexPanel />;
       default:
         return (
           <NovelEditor
@@ -460,7 +475,7 @@ export default function Workspace() {
                 className="w-full flex items-center gap-3 px-4 py-3 text-left border border-nf-border-light hover:border-fandex-primary/50 hover:bg-fandex-primary/5 transition-all duration-fast group"
               >
                 <div className="w-8 h-8 flex items-center justify-center bg-fandex-secondary/10 text-fandex-secondary text-sm font-bold">
-                  序
+                  {t("workspace.introBadge")}
                 </div>
                 <div>
                   <div className="text-sm font-medium text-nf-text group-hover:text-fandex-primary transition-colors">

@@ -416,7 +416,7 @@ export default function VolumeChapterGenerator({
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-nf-text-secondary">{t("volumeGen.preview")}</div>
               <div className="text-[10px] text-nf-text-tertiary">
-                {preview.length > 0 && `${preview.length} 项`}
+                {preview.length > 0 && t("volumeGen.itemsCount", { count: preview.length })}
               </div>
             </div>
             <div className="bg-nf-bg border border-nf-border-light max-h-48 overflow-y-auto">
@@ -473,7 +473,7 @@ export default function VolumeChapterGenerator({
         <footer className="flex justify-between items-center px-5 py-3 border-t border-nf-border-light flex-shrink-0">
           <div className="flex items-center gap-1.5 text-xs text-nf-text-tertiary">
             <AlertTriangle className="w-3.5 h-3.5" />
-            <span>已存在的同名文件将自动跳过，不会被覆盖</span>
+            <span>{t("volumeGen.skipExistingHint")}</span>
           </div>
           <div className="flex gap-2">
             <button

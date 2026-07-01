@@ -22,65 +22,45 @@ import { createViewSlice } from "./stores/viewSlice";
 
 // 左侧导航分类枚举
 export type SidebarCategory =
-  | "characters"
-  | "worldview"
-  | "glossary"
-  | "timeline"
   | "manuscript"
   | "outline"
-  | "materials"
+  | "codex"
+  | "foreshadowing"
   | "volumes"
   | "stats"
-  | "search"
-  | "knowledge"
-  | "foreshadowing";
+  | "search";
 
 // 分类中文名称
 export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
-  characters: "角色",
-  worldview: "世界观",
-  glossary: "术语",
-  timeline: "时间线",
   manuscript: "正文",
   outline: "大纲",
-  materials: "素材",
+  codex: "设定库",
+  foreshadowing: "伏笔",
   volumes: "分卷",
   stats: "统计",
   search: "搜索",
-  knowledge: "知识图谱",
-  foreshadowing: "伏笔",
 };
 
 // 分类对应目录名
 export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
-  characters: "角色",
-  worldview: "世界观",
-  glossary: "术语",
-  timeline: "时间线",
   manuscript: "正文",
   outline: "大纲",
-  materials: "素材",
+  codex: "",
+  foreshadowing: "伏笔记录",
   volumes: "卷宗",
   stats: "",
   search: "",
-  knowledge: "",
-  foreshadowing: "伏笔记录",
 };
 
 // 分类图标名 (lucide-react)
 export const CATEGORY_ICONS: Record<SidebarCategory, string> = {
-  characters: "Users",
-  worldview: "Globe",
-  glossary: "Quote",
-  timeline: "GitBranch",
   manuscript: "FileText",
   outline: "ListTree",
-  materials: "FolderOpen",
+  codex: "Library",
+  foreshadowing: "Eye",
   volumes: "BookOpen",
   stats: "BarChart3",
   search: "Search",
-  knowledge: "Network",
-  foreshadowing: "Eye",
 };
 
 // 组合后的完整 App 状态类型

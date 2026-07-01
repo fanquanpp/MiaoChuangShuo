@@ -41,6 +41,11 @@
   --fandex-nav-height: 48px;
   --fandex-sidebar-width: 260px;
 
+  /* 编辑器阅读体验参数：可通过 settingsStore 动态覆盖 */
+  --fandex-editor-max-width: 760px;
+  --fandex-editor-font-size: 1.0625rem;
+  --fandex-editor-line-height: 1.85;
+
   /* 字体族 */
   --fandex-font-display: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --fandex-font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
@@ -250,9 +255,19 @@ select:focus-visible {
   color: var(--fandex-text);
   font-family: var(--fandex-font-body);
   font-size: var(--fandex-editor-font-size, 1.0625rem);
-  line-height: 1.85;
+  line-height: var(--fandex-editor-line-height, 1.85);
   outline: none;
   text-align: justify;
+  /* 阅读体验优化：限制单行字数上限，降低长行扫视负担 */
+  max-width: var(--fandex-editor-max-width, 760px);
+  /* 字距微调：中文密集排版下提升可读性 */
+  letter-spacing: 0.01em;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  /* 文字渲染：暗色背景下开启亚像素抗锯齿 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* h1: 左侧 3px 竖线 + 底部边框 */

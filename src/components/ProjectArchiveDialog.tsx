@@ -144,7 +144,7 @@ export default function ProjectArchiveDialog({
       setResult(res);
       showToast(
         "success",
-        t("archive.importSuccess", { name: res.project_name || "项目", count: res.file_count })
+        t("archive.importSuccess", { name: res.project_name || t("archive.defaultProjectName"), count: res.file_count })
       );
       if (onImported && res.project_name) {
         // 解压后的项目路径：target_dir/project_name

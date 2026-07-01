@@ -86,11 +86,8 @@ export interface TemplateSchema {
 
 // ===== 分类到模板 category 的映射 =====
 // SidebarCategory 与后端模板 category 的桥接
-// 仅角色/世界观/术语/大纲支持模板化新建，其他分类回退到原流程
+// 仅大纲支持模板化新建；设定类已统一收敛到 Codex（自有实体创建流程）
 export const CATEGORY_TO_TEMPLATE: Partial<Record<SidebarCategory, string>> = {
-  characters: "character",
-  worldview: "worldview",
-  glossary: "glossary",
   outline: "outline",
 };
 
@@ -143,6 +140,47 @@ export async function renderTemplate(
     enabledModuleIds,
     fileName,
   });
+}
+
+// ===== 自定义文件模板 API（去硬编码：支持用户从文件系统加载/保存/删除模板）=====
+
+/**
+ * 保存自定义文件模板到文件系统
+ * 输入: template 完整的模板结构体
+ * 输出: Promise<string> 保存成功后的模板 ID（自动添加 custom- 前缀）
+ * 流程: 调用后端 save_custom_file_template 命令，序列化为 JSON 写入 ~/.novelforge/templates/
+ */
+export async function saveCustomFileTemplate(template: TemplateSchema): Promise<string> {
+  return invoke<string>("save_custom_file_template", { template });
+}
+
+/**
+ * 删除自定义文件模板
+ * 输入: templateId 模板 ID（必须以 custom- 开头）
+ * 输出: Promise<string> 被删除的模板 ID
+ * 流程: 调用后端 delete_custom_file_template 命令，删除对应的 JSON 文件
+ */
+export async function deleteCustomFileTemplate(templateId: string): Promise<string> {
+  return invoke<string>("delete_custom_file_template", { templateId });
+}
+
+/**
+ * 获取所有自定义文件模板列表
+ * 输入: 无
+ * 输出: Promise<TemplateSchema[]> 自定义模板列表
+ * 流程: 调用后端 list_custom_file_templates 命令，从 ~/.novelforge/templates/ 加载
+ */
+export async function listCustomFileTemplates(): Promise<TemplateSchema[]> {
+  return invoke<TemplateSchema[]>("list_custom_file_templates");
+}
+
+/**
+ * 判断模板是否为自定义模板
+ * 输入: templateId 模板 ID
+ * 输出: boolean 是否为自定义模板（以 custom- 前缀标识）
+ */
+export function isCustomTemplate(templateId: string): boolean {
+  return templateId.startsWith("custom-");
 }
 
 // ===== 字段渲染辅助工具 =====

@@ -503,6 +503,7 @@ function TemplateCard({
   selected,
   onClick,
 }: TemplateCardProps) {
+  const { t } = useI18n();
   // 图标映射：字符串名 → 组件（仅用常用几个）
   const IconComponent = icon === "Sparkles" ? Sparkles : icon === "Eye" ? Eye : FileText;
 
@@ -533,9 +534,9 @@ function TemplateCard({
           <p className="text-xs text-nf-text-secondary mt-0.5 line-clamp-2">{description}</p>
           {moduleCount !== undefined && baseFieldCount !== undefined && (
             <div className="flex items-center gap-3 mt-1.5 text-[10px] text-nf-text-tertiary">
-              <span>{baseFieldCount} 基础字段</span>
+              <span>{t("wizard.fieldCount", { count: baseFieldCount })}</span>
               <span>·</span>
-              <span>{moduleCount} 可选模块</span>
+              <span>{t("wizard.moduleCount", { count: moduleCount })}</span>
             </div>
           )}
         </div>
