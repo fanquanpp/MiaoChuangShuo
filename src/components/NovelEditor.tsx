@@ -1,17 +1,20 @@
-// TipTap 纯文本编辑器组件
+// TipTap 富文本编辑器组件（Office 级）
 //
 // 功能概述：
-// 基于 TipTap 的小说创作编辑器，纯文本/WYSIWYG 体验。
-// 底层存储为纯文本（无 Markdown 转换层），支持基础富文本（加粗/斜体）。
-// 支持自动保存、字数统计、TXT 导出、大纲视图、聚焦模式。
+// 基于 TipTap 的小说创作编辑器，提供 Office 级富文本编辑体验。
+// 支持标题层级、有序/无序列表、任务列表、表格、链接、高亮、文本对齐、
+// 字体颜色、上下标、水平分割线、硬换行等完整富文本能力。
+// 底层存储采用 HTML 格式（持久化富文本格式），向后兼容纯文本 .txt 文件。
+// 支持自动保存、字数统计、TXT 导出（用于番茄/起点发布）、大纲视图、
+// 聚焦模式、版本快照、查找替换、角色悬停卡片。
 // 适配 FANDEX 暗黑主题。
 //
 // 模块职责：
-// 1. 提供 TipTap 编辑器实例（基础纯文本模式）
-// 2. 自动加载与保存文件内容（纯文本直读直写）
+// 1. 提供 TipTap 编辑器实例（Office 级富文本模式）
+// 2. 自动加载与保存文件内容（HTML 存储向后兼容纯文本）
 // 3. 实时统计字数
 // 4. 根据项目类型加载特色扩展
-// 5. 支持 TXT 导出、大纲视图、聚焦模式
+// 5. 支持 TXT 导出、大纲视图、聚焦模式、查找替换
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import type { Extensions } from "@tiptap/core";
@@ -27,6 +30,27 @@ import Code from "@tiptap/extension-code";
 import CodeBlock from "@tiptap/extension-code-block";
 import Blockquote from "@tiptap/extension-blockquote";
 import Placeholder from "@tiptap/extension-placeholder";
+// Office 级富文本扩展
+import Heading from "@tiptap/extension-heading";
+import BulletList from "@tiptap/extension-bullet-list";
+import OrderedList from "@tiptap/extension-ordered-list";
+import ListItem from "@tiptap/extension-list-item";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import Link from "@tiptap/extension-link";
+import Highlight from "@tiptap/extension-highlight";
+import TextAlign from "@tiptap/extension-text-align";
+import TextStyle from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import Typography from "@tiptap/extension-typography";
+import HorizontalRule from "@tiptap/extension-horizontal-rule";
+import HardBreak from "@tiptap/extension-hard-break";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import Subscript from "@tiptap/extension-subscript";
+import Superscript from "@tiptap/extension-superscript";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { readFile, writeFile, readProjectTree, createSnapshot } from "../lib/api";
 import { useAppStore } from "../lib/store";
@@ -49,10 +73,55 @@ import EditorToolbar from "./EditorToolbar";
 import OutlineView from "./OutlineView";
 import SnapshotHistory from "./SnapshotHistory";
 import CharacterHoverCard from "./CharacterHoverCard";
+import FindReplace from "./FindReplace";
 
 interface NovelEditorProps {
   filePath: string | null;
   focusMode?: boolean;
+}
+
+/**
+ * 检测内容是否为 HTML 格式（富文本存储）
+ * 输入: content 文件内容字符串
+ * 输出: boolean 是否为 HTML 格式
+ * 流程:
+ *   1. 去除首尾空白
+ *   2. 检测是否以常见 HTML 块级标签开头
+ *   3. 用于加载时智能识别 HTML（新格式）vs 纯文本（旧格式）
+ */
+function isHtmlContent(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("<")) return false;
+  // 检测常见块级标签：p/h1-h6/ul/ol/div/blockquote/pre/table/section/article
+  return /^<(p|h[1-6]|ul|ol|div|blockquote|pre|table|section|article|figure)\b/i.test(trimmed);
+}
+
+/**
+ * 转义 HTML 特殊字符（防止 XSS 与解析错误）
+ * 输入: s 原始字符串
+ * 输出: 转义后的字符串
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
+ * 纯文本转 HTML 段落（向后兼容旧 .txt 文件加载）
+ * 输入: text 纯文本内容（按 \n 分隔段落）
+ * 输出: HTML 字符串（每行转为 <p> 段落）
+ * 流程:
+ *   1. 按换行符分割文本
+ *   2. 非空行转 <p>已转义文本</p>，空行转 <p></p>
+ *   3. 拼接为完整 HTML 字符串
+ */
+function plainTextToHtml(text: string): string {
+  const lines = text.split(/\r?\n/);
+  return lines
+    .map((line) => (line ? `<p>${escapeHtml(line)}</p>` : "<p></p>"))
+    .join("");
 }
 
 /**
@@ -132,6 +201,10 @@ export default function NovelEditor({
   const snapshotMinInterval = useSettingsStore((s) => s.snapshotMinInterval);
   const [showOutline, setShowOutline] = useState(false);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
+  // 查找替换面板可见性（Ctrl+F / Ctrl+H 触发）
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  // 查找替换初始模式：'find' 仅查找 / 'replace' 查找并替换
+  const [findReplaceMode, setFindReplaceMode] = useState<"find" | "replace">("find");
   // 文件重载触发器：恢复快照后递增以强制重新加载文件内容
   const [reloadKey, setReloadKey] = useState(0);
   // 上次自动创建快照的时间戳（毫秒），用于控制最小间隔，避免高频保存产生重复快照
@@ -220,20 +293,61 @@ export default function NovelEditor({
     return () => { cancelled = true; };
   }, [isScript, isDialogue, currentProject]);
 
-  // 构建 TipTap 扩展列表（纯文本 + 新增格式化扩展）
+  // 构建 TipTap 扩展列表（Office 级富文本模式）
+  // 包含完整富文本能力：标题层级、列表、表格、链接、高亮、对齐、颜色等
   const extensions: Extensions = useMemo(() => {
     const exts: Extensions = [
+      // 基础节点
       Document,
       Paragraph,
       Text,
+      // 基础行内格式（粗体/斜体/下划线/删除线/行内代码）
       Bold,
       Italic,
       Underline,
       Strike,
       Code,
+      // 块级格式
       CodeBlock,
       Blockquote,
+      // Office 级标题层级（h1-h4，对应章节/卷/节/小节）
+      Heading.configure({ levels: [1, 2, 3, 4] }),
+      // 列表：无序/有序/任务列表
+      BulletList,
+      OrderedList,
+      ListItem,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      // 表格：可调整列宽
+      Table.configure({ resizable: true, HTMLAttributes: { class: "nf-table" } }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      // 链接：不自动跳转（按 Ctrl/Cmd+Click 跳转），允许任意协议
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        HTMLAttributes: { class: "nf-link", rel: "noopener noreferrer" },
+      }),
+      // 高亮标记（黄底强调，类似 Office 荧光笔）
+      Highlight.configure({ multicolor: true }),
+      // 文本对齐（左/中/右/两端，作用于标题与段落）
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      // 字体颜色（依赖 TextStyle 承载 color 属性）
+      TextStyle,
+      Color,
+      // 排版增强（自动转换 (c) (tm) -> © ™ 等，智能引号）
+      Typography,
+      // 水平分割线 <hr>
+      HorizontalRule,
+      // 硬换行（Shift+Enter）
+      HardBreak,
+      // 上下标（化学式/数学公式/注释引用）
+      Subscript,
+      Superscript,
+      // 历史记录（撤销/重做）
       History,
+      // 占位符
       Placeholder.configure({ placeholder: t("editor.placeholder") }),
       // VSCode 风格段落级快捷键（所有文体通用）
       VSShortcuts.configure({ enabled: true }),
@@ -275,14 +389,14 @@ export default function NovelEditor({
     return exts;
   }, [isProse, isScript, isDialogue, characters, t, indentEnabled, indentWidth, typewriterMode, focusDim, focusDimOpacity]);
 
-  // 创建编辑器实例（纯文本模式）
+  // 创建编辑器实例（Office 级富文本模式）
   const editor = useEditor({
     extensions,
     content: "",
     editorProps: {
       attributes: {
         class:
-          "fandex-editor-plain prose max-w-none focus:outline-none min-h-[60vh] px-8 py-6 leading-loose text-nf-text",
+          "fandex-editor-rich prose max-w-none focus:outline-none min-h-[60vh] px-8 py-6 leading-loose text-nf-text",
       },
     },
     onUpdate: () => {
@@ -296,7 +410,7 @@ export default function NovelEditor({
     },
   });
 
-  // 加载文件内容（纯文本直读，无 MD→HTML 转换）
+  // 加载文件内容（智能识别 HTML 富文本 vs 纯文本，向后兼容旧 .txt）
   useEffect(() => {
     let cancelled = false;
     if (!editor || !filePath) {
@@ -318,19 +432,19 @@ export default function NovelEditor({
           finalContent = `${dateStr}\n\n`;
         }
 
-        // 纯文本转为 ProseMirror JSON 文档结构，避免 setContent 将文本当作 HTML 解析
-        const lines = finalContent.split(/\r?\n/);
-        const docContent = lines.map((line: string) => ({
-          type: "paragraph",
-          content: line ? [{ type: "text", text: line }] : [],
-        }));
-        editor.commands.setContent({
-          type: "doc",
-          content: docContent.length > 0 ? docContent : [{ type: "paragraph" }],
-        });
+        // 智能识别内容格式：
+        // - HTML 格式（新富文本存储）：直接 setContent(html)
+        // - 纯文本（旧 .txt 兼容）：按行转 HTML 段落再 setContent
+        if (isHtmlContent(finalContent)) {
+          editor.commands.setContent(finalContent);
+        } else {
+          const html = plainTextToHtml(finalContent);
+          editor.commands.setContent(html);
+        }
         if (cancelled) return;
         setDirty(false);
-        lastSavedContentRef.current = finalContent;
+        // 记录上次保存内容（用于冲突检测，使用 HTML 字符串）
+        lastSavedContentRef.current = editor.getHTML();
         setWordCount(countWords(editor.getText()));
         // 记录最近文件
         const relativePath = filePath.replace(
@@ -352,7 +466,7 @@ export default function NovelEditor({
     return () => { cancelled = true; };
   }, [filePath, editor, currentProject, t, projectType, diaryAutoDate, reloadKey]);
 
-  // 保存文件（纯文本直写，无 HTML→MD 转换；含竞态保护）
+  // 保存文件（HTML 持久化，保留富文本格式；含竞态保护）
   const savingRef = useRef(false);
   const pendingSaveRef = useRef(false);
   const lastSavedContentRef = useRef("");
@@ -384,9 +498,10 @@ export default function NovelEditor({
         // 文件可能不存在，跳过冲突检测
       }
 
-      const text = editor.getText();
-      await writeFile(filePath, text, currentProject?.path || "");
-      lastSavedContentRef.current = text;
+      // 保存为 HTML 格式，持久化富文本格式（标题/列表/表格/链接/高亮等）
+      const html = editor.getHTML();
+      await writeFile(filePath, html, currentProject?.path || "");
+      lastSavedContentRef.current = html;
       setDirty(false);
       useAppStore.getState().setEditorDirty(false);
       showToast("success", t("editor.saved"));
@@ -400,7 +515,7 @@ export default function NovelEditor({
         if (elapsed >= snapshotMinInterval * 1000) {
           lastSnapshotTimeRef.current = now;
           // 异步创建快照，不阻塞保存流程，失败静默处理（不打扰作者）
-          createSnapshot(filePath, currentProject.path, text, "auto").catch(() => {
+          createSnapshot(filePath, currentProject.path, html, "auto").catch(() => {
             // 快照创建失败不影响保存成功状态，仅回退时间戳以便下次重试
             lastSnapshotTimeRef.current = 0;
           });
@@ -447,9 +562,10 @@ export default function NovelEditor({
     }
   }, [editor, filePath, showToast, t]);
 
-  // Ctrl+S 快捷键 & Ctrl+Q 快速加引号
+  // 全局快捷键：Ctrl+S 保存 / Ctrl+Q 加引号 / Ctrl+F 查找 / Ctrl+H 替换 / Esc 关闭面板
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+S 保存
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         handleSave();
@@ -472,10 +588,26 @@ export default function NovelEditor({
             .run();
         }
       }
+      // Ctrl+F 打开查找面板
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        setFindReplaceMode("find");
+        setShowFindReplace(true);
+      }
+      // Ctrl+H 打开替换面板
+      if ((e.ctrlKey || e.metaKey) && e.key === "h") {
+        e.preventDefault();
+        setFindReplaceMode("replace");
+        setShowFindReplace(true);
+      }
+      // Esc 关闭查找替换面板
+      if (e.key === "Escape" && showFindReplace) {
+        setShowFindReplace(false);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, editor]);
+  }, [handleSave, editor, showFindReplace]);
 
   // 自动保存: 使用用户设置的间隔（0=禁用）
   useEffect(() => {
@@ -679,6 +811,8 @@ export default function NovelEditor({
         onToggleFocusDim={() => useSettingsStore.getState().setFocusDim(!focusDim)}
         showSnapshotHistory={showSnapshotHistory}
         onToggleSnapshotHistory={() => setShowSnapshotHistory((prev) => !prev)}
+        showFindReplace={showFindReplace}
+        onToggleFindReplace={() => setShowFindReplace((prev) => !prev)}
       />
 
       {isScript && characters.length > 0 && (
@@ -716,15 +850,24 @@ export default function NovelEditor({
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto relative">
           <EditorContent editor={editor} />
+          {/* 查找替换面板：浮于编辑区顶部，Ctrl+F / Ctrl+H 触发 */}
+          {showFindReplace && editor && (
+            <FindReplace
+              editor={editor}
+              mode={findReplaceMode}
+              onClose={() => setShowFindReplace(false)}
+              onModeChange={setFindReplaceMode}
+            />
+          )}
           {showOutline && editor && (
-            <OutlineView htmlContent={editor.getText()} />
+            <OutlineView editor={editor} />
           )}
         </div>
         {showSnapshotHistory && filePath && currentProject?.path && (
           <SnapshotHistory
             filePath={filePath}
             projectPath={currentProject.path}
-            currentContent={editor?.getText() || ""}
+            currentContent={editor?.getHTML() || ""}
             onClose={() => setShowSnapshotHistory(false)}
             onRestored={() => setReloadKey((n) => n + 1)}
           />

@@ -502,6 +502,256 @@ select:focus-visible {
   margin-top: 1em;
 }
 
+/* ========== Office 级富文本元素样式 ========== */
+
+/* 表格 .nf-table：Office 风格表格（带表头、单元格边框、悬浮高亮）
+ * 扩展配置：Table.configure({ HTMLAttributes: { class: "nf-table" } })
+ */
+.ProseMirror .nf-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  overflow: hidden;
+  background: var(--fandex-bg-card);
+  border: 1px solid var(--fandex-border);
+  font-size: 0.95em;
+}
+
+.ProseMirror .nf-table th,
+.ProseMirror .nf-table td {
+  border: 1px solid var(--fandex-border-light);
+  padding: 0.5em 0.75em;
+  vertical-align: top;
+  min-width: 80px;
+}
+
+/* 表头：主色底 + 反色文字 */
+.ProseMirror .nf-table th {
+  background: var(--fandex-bg-hover);
+  color: var(--fandex-text);
+  font-weight: 700;
+  text-align: left;
+  border-bottom: 2px solid var(--fandex-primary);
+}
+
+/* 行悬浮：浅主色背景 */
+.ProseMirror .nf-table tbody tr:hover {
+  background: rgba(124, 158, 255, 0.06);
+}
+
+/* 亮色主题下行悬浮 */
+.light .ProseMirror .nf-table tbody tr:hover {
+  background: rgba(68, 102, 221, 0.06);
+}
+
+/* 选中单元格：主色边框 */
+.ProseMirror .nf-table .selectedCell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(124, 158, 255, 0.1);
+  pointer-events: none;
+}
+
+/* 表格列宽调整手柄（resizable） */
+.ProseMirror .nf-table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--fandex-primary);
+  opacity: 0;
+  cursor: col-resize;
+  transition: opacity 0.15s ease;
+}
+
+.ProseMirror .nf-table:hover .column-resize-handle {
+  opacity: 0.5;
+}
+
+.ProseMirror .nf-table .column-resize-handle:hover {
+  opacity: 1;
+}
+
+/* 表格处于调整列宽状态时的光标 */
+.ProseMirror .nf-table.resizing {
+  cursor: col-resize;
+}
+
+/* 链接 .nf-link：主色 + 下划线 + 悬浮高亮 */
+.ProseMirror .nf-link {
+  color: var(--fandex-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(124, 158, 255, 0.5);
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.ProseMirror .nf-link:hover {
+  color: var(--fandex-primary-hover);
+  text-decoration-color: var(--fandex-primary-hover);
+}
+
+/* Ctrl/Cmd+Click 时显示可点击态 */
+.ProseMirror .nf-link[data-cursor="pointer"] {
+  cursor: pointer;
+}
+
+/* 高亮标记 mark：默认荧光黄 + 多色支持 */
+.ProseMirror mark {
+  background: #fff59d;
+  color: inherit;
+  padding: 0.05em 0.15em;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+
+.ProseMirror mark[data-color] {
+  background: attr(data-color color, #fff59d);
+}
+
+/* 亮色主题下高亮保持柔和 */
+.light .ProseMirror mark {
+  background: #ffe082;
+}
+
+/* 任务列表 ul[data-type="taskList"]：自定义复选框 */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.5em;
+  margin: 0.5em 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin: 0.25em 0;
+  padding-left: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  user-select: none;
+  margin-top: 0.25em;
+  display: inline-block;
+}
+
+/* 自定义复选框外观：未选中空心方框 / 选中主色实心 */
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--fandex-border);
+  border-radius: 3px;
+  background: var(--fandex-bg);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+  margin: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
+  border-color: var(--fandex-primary);
+}
+
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > label input[type="checkbox"] {
+  background: var(--fandex-primary);
+  border-color: var(--fandex-primary);
+}
+
+/* 选中态对勾（用 SVG 路径绘制） */
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > label input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--fandex-text-inverse);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* 已完成任务文字变灰带删除线 */
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--fandex-text-tertiary);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* 任务列表内段落去除上下边距 */
+.ProseMirror ul[data-type="taskList"] li > div > p {
+  margin: 0;
+}
+
+/* 水平分割线 hr：FANDEX 风格渐变分割 */
+.ProseMirror hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--fandex-border-light) 20%,
+    var(--fandex-border) 50%,
+    var(--fandex-border-light) 80%,
+    transparent
+  );
+  margin: 2em 0;
+  position: relative;
+}
+
+/* hr 居中点缀主色圆点 */
+.ProseMirror hr::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fandex-primary);
+  opacity: 0.6;
+}
+
+/* 下标 sub / 上标 sup：Office 标准字号 */
+.ProseMirror sub {
+  font-size: 0.72em;
+  vertical-align: sub;
+  line-height: 0;
+}
+
+.ProseMirror sup {
+  font-size: 0.72em;
+  vertical-align: super;
+  line-height: 0;
+}
+
+/* 文本对齐：TextAlign 扩展通过 inline style 设置 text-align，
+ * 这里补充首行缩进段落在对齐时的视觉调整 */
+.ProseMirror p[style*="text-align: center"],
+.ProseMirror h1[style*="text-align: center"],
+.ProseMirror h2[style*="text-align: center"],
+.ProseMirror h3[style*="text-align: center"] {
+  border-left: none;
+  padding-left: 0;
+}
+
+.ProseMirror p[style*="text-align: right"] {
+  border-left: none;
+  padding-left: 0;
+}
+
+/* 上下标与行内代码不影响行高 */
+.ProseMirror sub, .ProseMirror sup, .ProseMirror code {
+  line-height: 0;
+  position: relative;
+}
+
 /* ========== FANDEX 提示块(Admonition) ========== */
 .fandex-admonition {
   border-left: 4px solid;
