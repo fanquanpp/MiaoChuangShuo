@@ -136,9 +136,12 @@ function ToastItemComponent({
     );
   }
 
+  // 错误类型增加左侧 2px 红色色条,强化视觉警示区分
+  const accentClass = toast.type === "error" ? "border-l-2 border-l-red-400" : "";
+
   return (
     <div
-      className={`pointer-events-auto flex items-start gap-2.5 px-4 py-3 border ${COLOR_MAP[toast.type]} ${BG_MAP[toast.type]} bg-nf-bg-card shadow-lg transition-all animate-slide-in-right`}
+      className={`pointer-events-auto flex items-start gap-2.5 px-4 py-3 border ${COLOR_MAP[toast.type]} ${BG_MAP[toast.type]} ${accentClass} bg-nf-bg-card shadow-lg transition-all animate-slide-in-right`}
       role="alert"
     >
       <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" />

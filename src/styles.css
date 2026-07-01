@@ -10,13 +10,13 @@
   --fandex-secondary: #4ee6b0;
   --fandex-tertiary: #ff9e7a;
 
-  /* 背景色 - 更丰富的层次 */
-  --fandex-bg: #0a0a0f;
-  --fandex-bg-card: #14141c;
-  --fandex-bg-code: #1a1a24;
-  --fandex-bg-hover: #22222e;
-  --fandex-bg-sidebar: #0e0e16;
-  --fandex-bg-nav: rgba(10, 10, 15, 0.92);
+  /* 背景色 - 更丰富的层次(略提亮度,降低纯黑压抑感) */
+  --fandex-bg: #0c0d14;
+  --fandex-bg-card: #161821;
+  --fandex-bg-code: #1c1e28;
+  --fandex-bg-hover: #232531;
+  --fandex-bg-sidebar: #101218;
+  --fandex-bg-nav: rgba(12, 13, 20, 0.88);
 
   /* 文字色 */
   --fandex-text: #e8e8f0;
@@ -250,6 +250,23 @@ select:focus-visible {
   -webkit-backdrop-filter: blur(12px);
 }
 
+/* ========== 通用毛玻璃面板（受 glassOpacity 控制） ==========
+ * 用法:为需要毛玻璃效果的面板添加 .nf-glass 类
+ * 背景使用 rgba(var(--nf-bg-rgb), var(--nf-glass-opacity)) 实现透明度控制
+ * backdrop-filter 提供模糊效果，透明度越低模糊感越强 */
+.nf-glass {
+  background: rgba(var(--nf-bg-rgb, 12, 13, 20), var(--nf-glass-opacity, 1));
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  transition: background 0.25s ease;
+}
+
+/* 当透明度低于 0.6 时，增强模糊以保持文字可读性 */
+.nf-glass.nf-glass-strong {
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
 /* ========== TipTap 编辑器 ProseMirror 样式 ========== */
 .ProseMirror {
   color: var(--fandex-text);
@@ -258,8 +275,11 @@ select:focus-visible {
   line-height: var(--fandex-editor-line-height, 1.85);
   outline: none;
   text-align: justify;
-  /* 阅读体验优化：限制单行字数上限，降低长行扫视负担 */
-  max-width: var(--fandex-editor-max-width, 760px);
+  /* 占满容器宽度,通过内边距保证阅读舒适度 */
+  width: 100%;
+  max-width: 100%;
+  /* 左右内边距:保证文字不贴边,宽屏下仍有合理阅读宽度 */
+  padding: 1rem 2.5rem;
   /* 字距微调：中文密集排版下提升可读性 */
   letter-spacing: 0.01em;
   word-break: break-word;
@@ -920,4 +940,135 @@ input:focus, textarea:focus, select:focus {
 }
 .fandex-glow-border:hover::after {
   opacity: 0.3;
+}
+
+/* ========== 舒缓背景层:弱化纯色压抑感 ========== */
+
+/* 全局背景:在主背景上叠加多个柔光斑点,形成空间感与呼吸感
+ * 使用 fixed 定位 + pointer-events:none 避免影响交互
+ * 颜色采用品牌色的极低透明度,保持色彩统一 */
+.nf-ambient-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 50% 35% at 12% 8%, rgba(124, 158, 255, 0.045), transparent 70%),
+    radial-gradient(ellipse 45% 30% at 88% 18%, rgba(78, 230, 176, 0.035), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 50% 110%, rgba(255, 158, 122, 0.030), transparent 70%);
+}
+
+/* 亮色主题下的柔光层:色彩更克制,避免泛白 */
+.light .nf-ambient-bg {
+  background:
+    radial-gradient(ellipse 50% 35% at 12% 8%, rgba(68, 102, 221, 0.05), transparent 70%),
+    radial-gradient(ellipse 45% 30% at 88% 18%, rgba(0, 200, 150, 0.04), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 50% 110%, rgba(232, 93, 58, 0.035), transparent 70%);
+}
+
+/* 侧边栏顶部柔光条:与品牌色统一,提升层次感 */
+.nf-sidebar-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(124, 158, 255, 0.04), transparent);
+  z-index: 0;
+}
+
+/* ========== 统一过渡动效:展开/关闭舒缓化 ========== */
+
+/* 通用高度过渡:用于折叠组、面板展开/关闭
+ * 通过 max-height 切换实现,搭配 opacity 与 translate */
+.nf-collapse {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+    margin-top 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.nf-collapse.nf-open {
+  max-height: 1000px;
+  opacity: 1;
+}
+
+/* 通用淡入上浮:面板挂载/切换时使用 */
+.nf-rise-in {
+  animation: nfRiseIn 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes nfRiseIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 通用淡入缩放:对话框、卡片悬浮 */
+.nf-pop-in {
+  animation: nfPopIn 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+@keyframes nfPopIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 面板横向滑入:右侧文件列表/抽屉 */
+.nf-slide-in-left {
+  animation: nfSlideInLeft 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes nfSlideInLeft {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* 通用 hover 浮起:卡片、可点击容器 */
+.nf-hover-float {
+  transition:
+    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+.nf-hover-float:hover {
+  transform: translateY(-2px);
+}
+
+/* ========== 工具栏按钮统一悬浮态 ========== */
+.nf-tool-btn {
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.12s ease;
+}
+.nf-tool-btn:active {
+  transform: scale(0.96);
+}
+
+/* ========== 项目卡片渐变光:提升主页视觉档次 ========== */
+.nf-card-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.nf-card-sheen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 100%
+  );
+  transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+.nf-card-sheen:hover::after {
+  left: 120%;
 }

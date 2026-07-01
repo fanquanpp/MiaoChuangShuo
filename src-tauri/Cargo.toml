@@ -1,12 +1,12 @@
 [package]
-name = "novelforge"
-version = "3.0.0"
-description = "NovelForge - 离线小说创作工作站"
-authors = ["NovelForge"]
+name = "miaochuangshuo"
+version = "3.1.0"
+description = "喵创说 - 离线小说创作工作站"
+authors = ["MiaoChuangShuo"]
 edition = "2021"
 
 [lib]
-name = "novelforge_lib"
+name = "miaochuangshuo_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "NovelForge",
-  "version": "3.0.0",
-  "identifier": "com.novelforge.app",
+  "productName": "喵创说",
+  "version": "3.1.0",
+  "identifier": "com.miaochuangshuo.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "NovelForge - 离线小说创作工作站",
+        "title": "喵创说 - 离线小说创作工作站",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data:; font-src 'self'"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data:; font-src 'self'; connect-src 'self' https://api.github.com"
     }
   },
   "bundle": {

@@ -1,7 +1,7 @@
 // AI 辅助创作中心面板组件（接口预留，不实装）
 //
 // 功能概述：
-// NovelForge 的 AI 辅助创作中心入口，展示未来规划的 6 项 AI 功能。
+// 喵创说 的 AI 辅助创作中心入口，展示未来规划的 6 项 AI 功能。
 // 当前版本仅提供界面骨架，所有功能点击时提示"尚未实装"。
 // 后续接入实际 AI 服务时，只需替换后端命令实现，前端面板无需重构。
 //
@@ -67,7 +67,7 @@ export default function AiAssistantPanel({ open, onClose }: AiAssistantPanelProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
       <div className="w-[640px] max-w-[90vw] max-h-[80vh] bg-nf-bg-panel border border-nf-border-light rounded-xl shadow-2xl flex flex-col overflow-hidden">
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-nf-border-light">

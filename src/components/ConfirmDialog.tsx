@@ -94,7 +94,7 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
       onKeyDown={handleKeyDown}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -145,14 +145,14 @@ export default function ConfirmDialog({
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
+            className="nf-tool-btn px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
           >
             {cancelLabel || t("app.cancel")}
           </button>
           <button
             onClick={handleConfirm}
             disabled={type === "prompt" && !inputValue.trim()}
-            className={`px-3 py-1.5 text-sm font-medium text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`nf-tool-btn px-3 py-1.5 text-sm font-medium text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed ${
               isDanger
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-fandex-primary hover:bg-fandex-primary-hover"

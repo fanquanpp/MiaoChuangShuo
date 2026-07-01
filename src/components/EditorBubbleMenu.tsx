@@ -15,6 +15,7 @@
 
 import type { Editor } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react";
+import { useState } from "react";
 import {
   Bold,
   Italic,
@@ -26,6 +27,7 @@ import {
   Highlighter,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
+import ConfirmDialog from "./ConfirmDialog";
 
 // BubbleMenu 属性接口
 interface EditorBubbleMenuProps {
@@ -66,20 +68,32 @@ const HIGHLIGHT_COLORS = [
  */
 export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
   const { t } = useI18n();
+  // 链接输入对话框状态
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
 
   /**
-   * 插入链接：弹出输入框获取 URL 并应用
-   * 输入: 无（从编辑器选区获取选中文本）
-   * 输出: 无（直接修改编辑器内容）
+   * 打开链接输入对话框
+   * 输入: 无
+   * 输出: 无（仅切换对话框状态）
    */
   const handleInsertLink = () => {
-    const url = window.prompt(t("editor.linkUrlPrompt"), "https://");
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run();
+    setLinkDialogOpen(true);
+  };
+
+  /**
+   * 确认链接输入:应用链接到编辑器选区
+   * 输入: url 用户输入的链接地址
+   * 输出: 无（直接修改编辑器内容）
+   */
+  const handleLinkConfirm = (url?: string) => {
+    if (url && url.trim()) {
+      editor.chain().focus().setLink({ href: url.trim() }).run();
     }
+    setLinkDialogOpen(false);
   };
 
   return (
+    <>
     <BubbleMenu
       editor={editor}
       tippyOptions={{
@@ -227,6 +241,20 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
         </BubbleButton>
       </div>
     </BubbleMenu>
+
+    {/* 链接输入对话框:替代原生 window.prompt,统一视觉风格 */}
+    <ConfirmDialog
+      open={linkDialogOpen}
+      title={t("editor.link")}
+      message={t("editor.linkUrlPrompt")}
+      type="prompt"
+      placeholder="https://"
+      defaultValue="https://"
+      confirmLabel={t("app.confirm")}
+      onConfirm={handleLinkConfirm}
+      onCancel={() => setLinkDialogOpen(false)}
+    />
+    </>
   );
 }
 

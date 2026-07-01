@@ -9,11 +9,14 @@
 // 2. 实时预览设置变更
 // 3. 持久化到 localStorage
 
-import { useCallback } from "react";
-import { X, Type, BookOpen, FileText, Palette, Zap } from "lucide-react";
-import { useSettingsStore, type ChapterFormat } from "../lib/settingsStore";
+import { useCallback, useState, useEffect } from "react";
+import { X, Type, BookOpen, FileText, Palette, Zap, Droplet, Info, RefreshCw, ExternalLink, CheckCircle } from "lucide-react";
+import { useSettingsStore, BACKGROUND_PRESETS, type ChapterFormat } from "../lib/settingsStore";
 import { useThemeStore } from "../lib/themeStore";
 import { useI18n } from "../lib/i18n";
+import { useToast } from "../lib/toast";
+import { checkForUpdates, getCurrentVersion, openExternalUrl, RELEASES_PAGE_URL, type ReleaseInfo } from "../lib/updateChecker";
+import UpdateNoticeDialog from "./UpdateNoticeDialog";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -46,6 +49,12 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     autoTemplateFill,
     indentEnabled,
     indentWidth,
+    backgroundPreset,
+    customBackgroundColor,
+    glassOpacity,
+    checkUpdateOnStartup,
+    lastUpdateCheckTime,
+    skipUpdateVersion,
     setFontSize,
     setAutoSaveInterval,
     setChapterFormat,
@@ -57,8 +66,74 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     setAutoTemplateFill,
     setIndentEnabled,
     setIndentWidth,
+    setBackgroundPreset,
+    setCustomBackgroundColor,
+    setGlassOpacity,
+    setCheckUpdateOnStartup,
+    setLastUpdateCheckTime,
+    setSkipUpdateVersion,
   } = useSettingsStore();
   const { theme, toggleTheme } = useThemeStore();
+  const { showToast } = useToast();
+
+  // ===== 版本更新检测状态 =====
+  // 当前应用版本号（组件挂载时异步获取）
+  const [currentVersion, setCurrentVersion] = useState("3.1.0");
+  // 检查中状态（控制按钮 loading 动画）
+  const [checking, setChecking] = useState(false);
+  // 检测到的新版本信息（null=未检测到或未检查）
+  const [latestRelease, setLatestRelease] = useState<ReleaseInfo | null>(null);
+  // 更新提示弹窗显示状态
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+
+  // 组件挂载时获取当前版本号
+  useEffect(() => {
+    if (!open) return;
+    let mounted = true;
+    (async () => {
+      const v = await getCurrentVersion();
+      if (mounted) setCurrentVersion(v);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [open]);
+
+  /**
+   * 手动触发检查更新
+   * 流程:
+   *   1. 设置 checking 状态
+   *   2. 调用 checkForUpdates 获取结果
+   *   3. 有新版本:弹出 UpdateNoticeDialog
+   *   4. 无新版本:toast 提示"已是最新"
+   *   5. 失败:toast 提示错误信息
+   *   6. 更新 lastUpdateCheckTime
+   */
+  const handleCheckUpdate = useCallback(async () => {
+    if (checking) return;
+    setChecking(true);
+    try {
+      const result = await checkForUpdates();
+      setLastUpdateCheckTime(Date.now());
+
+      if (result.hasUpdate) {
+        // 检查用户是否已跳过此版本
+        if (skipUpdateVersion === result.latest.version) {
+          showToast("info", t("update.upToDateDesc", { version: result.current }), 4000);
+        } else {
+          setLatestRelease(result.latest);
+          setUpdateDialogOpen(true);
+        }
+      } else {
+        showToast("success", t("update.upToDateDesc", { version: result.current }), 4000);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast("error", t("update.checkFailed", { error: msg }), 5000);
+    } finally {
+      setChecking(false);
+    }
+  }, [checking, setLastUpdateCheckTime, skipUpdateVersion, showToast, t]);
 
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent) => {
@@ -67,11 +142,27 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     [onClose]
   );
 
+  // 缩进宽度自定义输入:本地缓存输入文本,失焦或回车时提交到 store
+  // 避免受控 input 在输入过程中被钳制导致体验问题(如输入"12"时中途被截为1)
+  const [indentInput, setIndentInput] = useState(String(indentWidth));
+  useEffect(() => {
+    setIndentInput(String(indentWidth));
+  }, [indentWidth]);
+  const commitIndentInput = useCallback(() => {
+    const v = parseInt(indentInput, 10);
+    if (!isNaN(v) && v >= 1 && v <= 8) {
+      setIndentWidth(v);
+    } else {
+      // 无效输入回退为当前 store 值
+      setIndentInput(String(indentWidth));
+    }
+  }, [indentInput, indentWidth, setIndentWidth]);
+
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
       onClick={handleOverlayClick}
     >
       <div className="w-full max-w-lg bg-nf-bg-card border border-nf-border-light shadow-2xl max-h-[85vh] flex flex-col">
@@ -361,6 +452,23 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     </button>
                   ))}
                 </div>
+                {/* 自定义缩进宽度:允许 1-8 任意值,补充快捷按钮无法覆盖的更宽缩进 */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-nf-text-tertiary">{t("settings.indentCustom")}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={8}
+                    value={indentInput}
+                    onChange={(e) => setIndentInput(e.target.value)}
+                    onBlur={commitIndentInput}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitIndentInput();
+                    }}
+                    className="w-16 px-2 py-1 text-xs bg-nf-bg-input border border-nf-border-light rounded text-nf-text focus:outline-none focus:border-fandex-primary transition-colors"
+                  />
+                  <span className="text-[10px] text-nf-text-tertiary">1-8</span>
+                </div>
               </div>
             </div>
           </section>
@@ -388,6 +496,233 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 {theme === "dark" ? t("settings.switchLight") : t("settings.switchDark")}
               </button>
             </div>
+
+            {/* 背景预设色板 */}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-nf-text-secondary">{t("settings.backgroundPreset")}</label>
+                <span className="text-[10px] text-nf-text-tertiary">{t("settings.backgroundPresetHint")}</span>
+              </div>
+              <div className="grid grid-cols-6 gap-2">
+                {BACKGROUND_PRESETS.map((preset) => {
+                  const isActive = backgroundPreset === preset.id;
+                  const labelKey = `settings.preset${preset.id.charAt(0).toUpperCase()}${preset.id.slice(1)}`;
+                  return (
+                    <button
+                      key={preset.id}
+                      onClick={() => setBackgroundPreset(preset.id)}
+                      title={t(labelKey)}
+                      className={`relative h-10 border transition-all duration-fast flex items-end justify-center pb-1 ${
+                        isActive
+                          ? "border-fandex-primary ring-1 ring-fandex-primary/40"
+                          : "border-nf-border-light hover:border-nf-border"
+                      }`}
+                      style={{ background: preset.bg }}
+                    >
+                      <span
+                        className="text-[9px] font-medium leading-none"
+                        style={{ color: "rgba(232, 232, 240, 0.85)" }}
+                      >
+                        {t(labelKey)}
+                      </span>
+                      {isActive && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-fandex-primary" />
+                      )}
+                    </button>
+                  );
+                })}
+                {/* 自定义预设按钮 */}
+                <button
+                  onClick={() => setBackgroundPreset("custom")}
+                  title={t("settings.presetCustom")}
+                  className={`relative h-10 border transition-all duration-fast flex items-end justify-center pb-1 ${
+                    backgroundPreset === "custom"
+                      ? "border-fandex-primary ring-1 ring-fandex-primary/40"
+                      : "border-nf-border-light hover:border-nf-border"
+                  }`}
+                  style={{
+                    background:
+                      backgroundPreset === "custom"
+                        ? customBackgroundColor
+                        : "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+                  }}
+                >
+                  <span
+                    className="text-[9px] font-medium leading-none"
+                    style={{ color: "rgba(232, 232, 240, 0.85)" }}
+                  >
+                    {t("settings.presetCustom")}
+                  </span>
+                  {backgroundPreset === "custom" && (
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-fandex-primary" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* 自定义颜色选择器（仅 custom 预设时显示） */}
+            {backgroundPreset === "custom" && (
+              <div className="mt-3 p-3 border border-nf-border-light bg-nf-bg/40 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Droplet className="w-3.5 h-3.5 text-fandex-secondary flex-shrink-0" />
+                  <label className="text-xs text-nf-text-secondary">{t("settings.customColor")}</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={customBackgroundColor}
+                    onChange={(e) => setCustomBackgroundColor(e.target.value)}
+                    className="w-12 h-8 bg-transparent border border-nf-border-light cursor-pointer p-0"
+                  />
+                  <input
+                    type="text"
+                    value={customBackgroundColor}
+                    onChange={(e) => setCustomBackgroundColor(e.target.value)}
+                    className="flex-1 px-2 py-1 text-xs font-mono bg-nf-bg border border-nf-border-light text-nf-text focus:outline-none focus:border-fandex-primary transition-colors"
+                    placeholder="#0c0d14"
+                  />
+                </div>
+                <p className="text-[10px] text-nf-text-tertiary leading-relaxed">
+                  {t("settings.customColorHint")}
+                </p>
+              </div>
+            )}
+
+            {/* 毛玻璃透明度滑块 */}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-nf-text-secondary">{t("settings.glassOpacity")}</label>
+                <span className="text-xs text-nf-text-tertiary font-mono">
+                  {(glassOpacity * 100).toFixed(0)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0.3}
+                max={1}
+                step={0.05}
+                value={glassOpacity}
+                onChange={(e) => setGlassOpacity(Number(e.target.value))}
+                className="w-full h-1.5 bg-nf-bg-hover accent-fandex-tertiary cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-nf-text-tertiary">
+                <span>{t("settings.glassOpacityTransparent")}</span>
+                <span>{t("settings.glassOpacityFull")}</span>
+              </div>
+              {/* 毛玻璃效果预览 */}
+              <div className="relative h-12 overflow-hidden border border-nf-border-light">
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(124,158,255,0.3) 0%, rgba(78,230,176,0.25) 50%, rgba(255,158,122,0.2) 100%)",
+                  }}
+                />
+                <div
+                  className="absolute inset-0 flex items-center justify-center backdrop-blur-[8px]"
+                  style={{
+                    background: `rgba(var(--nf-bg-rgb, 12, 13, 20), ${glassOpacity})`,
+                  }}
+                >
+                  <span className="text-[10px] text-nf-text-secondary">
+                    {t("settings.glassOpacityHint")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 关于与更新设置 */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-fandex-primary" />
+              <h3 className="text-sm font-bold font-display text-nf-text">
+                {t("update.section")}
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              {/* 当前版本号 + 检查更新按钮 */}
+              <div className="flex items-center justify-between p-3 border border-nf-border-light bg-nf-bg">
+                <div>
+                  <div className="text-xs text-nf-text-secondary mb-0.5">
+                    {t("update.currentVersion")}
+                  </div>
+                  <div className="text-sm font-mono font-bold text-nf-text">
+                    v{currentVersion}
+                  </div>
+                </div>
+                <button
+                  onClick={handleCheckUpdate}
+                  disabled={checking}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs bg-fandex-primary/10 hover:bg-fandex-primary/20 border border-fandex-primary/40 text-fandex-primary transition duration-fast disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${checking ? "animate-spin" : ""}`} />
+                  {checking ? t("update.checking") : t("update.checkNow")}
+                </button>
+              </div>
+
+              {/* 上次检查时间 */}
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-nf-text-tertiary">{t("update.lastCheck")}</span>
+                <span className="text-nf-text-secondary font-mono">
+                  {lastUpdateCheckTime > 0
+                    ? new Date(lastUpdateCheckTime).toLocaleString("zh-CN", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : t("update.neverChecked")}
+                </span>
+              </div>
+
+              {/* 启动时自动检查更新 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={checkUpdateOnStartup}
+                  onChange={(e) => setCheckUpdateOnStartup(e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("update.autoCheck")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("update.autoCheckHint")}
+                  </p>
+                </div>
+              </label>
+
+              {/* 已跳过版本显示（仅当用户跳过过版本时显示） */}
+              {skipUpdateVersion && (
+                <div className="flex items-center justify-between p-2 border border-nf-border-light bg-nf-bg-hover/50">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="w-3 h-3 text-nf-text-tertiary" />
+                    <span className="text-[11px] text-nf-text-tertiary">
+                      {t("update.skipVersion")}: v{skipUpdateVersion}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setSkipUpdateVersion("")}
+                    className="text-[10px] text-fandex-primary hover:text-fandex-primary-hover transition duration-fast"
+                  >
+                    {t("app.cancel")}
+                  </button>
+                </div>
+              )}
+
+              {/* 查看发布页面链接 */}
+              <button
+                onClick={() => openExternalUrl(RELEASES_PAGE_URL)}
+                className="flex items-center gap-1.5 text-[11px] text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
+              >
+                <ExternalLink className="w-3 h-3" />
+                {t("update.viewReleases")}
+              </button>
+            </div>
           </section>
         </div>
 
@@ -401,6 +736,15 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           </button>
         </div>
       </div>
+
+      {/* 更新提示弹窗（检测到新版本时显示） */}
+      <UpdateNoticeDialog
+        open={updateDialogOpen}
+        onClose={() => setUpdateDialogOpen(false)}
+        currentVersion={currentVersion}
+        release={latestRelease}
+        onSkip={(version) => setSkipUpdateVersion(version)}
+      />
     </div>
   );
 }

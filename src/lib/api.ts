@@ -1,4 +1,4 @@
-// NovelForge 后端 API 类型定义
+// 喵创说 后端 API 类型定义
 //
 // 功能概述：
 // 定义与 Rust 后端交互的 TypeScript 类型与接口封装。
@@ -801,7 +801,7 @@ export async function importArchive(
 export async function pickSaveFile(defaultName: string): Promise<string | null> {
   const result = await saveDialog({
     defaultPath: defaultName,
-    filters: [{ name: "NovelForge 项目包", extensions: ["novelforge"] }],
+    filters: [{ name: "喵创说 项目包", extensions: ["novelforge"] }],
   });
   return result ?? null;
 }
@@ -812,7 +812,7 @@ export async function pickSaveFile(defaultName: string): Promise<string | null> 
 export async function pickOpenArchive(): Promise<string | null> {
   const result = await openDialog({
     multiple: false,
-    filters: [{ name: "NovelForge 项目包", extensions: ["novelforge", "zip"] }],
+    filters: [{ name: "喵创说 项目包", extensions: ["novelforge", "zip"] }],
   });
   // open 返回 string | string[] | null，单选模式下为 string | null
   return typeof result === "string" ? result : null;

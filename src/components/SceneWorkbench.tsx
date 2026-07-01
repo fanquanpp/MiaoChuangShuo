@@ -1,7 +1,7 @@
 // 场景化叙事工作台组件
 //
 // 功能概述：
-// NovelForge 的场景化叙事辅助面板，以 yWriter 风格管理章节内场景的叙事字段。
+// 喵创说 的场景化叙事辅助面板，以 yWriter 风格管理章节内场景的叙事字段。
 // 作为编辑器底部可折叠面板，解析当前文件的 `## 场景N：标题` 标记，
 // 为每个场景提供 Viewpoint/Goal/Conflict/Outcome 字段编辑。
 //
@@ -66,6 +66,7 @@ export default function SceneWorkbench({ filePath }: { filePath: string | null }
   const [expandedSceneIds, setExpandedSceneIds] = useState<Set<string>>(new Set());
 
   // 加载场景列表
+  // 对空文件或无场景标记的文件静默处理:无场景是正常状态,不应弹出错误提示
   const loadScenes = useCallback(async () => {
     if (!currentProject || !filePath) {
       setScenes([]);
@@ -79,13 +80,14 @@ export default function SceneWorkbench({ filePath }: { filePath: string | null }
       if (meta.scenes.length > 0) {
         setExpandedSceneIds(new Set([meta.scenes[0].id]));
       }
-    } catch (e) {
-      showToast("error", t("scene.loadFailed", { error: String(e) }));
+    } catch {
+      // 静默处理:空文件、无场景标记、或元数据不存在均属正常状态
+      // 仅清空场景列表,不弹出错误提示,避免干扰用户
       setScenes([]);
     } finally {
       setLoading(false);
     }
-  }, [currentProject, filePath, showToast, t]);
+  }, [currentProject, filePath]);
 
   useEffect(() => {
     loadScenes();

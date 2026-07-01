@@ -1,7 +1,7 @@
 // 启动器页面
 //
 // 功能概述：
-// NovelForge 的入口页面，支持创建新项目、导入已有项目、
+// 喵创说 的入口页面，支持创建新项目、导入已有项目、
 // 扫描目录下的项目列表、搜索过滤、删除项目。
 // 采用 FANDEX 直角美学与品牌色。
 //
@@ -37,6 +37,7 @@ import {
   Layers,
   Settings,
   FileArchive,
+  Sparkles,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import {
@@ -60,6 +61,10 @@ import { exists, mkdir } from "@tauri-apps/plugin-fs";
 import { useToast } from "../lib/toast";
 import ConfirmDialog from "./ConfirmDialog";
 import ProjectArchiveDialog from "./ProjectArchiveDialog";
+import WelcomeDialog from "./WelcomeDialog";
+import UpdateNoticeDialog from "./UpdateNoticeDialog";
+import { useSettingsStore } from "../lib/settingsStore";
+import { checkForUpdates, type ReleaseInfo } from "../lib/updateChecker";
 
 const SCAN_DIR_KEY = "novelforge:scanDir:v1";
 
@@ -101,12 +106,60 @@ export default function Launcher() {
   const [selectedType, setSelectedType] = useState<ProjectType>("standard");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("1.4.0");
+  const [appVersion, setAppVersion] = useState("3.1.0");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [selectedCustomTemplate, setSelectedCustomTemplate] = useState<CustomTemplate | null>(null);
   const [importArchiveOpen, setImportArchiveOpen] = useState(false);
+  // 首次欢迎页受控开关：主页"回顾"按钮触发
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+
+  // ===== 启动时自动检查更新 =====
+  // 从 settingsStore 读取更新检查相关设置
+  const checkUpdateOnStartup = useSettingsStore((s) => s.checkUpdateOnStartup);
+  const lastUpdateCheckTime = useSettingsStore((s) => s.lastUpdateCheckTime);
+  const skipUpdateVersion = useSettingsStore((s) => s.skipUpdateVersion);
+  const setLastUpdateCheckTime = useSettingsStore((s) => s.setLastUpdateCheckTime);
+  const setSkipUpdateVersion = useSettingsStore((s) => s.setSkipUpdateVersion);
+  // 自动检查检测到的新版本信息
+  const [autoCheckRelease, setAutoCheckRelease] = useState<ReleaseInfo | null>(null);
+  const [autoCheckDialogOpen, setAutoCheckDialogOpen] = useState(false);
+
+  /**
+   * 启动时自动检查更新
+   * 条件:
+   *   1. 用户启用了"启动时自动检查更新"
+   *   2. 距离上次检查超过 24 小时（避免频繁请求）
+   * 失败时静默处理，不干扰用户
+   */
+  useEffect(() => {
+    if (!checkUpdateOnStartup) return;
+    const now = Date.now();
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    // 24 小时内已检查过则跳过
+    if (lastUpdateCheckTime > 0 && now - lastUpdateCheckTime < ONE_DAY) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await checkForUpdates();
+        if (cancelled) return;
+        setLastUpdateCheckTime(now);
+        // 有新版本且未被用户跳过时弹出提示
+        if (result.hasUpdate && result.latest.version !== skipUpdateVersion) {
+          setAutoCheckRelease(result.latest);
+          setAutoCheckDialogOpen(true);
+        }
+      } catch {
+        // 自动检查失败时静默处理，不干扰用户
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkUpdateOnStartup, lastUpdateCheckTime, skipUpdateVersion, setLastUpdateCheckTime]);
 
   const handleScan = useCallback(async () => {
     if (!scanDir) return;
@@ -342,6 +395,10 @@ export default function Launcher() {
       chapters: p.chapter_count,
       updated: formatTimeAgo(p.meta.updated_at),
       gradient: gradients[p.meta.type] || "from-nf-border to-nf-border/40",
+      // 透传元数据字段,供卡片展示详细信息
+      author: p.meta.author || "",
+      description: p.meta.description || "",
+      genre: p.meta.genre || "",
     };
   }, [t, formatWordCount, formatTimeAgo]);
 
@@ -410,7 +467,9 @@ export default function Launcher() {
 
   return (
     <div className="flex h-screen bg-nf-bg overflow-hidden relative">
-      {/* 背景装饰渐变 */}
+      {/* 全局舒缓柔光背景层:替代单一渐变,提升空间感 */}
+      <div className="nf-ambient-bg" />
+      {/* 背景装饰渐变(保留原主区域光斑) */}
       <div className="absolute inset-0 pointer-events-none" style={{
         background: 'radial-gradient(ellipse 80% 60% at 70% 20%, rgba(124, 158, 255, 0.04), transparent)',
       }} />
@@ -630,6 +689,14 @@ export default function Launcher() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setWelcomeOpen(true)}
+              title={t("welcome.reviewButton")}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs text-nf-text-secondary hover:text-fandex-secondary border border-nf-border-light hover:border-fandex-secondary/40 hover:bg-nf-bg-hover transition duration-fast"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {t("welcome.reviewButton")}
+            </button>
+            <button
               onClick={toggleTheme}
               title={theme === "dark" ? t("sidebar.switchLight") : t("sidebar.switchDark")}
               className="p-2 text-nf-text-tertiary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition duration-fast"
@@ -699,14 +766,19 @@ export default function Launcher() {
               <h3 className="fandex-bar-left text-sm font-semibold font-display text-nf-text mb-6">
                 {t("launcher.recentProjectsCount", { count: sortedProjects.length })}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {sortedProjects.map((p) => (
-                  <ProjectCard
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {sortedProjects.map((p, idx) => (
+                  <div
                     key={p.path}
-                    project={toProjectData(p)}
-                    projectInfo={p}
-                    onDelete={handleDeleteProject}
-                  />
+                    className="nf-rise-in"
+                    style={{ animationDelay: `${Math.min(idx, 8) * 40}ms` }}
+                  >
+                    <ProjectCard
+                      project={toProjectData(p)}
+                      projectInfo={p}
+                      onDelete={handleDeleteProject}
+                    />
+                  </div>
                 ))}
               </div>
             </section>
@@ -751,6 +823,18 @@ export default function Launcher() {
         mode="import"
         onClose={() => setImportArchiveOpen(false)}
         onImported={handleArchiveImported}
+      />
+
+      {/* 首次欢迎页：首次启动自动弹出，主页"回顾"按钮可重新打开 */}
+      <WelcomeDialog open={welcomeOpen} onClose={() => setWelcomeOpen(false)} />
+
+      {/* 启动时自动检查更新提示（仅当检测到新版本时显示） */}
+      <UpdateNoticeDialog
+        open={autoCheckDialogOpen}
+        onClose={() => setAutoCheckDialogOpen(false)}
+        currentVersion={appVersion}
+        release={autoCheckRelease}
+        onSkip={(version) => setSkipUpdateVersion(version)}
       />
     </div>
   );

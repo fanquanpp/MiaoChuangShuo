@@ -13,9 +13,10 @@
 // 5. 创建成功后触发回调
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, FolderOpen, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { X, FolderOpen, Loader2, ChevronDown, ChevronRight, ArrowRight } from "lucide-react";
 import { createProject, pickDirectory, PROJECT_TEMPLATES, NOVEL_GENRES, type ProjectType, type CustomTemplate } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { useSettingsStore } from "../lib/settingsStore";
 
 // 组件属性接口
 interface CreateProjectDialogProps {
@@ -38,7 +39,8 @@ export default function CreateProjectDialog({
   const [genre, setGenre] = useState("");
   const [author, setAuthor] = useState("");
   const [description, setDescription] = useState("");
-  const [parentPath, setParentPath] = useState("");
+  // 初始值从 settingsStore 读取上次使用的目录,实现目录记忆
+  const [parentPath, setParentPath] = useState(() => useSettingsStore.getState().lastProjectPath);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [showTypeSelector, setShowTypeSelector] = useState(false);
@@ -80,6 +82,8 @@ export default function CreateProjectDialog({
       const dir = await pickDirectory();
       if (dir) {
         setParentPath(dir);
+        // 持久化保存本次选择的目录,下次创建项目时自动填充
+        useSettingsStore.getState().setLastProjectPath(dir);
       }
     } catch (e) {
       setError(t("project.dirPickFailed", { error: String(e) }));
@@ -122,7 +126,7 @@ export default function CreateProjectDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -207,6 +211,8 @@ export default function CreateProjectDialog({
           <div>
             <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
               {t("project.name")}
+              {/* 必填项红色星号标记 */}
+              <span className="text-red-400 ml-0.5" aria-hidden="true">*</span>
             </label>
             <input
               type="text"
@@ -214,7 +220,9 @@ export default function CreateProjectDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder={t("project.namePlaceholder")}
               autoFocus
-              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition duration-fast"
+              className={`w-full bg-nf-bg border px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition duration-fast ${
+                name.trim() ? "border-nf-border-light" : "border-red-400/50"
+              }`}
             />
           </div>
 
@@ -272,6 +280,8 @@ export default function CreateProjectDialog({
           <div>
             <label className="block text-sm font-medium text-nf-text-secondary mb-1.5">
               {t("project.saveLocation")}
+              {/* 必填项红色星号标记 */}
+              <span className="text-red-400 ml-0.5" aria-hidden="true">*</span>
             </label>
             <div className="flex gap-1">
               <input
@@ -280,11 +290,13 @@ export default function CreateProjectDialog({
                 onChange={(e) => setParentPath(e.target.value)}
                 placeholder={t("project.saveLocationPlaceholder")}
                 readOnly
-                className="flex-1 bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition duration-fast"
+                className={`flex-1 bg-nf-bg border px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none transition duration-fast ${
+                  parentPath.trim() ? "border-nf-border-light" : "border-red-400/50"
+                }`}
               />
               <button
                 onClick={handlePickDir}
-                className="px-3 py-2 bg-nf-bg-hover hover:bg-nf-border-light border border-nf-border-light text-sm text-nf-text flex items-center gap-1.5 transition duration-fast"
+                className="nf-tool-btn px-3 py-2 bg-nf-bg-hover hover:bg-nf-border-light border border-nf-border-light text-sm text-nf-text flex items-center gap-1.5 transition duration-fast"
               >
                 <FolderOpen className="w-4 h-4" />
                 {t("app.browse")}
@@ -304,17 +316,21 @@ export default function CreateProjectDialog({
         <div className="flex justify-end gap-1 px-6 py-4 border-t border-nf-border-light">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition duration-fast"
+            className="nf-tool-btn px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition duration-fast"
           >
             {t("app.cancel")}
           </button>
           <button
             onClick={handleCreate}
             disabled={creating}
-            className="px-4 py-2 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse flex items-center gap-1.5 transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
+            className="nf-tool-btn group px-4 py-2 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse flex items-center gap-1.5 transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
             {creating ? t("app.creating") : t("project.createTitle")}
+            {/* 提交按钮箭头:悬停时向右滑动,强化创建动作的方向感 */}
+            {!creating && (
+              <ArrowRight className="w-3.5 h-3.5 transition-transform duration-fast group-hover:translate-x-0.5" />
+            )}
           </button>
         </div>
       </div>

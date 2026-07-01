@@ -206,13 +206,13 @@ export default function WritingStats() {
               return (
                 <div
                   key={card.label}
-                  className={`${card.barClass} bg-nf-bg-card p-4 flex flex-col gap-2`}
+                  className={`${card.barClass} bg-nf-bg-card p-4 flex flex-col gap-2 transition-colors duration-base hover:bg-nf-bg-hover/40 group`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-nf-text-tertiary">{card.label}</span>
-                    <Icon className={`w-4 h-4 ${card.color}`} />
+                    <Icon className={`w-4 h-4 ${card.color} transition-transform duration-base group-hover:scale-110`} />
                   </div>
-                  <span className={`text-2xl font-bold font-display ${card.color}`}>
+                  <span className={`text-2xl font-bold font-display tabular-nums ${card.color}`}>
                     {card.value}
                   </span>
                 </div>
@@ -227,7 +227,7 @@ export default function WritingStats() {
             <div className="flex h-6 mb-4 border border-nf-border-light overflow-hidden">
               {manuscriptPct > 0 && (
                 <div
-                  className="bg-fandex-primary flex items-center justify-center text-xs text-nf-text-inverse font-medium"
+                  className="bg-fandex-primary flex items-center justify-center text-xs text-nf-text-inverse font-medium transition-all duration-700 ease-out"
                   style={{ width: `${manuscriptPct}%` }}
                   title={`${t("stats.manuscript")} ${stats.manuscript_words} ${t("stats.wordUnit")}`}
                 >
@@ -236,7 +236,7 @@ export default function WritingStats() {
               )}
               {settingPct > 0 && (
                 <div
-                  className="bg-fandex-secondary flex items-center justify-center text-xs text-nf-text-inverse font-medium"
+                  className="bg-fandex-secondary flex items-center justify-center text-xs text-nf-text-inverse font-medium transition-all duration-700 ease-out"
                   style={{ width: `${settingPct}%` }}
                   title={`${t("stats.setting")} ${stats.setting_words} ${t("stats.wordUnit")}`}
                 >
@@ -245,7 +245,7 @@ export default function WritingStats() {
               )}
               {outlinePct > 0 && (
                 <div
-                  className="bg-fandex-tertiary flex items-center justify-center text-xs text-nf-text-inverse font-medium"
+                  className="bg-fandex-tertiary flex items-center justify-center text-xs text-nf-text-inverse font-medium transition-all duration-700 ease-out"
                   style={{ width: `${outlinePct}%` }}
                   title={`${t("stats.outline")} ${stats.outline_words} ${t("stats.wordUnit")}`}
                 >
@@ -317,13 +317,13 @@ export default function WritingStats() {
                           <span className="text-xs text-nf-text truncate group-hover:text-fandex-primary transition duration-fast">
                             {chapter.file_name}
                           </span>
-                          <span className="text-xs text-nf-text-tertiary ml-2 flex-shrink-0">
+                          <span className="text-xs text-nf-text-tertiary ml-2 flex-shrink-0 tabular-nums">
                             {chapter.word_count.toLocaleString()} {t("stats.wordUnit")}
                           </span>
                         </div>
                         <div className="h-1 bg-nf-bg-hover overflow-hidden">
                           <div
-                            className={`h-full transition duration-fast ${
+                            className={`h-full transition-all duration-500 ease-out ${
                               idx === 0
                                 ? "bg-fandex-tertiary"
                                 : idx === 1

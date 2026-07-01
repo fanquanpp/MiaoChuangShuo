@@ -38,6 +38,7 @@ import { deletePath, readProjectTree, renamePath, copyFile } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
+import { useSettingsStore, toChineseNumber, type ChapterFormat } from "../lib/settingsStore";
 import ConfirmDialog from "./ConfirmDialog";
 import OutlineToChapters from "./OutlineToChapters";
 import VolumeChapterGenerator from "./VolumeChapterGenerator";
@@ -105,6 +106,53 @@ function getDisplayTitle(name: string): string {
   return title;
 }
 
+/**
+ * 正文分类专用:将物理文件名转换为带章节编号的显示标题
+ * 根据 chapterFormat 设置,将 "N.标题.txt" 转换为 "第N章 标题" / "01 标题" / "Chapter N 标题"
+ *
+ * 输入:
+ *   name 物理文件名(含扩展名,如 "1.开端.txt")
+ *   chapterFormat 章节标题格式(chinese/arabic/english)
+ *   autoNumbering 是否开启自动编号
+ * 输出:
+ *   带章节编号的显示标题(如 "第一章 开端")
+ *   若文件名不含 N. 前缀或未开启自动编号,回退到 getDisplayTitle
+ */
+function formatManuscriptTitle(
+  name: string,
+  chapterFormat: ChapterFormat,
+  autoNumbering: boolean
+): string {
+  // 去除扩展名
+  const baseName = name.replace(/\.txt$/i, "").trim();
+  // 匹配 "N.标题" / "N_标题" / "N-标题" / "N 标题" 格式
+  const match = baseName.match(/^(\d+)[._\-\s]+(.+)/);
+  if (match && autoNumbering) {
+    const num = parseInt(match[1], 10);
+    const pureTitle = match[2].trim();
+    switch (chapterFormat) {
+      case "chinese":
+        return pureTitle
+          ? `第${toChineseNumber(num)}章 ${pureTitle}`
+          : `第${toChineseNumber(num)}章`;
+      case "arabic":
+        return pureTitle
+          ? `${String(num).padStart(2, "0")} ${pureTitle}`
+          : String(num).padStart(2, "0");
+      case "english":
+        return pureTitle
+          ? `Chapter ${num} ${pureTitle}`
+          : `Chapter ${num}`;
+      default:
+        return pureTitle
+          ? `第${toChineseNumber(num)}章 ${pureTitle}`
+          : `第${toChineseNumber(num)}章`;
+    }
+  }
+  // 非编号格式或未开启自动编号:回退到普通显示(去除数字前缀)
+  return baseName.replace(/^\d+[._\-\s]+/, "").trim() || baseName;
+}
+
 // 递归渲染文件树节点（列表视图）
 function TreeNodeList({
   node,
@@ -119,6 +167,7 @@ function TreeNodeList({
   isDraggable,
   isDragOver,
   isDragging,
+  isManuscript,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -136,12 +185,16 @@ function TreeNodeList({
   isDraggable?: boolean;
   isDragOver?: boolean;
   isDragging?: boolean;
+  isManuscript?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // 正文分类:读取章节格式设置,用于显示"第N章 标题"
+  const chapterFormat = useSettingsStore((s) => s.chapterFormat);
+  const autoNumbering = useSettingsStore((s) => s.autoNumbering);
 
   if (node.is_dir) {
     const hasChildren = node.children && node.children.length > 0;
@@ -230,7 +283,11 @@ function TreeNodeList({
       )}
       {!isDraggable && <span className="w-3.5 flex-shrink-0" />}
       <FileText className="w-4 h-4 flex-shrink-0" />
-      <span className="flex-1 text-sm truncate">{getDisplayTitle(node.name)}</span>
+      <span className="flex-1 text-sm truncate">
+        {isManuscript
+          ? formatManuscriptTitle(node.name, chapterFormat, autoNumbering)
+          : getDisplayTitle(node.name)}
+      </span>
       <span className="text-xs text-nf-text-tertiary whitespace-nowrap">
         {formatSize(node.size)}
         {isSelected && activeFileWordCount !== undefined && activeFileWordCount > 0 && (
@@ -269,6 +326,7 @@ function TreeNodeGrid({
   isDraggable,
   isDragOver,
   isDragging,
+  isManuscript,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -286,12 +344,16 @@ function TreeNodeGrid({
   isDraggable?: boolean;
   isDragOver?: boolean;
   isDragging?: boolean;
+  isManuscript?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // 正文分类:读取章节格式设置,用于显示"第N章 标题"
+  const chapterFormat = useSettingsStore((s) => s.chapterFormat);
+  const autoNumbering = useSettingsStore((s) => s.autoNumbering);
 
   if (node.is_dir) {
     const hasChildren = node.children && node.children.length > 0;
@@ -381,7 +443,9 @@ function TreeNodeGrid({
       )}
       <FileText className="w-5 h-5 text-fandex-primary mb-2" />
       <div className="text-xs font-medium font-display text-nf-text truncate">
-        {getDisplayTitle(node.name)}
+        {isManuscript
+          ? formatManuscriptTitle(node.name, chapterFormat, autoNumbering)
+          : getDisplayTitle(node.name)}
       </div>
       <div className="text-[10px] text-nf-text-tertiary mt-1">
         {formatSize(node.size)}
@@ -430,7 +494,8 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
   const currentProject = useAppStore((s) => s.currentProject);
   const { t } = useI18n();
   const { showToast } = useToast();
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  // 默认列表视图:章节以列表排列更紧凑,避免卡片占用过多垂直空间
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
   const [renameTarget, setRenameTarget] = useState<FileNode | null>(null);
   // 右键上下文菜单状态
@@ -761,72 +826,76 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
   };
 
   return (
-    <div className="w-72 min-w-[260px] border-l border-nf-border-light bg-nf-bg flex flex-col">
-      {/* 顶部: 标题与视图切换 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-nf-border-light">
-        <h2 className="fandex-bar-left text-sm font-bold font-display text-nf-text">
-          {dirName}
-        </h2>
-        <div className="flex items-center gap-1">
-          {isManuscript && (
-            <>
-              <button
-                onClick={onCreateFile}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition duration-fast"
-                title={t("filelist.newChapter")}
-              >
-                <FilePlus className="w-3.5 h-3.5" />
-                <span>{t("filelist.newChapter")}</span>
-              </button>
-              <button
-                onClick={() => setShowOutlineToChapters(true)}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-tertiary border border-fandex-tertiary/50 hover:bg-fandex-tertiary/10 transition duration-fast"
-                title={t("outlineToChapters.btnTitle")}
-              >
-                <ListTree className="w-3.5 h-3.5" />
-                <span>{t("outlineToChapters.btn")}</span>
-              </button>
-              <button
-                onClick={() => setShowVolumeGenerator(true)}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-secondary border border-fandex-secondary/50 hover:bg-fandex-secondary/10 transition duration-fast"
-                title={t("volumeGen.title")}
-              >
-                <BookCopy className="w-3.5 h-3.5" />
-                <span>{t("volumeGen.title")}</span>
-              </button>
-              <button
-                onClick={handleBatchRenumber}
-                disabled={isRenumbering || children.filter(c => !c.is_dir).length < 2}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-nf-text-secondary border border-nf-border-light hover:border-fandex-secondary/60 hover:text-fandex-secondary transition duration-fast disabled:opacity-40 disabled:cursor-not-allowed"
-                title={t("filelist.batchRenumber")}
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRenumbering ? "animate-spin" : ""}`} />
-              </button>
-            </>
-          )}
-          <button
-            onClick={() => setViewMode("grid")}
-            className={`p-1.5 transition duration-fast border ${
-              viewMode === "grid"
-                ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
-                : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
-            }`}
-            title={t("filelist.gridView")}
-          >
-            <Grid className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode("list")}
-            className={`p-1.5 transition duration-fast border ${
-              viewMode === "list"
-                ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
-                : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
-            }`}
-            title={t("filelist.listView")}
-          >
-            <List className="w-4 h-4" />
-          </button>
+    <div className="w-72 min-w-[260px] border-l border-nf-border-light bg-nf-bg flex flex-col nf-slide-in-left">
+      {/* 顶部: 标题与视图切换 - 改为两行布局防溢出 */}
+      <div className="px-4 py-3 border-b border-nf-border-light">
+        {/* 第一行:目录名 + 视图切换 */}
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="fandex-bar-left text-sm font-bold font-display text-nf-text">
+            {dirName}
+          </h2>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`nf-tool-btn p-1.5 border ${
+                viewMode === "grid"
+                  ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
+                  : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
+              }`}
+              title={t("filelist.gridView")}
+            >
+              <Grid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`nf-tool-btn p-1.5 border ${
+                viewMode === "list"
+                  ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
+                  : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
+              }`}
+              title={t("filelist.listView")}
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
+        {/* 第二行:正文分类的快捷操作按钮 - flex-wrap 自适应换行 */}
+        {isManuscript && (
+          <div className="flex items-center gap-1 flex-wrap">
+            <button
+              onClick={onCreateFile}
+              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-[11px] text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10"
+              title={t("filelist.newChapter")}
+            >
+              <FilePlus className="w-3 h-3" />
+              <span>{t("filelist.newChapter")}</span>
+            </button>
+            <button
+              onClick={() => setShowOutlineToChapters(true)}
+              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-[11px] text-fandex-tertiary border border-fandex-tertiary/50 hover:bg-fandex-tertiary/10"
+              title={t("outlineToChapters.btnTitle")}
+            >
+              <ListTree className="w-3 h-3" />
+              <span>{t("outlineToChapters.btn")}</span>
+            </button>
+            <button
+              onClick={() => setShowVolumeGenerator(true)}
+              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-[11px] text-fandex-secondary border border-fandex-secondary/50 hover:bg-fandex-secondary/10"
+              title={t("volumeGen.title")}
+            >
+              <BookCopy className="w-3 h-3" />
+              <span>{t("volumeGen.title")}</span>
+            </button>
+            <button
+              onClick={handleBatchRenumber}
+              disabled={isRenumbering || children.filter(c => !c.is_dir).length < 2}
+              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-[11px] text-nf-text-secondary border border-nf-border-light hover:border-fandex-secondary/60 hover:text-fandex-secondary disabled:opacity-40 disabled:cursor-not-allowed"
+              title={t("filelist.batchRenumber")}
+            >
+              <RefreshCw className={`w-3 h-3 ${isRenumbering ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 文件列表区域 */}
@@ -857,6 +926,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
                 onContextMenu={handleContextMenu}
                 activeFileWordCount={activeFileWordCount}
                 t={t}
+                isManuscript={isManuscript}
                 {...getFileDragProps(node, index)}
               />
             ))}
@@ -875,6 +945,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
                 onContextMenu={handleContextMenu}
                 t={t}
                 activeFileWordCount={activeFileWordCount}
+                isManuscript={isManuscript}
                 {...getFileDragProps(node, index)}
               />
             ))}

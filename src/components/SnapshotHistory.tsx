@@ -40,6 +40,18 @@ import {
 } from "../lib/api";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import ConfirmDialog from "./ConfirmDialog";
+
+/**
+ * 待确认操作类型
+ * - restore: 恢复快照(危险操作,会覆盖当前内容)
+ * - delete: 删除单个快照
+ * - clear: 清空所有快照
+ */
+type ConfirmAction =
+  | { type: "restore"; snapshot: SnapshotInfo }
+  | { type: "delete"; snapshot: SnapshotInfo }
+  | { type: "clear" };
 
 interface SnapshotHistoryProps {
   /** 当前文件路径（绝对路径） */
@@ -136,6 +148,8 @@ export default function SnapshotHistory({
   const [previewContent, setPreviewContent] = useState<string>("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  // 待确认操作状态(null 表示无待确认操作)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   // 加载快照列表
   const loadSnapshots = useCallback(async () => {
@@ -208,11 +222,9 @@ export default function SnapshotHistory({
     }
   };
 
-  // 恢复快照
-  const handleRestore = async (snapshot: SnapshotInfo) => {
+  // 恢复快照(实际执行,已在 ConfirmDialog 中确认)
+  const performRestore = async (snapshot: SnapshotInfo) => {
     if (!filePath || !projectPath) return;
-    const confirmed = window.confirm(t("snapshot.restoreConfirm"));
-    if (!confirmed) return;
     setActionLoading(true);
     try {
       await restoreSnapshot(snapshot.snapshot_path, filePath, projectPath);
@@ -226,11 +238,9 @@ export default function SnapshotHistory({
     }
   };
 
-  // 删除单个快照
-  const handleDelete = async (snapshot: SnapshotInfo) => {
+  // 删除单个快照(实际执行,已在 ConfirmDialog 中确认)
+  const performDelete = async (snapshot: SnapshotInfo) => {
     if (!filePath || !projectPath) return;
-    const confirmed = window.confirm(t("snapshot.deleteConfirm"));
-    if (!confirmed) return;
     setActionLoading(true);
     try {
       await deleteSnapshot(
@@ -252,11 +262,9 @@ export default function SnapshotHistory({
     }
   };
 
-  // 清空所有快照
-  const handleClearAll = async () => {
+  // 清空所有快照(实际执行,已在 ConfirmDialog 中确认)
+  const performClearAll = async () => {
     if (!filePath || !projectPath) return;
-    const confirmed = window.confirm(t("snapshot.clearConfirm"));
-    if (!confirmed) return;
     setActionLoading(true);
     try {
       await clearSnapshots(filePath, projectPath);
@@ -267,6 +275,35 @@ export default function SnapshotHistory({
       showToast("error", t("snapshot.clearFailed", { error: String(e) }));
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // 请求恢复快照:打开确认对话框
+  const handleRestore = (snapshot: SnapshotInfo) => {
+    setConfirmAction({ type: "restore", snapshot });
+  };
+
+  // 请求删除快照:打开确认对话框
+  const handleDelete = (snapshot: SnapshotInfo) => {
+    setConfirmAction({ type: "delete", snapshot });
+  };
+
+  // 请求清空所有:打开确认对话框
+  const handleClearAll = () => {
+    setConfirmAction({ type: "clear" });
+  };
+
+  // 确认对话框确认回调:根据类型分发到实际执行函数
+  const handleConfirm = () => {
+    if (!confirmAction) return;
+    const action = confirmAction;
+    setConfirmAction(null);
+    if (action.type === "restore") {
+      performRestore(action.snapshot);
+    } else if (action.type === "delete") {
+      performDelete(action.snapshot);
+    } else {
+      performClearAll();
     }
   };
 
@@ -377,7 +414,7 @@ export default function SnapshotHistory({
                         onClick={() => handleRestore(snapshot)}
                         disabled={actionLoading}
                         title={t("snapshot.restore")}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition-all duration-fast ease-fandex disabled:opacity-50"
+                        className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition-all duration-fast ease-fandex disabled:opacity-50"
                       >
                         <RotateCcw className="w-3 h-3" />
                         {t("snapshot.restore")}
@@ -386,7 +423,7 @@ export default function SnapshotHistory({
                         onClick={() => handleDelete(snapshot)}
                         disabled={actionLoading}
                         title={t("snapshot.delete")}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-fandex-tertiary border border-fandex-tertiary/30 hover:bg-fandex-tertiary/10 transition-all duration-fast ease-fandex disabled:opacity-50 ml-auto"
+                        className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-xs text-fandex-tertiary border border-fandex-tertiary/30 hover:bg-fandex-tertiary/10 transition-all duration-fast ease-fandex disabled:opacity-50 ml-auto"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -436,6 +473,35 @@ export default function SnapshotHistory({
           </div>
         </div>
       )}
+
+      {/* 确认对话框:替代原生 window.confirm,统一视觉风格 */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={
+          confirmAction?.type === "restore"
+            ? t("snapshot.restore")
+            : confirmAction?.type === "delete"
+              ? t("snapshot.delete")
+              : t("snapshot.clearAll")
+        }
+        message={
+          confirmAction?.type === "restore"
+            ? t("snapshot.restoreConfirm")
+            : confirmAction?.type === "delete"
+              ? t("snapshot.deleteConfirm")
+              : t("snapshot.clearConfirm")
+        }
+        type={confirmAction?.type === "clear" ? "danger" : "confirm"}
+        confirmLabel={
+          confirmAction?.type === "restore"
+            ? t("snapshot.restore")
+            : confirmAction?.type === "delete"
+              ? t("snapshot.delete")
+              : t("snapshot.clearAll")
+        }
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
     </aside>
   );
 }

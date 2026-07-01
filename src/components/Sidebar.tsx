@@ -29,6 +29,8 @@ import {
   BookOpen,
   Folder,
   Eye,
+  PanelLeft,
+  PanelLeftClose,
 } from "lucide-react";
 import {
   useAppStore,
@@ -95,6 +97,9 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
   // 设定组折叠状态：默认展开，用户可点击折叠以聚焦写作
   const [settingsExpanded, setSettingsExpanded] = useState(true);
 
+  // 侧边栏整体折叠状态：折叠后仅显示图标列，单次会话内有效，不做持久化
+  const [collapsed, setCollapsed] = useState(false);
+
   // 分类切换：优先使用外部传入的保存后切换回调
   const switchTo = onSwitchCategory || setActiveCategory;
 
@@ -139,7 +144,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
   }, [currentProject, typeSpecificDirs]);
 
   return (
-    <div className="w-40 min-w-[150px] border-r border-nf-border-light bg-nf-bg-sidebar flex flex-col relative">
+    <div className={`${collapsed ? "w-12 min-w-[48px]" : "w-52 min-w-[200px]"} border-r border-nf-border-light bg-nf-bg-sidebar flex flex-col relative z-10 nf-sidebar-glow transition-all duration-300`}>
       {/* 顶部渐变装饰条 */}
       <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{
         background: 'linear-gradient(90deg, var(--fandex-primary), var(--fandex-secondary))',
@@ -151,27 +156,46 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
         <div className="absolute inset-0 opacity-[0.03]" style={{
           background: 'linear-gradient(135deg, var(--fandex-primary), var(--fandex-secondary))',
         }} />
+        {/* 折叠/展开切换按钮:固定右上角,折叠态下为顶部唯一可见控件 */}
         <button
-          onClick={handleBackToLauncher}
-          className="relative flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition-all duration-base ease-fandex mb-1.5 group"
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
+          className="absolute top-2 right-2 z-20 w-6 h-6 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary transition-colors duration-fast"
         >
-          <ChevronLeft className="w-3.5 h-3.5 transition-transform duration-fast group-hover:-translate-x-0.5" />
-          {t("app.back")}
+          {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
-        <h1 className="relative fandex-bar-left text-sm font-bold font-display text-nf-text truncate leading-snug" title={currentProject?.meta.name}>
-          《{currentProject?.meta.name || t("sidebar.unnamedProject")}》
-        </h1>
-        <div className="relative text-[11px] text-nf-text-tertiary mt-0.5 truncate pl-3">
-          {currentProject?.meta.author || t("sidebar.anonymousAuthor")}
-        </div>
+        {/* 返回启动器按钮:折叠时隐藏 */}
+        {!collapsed && (
+          <button
+            onClick={handleBackToLauncher}
+            className="relative flex items-center gap-1 text-xs text-nf-text-tertiary hover:text-fandex-primary transition-all duration-base ease-fandex mb-1.5 group"
+          >
+            <ChevronLeft className="w-3.5 h-3.5 transition-transform duration-fast group-hover:-translate-x-0.5" />
+            {t("app.back")}
+          </button>
+        )}
+        {/* 项目名:折叠时隐藏 */}
+        {!collapsed && (
+          <h1 className="relative fandex-bar-left text-sm font-bold font-display text-nf-text truncate leading-snug pr-8" title={currentProject?.meta.name}>
+            《{currentProject?.meta.name || t("sidebar.unnamedProject")}》
+          </h1>
+        )}
+        {/* 作者:折叠时隐藏 */}
+        {!collapsed && (
+          <div className="relative text-[11px] text-nf-text-tertiary mt-0.5 truncate pl-3">
+            {currentProject?.meta.author || t("sidebar.anonymousAuthor")}
+          </div>
+        )}
       </div>
 
       {/* 中间: 分类导航 - FANDEX 左侧色条激活态 */}
       <div className="flex-1 overflow-y-auto py-2">
         {/* 写作主分类组：正文、大纲 - 常驻显示，聚焦核心写作 */}
-        <div className="px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
-          {t("sidebar.writingSection")}
-        </div>
+        {!collapsed && (
+          <div className="px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+            {t("sidebar.writingSection")}
+          </div>
+        )}
         {PRIMARY_CATEGORIES.map((cat) => {
           const Icon = ICON_MAP[cat];
           const isActive = activeCategory === cat;
@@ -180,7 +204,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
               key={cat}
               onClick={() => switchTo(cat)}
               title={t(`sidebar.${cat}`)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+              className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
                 isActive
                   ? "bg-fandex-primary/10 text-fandex-primary"
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -193,26 +217,33 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
               <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
                 isActive ? 'scale-110' : 'group-hover:scale-105'
               }`} />
-              <span className="truncate">{t(`sidebar.${cat}`)}</span>
+              {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
             </button>
           );
         })}
 
         {/* 设定类分组：可折叠，避免辅助功能干扰写作焦点 */}
-        <button
-          onClick={() => setSettingsExpanded((v) => !v)}
-          title={settingsExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
-          className="w-full flex items-center gap-1.5 px-3 mt-2 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
-        >
-          {settingsExpanded ? (
-            <ChevronDown className="w-3 h-3" />
-          ) : (
-            <ChevronRight className="w-3 h-3" />
-          )}
-          {t("sidebar.settingsGroup")}
-        </button>
-        {settingsExpanded &&
-          SETTINGS_CATEGORIES.map((cat) => {
+        {/* 整体折叠时隐藏分组折叠按钮(已是最简形态) */}
+        {!collapsed && (
+          <button
+            onClick={() => setSettingsExpanded((v) => !v)}
+            title={settingsExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
+            className="w-full flex items-center gap-1.5 px-3 mt-2 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
+          >
+            {settingsExpanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+            {t("sidebar.settingsGroup")}
+          </button>
+        )}
+        {/* 折叠容器:使用 max-height + opacity 实现舒缓展开/关闭 */}
+        {/* 整体折叠时强制展开以显示图标列 */}
+        <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
+          (collapsed || settingsExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          {SETTINGS_CATEGORIES.map((cat) => {
             const Icon = ICON_MAP[cat];
             const isActive = activeCategory === cat;
             return (
@@ -220,7 +251,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
                 key={cat}
                 onClick={() => switchTo(cat)}
                 title={t(`sidebar.${cat}`)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
                   isActive
                     ? "bg-fandex-primary/10 text-fandex-primary"
                     : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -232,13 +263,14 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
                 <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
                   isActive ? 'scale-110' : 'group-hover:scale-105'
                 }`} />
-                <span className="truncate">{t(`sidebar.${cat}`)}</span>
+                {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
               </button>
             );
           })}
+        </div>
 
-        {/* 分隔线 */}
-        <div className="mx-3 my-2 border-t border-nf-border-light/60" />
+        {/* 分隔线:折叠时隐藏 */}
+        {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
 
         {/* 分卷管理入口（仅对分卷类型项目显示） */}
         {showVolumeEntry && (
@@ -246,7 +278,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
             <button
               onClick={() => switchTo("volumes" as SidebarCategory)}
               title={t("sidebar.volumes")}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+              className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
                 activeCategory === "volumes"
                   ? "bg-fandex-tertiary/10 text-fandex-tertiary"
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -258,18 +290,20 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
               <BookOpen className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
                 activeCategory === "volumes" ? 'scale-110' : 'group-hover:scale-105'
               }`} />
-              <span className="truncate">{t("sidebar.volumes")}</span>
+              {!collapsed && <span className="truncate">{t("sidebar.volumes")}</span>}
             </button>
-            <div className="mx-3 my-2 border-t border-nf-border-light/60" />
+            {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
           </>
         )}
 
         {/* 类型专属目录（模板扩展） */}
         {typeSpecificDirs.length > 0 && (
           <>
-            <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
-              {t("sidebar.extensionSection")}
-            </div>
+            {!collapsed && (
+              <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+                {t("sidebar.extensionSection")}
+              </div>
+            )}
             {typeSpecificDirs.map((dirName) => {
               const isActive = activeCategory === dirName;
               return (
@@ -277,7 +311,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
                   key={dirName}
                   onClick={() => switchTo(dirName as SidebarCategory)}
                   title={dirName}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                  className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
                     isActive
                       ? "bg-fandex-primary/10 text-fandex-primary"
                       : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -289,22 +323,24 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
                   <Layers className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
                     isActive ? 'scale-110' : 'group-hover:scale-105'
                   }`} />
-                  <span className="truncate">{dirName}</span>
+                  {!collapsed && <span className="truncate">{dirName}</span>}
                 </button>
               );
             })}
 
-            {/* 分隔线 */}
-            <div className="mx-3 my-2 border-t border-nf-border-light/60" />
+            {/* 分隔线:折叠时隐藏 */}
+            {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
           </>
         )}
 
         {/* 项目自定义目录（非预设的额外目录） */}
         {extraDirs.length > 0 && (
           <>
-            <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
-              {t("sidebar.customSection")}
-            </div>
+            {!collapsed && (
+              <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+                {t("sidebar.customSection")}
+              </div>
+            )}
             {extraDirs.map((dirName) => {
               const isActive = activeCategory === dirName;
               return (
@@ -312,7 +348,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
                   key={dirName}
                   onClick={() => switchTo(dirName as SidebarCategory)}
                   title={dirName}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+                  className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
                     isActive
                       ? "bg-fandex-primary/10 text-fandex-primary"
                       : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -324,18 +360,20 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
                   <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
                     isActive ? 'scale-110' : 'group-hover:scale-105'
                   }`} />
-                  <span className="truncate">{dirName}</span>
+                  {!collapsed && <span className="truncate">{dirName}</span>}
                 </button>
               );
             })}
-            <div className="mx-3 my-2 border-t border-nf-border-light/60" />
+            {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
           </>
         )}
 
         {/* 工具分组 */}
-        <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
-          {t("sidebar.toolSection")}
-        </div>
+        {!collapsed && (
+          <div className="px-3 py-1 mt-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider">
+            {t("sidebar.toolSection")}
+          </div>
+        )}
         {TOOL_CATEGORIES.map((cat) => {
           const Icon = ICON_MAP[cat];
           const isActive = activeCategory === cat;
@@ -344,7 +382,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
               key={cat}
               onClick={() => switchTo(cat)}
               title={t(`sidebar.${cat}`)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-base ease-fandex relative group ${
+              className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm transition-all duration-base ease-fandex relative group ${
                 isActive
                   ? "bg-fandex-tertiary/10 text-fandex-tertiary"
                   : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
@@ -357,7 +395,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
               <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
                 isActive ? 'scale-110' : 'group-hover:scale-105'
               }`} />
-              <span className="truncate">{t(`sidebar.${cat}`)}</span>
+              {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
             </button>
           );
         })}
@@ -365,33 +403,35 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onSwitchCategory
 
       {/* 底部: 主题切换、设置与新建文件按钮 - FANDEX 直角 */}
       <div className="px-2 py-2 border-t border-nf-border-light space-y-1">
-        <div className="flex gap-1">
+        {/* 折叠态:按钮垂直排列仅显示图标;展开态:主题与设置横向并排 */}
+        <div className={`flex ${collapsed ? "flex-col gap-1" : "gap-1"}`}>
           <button
             onClick={toggleTheme}
             title={theme === "dark" ? t("sidebar.switchLight") : t("sidebar.switchDark")}
-            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex"
+            className={`${collapsed ? "w-full" : "flex-1"} flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex`}
           >
             {theme === "dark" ? (
               <Sun className="w-3.5 h-3.5 transition-transform duration-fast hover:rotate-45" />
             ) : (
               <Moon className="w-3.5 h-3.5" />
             )}
-            {theme === "dark" ? t("sidebar.light") : t("sidebar.dark")}
+            {!collapsed && (theme === "dark" ? t("sidebar.light") : t("sidebar.dark"))}
           </button>
           <button
             onClick={onOpenSettings}
             title={t("sidebar.settings")}
-            className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex"
+            className={`${collapsed ? "w-full" : ""} flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex`}
           >
             <Settings className="w-3.5 h-3.5" />
           </button>
         </div>
         <button
           onClick={onCreateFile}
+          title={t("sidebar.newFile")}
           className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/60 hover:bg-fandex-primary/5 transition-all duration-base ease-fandex"
         >
           <Plus className="w-3.5 h-3.5" />
-          {t("sidebar.newFile")}
+          {!collapsed && t("sidebar.newFile")}
         </button>
       </div>
     </div>

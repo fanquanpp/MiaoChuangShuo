@@ -1,4 +1,4 @@
-// NovelForge 应用入口模块
+// 喵创说 应用入口模块
 //
 // 功能概述：
 // 初始化 Tauri 应用，注册文件系统插件、项目管理命令与版本快照命令。
@@ -105,5 +105,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("运行 NovelForge 应用时发生错误");
+        .expect("运行 喵创说 应用时发生错误");
 }

@@ -40,6 +40,9 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
         { keys: "Ctrl + S", desc: t("shortcuts.save") },
         { keys: "Ctrl + Q", desc: t("shortcuts.quickQuote") },
         { keys: "Tab", desc: t("shortcuts.scriptMode") },
+        { keys: "Ctrl + =", desc: t("shortcuts.fontSizeIncrease") },
+        { keys: "Ctrl + -", desc: t("shortcuts.fontSizeDecrease") },
+        { keys: "Ctrl + 0", desc: t("shortcuts.fontSizeReset") },
       ],
     },
     {
@@ -73,6 +76,8 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
         { keys: "Ctrl + K", desc: t("shortcuts.commandPalette") },
         { keys: "Escape", desc: t("shortcuts.close") },
         { keys: "F11", desc: t("shortcuts.focusMode") },
+        { keys: "Ctrl + F", desc: t("shortcuts.findReplace") },
+        { keys: "Ctrl + H", desc: t("shortcuts.replaceMode") },
       ],
     },
     {
@@ -80,12 +85,11 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
       shortcuts: [
         { keys: "Alt + 1", desc: t("shortcuts.navManuscript") },
         { keys: "Alt + 2", desc: t("shortcuts.navOutline") },
-        { keys: "Alt + 3", desc: t("shortcuts.navCharacters") },
-        { keys: "Alt + 4", desc: t("shortcuts.navWorldview") },
-        { keys: "Alt + 5", desc: t("shortcuts.navGlossary") },
-        { keys: "Alt + 6", desc: t("shortcuts.navMaterials") },
-        { keys: "Alt + 7", desc: t("shortcuts.navTimeline") },
-        { keys: "Alt + 8", desc: t("shortcuts.navStats") },
+        { keys: "Alt + 3", desc: t("shortcuts.navCodex") },
+        { keys: "Alt + 4", desc: t("shortcuts.navForeshadowing") },
+        { keys: "Alt + 5", desc: t("shortcuts.navStats") },
+        { keys: "Alt + 6", desc: t("shortcuts.navSearch") },
+        { keys: "Alt + 7", desc: t("shortcuts.navVolumes") },
       ],
     },
   ];
@@ -150,7 +154,7 @@ export default function ShortcutPanel() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           setOpen(false);

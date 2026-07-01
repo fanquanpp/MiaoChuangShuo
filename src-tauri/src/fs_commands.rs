@@ -282,7 +282,7 @@ pub fn create_project(
     Ok(project_root.to_string_lossy().to_string())
 }
 
-/// 扫描指定目录下的所有 NovelForge 项目
+/// 扫描指定目录下的所有 喵创说 项目
 /// 输入: parent_path 父目录路径
 /// 输出: Result<Vec<ProjectInfo>, String> 项目信息列表或错误
 /// 流程:
@@ -470,13 +470,13 @@ pub async fn pick_directory(app: AppHandle) -> Result<Option<String>, String> {
 /// 导入已有项目
 /// 输入: project_path 项目根目录路径
 /// 输出: Result<ProjectInfo, String> 项目信息或错误
-/// 流程: 校验目录是否为有效 NovelForge 项目并返回信息
+/// 流程: 校验目录是否为有效 喵创说 项目并返回信息
 #[tauri::command]
 pub fn import_project(project_path: String) -> Result<ProjectInfo, String> {
     let path = validate_project_path(&project_path)?;
     let meta_path = path.join(".novelforge").join("project.json");
     if !meta_path.exists() {
-        return Err("不是有效的 NovelForge 项目(缺少元数据文件)".to_string());
+        return Err("不是有效的 喵创说 项目(缺少元数据文件)".to_string());
     }
     let meta = read_project_meta(&path)?;
     let word_count = count_project_words(&path);
@@ -716,10 +716,10 @@ pub fn copy_file(
 #[tauri::command]
 pub fn delete_project(project_path: String) -> Result<(), String> {
     let path = validate_project_path(&project_path)?;
-    // 验证是有效的 NovelForge 项目（防止误删非项目目录）
+    // 验证是有效的 喵创说 项目（防止误删非项目目录）
     let meta_path = path.join(".novelforge").join("project.json");
     if !meta_path.exists() {
-        return Err("不是有效的 NovelForge 项目（缺少元数据文件）".to_string());
+        return Err("不是有效的 喵创说 项目（缺少元数据文件）".to_string());
     }
     trash::delete(&path).map_err(|e| format!("删除项目失败: {}", e))
 }

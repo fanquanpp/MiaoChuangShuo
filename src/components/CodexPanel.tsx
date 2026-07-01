@@ -1,7 +1,7 @@
 // 智能设定库（Codex）面板组件
 //
 // 功能概述：
-// NovelForge 的智能设定库入口，统一收敛原角色/世界观/术语/素材四类设定。
+// 喵创说 的智能设定库入口，统一收敛原角色/世界观/术语/素材四类设定。
 // 提供实体列表 + 出现追踪双栏布局，支持搜索过滤与点击跳转编辑。
 // 参考 Novelcrafter Codex 设计：实体作为可追踪对象，统计在正文中的出现。
 //
@@ -166,9 +166,9 @@ export default function CodexPanel() {
   }, [mentions]);
 
   return (
-    <div className="flex h-full bg-nf-bg-panel">
-      {/* 左侧：实体列表 */}
-      <div className="w-72 min-w-[260px] border-r border-nf-border-light flex flex-col bg-nf-bg-sidebar">
+    <div className="flex flex-row-reverse h-full bg-nf-bg-panel">
+      {/* 最右侧：实体列表（作为右侧导航栏，与其它分类的文件列表位置一致） */}
+      <div className="w-72 min-w-[260px] border-l border-nf-border-light flex flex-col bg-nf-bg-sidebar flex-shrink-0">
         {/* 头部：标题 + 刷新 */}
         <div className="px-4 py-3 border-b border-nf-border-light flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -259,8 +259,8 @@ export default function CodexPanel() {
         </div>
       </div>
 
-      {/* 右侧：出现追踪详情 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* 主区域：实体详情与出现追踪（占据中间最大空间） */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {selectedEntity ? (
           <>
             {/* 详情头部 */}

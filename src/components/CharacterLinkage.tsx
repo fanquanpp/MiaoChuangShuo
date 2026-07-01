@@ -123,7 +123,7 @@ export function CharacterAppearancePanel({
     <>
       {/* 遮罩层 */}
       <div
-        className="fixed inset-0 bg-black/50 z-40"
+        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -404,7 +404,7 @@ export function CharacterRenameDialog({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4"
       onClick={handleClose}
       role="dialog"
       aria-modal="true"

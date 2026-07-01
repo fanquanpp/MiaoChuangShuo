@@ -22,6 +22,12 @@ export interface ProjectData {
   chapters: number;
   updated: string;
   gradient: string;
+  /** 项目作者（可为空字符串） */
+  author: string;
+  /** 项目描述（可为空字符串,过长时自动截断） */
+  description: string;
+  /** 项目题材（中文化后的字符串,可为空） */
+  genre: string;
 }
 
 /** ProjectCard 组件属性 */
@@ -101,17 +107,21 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
       aria-label={t("projectcard.openProject") + ": " + project.name}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className="group relative bg-nf-bg-card backdrop-blur-none border border-nf-border-light hover:border-fandex-primary/50 transition-all duration-300 cursor-pointer flex overflow-hidden focus:outline-none focus:ring-1 focus:ring-fandex-primary focus:ring-inset hover:shadow-lg hover:shadow-black/20"
+      className="nf-card-sheen nf-hover-float group relative bg-nf-bg-card backdrop-blur-none border border-nf-border-light hover:border-fandex-primary/50 cursor-pointer flex overflow-hidden focus:outline-none focus:ring-1 focus:ring-fandex-primary focus:ring-inset hover:shadow-lg hover:shadow-black/25"
       style={{ backgroundColor: 'var(--fandex-bg-card)' }}
     >
-      {/* 左侧渐变色条 */}
-      <div className={`w-1.5 flex-shrink-0 bg-gradient-to-b ${project.gradient}`} />
+      {/* 左侧渐变色条 - 加宽并增加光晕 */}
+      <div className={`relative w-2 flex-shrink-0 bg-gradient-to-b ${project.gradient}`}>
+        <div className="absolute inset-0 opacity-50" style={{
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.15), transparent 30%)',
+        }} />
+      </div>
 
-      {/* 主内容区 */}
-      <div className="flex-1 min-w-0 px-4 py-3 flex flex-col gap-2">
+      {/* 主内容区 - 增加留白与呼吸感 */}
+      <div className="flex-1 min-w-0 px-5 py-4 flex flex-col gap-2.5 relative z-[2]">
         {/* 顶部行：项目名 + 类型标签 + 删除按钮 */}
         <div className="flex items-start gap-2">
-          <h3 className="flex-1 min-w-0 text-sm font-bold font-display text-nf-text group-hover:text-fandex-primary transition-colors duration-200 truncate leading-snug">
+          <h3 className="flex-1 min-w-0 text-base font-bold font-display text-nf-text group-hover:text-fandex-primary transition-colors duration-200 truncate leading-snug">
             《{project.name}》
           </h3>
           <span className={`flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 border ${project.typeColor}`}>
@@ -130,25 +140,49 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
           )}
         </div>
 
-        {/* 底部行：统计信息 */}
+        {/* 描述行:有描述时显示,最多两行,无描述时隐藏节省垂直空间 */}
+        {project.description && (
+          <p className="text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
+            {project.description}
+          </p>
+        )}
+
+        {/* 作者与题材行:两者皆空时隐藏 */}
+        {(project.author || project.genre) && (
+          <div className="flex items-center gap-2 text-[11px] text-nf-text-tertiary/80">
+            {project.author && (
+              <span className="truncate">
+                {t("project.author")}: {project.author}
+              </span>
+            )}
+            {project.author && project.genre && (
+              <span className="text-nf-text-tertiary/40">·</span>
+            )}
+            {project.genre && (
+              <span className="truncate">{project.genre}</span>
+            )}
+          </div>
+        )}
+
+        {/* 底部行：统计信息 - 增加间距与图标精致度 */}
         <div className="flex items-center gap-4 text-xs text-nf-text-tertiary">
-          <div className="flex items-center gap-1" title={t("projectcard.totalWords")}>
-            <BarChart3 className="w-3 h-3 text-fandex-primary/70" />
+          <div className="flex items-center gap-1.5" title={t("projectcard.totalWords")}>
+            <BarChart3 className="w-3.5 h-3.5 text-fandex-primary/70 transition-transform duration-fast group-hover:scale-110" />
             <span className="tabular-nums">{project.words}</span>
           </div>
-          <div className="flex items-center gap-1" title={t("projectcard.chapters")}>
-            <BookOpen className="w-3 h-3 text-fandex-secondary/70" />
+          <div className="flex items-center gap-1.5" title={t("projectcard.chapters")}>
+            <BookOpen className="w-3.5 h-3.5 text-fandex-secondary/70 transition-transform duration-fast group-hover:scale-110" />
             <span className="tabular-nums">{project.chapters} {t("projectcard.chapterUnit")}</span>
           </div>
-          <div className="flex items-center gap-1 ml-auto" title={t("projectcard.lastUpdate")}>
-            <Clock className="w-3 h-3 text-fandex-tertiary/70" />
+          <div className="flex items-center gap-1.5 ml-auto" title={t("projectcard.lastUpdate")}>
+            <Clock className="w-3.5 h-3.5 text-fandex-tertiary/70 transition-transform duration-fast group-hover:scale-110" />
             <span className="truncate">{project.updated}</span>
           </div>
         </div>
       </div>
 
-      {/* 底部进度条装饰 */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-fandex-primary via-fandex-secondary to-fandex-tertiary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* 底部进度条装饰 - 加粗并增加光晕 */}
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-fandex-primary via-fandex-secondary to-fandex-tertiary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 }

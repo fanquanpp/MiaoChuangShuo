@@ -55,8 +55,10 @@ import {
   Plus,
   Trash2,
   Sparkles,
+  BookOpen,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
+import ConfirmDialog from "./ConfirmDialog";
 
 // 工具栏按钮属性
 interface ToolbarButtonProps {
@@ -80,7 +82,7 @@ export function ToolbarButton({
       onClick={onClick}
       title={title}
       tabIndex={-1}
-      className={`relative p-1.5 transition-all duration-base ease-fandex border group ${
+      className={`nf-tool-btn relative p-1.5 ease-fandex border group ${
         active
           ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/40"
           : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light"
@@ -97,9 +99,9 @@ export function ToolbarButton({
   );
 }
 
-// 分隔符
+// 分隔符 - 增加渐变效果,视觉更柔和
 export function Divider() {
-  return <div className="w-px h-4 bg-nf-border-light/60 mx-1.5" />;
+  return <div className="w-px h-4 bg-gradient-to-b from-transparent via-nf-border-light to-transparent mx-1.5" />;
 }
 
 // 注：COLOR_PRESETS 和 HIGHLIGHT_PRESETS 已移至 EditorBubbleMenu 组件
@@ -368,6 +370,8 @@ function SessionStats({
 }: SessionStatsProps) {
   const { t } = useI18n();
   const [targetDialogOpen, setTargetDialogOpen] = useState(false);
+  // 重置会话确认对话框状态
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [inputTarget, setInputTarget] = useState<string>(String(wordTarget || ""));
 
   // 净增字数着色：正数绿色，负数红色，零灰色
@@ -465,11 +469,7 @@ function SessionStats({
       {onResetSession && (wordTarget > 0 || sessionWords !== 0) && (
         <button
           type="button"
-          onClick={() => {
-            if (window.confirm(t("editor.sessionResetConfirm"))) {
-              onResetSession();
-            }
-          }}
+          onClick={() => setResetConfirmOpen(true)}
           title={t("editor.sessionReset")}
           tabIndex={-1}
           className="p-1 text-nf-text-tertiary hover:text-fandex-tertiary transition duration-fast"
@@ -478,10 +478,24 @@ function SessionStats({
         </button>
       )}
 
+      {/* 重置会话确认对话框:替代原生 window.confirm */}
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        title={t("editor.sessionReset")}
+        message={t("editor.sessionResetConfirm")}
+        type="confirm"
+        confirmLabel={t("editor.sessionReset")}
+        onConfirm={() => {
+          setResetConfirmOpen(false);
+          onResetSession?.();
+        }}
+        onCancel={() => setResetConfirmOpen(false)}
+      />
+
       {/* 目标设定对话框 */}
       {targetDialogOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
           onClick={() => setTargetDialogOpen(false)}
         >
           <div
@@ -610,6 +624,9 @@ interface EditorToolbarProps {
   onToggleFindReplace?: () => void;
   // AI 辅助创作中心
   onToggleAiAssistant?: () => void;
+  // 纯阅读模式：只读 + 隐藏格式工具栏
+  readingMode?: boolean;
+  onToggleReadingMode?: () => void;
 }
 
 // 编辑器工具栏组件（Office 级富文本模式）
@@ -642,6 +659,8 @@ export default function EditorToolbar({
   showFindReplace = false,
   onToggleFindReplace,
   onToggleAiAssistant,
+  readingMode = false,
+  onToggleReadingMode,
 }: EditorToolbarProps) {
   const { t } = useI18n();
 
@@ -692,7 +711,11 @@ export default function EditorToolbar({
   };
 
   return (
-    <div className="fandex-nav-blur flex flex-col border-b border-nf-border-light">
+    <div className="fandex-nav-blur flex flex-col border-b border-nf-border-light relative">
+      {/* 顶部细渐变光带:增加视觉层次 */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] pointer-events-none" style={{
+        background: 'linear-gradient(90deg, transparent, rgba(124, 158, 255, 0.25), rgba(78, 230, 176, 0.18), transparent)',
+      }} />
       {/* 顶栏：状态区 + 会话统计 + 保存（永不溢出，固定一行） */}
       <div className="flex items-center gap-2 px-4 py-1.5 min-h-0">
         {/* 写作会话统计 */}
@@ -709,26 +732,39 @@ export default function EditorToolbar({
           onResetSession={onResetSession}
         />
         <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary flex-shrink-0">
-          {/* 专注模式快捷切换 */}
-          {!focusMode && (
-            <div className="flex items-center gap-0.5">
+          {/* 纯阅读模式切换：只读浏览已写内容，隐藏格式工具栏与 BubbleMenu */}
+          {!focusMode && onToggleReadingMode && (
+            <ToolbarButton
+              onClick={onToggleReadingMode}
+              active={readingMode}
+              title={`${t("editor.readingMode")} - ${t("editor.readingModeHint")}`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+            </ToolbarButton>
+          )}
+          {/* 专注模式快捷切换：阅读模式下隐藏（只读时无需打字机/焦点暗化） */}
+          {!focusMode && !readingMode && (
+            <div className="flex items-center gap-0.5 p-0.5 border border-nf-border-light/40 bg-nf-bg-card/40">
               <ToolbarButton
                 onClick={onToggleTypewriter}
                 active={typewriterMode}
-                title={t("editor.typewriterMode")}
+                title={`${t("editor.typewriterMode")} - ${t("editor.typewriterModeHint")}`}
               >
                 <Square className="w-3.5 h-3.5" />
               </ToolbarButton>
               <ToolbarButton
                 onClick={onToggleFocusDim}
                 active={focusDim}
-                title={t("editor.focusDim")}
+                title={`${t("editor.focusDim")} - ${t("editor.focusDimHint")}`}
               >
                 <Eye className="w-3.5 h-3.5" />
               </ToolbarButton>
             </div>
           )}
-          <span className="tabular-nums">{t("editor.wordCount", { count: wordCount })}</span>
+          {/* 字数统计:增加微胶囊背景 */}
+          <span className="tabular-nums px-2 py-0.5 bg-nf-bg-card/60 border border-nf-border-light/40 text-nf-text-secondary">
+            {t("editor.wordCount", { count: wordCount })}
+          </span>
           {/* 保存状态指示器 */}
           {dirty && (
             <span className="flex items-center gap-1 px-1.5 py-0.5 bg-fandex-tertiary/10 text-fandex-tertiary border border-fandex-tertiary/20">
@@ -742,7 +778,7 @@ export default function EditorToolbar({
               onClick={onExportTxt}
               title={t("editor.exportTxt")}
               tabIndex={-1}
-              className="flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 transition-all duration-base ease-fandex"
+              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 ease-fandex"
             >
               <Download className="w-3.5 h-3.5" />
               TXT
@@ -753,7 +789,7 @@ export default function EditorToolbar({
             onClick={onSave}
             disabled={!dirty || saving}
             tabIndex={-1}
-            className={`flex items-center gap-1 px-2.5 py-1 transition-all duration-base ease-fandex disabled:opacity-30 disabled:cursor-not-allowed ${
+            className={`nf-tool-btn flex items-center gap-1 px-2.5 py-1 ease-fandex disabled:opacity-30 disabled:cursor-not-allowed ${
               dirty
                 ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm hover:shadow-md'
                 : 'bg-fandex-primary/40 text-nf-text-inverse/60'
@@ -771,8 +807,9 @@ export default function EditorToolbar({
 
       {/* 格式栏：分组容器 + flex-wrap 自动换行（无滚动条）
           行内格式（粗体/斜体/下划线/删除线/代码/颜色/链接）已移至 EditorBubbleMenu，
-          此处仅保留段落级操作，大幅减少按钮数量，解决工具栏溢出问题 */}
-      {!focusMode && (
+          此处仅保留段落级操作，大幅减少按钮数量，解决工具栏溢出问题。
+          纯阅读模式下隐藏全部格式按钮（只读无需格式化操作） */}
+      {!focusMode && !readingMode && (
         <div className="flex flex-wrap items-center gap-1 px-4 py-1.5 border-t border-nf-border-light/50">
           {/* 标题段落组 */}
           <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">

@@ -94,6 +94,7 @@ function buildFocusDimDecorations(
 //   1. 注册 ProseMirror 插件
 //   2. 初始化时构建装饰集合
 //   3. 选区变化时重建装饰集合
+//   4. 编辑器失焦时清除暗化装饰,恢复正常亮度,避免切换界面后文字变浅
 export const FocusDim = Extension.create<FocusDimOptions>({
   name: "focusDim",
 
@@ -103,6 +104,23 @@ export const FocusDim = Extension.create<FocusDimOptions>({
       dimOpacity: 0.35,
       scope: "paragraph",
     };
+  },
+
+  // 编辑器失焦时:清除暗化装饰,让所有文字恢复正常亮度
+  // 解决"切换界面后文字变浅"问题:失焦后不应保持暗化状态
+  onBlur() {
+    if (this.editor.isDestroyed) return;
+    this.editor.view.dispatch(
+      this.editor.view.state.tr.setMeta(focusDimKey, { blurred: true })
+    );
+  },
+
+  // 编辑器聚焦时:重建暗化装饰,恢复焦点效果
+  onFocus() {
+    if (this.editor.isDestroyed) return;
+    this.editor.view.dispatch(
+      this.editor.view.state.tr.setMeta(focusDimKey, { blurred: false })
+    );
   },
 
   addProseMirrorPlugins() {
@@ -118,6 +136,11 @@ export const FocusDim = Extension.create<FocusDimOptions>({
           },
           apply(tr, oldState, _oldState2, newState): DecorationSet {
             if (!options.enabled) return DecorationSet.empty;
+            // 失焦标记:清除暗化装饰,恢复正常亮度
+            const blurred = tr.getMeta(focusDimKey)?.blurred;
+            if (blurred === true) return DecorationSet.empty;
+            // 聚焦标记:重建暗化装饰
+            if (blurred === false) return buildFocusDimDecorations(newState, options.dimOpacity);
             // 仅在选区或文档变化时重建
             if (!tr.docChanged && !tr.selectionSet) {
               return oldState;

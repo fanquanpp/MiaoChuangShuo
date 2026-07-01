@@ -64,6 +64,7 @@ import { LineHighlight } from "../lib/lineHighlight";
 import { SmartTab } from "../lib/smartTab";
 import { TypewriterMode } from "../lib/typewriterMode";
 import { FocusDim } from "../lib/focusDim";
+import { FontSizeShortcut } from "../lib/fontSizeShortcut";
 import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
@@ -202,6 +203,7 @@ export default function NovelEditor({
   const focusDimOpacity = useSettingsStore((s) => s.focusDimOpacity);
   const snapshotEnabled = useSettingsStore((s) => s.snapshotEnabled);
   const snapshotMinInterval = useSettingsStore((s) => s.snapshotMinInterval);
+  const readingMode = useSettingsStore((s) => s.readingMode);
   const [showOutline, setShowOutline] = useState(false);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   // 查找替换面板可见性（Ctrl+F / Ctrl+H 触发）
@@ -365,6 +367,8 @@ export default function NovelEditor({
       TypewriterMode.configure({ enabled: typewriterMode, centerRatio: 0.45 }),
       // 焦点暗化：非当前段落降低透明度（iA Writer 风格）
       FocusDim.configure({ enabled: focusDim, dimOpacity: focusDimOpacity, scope: "paragraph" }),
+      // 字号快捷键:Ctrl+= 放大 / Ctrl+- 缩小 / Ctrl+0 重置
+      FontSizeShortcut.configure({ enabled: true }),
     ];
 
     // 散文类文体启用首行缩进（标准长篇/短篇/日记/分卷/同世界观/诗歌等）
@@ -394,9 +398,11 @@ export default function NovelEditor({
   }, [isProse, isScript, isDialogue, characters, t, indentEnabled, indentWidth, typewriterMode, focusDim, focusDimOpacity]);
 
   // 创建编辑器实例（Office 级富文本模式）
+  // editable 受 readingMode 控制：纯阅读模式下只读，避免误编辑
   const editor = useEditor({
     extensions,
     content: "",
+    editable: !readingMode,
     editorProps: {
       attributes: {
         class:
@@ -413,6 +419,14 @@ export default function NovelEditor({
       }
     },
   });
+
+  // 纯阅读模式切换：实时调整编辑器可编辑状态
+  // 阅读模式下禁用编辑，避免阅读时误触修改内容
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!readingMode);
+    }
+  }, [editor, readingMode]);
 
   // 加载文件内容（智能识别 HTML 富文本 vs 纯文本，向后兼容旧 .txt）
   useEffect(() => {
@@ -866,6 +880,8 @@ export default function NovelEditor({
         showFindReplace={showFindReplace}
         onToggleFindReplace={() => setShowFindReplace((prev) => !prev)}
         onToggleAiAssistant={() => setShowAiAssistant(true)}
+        readingMode={readingMode}
+        onToggleReadingMode={() => useSettingsStore.getState().setReadingMode(!readingMode)}
       />
 
       {isScript && characters.length > 0 && (
@@ -904,7 +920,8 @@ export default function NovelEditor({
         <div className="flex-1 overflow-y-auto relative">
           <EditorContent editor={editor} />
           {/* 选中文字时浮起的格式化工具栏：行内格式移到此处的 BubbleMenu，减少主工具栏按钮数量 */}
-          {editor && <EditorBubbleMenu editor={editor} />}
+          {/* 纯阅读模式下隐藏 BubbleMenu，避免只读时弹出格式化菜单 */}
+          {editor && !readingMode && <EditorBubbleMenu editor={editor} />}
           {/* 查找替换面板：浮于编辑区顶部，Ctrl+F / Ctrl+H 触发 */}
           {showFindReplace && editor && (
             <FindReplace

@@ -1,7 +1,7 @@
 // 工作台主容器组件
 //
 // 功能概述：
-// NovelForge 的工作台界面，三栏布局: 左侧导航 + 中间内容区 + 右侧文件列表。
+// 喵创说 的工作台界面，三栏布局: 左侧导航 + 中间内容区 + 右侧文件列表。
 // 支持聚焦模式(F11)隐藏侧边栏和文件列表，专注模式计时器。
 // 集成命令面板(Ctrl+K)和全局快捷键(?)。
 //
@@ -395,13 +395,16 @@ export default function Workspace() {
   const showFileList = getCategoryConfig(activeCategory).showFileList;
 
   return (
-    <div className="h-screen w-screen flex bg-nf-bg overflow-hidden">
+    <div className="h-screen w-screen flex bg-nf-bg overflow-hidden relative">
+      {/* 全局舒缓柔光背景层:弱化纯色压抑感 */}
+      <div className="nf-ambient-bg" />
+
       {/* 聚焦模式下隐藏侧边栏 */}
       {!focusMode && (
         <Sidebar onCreateFile={handleNewFileRequest} onOpenSettings={() => setSettingsOpen(true)} onSwitchCategory={handleSwitchCategory} />
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* 专注模式计时器条 */}
         {showFocusTimer && (
           <FocusTimer onClose={() => setShowFocusTimer(false)} />
@@ -413,7 +416,9 @@ export default function Workspace() {
 
       {/* 聚焦模式下隐藏文件列表 */}
       {!focusMode && showFileList && (
-        <FileList onCreateFile={handleNewFileRequest} onSelectFile={handleSelectFile} />
+        <div className="relative z-10 flex">
+          <FileList onCreateFile={handleNewFileRequest} onSelectFile={handleSelectFile} />
+        </div>
       )}
 
       <CreateFileDialog
@@ -457,7 +462,7 @@ export default function Workspace() {
       {/* 首次创建文件选择对话框 */}
       {showFirstFileDialog && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
           onClick={(e) => { if (e.target === e.currentTarget) setShowFirstFileDialog(false); }}
         >
           <div className="w-full max-w-sm bg-nf-bg-card border border-nf-border-light shadow-lg overflow-hidden">
