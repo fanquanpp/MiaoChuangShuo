@@ -15,8 +15,10 @@ NovelForge 取自 Novel（小说）与 Forge（锻造），寓意「锻造你的
 - 专注模式（F11）：隐藏侧边栏与文件列表，沉浸式写作
 - 专注计时器（Ctrl+Shift+T）：番茄钟式写作节奏管理
 - 命令面板（Ctrl+K）：快速执行任意操作
+- 侧边栏精简架构：7 大分类入口（正文 / 大纲 / 设定库 / 卷宗 / 伏笔 / 统计 / 搜索）
 
 ### 编辑器体验
+- Office 级富文本：21 项 TipTap 扩展，支持标题层级、列表、表格、链接、高亮、对齐、字体颜色、上下标等
 - 首行缩进：中文段落自动两字符缩进
 - 角色名补全：输入对话时自动轮换填充角色名（Ctrl+Shift+N）
 - 智能配对：括号与引号自动配对，支持全角/半角
@@ -24,7 +26,28 @@ NovelForge 取自 Novel（小说）与 Forge（锻造），寓意「锻造你的
 - 批量缩进：Tab / Shift+Tab 多行批量缩进
 - 打字机模式：光标始终居中
 - 焦点暗化：非当前段落自动降低亮度
+- 气泡菜单：选中文本即浮现格式化工具栏
+- 查找替换（Ctrl+F / Ctrl+H）：支持正则表达式
 - VSCode 风格快捷键：熟悉的高效操作体验
+- HTML 持久化：富文本格式完整保留，向后兼容纯文本 .txt
+
+### 智能设定库 Codex（v3.0.0 新增）
+- 实体出现追踪：扫描正文中所有角色 / 世界观 / 术语 / 素材的提及位置与次数
+- 双栏面板布局：左侧按类型分组的实体列表，右侧出现追踪详情
+- 搜索过滤与点击跳转：快速定位实体在正文中的出现位置
+- 多目录命名兼容：角色 / 人物、世界观 / 设定、术语 / 名词、素材 / 资料
+
+### 场景化叙事工作台（v3.0.0 新增）
+- yWriter 风格场景字段：Viewpoint（视点）/ Goal（目标）/ Conflict（冲突）/ Outcome（结果）/ Notes（备注）
+- 自动场景解析：识别章节文件中的 `## 场景N：标题` 标记
+- 元数据持久化：场景字段保存至 `.novelforge/scenes/` 目录
+- 失焦自动保存：编辑器底部可折叠面板，专注创作无干扰
+
+### AI 辅助创作中心（v3.0.0 接口预留）
+- 6 项 AI 功能规划：续写 / 摘要 / 润色 / 大纲生成 / 角色建议 / 一致性检查
+- 标准化命令骨架：8 个后端 Tauri 命令预留，统一返回未实装提示
+- 模态面板界面：功能卡片网格 + 配置入口 + 路线图说明
+- 后续接入实际 AI 服务时无需重构前端
 
 ### 角色系统
 - 角色卡片管理：结构化字段，可视化浏览
@@ -49,6 +72,7 @@ NovelForge 取自 Novel（小说）与 Forge（锻造），寓意「锻造你的
 - 项目导入导出：.novelforge 归档格式
 - 自定义模板：保存常用目录结构
 - 分卷章节批量生成：自动编号、卷首语、卷尾语
+- 模块化模板向导：4 步创建文件，Chip 式模块选择
 
 ### 模块联动
 - 大纲生成章节：从大纲文件批量生成章节
@@ -70,6 +94,8 @@ NovelForge 取自 Novel（小说）与 Forge（锻造），寓意「锻造你的
 |--------|------|
 | Ctrl+K | 命令面板 |
 | Ctrl+S | 保存文件 |
+| Ctrl+F | 查找 |
+| Ctrl+H | 查找替换 |
 | F11 | 专注模式 |
 | Ctrl+Shift+T | 专注计时器 |
 | Alt+1~8 | 切换侧边栏分类 |
@@ -81,8 +107,8 @@ NovelForge 取自 Novel（小说）与 Forge（锻造），寓意「锻造你的
 
 - **桌面框架**：Tauri 2.0（Rust 后端）
 - **前端框架**：React 18 + TypeScript
-- **编辑器**：TipTap（ProseMirror）
-- **样式方案**：Tailwind CSS
+- **编辑器**：TipTap v2.27（ProseMirror）
+- **样式方案**：Tailwind CSS + FANDEX 设计令牌
 - **状态管理**：Zustand
 - **动画引擎**：Framer Motion
 - **国际化**：中英文双语
@@ -91,32 +117,48 @@ NovelForge 取自 Novel（小说）与 Forge（锻造），寓意「锻造你的
 
 ```
 novelforge/
-├── src/                          # 前端源码
-│   ├── components/               # UI 组件
-│   │   ├── Launcher.tsx          # 启动器（项目管理）
-│   │   ├── Workspace.tsx         # 工作台（三栏布局）
-│   │   ├── NovelEditor.tsx       # 小说编辑器
-│   │   ├── ForeshadowingPanel.tsx# 伏笔追踪面板
-│   │   ├── CharacterHoverCard.tsx# 角色悬停卡片
-│   │   ├── CardManager.tsx       # 卡片管理器
-│   │   ├── GlobalSearch.tsx      # 全局搜索
-│   │   ├── WritingStats.tsx      # 写作统计
+├── src/                              # 前端源码
+│   ├── components/                   # UI 组件
+│   │   ├── Launcher.tsx              # 启动器（项目管理）
+│   │   ├── Workspace.tsx             # 工作台（三栏布局）
+│   │   ├── NovelEditor.tsx           # 小说编辑器（Office 级富文本）
+│   │   ├── EditorToolbar.tsx         # 编辑器工具栏
+│   │   ├── EditorBubbleMenu.tsx      # 编辑器气泡菜单
+│   │   ├── FindReplace.tsx           # 查找替换面板
+│   │   ├── OutlineView.tsx           # 大纲视图
+│   │   ├── CodexPanel.tsx            # 智能设定库面板
+│   │   ├── SceneWorkbench.tsx        # 场景化叙事工作台
+│   │   ├── AiAssistantPanel.tsx      # AI 辅助创作中心
+│   │   ├── ForeshadowingPanel.tsx    # 伏笔追踪面板
+│   │   ├── CharacterHoverCard.tsx    # 角色悬停卡片
+│   │   ├── SnapshotHistory.tsx       # 版本快照历史
+│   │   ├── CreateFileWizard.tsx      # 新建文件向导
+│   │   ├── GlobalSearch.tsx          # 全局搜索
+│   │   ├── WritingStats.tsx          # 写作统计
 │   │   └── ...
-│   ├── lib/                      # 核心库
-│   │   ├── api.ts                # Tauri 命令封装
-│   │   ├── store.ts              # 全局状态
-│   │   ├── i18n.tsx              # 国际化
-│   │   ├── templateRegistry.ts   # 模板注册表
+│   ├── lib/                          # 核心库
+│   │   ├── api.ts                    # Tauri 命令封装
+│   │   ├── codexApi.ts               # 智能设定库 API
+│   │   ├── sceneApi.ts               # 场景工作台 API
+│   │   ├── aiApi.ts                  # AI 辅助 API
+│   │   ├── store.ts                  # 全局状态
+│   │   ├── categoryRegistry.ts       # 分类注册表
+│   │   ├── i18n.tsx                  # 国际化
+│   │   ├── templateSchema.ts         # 模板字段架构
 │   │   └── ...
 │   └── ...
-├── src-tauri/                    # Rust 后端
+├── src-tauri/                        # Rust 后端
 │   └── src/
-│       ├── fs_commands.rs       # 文件系统命令
-│       ├── project_template.rs   # 项目模板
-│       ├── snapshot_commands.rs # 版本快照
-│       ├── character_commands.rs # 角色联动
+│       ├── fs_commands.rs            # 文件系统命令
+│       ├── project_template.rs       # 项目模板
+│       ├── template_schema.rs        # 模板字段架构
+│       ├── snapshot_commands.rs      # 版本快照
+│       ├── character_commands.rs     # 角色联动
 │       ├── foreshadowing_commands.rs # 伏笔追踪
-│       └── lib.rs                # 应用入口
+│       ├── codex_commands.rs         # 智能设定库
+│       ├── scene_commands.rs         # 场景化叙事工作台
+│       ├── ai_commands.rs            # AI 辅助命令骨架
+│       └── lib.rs                    # 应用入口
 └── ...
 ```
 
@@ -142,6 +184,15 @@ npm run tauri build
 ```
 
 构建产物位于 `src-tauri/target/release/bundle/`。
+
+## 版本历程
+
+- **v3.0.0**：智能设定库 Codex + 场景化叙事工作台 + AI 辅助接口预留 + 侧边栏架构精简
+- **v2.9.0**：Office 级富文本编辑器（21 项 TipTap 扩展 + 气泡菜单 + 查找替换）
+- **v2.8.0**：伏笔追踪系统 + 模块化模板向导
+- **v2.7.0**：VSCode 风格编辑器体验增强
+- **v2.6.0**：编辑器体验优化（首行缩进、角色名轮换）
+- **v2.5.0**：版本快照系统 + 模板系统升级
 
 ## 许可证
 
