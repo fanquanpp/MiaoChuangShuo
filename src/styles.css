@@ -136,7 +136,7 @@ pre,
 
 ::-webkit-scrollbar-thumb {
   background: var(--fandex-border-light);
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -220,7 +220,7 @@ select:focus-visible {
   bottom: 0;
   width: 3px;
   background: var(--fandex-primary);
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .fandex-bar-left-secondary::before {
@@ -361,7 +361,7 @@ select:focus-visible {
 .ProseMirror ::selection {
   background: var(--fandex-primary);
   color: var(--fandex-text-inverse);
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 /* 光标闪烁样式 */
@@ -583,7 +583,7 @@ select:focus-visible {
   width: 16px;
   height: 16px;
   border: 1.5px solid var(--fandex-border);
-  border-radius: 3px;
+  border-radius: 0;
   background: var(--fandex-bg);
   cursor: pointer;
   position: relative;
@@ -669,7 +669,7 @@ select:focus-visible {
 /* ========== FANDEX 提示块(Admonition) ========== */
 .fandex-admonition {
   border-left: 4px solid;
-  border-radius: 6px;
+  border-radius: 0;
   padding: 0.8em 1em;
   margin: 0.8em 0;
   background: var(--fandex-bg-card);
@@ -705,7 +705,7 @@ select:focus-visible {
 *:focus-visible {
   outline: 2px solid var(--fandex-primary);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 /* 高对比度模式适配 */
@@ -1103,6 +1103,7 @@ input:focus, textarea:focus, select:focus {
  *   2. 纸张纤维颗粒:SVG feTurbulence 分形噪声生成不规则纤维纹理,
  *      透明度 0.10,保持质感但不喧宾夺主
  *   3. 细微横纹:repeating-linear-gradient 模拟纸张纤维走向
+ * 渲染控制:仅当 root 含 .nf-tex-paper 类时显示，由 settingsStore 切换
  * 用法:作为全局背景叠加层,pointer-events:none 不影响交互
  */
 .nf-paper-grain {
@@ -1110,11 +1111,18 @@ input:focus, textarea:focus, select:focus {
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  /* 默认隐藏，仅纸质模式下显示 */
+  display: none;
   /* 冷色染色层:蓝紫调,与品牌色统一,避免暖褐色偏色 */
   background:
     linear-gradient(180deg, rgba(80, 100, 180, 0.035), rgba(60, 80, 140, 0.025)),
     radial-gradient(ellipse 70% 50% at 30% 20%, rgba(100, 120, 200, 0.03), transparent 70%),
     radial-gradient(ellipse 60% 45% at 75% 80%, rgba(80, 100, 160, 0.028), transparent 70%);
+}
+
+/* 仅纸质模式下显示纸质感层 */
+.nf-tex-paper .nf-paper-grain {
+  display: block;
 }
 
 /* 纸张纤维颗粒层:SVG 噪声,独立分层避免与染色层互相干扰
@@ -1156,6 +1164,54 @@ input:focus, textarea:focus, select:focus {
   mix-blend-mode: multiply;
 }
 
+/* ========== 质感模式全局渲染规则 ==========
+ * 通过 root 上的 .nf-tex-* 类切换全局面板质感
+ *   .nf-tex-solid    纯色：禁用所有面板毛玻璃与模糊
+ *   .nf-tex-frosted  磨砂玻璃：面板应用 backdrop-blur + 半透明背景
+ *   .nf-tex-paper    纸质书：显示纸质感层，面板保持纯色或轻微半透明
+ *   .nf-tex-blur     高斯模糊：面板应用更强 backdrop-blur
+ *
+ * 实现策略:
+ *   1. .nf-glass-panel 在 solid/paper 模式下退化为纯色背景
+ *   2. .nf-glass 在 solid 模式下退化为纯色，在 blur 模式下增强模糊
+ *   3. .nf-glass-overlay 始终保留遮罩模糊（遮罩本身需要柔和化）
+ */
+
+/* 纯色模式：毛玻璃面板退化为纯色背景 */
+.nf-tex-solid .nf-glass-panel {
+  background: rgb(var(--nf-bg-rgb, 12, 13, 20)) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.nf-tex-solid .nf-glass {
+  background: rgb(var(--nf-bg-rgb, 12, 13, 20), 1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 纸质模式：毛玻璃面板退化为纯色，避免与纸纹互相干扰 */
+.nf-tex-paper .nf-glass-panel {
+  background: rgb(var(--nf-bg-rgb, 12, 13, 20), 0.92) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.nf-tex-paper .nf-glass {
+  background: rgba(var(--nf-bg-rgb, 12, 13, 20), 0.92);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 高斯模糊模式：增强模糊强度 */
+.nf-tex-blur .nf-glass-panel {
+  background: rgba(var(--nf-bg-rgb, 12, 13, 20), 0.7) !important;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+.nf-tex-blur .nf-glass {
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+
 /* ========== 侧边栏统一悬停泛光 ==========
  * 统一所有侧边栏导航项的悬停视觉:左侧色条 + 背景柔光 + 图标微动
  * 替代各按钮散乱的 hover 类,保证全栏悬停反馈一致
@@ -1177,7 +1233,7 @@ input:focus, textarea:focus, select:focus {
   width: 3px;
   height: 60%;
   background: var(--fandex-primary);
-  border-radius: 0 2px 2px 0;
+  border-radius: 0;
   opacity: 0;
   transition: transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.22s ease;
 }

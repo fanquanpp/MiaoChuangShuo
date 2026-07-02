@@ -29,7 +29,6 @@ import {
   Download,
   Music,
   Pilcrow,
-  ListTree,
   Eye,
   Pause,
   Play,
@@ -588,8 +587,6 @@ interface EditorToolbarProps {
   onSave: () => void;
   onExportTxt: () => void;
   focusMode?: boolean;
-  showOutline?: boolean;
-  onToggleOutline?: () => void;
   // 写作会话统计
   sessionWords: number;
   sessionDuration: number;
@@ -621,8 +618,6 @@ export default function EditorToolbar({
   onSave,
   onExportTxt,
   focusMode = false,
-  showOutline = false,
-  onToggleOutline,
   sessionWords,
   sessionDuration,
   wpm,
@@ -814,14 +809,14 @@ export default function EditorToolbar({
             <ToolbarButton
               onClick={() => editor?.chain().focus().setHorizontalRule().run()}
               active={false}
-              title={t("editor.horizontalRule")}
+              title={t("editor.horizontalRuleHint")}
             >
               <Minus className="w-3.5 h-3.5" />
             </ToolbarButton>
             {/* 中文引号下拉菜单：提供中文双引号、中文单引号、直角引号三种包裹方式 */}
             <Dropdown
               trigger={<Quote className="w-3.5 h-3.5" />}
-              title={t("editor.chineseQuote")}
+              title={t("editor.chineseQuoteHint")}
               panelWidth="w-44"
             >
               <div className="py-1">
@@ -855,28 +850,28 @@ export default function EditorToolbar({
             <ToolbarButton
               onClick={() => editor?.chain().focus().setTextAlign("left").run()}
               active={editor?.isActive({ textAlign: "left" }) || false}
-              title={t("editor.alignLeft")}
+              title={t("editor.alignLeftHint")}
             >
               <AlignLeft className="w-3.5 h-3.5" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor?.chain().focus().setTextAlign("center").run()}
               active={editor?.isActive({ textAlign: "center" }) || false}
-              title={t("editor.alignCenter")}
+              title={t("editor.alignCenterHint")}
             >
               <AlignCenter className="w-3.5 h-3.5" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor?.chain().focus().setTextAlign("right").run()}
               active={editor?.isActive({ textAlign: "right" }) || false}
-              title={t("editor.alignRight")}
+              title={t("editor.alignRightHint")}
             >
               <AlignRight className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor?.chain().focus().setTextAlign("justify").run()}
               active={editor?.isActive({ textAlign: "justify" }) || false}
-              title={t("editor.alignJustify")}
+              title={t("editor.alignJustifyHint")}
             >
               <AlignJustify className="w-3.5 h-3.5" />
             </ToolbarButton>
@@ -887,53 +882,46 @@ export default function EditorToolbar({
             <ToolbarButton
               onClick={handlePoetryToggle}
               active={isPoetryActive()}
-              title={t("editor.poetryFormat")}
+              title={t("editor.poetryFormatHint")}
             >
               <Pilcrow className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={handleLyricsToggle}
               active={isLyricsActive()}
-              title={t("editor.lyricsFormat")}
+              title={t("editor.lyricsFormatHint")}
             >
               <Music className="w-4 h-4" />
             </ToolbarButton>
           </div>
           <Divider />
-          {/* 操作历史组 + 大纲 + 快照 + 查找替换 */}
+          {/* 操作历史组 + 快照 + 查找替换 */}
           <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
             <ToolbarButton
               onClick={() => editor?.chain().focus().undo().run()}
               active={false}
-              title={t("editor.undo")}
+              title={t("editor.undoHint")}
             >
               <Undo className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor?.chain().focus().redo().run()}
               active={false}
-              title={t("editor.redo")}
+              title={t("editor.redoHint")}
             >
               <Redo className="w-3.5 h-3.5" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => onToggleOutline?.()}
-              active={showOutline}
-              title={t("outline.title")}
-            >
-              <ListTree className="w-3.5 h-3.5" />
-            </ToolbarButton>
-            <ToolbarButton
               onClick={() => onToggleSnapshotHistory?.()}
               active={showSnapshotHistory}
-              title={t("snapshot.toggleHistory")}
+              title={t("snapshot.toggleHistoryHint")}
             >
               <History className="w-3.5 h-3.5" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => onToggleFindReplace?.()}
               active={showFindReplace}
-              title={t("editor.findReplace")}
+              title={t("editor.findReplaceHint")}
             >
               <Search className="w-4 h-4" />
             </ToolbarButton>

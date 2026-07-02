@@ -10,6 +10,8 @@
 // 3. 持久化主题到 localStorage
 // 4. 应用主题到 DOM 根元素
 // 5. 主题切换时联动 settingsStore 重新应用背景预设，确保亮/暗主题与背景色协同
+//    - 切换到亮色：自动切到亮色默认预设（晨光白），除非当前已是亮色预设
+//    - 切换到暗色：自动切到暗色默认预设（深空黑），除非当前已是暗色预设
 
 import { create } from "zustand";
 
@@ -66,16 +68,24 @@ function saveThemeToStorage(theme: ThemeMode): void {
 }
 
 // 主题切换后联动 settingsStore 重新应用背景预设
-// 输入: 无
+// 输入: nextTheme 即将切换到的主题模式
 // 输出: 无
-// 流程: 动态导入 settingsStore 并调用 setBackgroundPreset 触发重新应用
-//       避免静态导入导致循环依赖
-function syncBackgroundWithTheme(): void {
-  // 使用动态 import 避免循环依赖
-  import("./settingsStore").then(({ useSettingsStore }) => {
+// 流程:
+//   1. 动态导入 settingsStore，避免循环依赖
+//   2. 读取当前预设，若其 mode 与目标主题不一致，则切到目标主题的默认预设
+//      （例如从暗色 default 切到亮色时，自动切到 lightDay）
+//   3. 若当前预设已是目标主题的预设，则仅重新应用以刷新内联变量
+function syncBackgroundWithTheme(nextTheme: ThemeMode): void {
+  import("./settingsStore").then(({ useSettingsStore, BACKGROUND_PRESETS, getDefaultPresetByMode }) => {
     const state = useSettingsStore.getState();
-    // 重新应用当前预设，applyBackgroundTheme 会根据当前主题模式决定是否注入背景色
-    state.setBackgroundPreset(state.backgroundPreset);
+    const currentPreset = BACKGROUND_PRESETS.find((p) => p.id === state.backgroundPreset);
+    // 当前预设与目标主题不匹配（或为 custom）时，切到目标主题的默认预设
+    if (!currentPreset || currentPreset.mode !== nextTheme) {
+      state.setBackgroundPreset(getDefaultPresetByMode(nextTheme));
+    } else {
+      // 已是匹配预设，仅重新应用以刷新内联变量
+      state.setBackgroundPreset(state.backgroundPreset);
+    }
   }).catch(() => {
     // 静默处理，主题切换本身已生效
   });
@@ -95,14 +105,14 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     saveThemeToStorage(next);
     set({ theme: next });
     // 主题切换后联动重新应用背景预设，确保亮色主题下不被深色内联样式覆盖
-    syncBackgroundWithTheme();
+    syncBackgroundWithTheme(next);
   },
 
   setTheme: (theme) => {
     applyThemeToDom(theme);
     saveThemeToStorage(theme);
     set({ theme });
-    syncBackgroundWithTheme();
+    syncBackgroundWithTheme(theme);
   },
 
   initTheme: () => {
@@ -110,6 +120,6 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     applyThemeToDom(stored);
     set({ theme: stored });
     // 初始化时也同步一次，确保背景预设与主题一致
-    syncBackgroundWithTheme();
+    syncBackgroundWithTheme(stored);
   },
 }));

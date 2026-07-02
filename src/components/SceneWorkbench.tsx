@@ -144,7 +144,7 @@ export default function SceneWorkbench({ filePath }: { filePath: string | null }
         <Clapperboard className="w-3.5 h-3.5 text-fandex-tertiary" />
         <span>{t("scene.title")}</span>
         {scenes.length > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-fandex-tertiary/10 text-fandex-tertiary">
+          <span className="text-[10px] px-1.5 py-0.5 bg-fandex-tertiary/10 text-fandex-tertiary">
             {scenes.length}
           </span>
         )}
@@ -183,7 +183,7 @@ export default function SceneWorkbench({ filePath }: { filePath: string | null }
                       ) : (
                         <ChevronRight className="w-3 h-3 flex-shrink-0" />
                       )}
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-fandex-tertiary/10 text-fandex-tertiary font-medium">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 bg-fandex-tertiary/10 text-fandex-tertiary font-medium">
                         {scene.index}
                       </span>
                       <span className="flex-1 text-left text-nf-text truncate font-medium">
@@ -211,7 +211,7 @@ export default function SceneWorkbench({ filePath }: { filePath: string | null }
                                   handleFieldBlur(scene.id, field.key, e.target.value)
                                 }
                                 placeholder={field.placeholder}
-                                className="flex-1 px-2 py-1 text-xs bg-nf-bg-input border border-nf-border-light rounded text-nf-text placeholder:text-nf-text-tertiary/60 focus:outline-none focus:border-fandex-primary transition-colors"
+                                className="flex-1 px-2 py-1 text-xs bg-nf-bg-input border border-nf-border-light text-nf-text placeholder:text-nf-text-tertiary/60 focus:outline-none focus:border-fandex-primary transition-colors"
                               />
                             </div>
                           );

@@ -190,7 +190,7 @@ export default function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
             <ol className="space-y-2">
               {steps.map((step, idx) => (
                 <li key={idx} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-fandex-primary/10 text-fandex-primary text-[11px] font-bold font-display rounded">
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-fandex-primary/10 text-fandex-primary text-[11px] font-bold font-display">
                     {idx + 1}
                   </span>
                   <span className="text-sm text-nf-text-secondary leading-relaxed">{step}</span>

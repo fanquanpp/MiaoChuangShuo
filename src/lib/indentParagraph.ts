@@ -34,7 +34,7 @@ function getIndentText(width: number): string {
 // 输入: enabled 是否启用, indentWidth 缩进宽度
 // 输出: TipTap Extension 实例
 // 流程:
-//   1. 监听编辑器事务，过滤非文本输入事务
+//   1. 监听编辑器事务，过滤非文档变更事务
 //   2. 定位光标所在段落
 //   3. 检查段落是否已有缩进（以全角空格开头则跳过）
 //   4. 检查光标是否在段首附近（偏移量 <= 缩进宽度 + 容差）
@@ -64,18 +64,9 @@ export const IndentParagraph = Extension.create<IndentParagraphOptions>({
         ): Transaction | null => {
           if (!options.enabled) return null;
 
-          // 检查是否有文档结构变化
+          // 检查是否有文档结构变化（覆盖键盘输入、Enter 分段、粘贴等所有文本变更场景）
           const docChanged = transactions.some((tr) => tr.docChanged);
           if (!docChanged) return null;
-
-          // 检查是否有文本输入事务（insertText 或 paste）
-          // 注：ProseMirror 的 Enter 键产生 splitBlock，不会触发此分支
-          const hasTextInput = transactions.some(
-            (tr) =>
-              tr.getMeta("inputType") === "insertText" ||
-              tr.getMeta("paste") === true
-          );
-          if (!hasTextInput) return null;
 
           const { selection } = newState;
           const $head = selection.$head;

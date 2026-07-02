@@ -164,7 +164,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         <button
           onClick={() => setCollapsed((v) => !v)}
           title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
-          className={`absolute top-2 ${collapsed ? "left-1/2 -translate-x-1/2" : "right-2"} z-30 w-6 h-6 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover rounded transition-colors duration-fast`}
+          className={`absolute top-2 ${collapsed ? "left-1/2 -translate-x-1/2" : "right-2"} z-30 w-6 h-6 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast`}
         >
           {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>

@@ -364,8 +364,10 @@ export interface VolumeGenerationResult {
 //   includePrologue 是否生成卷首语
 //   includeEpilogue 是否生成卷尾语
 //   formatStr 标题格式: "chinese" | "arabic" | "english"
+//   chapterNameTemplate 章节文件名模板（含 {n} 占位符，如"第{n}章"；为空时回退为"第{n}章"）
 // 输出: Promise<VolumeGenerationResult> 生成结果统计
 // 流程: 调用后端 generate_volume_chapters，在"正文/{卷名}"下批量创建章节文件
+//       章节文件名仅由模板生成，不再追加卷号标识（文件已归类到分卷子目录）
 export async function generateVolumeChapters(
   projectPath: string,
   volumeName: string,
@@ -373,7 +375,8 @@ export async function generateVolumeChapters(
   startChapterNum?: number,
   includePrologue?: boolean,
   includeEpilogue?: boolean,
-  formatStr?: string
+  formatStr?: string,
+  chapterNameTemplate?: string
 ): Promise<VolumeGenerationResult> {
   return invoke<VolumeGenerationResult>("generate_volume_chapters", {
     projectPath,
@@ -383,6 +386,7 @@ export async function generateVolumeChapters(
     includePrologue,
     includeEpilogue,
     formatStr,
+    chapterNameTemplate,
   });
 }
 

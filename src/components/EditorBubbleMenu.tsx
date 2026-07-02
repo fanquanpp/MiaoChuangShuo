@@ -104,7 +104,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
       }}
     >
       <div
-        className="nf-glass-panel flex items-center gap-0.5 bg-nf-bg-card border border-nf-border-light shadow-lg px-1.5 py-1 rounded-sm"
+        className="nf-glass-panel flex items-center gap-0.5 bg-nf-bg-card border border-nf-border-light shadow-lg px-1.5 py-1"
         // 防止点击 BubbleMenu 按钮时编辑器失焦
         onMouseDown={(e) => e.preventDefault()}
       >
@@ -163,7 +163,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
             />
           </button>
           {/* 悬浮色板 */}
-          <div className="nf-glass-panel absolute top-full left-0 mt-1 hidden group-hover:flex flex-wrap gap-1 bg-nf-bg-card border border-nf-border-light shadow-lg p-1.5 rounded-sm z-50 w-[120px]">
+          <div className="nf-glass-panel absolute top-full left-0 mt-1 hidden group-hover:flex flex-wrap gap-1 bg-nf-bg-card border border-nf-border-light shadow-lg p-1.5 z-50 w-[120px]">
             {TEXT_COLORS.map((color) => (
               <button
                 key={color}
@@ -203,7 +203,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
             />
           </button>
           {/* 悬浮色板 */}
-          <div className="nf-glass-panel absolute top-full left-0 mt-1 hidden group-hover:flex flex-wrap gap-1 bg-nf-bg-card border border-nf-border-light shadow-lg p-1.5 rounded-sm z-50 w-[120px]">
+          <div className="nf-glass-panel absolute top-full left-0 mt-1 hidden group-hover:flex flex-wrap gap-1 bg-nf-bg-card border border-nf-border-light shadow-lg p-1.5 z-50 w-[120px]">
             {HIGHLIGHT_COLORS.map((color) => (
               <button
                 key={color}

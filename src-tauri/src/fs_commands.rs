@@ -1298,26 +1298,39 @@ fn number_to_chinese(n: u64) -> String {
     n.to_string()
 }
 
-/// 根据格式生成章节标题
+/// 根据格式生成章节标题（旧版保留用于兼容，新版使用模板）
 /// 输入:
 ///   chapter_num 章节序号
-///   volume_num 卷序号（可选）
+///   volume_num 卷序号（可选，已不用于追加卷标识）
 ///   format_str 格式字符串: "chinese" | "arabic" | "english"
 /// 输出: 章节标题字符串
+#[allow(dead_code)]
 fn format_chapter_title(chapter_num: u64, volume_num: Option<u64>, format_str: &str) -> String {
     // 与前端 formatChapterHeading 保持一致：
     //   chinese → "第一章"
     //   arabic  → "01"（纯数字零填充）
     //   english → "Chapter 1"
-    let title = match format_str {
+    let _ = volume_num; // 卷号不再用于追加卷标识
+    match format_str {
         "arabic" => format!("{:02}", chapter_num),
         "english" => format!("Chapter {}", chapter_num),
         _ => format!("第{}章", number_to_chinese(chapter_num)),
-    };
-    match volume_num {
-        Some(v) => format!("{}（第{}卷）", title, number_to_chinese(v)),
-        None => title,
     }
+}
+
+/// 根据用户模板生成章节标题
+/// 输入:
+///   chapter_num 章节序号
+///   template 模板字符串（含 {n} 占位符）
+/// 输出: 章节标题字符串
+/// 流程: 若模板为空或不含 {n}，回退为 "第{n}章" 后替换 {n} 为章节序号
+fn format_chapter_title_by_template(chapter_num: u64, template: &str) -> String {
+    let tpl = if template.is_empty() || !template.contains("{n}") {
+        "第{n}章"
+    } else {
+        template
+    };
+    tpl.replace("{n}", &chapter_num.to_string())
 }
 
 /// 根据格式生成卷首/卷尾语标题
@@ -1338,7 +1351,8 @@ fn format_volume_prelude(volume_num: u64, is_prologue: bool) -> String {
 ///   start_chapter_num 起始章节序号（默认1）
 ///   include_prologue 是否生成卷首语
 ///   include_epilogue 是否生成卷尾语
-///   format_str 标题格式: "chinese" | "arabic" | "english"
+///   format_str 标题格式（保留兼容，已不直接用于标题生成）
+///   chapter_name_template 章节文件名模板（含 {n} 占位符）
 /// 输出: Result<VolumeGenerationResult, String> 生成结果统计
 /// 流程:
 ///   1. 校验项目路径与分卷名
@@ -1346,6 +1360,8 @@ fn format_volume_prelude(volume_num: u64, is_prologue: bool) -> String {
 ///   3. 按需生成卷首语、N 个章节、卷尾语
 ///   4. 已存在的文件跳过，不覆盖
 ///   5. 返回各文件创建详情
+/// 说明: 章节文件名仅由 chapter_name_template 生成，不再追加"（第X卷）"标识，
+///      因文件已归类到分卷子目录，卷号信息由目录承载
 #[tauri::command]
 pub fn generate_volume_chapters(
     project_path: String,
@@ -1355,6 +1371,7 @@ pub fn generate_volume_chapters(
     include_prologue: Option<bool>,
     include_epilogue: Option<bool>,
     format_str: Option<String>,
+    chapter_name_template: Option<String>,
 ) -> Result<VolumeGenerationResult, String> {
     if volume_name.trim().is_empty() {
         return Err("分卷名不能为空".to_string());
@@ -1373,7 +1390,8 @@ pub fn generate_volume_chapters(
     let start_num = start_chapter_num.unwrap_or(1);
     let with_prologue = include_prologue.unwrap_or(false);
     let with_epilogue = include_epilogue.unwrap_or(false);
-    let fmt = format_str.unwrap_or_else(|| "chinese".to_string());
+    let _fmt = format_str.unwrap_or_else(|| "chinese".to_string());
+    let name_template = chapter_name_template.unwrap_or_else(|| "第{n}章".to_string());
 
     // 推算卷序号：从 volume_name 中提取数字，否则用 1
     let volume_num = extract_volume_number(&volume_name).unwrap_or(1);
@@ -1407,10 +1425,10 @@ pub fn generate_volume_chapters(
         });
     }
 
-    // N 个章节
+    // N 个章节：文件名仅由用户模板生成，不再追加卷号标识
     for i in 0..chapter_count {
         let chapter_num = start_num + i;
-        let title = format_chapter_title(chapter_num, Some(volume_num), &fmt);
+        let title = format_chapter_title_by_template(chapter_num, &name_template);
         // 文件名：去重非法字符
         let safe_title = sanitize_filename(&title);
         let file_name = format!("{}.txt", safe_title);

@@ -590,7 +590,7 @@ function FieldsStep({ template, enabledModuleIds, onToggleModule, t }: FieldsSte
           <span className="text-xs font-semibold text-nf-text uppercase tracking-wider">
             {t("wizard.baseFields")}
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 bg-fandex-primary/10 text-fandex-primary rounded">
+          <span className="text-[10px] px-1.5 py-0.5 bg-fandex-primary/10 text-fandex-primary">
             {t("wizard.moduleRequired")}
           </span>
         </div>
@@ -609,7 +609,7 @@ function FieldsStep({ template, enabledModuleIds, onToggleModule, t }: FieldsSte
           <span className="text-xs font-semibold text-nf-text uppercase tracking-wider">
             {t("wizard.optionalModules")}
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 bg-fandex-secondary/10 text-fandex-secondary rounded">
+          <span className="text-[10px] px-1.5 py-0.5 bg-fandex-secondary/10 text-fandex-secondary">
             {t("wizard.moduleOptional")}
           </span>
           <span className="text-[10px] text-nf-text-tertiary ml-auto">

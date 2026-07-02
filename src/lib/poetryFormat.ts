@@ -9,19 +9,20 @@
 // 模块职责：
 // 1. 定义 PoetryMark / LyricsMark 两个行内 Mark 扩展
 // 2. 提供 togglePoetry / toggleLyrics 命令供工具栏和快捷键调用
-// 3. 监听 Ctrl+Shift+P / Ctrl+Shift+L 快捷键
+// 3. 通过 addKeyboardShortcuts 注册 Ctrl+Shift+P / Ctrl+Shift+L 快捷键
 //
 // 设计说明：
 // 原实现将诗歌/歌词作为段落级属性（data-poetry/data-lyrics）作用于整段，
 // 并通过 CSS 添加边框/背景等块级装饰，视觉上类似 Markdown 引用块。
 // 现改为行内 Mark，仅对选中文本生效，且只改变文字本身属性，
 // 视觉表现保持纯文本风格，符合 Word 文档式的排版习惯。
+//
+// 快捷键注册方式说明：
+// 原实现使用 addProseMirrorPlugins 的 handleKeyDown 注册快捷键，
+// 但 TipTap 的 addKeyboardShortcuts 优先级更高，可能拦截或冲突导致失效。
+// 现统一使用 addKeyboardShortcuts 注册，确保快捷键可靠触发。
 
 import { Extension, Mark, mergeAttributes } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { toggleMark } from "@tiptap/pm/commands";
-import type { EditorView } from "@tiptap/pm/view";
-import type { MarkType } from "@tiptap/pm/model";
 
 // ===== 类型扩展：为 TipTap Commands 添加自定义命令声明 =====
 declare module "@tiptap/core" {
@@ -133,49 +134,17 @@ export const PoetryFormat = Extension.create<PoetryFormatOptions>({
     };
   },
 
-  addProseMirrorPlugins() {
-    const options = this.options;
-    const pluginKey = new PluginKey("poetryFormat");
-
-    return [
-      new Plugin({
-        key: pluginKey,
-        props: {
-          handleKeyDown(view: EditorView, event: KeyboardEvent) {
-            if (!options.enabled) return false;
-            // Ctrl+Shift+P 切换诗歌样式（作用于选中文本）
-            if (
-              (event.ctrlKey || event.metaKey) &&
-              event.shiftKey &&
-              (event.key === "P" || event.key === "p")
-            ) {
-              const { state, dispatch } = view;
-              const markType: MarkType | undefined = state.schema.marks.poetryMark;
-              if (markType) {
-                // 使用 ProseMirror 原生 toggleMark，仅作用于选中文本
-                toggleMark(markType)(state, dispatch);
-              }
-              event.preventDefault();
-              return true;
-            }
-            // Ctrl+Shift+L 切换歌词样式（作用于选中文本）
-            if (
-              (event.ctrlKey || event.metaKey) &&
-              event.shiftKey &&
-              (event.key === "L" || event.key === "l")
-            ) {
-              const { state, dispatch } = view;
-              const markType: MarkType | undefined = state.schema.marks.lyricsMark;
-              if (markType) {
-                toggleMark(markType)(state, dispatch);
-              }
-              event.preventDefault();
-              return true;
-            }
-            return false;
-          },
-        },
-      }),
-    ];
+  // 通过 addKeyboardShortcuts 注册快捷键（TipTap 优先级高于 addProseMirrorPlugins）
+  // 输入: 无
+  // 输出: 快捷键映射表
+  // 流程:
+  //   1. 注册 Mod-Shift-P（Ctrl/Cmd+Shift+P）切换诗歌样式
+  //   2. 注册 Mod-Shift-L（Ctrl/Cmd+Shift+L）切换歌词样式
+  //   3. 通过 commands.togglePoetry / toggleLyrics 调用行内 Mark 切换
+  addKeyboardShortcuts() {
+    return {
+      "Mod-Shift-p": () => this.editor.commands.togglePoetry(),
+      "Mod-Shift-l": () => this.editor.commands.toggleLyrics(),
+    };
   },
 });

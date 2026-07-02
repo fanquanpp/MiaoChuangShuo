@@ -67,7 +67,6 @@ import { useI18n } from "../lib/i18n";
 import { useWritingSession } from "../hooks/useWritingSession";
 import EditorToolbar from "./EditorToolbar";
 import EditorBubbleMenu from "./EditorBubbleMenu";
-import OutlineView from "./OutlineView";
 import SnapshotHistory from "./SnapshotHistory";
 import CharacterHoverCard from "./CharacterHoverCard";
 import FindReplace from "./FindReplace";
@@ -196,7 +195,6 @@ export default function NovelEditor({
   const focusDimOpacity = useSettingsStore((s) => s.focusDimOpacity);
   const snapshotEnabled = useSettingsStore((s) => s.snapshotEnabled);
   const snapshotMinInterval = useSettingsStore((s) => s.snapshotMinInterval);
-  const [showOutline, setShowOutline] = useState(false);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   // 查找替换面板可见性（Ctrl+F / Ctrl+H 触发）
   const [showFindReplace, setShowFindReplace] = useState(false);
@@ -639,10 +637,10 @@ export default function NovelEditor({
     };
   }, []);
 
-  // 焦点常驻：关闭浮层（查找替换/快照历史/大纲）后自动恢复编辑器焦点
+  // 焦点常驻：关闭浮层（查找替换/快照历史）后自动恢复编辑器焦点
   // 避免写作被打断后需鼠标点击才能继续输入
   useEffect(() => {
-    if (showFindReplace || showSnapshotHistory || showOutline) return;
+    if (showFindReplace || showSnapshotHistory) return;
     if (!editor || editor.isDestroyed) return;
     // 延迟一帧让浮层卸载完成
     const id = window.setTimeout(() => {
@@ -651,7 +649,7 @@ export default function NovelEditor({
       }
     }, 0);
     return () => window.clearTimeout(id);
-  }, [showFindReplace, showSnapshotHistory, showOutline, editor]);
+  }, [showFindReplace, showSnapshotHistory, editor]);
 
   // 焦点常驻：Tauri 窗口重新获焦时恢复编辑器焦点
   // 场景：用户切到其他应用查阅资料后切回，应能立即继续写作
@@ -659,7 +657,7 @@ export default function NovelEditor({
     const handleWindowFocus = () => {
       if (!editor || editor.isDestroyed) return;
       // 仅在所有浮层关闭时才抢焦点，避免打断用户在弹窗中的输入
-      if (showFindReplace || showSnapshotHistory || showOutline) return;
+      if (showFindReplace || showSnapshotHistory) return;
       // 检查当前活动元素是否已在编辑器内，避免重复 focus 打断 IME
       const active = document.activeElement;
       if (active && editor.view.dom.contains(active)) return;
@@ -667,7 +665,7 @@ export default function NovelEditor({
     };
     window.addEventListener("focus", handleWindowFocus);
     return () => window.removeEventListener("focus", handleWindowFocus);
-  }, [editor, showFindReplace, showSnapshotHistory, showOutline]);
+  }, [editor, showFindReplace, showSnapshotHistory]);
 
   // 焦点常驻：编辑器挂载后立即获焦
   useEffect(() => {
@@ -802,7 +800,7 @@ export default function NovelEditor({
             {t("editor.commandPaletteHint").split("Ctrl+K").length === 2 ? (
               <>
                 {t("editor.commandPaletteHint").split("Ctrl+K")[0]}
-                <kbd className="px-1 py-0.5 bg-nf-bg-hover border border-nf-border-light rounded text-[10px] font-mono text-nf-text-secondary">Ctrl+K</kbd>
+                <kbd className="px-1 py-0.5 bg-nf-bg-hover border border-nf-border-light text-[10px] font-mono text-nf-text-secondary">Ctrl+K</kbd>
                 {t("editor.commandPaletteHint").split("Ctrl+K")[1]}
               </>
             ) : t("editor.commandPaletteHint")}
@@ -834,8 +832,6 @@ export default function NovelEditor({
         onSave={handleSave}
         onExportTxt={handleExportTxt}
         focusMode={focusMode}
-        showOutline={showOutline}
-        onToggleOutline={() => setShowOutline((prev) => !prev)}
         sessionWords={session.sessionWords}
         sessionDuration={session.sessionDuration}
         wpm={session.wpm}
@@ -899,9 +895,6 @@ export default function NovelEditor({
               onClose={() => setShowFindReplace(false)}
               onModeChange={setFindReplaceMode}
             />
-          )}
-          {showOutline && editor && (
-            <OutlineView editor={editor} />
           )}
         </div>
         {showSnapshotHistory && filePath && currentProject?.path && (

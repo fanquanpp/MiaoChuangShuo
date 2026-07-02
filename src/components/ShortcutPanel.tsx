@@ -23,8 +23,8 @@ interface ShortcutGroup {
 /**
  * 构建快捷键分组数据
  * 输入: t i18n 翻译函数
- * 输出: ShortcutGroup[] 按编辑器/段落操作/自动行为/全局/侧边栏分组的快捷键列表
- * 流程: 静态枚举五组快捷键，通过 t 函数本地化描述文案
+ * 输出: ShortcutGroup[] 按编辑器/段落操作/全局/侧边栏分组的快捷键列表
+ * 流程: 静态枚举四组快捷键，通过 t 函数本地化描述文案
  */
 function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
   return [
@@ -39,7 +39,6 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
         { keys: "Ctrl + Shift + Z", desc: t("shortcuts.redo") },
         { keys: "Ctrl + S", desc: t("shortcuts.save") },
         { keys: "Ctrl + Q", desc: t("shortcuts.quickQuote") },
-        { keys: "Tab", desc: t("shortcuts.scriptMode") },
         { keys: "Ctrl + =", desc: t("shortcuts.fontSizeIncrease") },
         { keys: "Ctrl + -", desc: t("shortcuts.fontSizeDecrease") },
         { keys: "Ctrl + 0", desc: t("shortcuts.fontSizeReset") },
@@ -58,15 +57,6 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
         { keys: "Ctrl + [", desc: t("shortcuts.decreaseIndent") },
         { keys: "Tab", desc: t("shortcuts.indentSelection") },
         { keys: "Shift + Tab", desc: t("shortcuts.outdentSelection") },
-      ],
-    },
-    {
-      title: t("shortcuts.autoBehaviors"),
-      shortcuts: [
-        { keys: "( ) [ ]", desc: t("shortcuts.autoPair") },
-        { keys: "\" '", desc: t("shortcuts.smartQuote") },
-        { keys: "Backspace", desc: t("shortcuts.deletePair") },
-        { keys: "—", desc: t("shortcuts.lineHighlight") },
       ],
     },
     {
@@ -102,7 +92,7 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
  *   1. 监听全局 `?` 键切换面板开关，Escape 关闭
  *   2. 输入框/文本域/可编辑元素中按 `?` 不触发面板
  *   3. 监听外部 nf:open-shortcuts 事件打开面板
- *   4. 渲染五组快捷键：编辑器、段落操作、自动行为、全局、侧边栏导航
+ *   4. 渲染四组快捷键：编辑器、段落操作、全局、侧边栏导航
  */
 export default function ShortcutPanel() {
   const { t } = useI18n();

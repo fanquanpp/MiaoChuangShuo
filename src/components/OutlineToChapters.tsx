@@ -287,7 +287,7 @@ export default function OutlineToChapters({
           <button
             onClick={() => !creating && onClose()}
             disabled={creating}
-            className="p-1 text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover rounded transition duration-fast disabled:opacity-50"
+            className="p-1 text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast disabled:opacity-50"
             aria-label={t("app.close")}
           >
             <X className="w-5 h-5" />
@@ -350,7 +350,7 @@ export default function OutlineToChapters({
                 {chapters.map((chapter, idx) => (
                   <li
                     key={`${chapter.sourceFile}-${idx}`}
-                    className={`flex items-center gap-3 px-3 py-2 rounded border transition duration-fast ${
+                    className={`flex items-center gap-3 px-3 py-2 border transition duration-fast ${
                       chapter.exists
                         ? "border-nf-border-light bg-nf-bg-hover/20 opacity-60"
                         : chapter.selected
@@ -399,7 +399,7 @@ export default function OutlineToChapters({
           <button
             onClick={loadOutlineChapters}
             disabled={creating || loading}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-nf-border rounded transition duration-fast disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-nf-border transition duration-fast disabled:opacity-50"
           >
             <RefreshCw className="w-4 h-4" />
             {t("outlineToChapters.refresh")}
@@ -408,14 +408,14 @@ export default function OutlineToChapters({
             <button
               onClick={onClose}
               disabled={creating}
-              className="px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-nf-border rounded transition duration-fast disabled:opacity-50"
+              className="px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-nf-border transition duration-fast disabled:opacity-50"
             >
               {t("app.cancel")}
             </button>
             <button
               onClick={handleCreate}
               disabled={creating || creatableChapters.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse rounded transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

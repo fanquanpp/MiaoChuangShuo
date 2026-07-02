@@ -79,6 +79,30 @@ function detectVolumeNumber(name: string): number {
 }
 
 /**
+ * 根据标题格式返回默认章节文件名模板
+ * 输入: format 标题格式
+ * 输出: 默认模板字符串（含 {n} 占位符）
+ */
+function defaultTemplateByFormat(format: TitleFormat): string {
+  if (format === "arabic") return "第{n}章";
+  if (format === "english") return "Chapter {n}";
+  return "第{n}章";
+}
+
+/**
+ * 将模板中的 {n} 占位符替换为章节序号
+ * 输入:
+ *   template 模板字符串（含 {n} 占位符）
+ *   num 章节序号
+ * 输出: 替换后的标题字符串
+ * 流程: 若模板为空或不含 {n}，回退为 "第{n}章" 后替换
+ */
+function applyTemplate(template: string, num: number): string {
+  const tpl = template && template.includes("{n}") ? template : "第{n}章";
+  return tpl.replace(/\{n\}/g, String(num));
+}
+
+/**
  * 生成预览章节列表
  * 输入:
  *   volumeName 卷名
@@ -86,8 +110,10 @@ function detectVolumeNumber(name: string): number {
  *   startNum 起始章号
  *   withPrologue 是否含卷首语
  *   withEpilogue 是否含卷尾语
- *   format 标题格式
+ *   chapterNameTemplate 章节文件名模板（含 {n} 占位符）
  * 输出: VolumeChapterResult[] 预览列表
+ * 说明: 章节文件名仅使用用户模板，不再追加"（第X卷）"标识，
+ *      因文件已归类到分卷子目录，卷号信息由目录承载
  */
 function buildPreview(
   volumeName: string,
@@ -95,7 +121,7 @@ function buildPreview(
   startNum: number,
   withPrologue: boolean,
   withEpilogue: boolean,
-  format: TitleFormat
+  chapterNameTemplate: string
 ): VolumeChapterResult[] {
   const volumeNum = detectVolumeNumber(volumeName);
   const list: VolumeChapterResult[] = [];
@@ -111,18 +137,10 @@ function buildPreview(
     });
   }
 
-  // 章节
+  // 章节：文件名仅由用户模板生成，不再追加卷号标识
   for (let i = 0; i < chapterCount; i++) {
     const n = startNum + i;
-    let title: string;
-    if (format === "arabic") {
-      title = `第${n}章`;
-    } else if (format === "english") {
-      title = `Chapter ${n}`;
-    } else {
-      title = `第${toChinese(n)}章`;
-    }
-    title = `${title}（第${toChinese(volumeNum)}卷）`;
+    const title = applyTemplate(chapterNameTemplate, n);
     const safe = title.replace(/[\/\\:*?"<>|]/g, "").trim();
     list.push({
       relative_path: `正文/${volumeName}/${safe}.txt`,
@@ -176,10 +194,32 @@ export default function VolumeChapterGenerator({
   const [withPrologue, setWithPrologue] = useState(true);
   const [withEpilogue, setWithEpilogue] = useState(false);
   const [format, setFormat] = useState<TitleFormat>("chinese");
+  // 章节文件名模板：用户可自定义，支持 {n} 占位符
+  // 切换 format 时自动同步为对应默认模板（用户可后续手动修改）
+  const [chapterNameTemplate, setChapterNameTemplate] = useState(
+    defaultTemplateByFormat("chinese")
+  );
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
   // 二次确认对话框可见状态:点击"创建空白骨架"后先弹出确认,避免用户误操作
   const [showConfirm, setShowConfirm] = useState(false);
+
+  /**
+   * 切换标题格式时同步更新章节文件名模板为对应默认值
+   * 输入: f 新的标题格式
+   * 流程: 设置 format，并将模板重置为该格式对应的默认模板
+   */
+  const handleFormatChange = useCallback((f: TitleFormat) => {
+    setFormat(f);
+    setChapterNameTemplate(defaultTemplateByFormat(f));
+  }, []);
+
+  /**
+   * 重置章节文件名模板为当前格式对应的默认值
+   */
+  const handleResetTemplate = useCallback(() => {
+    setChapterNameTemplate(defaultTemplateByFormat(format));
+  }, [format]);
 
   // 预览列表
   const preview = useMemo(() => {
@@ -190,9 +230,9 @@ export default function VolumeChapterGenerator({
       Math.max(1, startNum),
       withPrologue,
       withEpilogue,
-      format
+      chapterNameTemplate
     );
-  }, [volumeName, chapterCount, startNum, withPrologue, withEpilogue, format]);
+  }, [volumeName, chapterCount, startNum, withPrologue, withEpilogue, chapterNameTemplate]);
 
   // 是否可生成
   const canGenerate = useMemo(() => {
@@ -226,7 +266,8 @@ export default function VolumeChapterGenerator({
         startNum,
         withPrologue,
         withEpilogue,
-        format
+        format,
+        chapterNameTemplate
       );
       setResult({
         created: res.created_count,
@@ -257,6 +298,7 @@ export default function VolumeChapterGenerator({
     withPrologue,
     withEpilogue,
     format,
+    chapterNameTemplate,
     showToast,
     t,
     refreshProjectTree,
@@ -412,7 +454,7 @@ export default function VolumeChapterGenerator({
                 {(["chinese", "arabic", "english"] as TitleFormat[]).map((f) => (
                   <button
                     key={f}
-                    onClick={() => setFormat(f)}
+                    onClick={() => handleFormatChange(f)}
                     className={`flex-1 px-2 py-1.5 text-xs transition duration-fast ${
                       format === f
                         ? "bg-fandex-primary/15 text-fandex-primary"
@@ -426,6 +468,31 @@ export default function VolumeChapterGenerator({
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* 章节文件名模板：用户自定义文件名格式，支持 {n} 占位符 */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-nf-text-secondary">
+                {t("volumeGen.chapterNameTemplate")}
+              </label>
+              <button
+                onClick={handleResetTemplate}
+                className="text-[10px] text-fandex-primary hover:text-fandex-primary-hover transition duration-fast"
+              >
+                {t("volumeGen.chapterNameTemplateReset")}
+              </button>
+            </div>
+            <input
+              type="text"
+              value={chapterNameTemplate}
+              onChange={(e) => setChapterNameTemplate(e.target.value)}
+              placeholder={t("volumeGen.chapterNameTemplatePlaceholder")}
+              className="w-full bg-nf-bg border border-nf-border-light px-3 py-2 text-sm text-nf-text placeholder-nf-text-tertiary focus:outline-none focus:border-fandex-primary/60 transition duration-fast font-mono"
+            />
+            <p className="text-[10px] text-nf-text-tertiary mt-1 leading-relaxed">
+              {t("volumeGen.chapterNameTemplateHint")}
+            </p>
           </div>
 
           {/* 附加选项 */}

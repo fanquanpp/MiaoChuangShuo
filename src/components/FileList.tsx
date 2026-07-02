@@ -57,19 +57,20 @@ function formatSize(bytes: number): string {
 
 // 从文件名中提取章节序号，用于正文文件自动排序
 // 排序规则：
-//   - 序章/楔子/引子/前言/引言 → 排在最前面（返回 -2）
+//   - 序章/楔子/引子/前言/引言/卷首语 → 排在最前面（返回 -2）
 //   - 正文章节（第N章/Chapter N/N.标题） → 按序号升序
-//   - 续章/尾声/后记/番外/终章 → 排在最后（返回 Infinity）
+//   - 续章/尾声/后记/番外/终章/卷尾语 → 排在最后（返回 Infinity）
+// 卷首语/卷尾语纳入分卷目录排序逻辑，确保卷首语始终在顶部、卷尾语始终在底部
 function extractChapterNumber(name: string): number {
   // 去除扩展名后的小写基准名，用于关键词匹配
   const base = name.replace(/\.txt$/i, "").trim().toLowerCase();
-  // 序章类前置于所有章节之前
-  const prologueKeywords = ["序章", "楔子", "引子", "前言", "引言", "prologue", "preface"];
+  // 序章类与卷首语前置于所有章节之前
+  const prologueKeywords = ["序章", "楔子", "引子", "前言", "引言", "卷首语", "prologue", "preface"];
   if (prologueKeywords.some((kw) => base === kw || base.startsWith(kw))) {
     return -2;
   }
-  // 续章/尾声/后记/番外/终章 排在所有正文章节之后
-  const epilogueKeywords = ["续章", "尾声", "后记", "番外", "终章", "epilogue", "afterword"];
+  // 续章/尾声/后记/番外/终章/卷尾语 排在所有正文章节之后
+  const epilogueKeywords = ["续章", "尾声", "后记", "番外", "终章", "卷尾语", "epilogue", "afterword"];
   if (epilogueKeywords.some((kw) => base === kw || base.startsWith(kw))) {
     return Infinity;
   }

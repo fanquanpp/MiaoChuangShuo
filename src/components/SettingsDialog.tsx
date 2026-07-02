@@ -10,8 +10,8 @@
 // 3. 持久化到 localStorage
 
 import { useCallback, useState, useEffect, useRef } from "react";
-import { X, Type, BookOpen, FileText, Palette, Zap, Droplet, Info, RefreshCw, ExternalLink, CheckCircle } from "lucide-react";
-import { useSettingsStore, BACKGROUND_PRESETS, type ChapterFormat } from "../lib/settingsStore";
+import { X, Type, BookOpen, FileText, Palette, Zap, Droplet, Info, RefreshCw, ExternalLink, CheckCircle, Layers } from "lucide-react";
+import { useSettingsStore, BACKGROUND_PRESETS, type ChapterFormat, type TextureMode } from "../lib/settingsStore";
 import { useThemeStore } from "../lib/themeStore";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
@@ -65,6 +65,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
     backgroundPreset,
     customBackgroundColor,
     glassOpacity,
+    textureMode,
     checkUpdateOnStartup,
     lastUpdateCheckTime,
     skipUpdateVersion,
@@ -82,6 +83,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
     setBackgroundPreset,
     setCustomBackgroundColor,
     setGlassOpacity,
+    setTextureMode,
     setCheckUpdateOnStartup,
     setLastUpdateCheckTime,
     setSkipUpdateVersion,
@@ -505,7 +507,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
                     onKeyDown={(e) => {
                       if (e.key === "Enter") commitIndentInput();
                     }}
-                    className="w-16 px-2 py-1 text-xs bg-nf-bg-input border border-nf-border-light rounded text-nf-text focus:outline-none focus:border-fandex-primary transition-colors"
+                    className="w-16 px-2 py-1 text-xs bg-nf-bg-input border border-nf-border-light text-nf-text focus:outline-none focus:border-fandex-primary transition-colors"
                   />
                   <span className="text-[10px] text-nf-text-tertiary">1-8</span>
                 </div>
@@ -537,16 +539,20 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
               </button>
             </div>
 
-            {/* 背景预设色板 */}
+            {/* 背景预设色板（按当前主题筛选） */}
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs text-nf-text-secondary">{t("settings.backgroundPreset")}</label>
-                <span className="text-[10px] text-nf-text-tertiary">{t("settings.backgroundPresetHint")}</span>
+                <span className="text-[10px] text-nf-text-tertiary">
+                  {theme === "dark" ? t("settings.themePresetGroupDark") : t("settings.themePresetGroupLight")}
+                </span>
               </div>
               <div className="grid grid-cols-6 gap-2">
-                {BACKGROUND_PRESETS.map((preset) => {
+                {BACKGROUND_PRESETS.filter((p) => p.mode === theme).map((preset) => {
                   const isActive = backgroundPreset === preset.id;
                   const labelKey = `settings.preset${preset.id.charAt(0).toUpperCase()}${preset.id.slice(1)}`;
+                  // 亮色预设使用深色文字，暗色预设使用浅色文字
+                  const isLightPreset = preset.mode === "light";
                   return (
                     <button
                       key={preset.id}
@@ -561,7 +567,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
                     >
                       <span
                         className="text-[9px] font-medium leading-none"
-                        style={{ color: "rgba(232, 232, 240, 0.85)" }}
+                        style={{ color: isLightPreset ? "rgba(30, 30, 46, 0.85)" : "rgba(232, 232, 240, 0.85)" }}
                       >
                         {t(labelKey)}
                       </span>
@@ -597,6 +603,43 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
                     <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-fandex-primary" />
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* 面板质感模式选择器 */}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-nf-text-secondary">{t("settings.textureMode")}</label>
+                <span className="text-[10px] text-nf-text-tertiary">{t("settings.textureModeHint")}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: "solid" as TextureMode, label: t("settings.textureSolid"), desc: t("settings.textureSolidDesc") },
+                  { value: "frosted" as TextureMode, label: t("settings.textureFrosted"), desc: t("settings.textureFrostedDesc") },
+                  { value: "paper" as TextureMode, label: t("settings.texturePaper"), desc: t("settings.texturePaperDesc") },
+                  { value: "blur" as TextureMode, label: t("settings.textureBlur"), desc: t("settings.textureBlurDesc") },
+                ]).map((opt) => {
+                  const isActive = textureMode === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setTextureMode(opt.value)}
+                      className={`p-2.5 text-left border transition-all duration-fast ${
+                        isActive
+                          ? "bg-fandex-primary/10 border-fandex-primary/40"
+                          : "border-nf-border-light hover:border-nf-border"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Layers className={`w-3 h-3 ${isActive ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
+                        <span className={`text-xs font-medium ${isActive ? "text-fandex-primary" : "text-nf-text-secondary"}`}>
+                          {opt.label}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-nf-text-tertiary leading-relaxed">{opt.desc}</p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

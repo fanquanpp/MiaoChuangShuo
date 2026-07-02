@@ -331,7 +331,7 @@ export default function CodexPanel() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("codex.searchPlaceholder")}
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-nf-bg-input border border-nf-border-light rounded text-nf-text placeholder:text-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition-colors"
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-nf-bg-input border border-nf-border-light text-nf-text placeholder:text-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition-colors"
             />
           </div>
         </div>
@@ -424,7 +424,7 @@ export default function CodexPanel() {
                   return <Icon className="w-5 h-5 text-fandex-primary" />;
                 })()}
                 <h2 className="text-lg font-semibold text-nf-text">{selectedEntity.name}</h2>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-fandex-primary/10 text-fandex-primary font-medium">
+                <span className="text-[10px] px-1.5 py-0.5 bg-fandex-primary/10 text-fandex-primary font-medium">
                   {CODEX_TYPE_LABELS[selectedEntity.type]}
                 </span>
               </div>
@@ -432,7 +432,7 @@ export default function CodexPanel() {
                 <div className="flex items-center gap-2 text-xs text-nf-text-tertiary">
                   <span>{t("codex.aliasesLabel")}:</span>
                   {selectedEntity.aliases.map((alias, i) => (
-                    <span key={i} className="px-1.5 py-0.5 rounded bg-nf-bg-hover text-nf-text-secondary">
+                    <span key={i} className="px-1.5 py-0.5 bg-nf-bg-hover text-nf-text-secondary">
                       {alias}
                     </span>
                   ))}
@@ -471,7 +471,7 @@ export default function CodexPanel() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-fandex-secondary/10 text-fandex-secondary font-medium">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-fandex-secondary/10 text-fandex-secondary font-medium">
                             {t("codex.mentionCount", { count: mention.count })}
                           </span>
                           <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary group-hover:text-fandex-primary transition-colors" />
