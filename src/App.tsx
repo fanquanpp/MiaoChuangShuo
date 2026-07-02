@@ -15,6 +15,7 @@ import Launcher from "./components/Launcher";
 import Workspace from "./components/Workspace";
 import ErrorBoundary, { setErrorBoundaryI18n } from "./components/ErrorBoundary";
 import ShortcutPanel from "./components/ShortcutPanel";
+import GlobalTooltip from "./components/GlobalTooltip";
 import { setSkeletonI18n } from "./components/SkeletonComponents";
 import { useAppStore } from "./lib/store";
 import { useThemeStore } from "./lib/themeStore";
@@ -61,6 +62,7 @@ function App() {
             {viewMode === "launcher" ? <Launcher /> : <Workspace />}
           </div>
           <ShortcutPanel />
+          <GlobalTooltip />
         </ToastProvider>
       </I18nProvider>
     </ErrorBoundary>

@@ -65,25 +65,22 @@ export default function TimelineNode({ id, selected }: NodeProps) {
   return (
     <div
       className={`
-        relative rounded-none backdrop-blur-md transition-all duration-200 ease-fandex overflow-hidden
+        nf-card-sheen nf-card-dots nf-hover-float group relative rounded-none backdrop-blur-md
+        transition-all duration-200 ease-fandex overflow-hidden border
         ${selected
-          ? "scale-[1.02]"
-          : "hover:-translate-y-0.5"
+          ? "scale-[1.02] border-fandex-primary/70"
+          : "border-nf-border-light/60 hover:border-fandex-primary/40"
         }
       `}
       style={{
         width: data.nodeType === "main" ? 256 : 184,
         // 磨砂玻璃 65% 透明度(硬约束保留): nf-bg-card 基色 rgba(22,24,33) 以 0.65 不透明度叠加
         backgroundColor: "rgba(22, 24, 33, 0.65)",
-        // 多层阴影提升质感: 外阴影(深度) + 1px 描边(轮廓) + 内顶部高光(立体感)
+        // 多层阴影提升质感: 外阴影(深度) + 内顶部高光(立体感)
         // 选中态追加强调色外发光环, 强化焦点反馈
         boxShadow: selected
           ? `0 10px 28px rgba(0,0,0,0.45), 0 0 0 1px ${accent}aa, 0 0 0 4px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.05)`
-          : `0 4px 12px rgba(0,0,0,0.32), 0 0 0 1px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.03)`,
-        // 左侧 2px 强调色边线(类型识别主信号, 取代原 border-l-2 + 单一 primary 色)
-        borderLeft: `2px solid ${accent}`,
-        // 顶部 1px 强调色渐变线(辅信号, 增加层次感与现代感)
-        borderTop: `1px solid ${accent}66`,
+          : `0 4px 12px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.03)`,
       }}
     >
       {/* 输入锚点 - 左侧(居中贴边, hover 放大, 提升连线体验) */}
@@ -94,14 +91,21 @@ export default function TimelineNode({ id, selected }: NodeProps) {
         style={{ left: -7, backgroundColor: accent }}
       />
 
-      {/* 顶部强调色装饰条(渐变收束, 强化类型识别与视觉层次) */}
-      <div
-        className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none"
-        style={{ background: `linear-gradient(90deg, ${accent}, ${accent}55 70%, transparent)` }}
-      />
+      {/* 右下角微型装饰:呼应项目卡片的同心圆+几何元素,极低透明度不影响内容 */}
+      <svg
+        className="absolute -bottom-3 -right-3 w-20 h-20 opacity-[0.08] pointer-events-none group-hover:opacity-[0.15] transition-opacity duration-500"
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <circle cx="80" cy="80" r="28" stroke="currentColor" strokeWidth="0.6" className="text-fandex-primary" opacity="0.5" />
+        <circle cx="80" cy="80" r="20" stroke="currentColor" strokeWidth="0.6" className="text-fandex-secondary" opacity="0.6" />
+        <circle cx="80" cy="80" r="12" stroke="currentColor" strokeWidth="0.6" className="text-fandex-tertiary" opacity="0.7" />
+      </svg>
 
-      {/* 内容区(统一内边距, 优化排版节奏) */}
-      <div className="px-3.5 py-2.5">
+      {/* 内容区(统一内边距, 优化排版节奏, z 层级高于装饰) */}
+      <div className="px-3.5 py-2.5 relative z-[1]">
         {/* 标题行: 标题 + 折叠按钮(仅 main 节点) */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className={`text-sm font-bold font-display ${colors.text} truncate flex-1 leading-tight`}>
@@ -152,6 +156,12 @@ export default function TimelineNode({ id, selected }: NodeProps) {
         position={Position.Right}
         className="!w-3.5 !h-3.5 !border-2 !border-nf-bg hover:!w-4 hover:!h-4 transition-all duration-fast"
         style={{ right: -7, backgroundColor: accent }}
+      />
+
+      {/* 底部进度条装饰:呼应项目卡片美术,悬停时显现 */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{ background: `linear-gradient(90deg, ${accent}, ${accent}55 70%, transparent)` }}
       />
 
       {/* 折叠角标(仅 main 节点折叠时显示, 微调尺寸与位置) */}

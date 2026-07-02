@@ -125,6 +125,23 @@ export default function CreateFileWizard({
       });
   }, [open, templateCategory, showToast, t]);
 
+  // ESC 键关闭向导(创建进行中时禁止关闭, 防止数据不一致)
+  // 修复: 原实现缺少 ESC 键支持, 用户只能通过点击 X 按钮或遮罩层关闭,
+  //       导致"无法取消关闭"的体验问题。现补充标准 ESC 键交互。
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !creating) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    // capture 阶段拦截, 确保在输入框等子组件之前处理
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, creating, onClose]);
+
   // 当前选中的模板对象
   const selectedTemplate = useMemo<TemplateSchema | null>(() => {
     if (!selectedTemplateId || selectedTemplateId === BLANK_TEMPLATE_ID) return null;
@@ -401,12 +418,23 @@ export default function CreateFileWizard({
           )}
         </div>
 
-        {/* 底部：上一步 / 下一步 / 完成 */}
+        {/* 底部：取消 / 上一步 / 下一步 / 完成 */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-nf-border-light bg-nf-bg/30">
-          <div className="text-xs text-nf-text-tertiary">
-            {step === "template" && templates.length === 0 && !loading
-              ? t("wizard.noTemplate")
-              : ""}
+          <div className="flex items-center gap-3">
+            {/* 取消按钮: 明确的关闭入口, 避免用户找不到关闭方式 */}
+            <button
+              onClick={() => !creating && onClose()}
+              disabled={creating}
+              className="nf-tool-btn h-7 px-3 text-xs flex items-center gap-1.5 text-nf-text-tertiary hover:text-red-400 hover:border-red-400/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              {t("wizard.cancel")}
+            </button>
+            <div className="text-xs text-nf-text-tertiary">
+              {step === "template" && templates.length === 0 && !loading
+                ? t("wizard.noTemplate")
+                : ""}
+            </div>
           </div>
           <div className="flex gap-2">
             <button

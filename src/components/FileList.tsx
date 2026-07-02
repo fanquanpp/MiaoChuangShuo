@@ -452,26 +452,35 @@ function TreeNodeGrid({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`group relative p-3 cursor-pointer transition duration-fast bg-nf-bg ${
+      className={`nf-card-sheen nf-hover-float group relative p-3 cursor-pointer overflow-hidden border border-nf-border-light/50 transition-all duration-base ${
         isDragging
           ? "opacity-40 ring-1 ring-fandex-primary/40"
           : isDragOver
-            ? "ring-t-2 ring-t-fandex-primary"
+            ? "ring-2 ring-fandex-primary ring-inset"
             : isSelected
-              ? "bg-fandex-primary/10 border-fandex-primary"
-              : "hover:bg-nf-bg-hover"
+              ? "bg-fandex-primary/10 border-fandex-primary/60 shadow-lg shadow-fandex-primary/10"
+              : "bg-nf-bg-card hover:border-fandex-primary/40 hover:shadow-md hover:shadow-black/30 hover:-translate-y-0.5"
       }`}
+      style={!isSelected && !isDragging && !isDragOver ? { backgroundColor: 'var(--fandex-bg-card)' } : undefined}
     >
+      {/* 背景点阵装饰:呼应项目卡片质感,极低透明度不影响文字 */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.4] group-hover:opacity-[0.7] transition-opacity duration-500"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(124, 158, 255, 0.06) 1px, transparent 1px)',
+          backgroundSize: '14px 14px',
+        }}
+      />
       {isDraggable && (
-        <GripVertical className="w-3.5 h-3.5 absolute top-1 left-1 text-nf-text-tertiary opacity-0 group-hover:opacity-60 cursor-grab" />
+        <GripVertical className="w-3.5 h-3.5 absolute top-1 left-1 text-nf-text-tertiary opacity-0 group-hover:opacity-60 cursor-grab z-10" />
       )}
-      <FileText className="w-5 h-5 text-fandex-primary mb-2" />
-      <div className="text-xs font-medium font-display text-nf-text truncate">
+      <FileText className="w-5 h-5 text-fandex-primary mb-2 relative z-[1]" />
+      <div className="text-xs font-medium font-display text-nf-text truncate relative z-[1]">
         {isManuscript
           ? formatManuscriptTitle(node.name, chapterFormat, autoNumbering)
           : getDisplayTitle(node.name)}
       </div>
-      <div className="text-[10px] text-nf-text-tertiary mt-1">
+      <div className="text-[10px] text-nf-text-tertiary mt-1 relative z-[1]">
         {formatSize(node.size)}
         {isSelected && activeFileWordCount !== undefined && activeFileWordCount > 0 && (
           <span className="ml-1 text-fandex-primary">
@@ -481,16 +490,18 @@ function TreeNodeGrid({
       </div>
       <button
         onClick={(e) => onRename(node, e)}
-        className="absolute top-2 right-8 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
+        className="absolute top-2 right-8 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-fandex-primary transition duration-fast z-10"
       >
         <PenLine className="w-3.5 h-3.5" />
       </button>
       <button
         onClick={(e) => onDelete(node, e)}
-        className="absolute top-2 right-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-red-400 transition duration-fast"
+        className="absolute top-2 right-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-red-400 transition duration-fast z-10"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
+      {/* 底部进度条装饰:悬停时显现,呼应项目卡片美术 */}
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-fandex-primary via-fandex-secondary to-fandex-tertiary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 }
@@ -885,7 +896,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
             </button>
           </div>
         ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-2 gap-1 bg-nf-border-light border border-nf-border-light">
+          <div className="grid grid-cols-2 gap-0">
             {children.map((node, index) => (
               <TreeNodeGrid
                 key={node.relative_path}

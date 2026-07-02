@@ -293,6 +293,7 @@ const zhCN: TranslationDict = {
   "wizard.prev": "上一步",
   "wizard.next": "下一步",
   "wizard.finish": "创建文件",
+  "wizard.cancel": "取消",
   "wizard.noTemplate": "当前分类暂无预设模板，将创建空白文件",
   "wizard.loadTemplateFailed": "加载模板失败：{error}",
   "wizard.renderFailed": "生成模板内容失败：{error}",
@@ -349,6 +350,17 @@ const zhCN: TranslationDict = {
   "stats.noData": "暂无统计数据",
   "stats.loadFailed": "加载统计数据失败：{error}",
   "stats.refresh": "刷新",
+  "stats.subtitle": "项目写作数据总览与效率分析",
+  "stats.loading": "正在加载统计数据",
+  "stats.dailyAvg": "日均字数",
+  "stats.avgChapterWords": "平均章节字数",
+  "stats.avgChapterDesc": "正文字数除以章节数",
+  "stats.settingRatio": "设定正文比",
+  "stats.settingRatioDesc": "设定字数相对正文的占比",
+  "stats.totalFilesDesc": "项目全部文件总数",
+  "stats.fileUnit": "个",
+  "stats.chapterUnit": "章",
+  "stats.efficiencyAnalysis": "创作效率分析",
 
   // ── 全局搜索 ──
   "search.title": "全局搜索",
@@ -451,6 +463,7 @@ const zhCN: TranslationDict = {
   "timeline.deleted": "已删除事件「{title}」",
   "timeline.save": "保存",
   "timeline.saving": "保存中…",
+  "timeline.autoSaved": "自动保存",
 
   // ── 剧情图谱（graph timeline） ──
   "sidebar.timeline": "剧情图谱",
@@ -1377,6 +1390,7 @@ const enUS: TranslationDict = {
   "wizard.prev": "Previous",
   "wizard.next": "Next",
   "wizard.finish": "Create File",
+  "wizard.cancel": "Cancel",
   "wizard.noTemplate": "No preset template for this category, a blank file will be created",
   "wizard.loadTemplateFailed": "Failed to load templates: {error}",
   "wizard.renderFailed": "Failed to render template: {error}",
@@ -1433,6 +1447,17 @@ const enUS: TranslationDict = {
   "stats.noData": "No statistics available",
   "stats.loadFailed": "Failed to load statistics: {error}",
   "stats.refresh": "Refresh",
+  "stats.subtitle": "Project writing data overview and efficiency analysis",
+  "stats.loading": "Loading statistics",
+  "stats.dailyAvg": "Daily Average",
+  "stats.avgChapterWords": "Avg Chapter Words",
+  "stats.avgChapterDesc": "Manuscript words divided by chapters",
+  "stats.settingRatio": "Setting Ratio",
+  "stats.settingRatioDesc": "Setting words relative to manuscript",
+  "stats.totalFilesDesc": "Total file count in project",
+  "stats.fileUnit": "files",
+  "stats.chapterUnit": "chapters",
+  "stats.efficiencyAnalysis": "Efficiency Analysis",
 
   // ── Global Search ──
   "search.title": "Global Search",
@@ -1535,6 +1560,7 @@ const enUS: TranslationDict = {
   "timeline.deleted": "Deleted event \"{title}\"",
   "timeline.save": "Save",
   "timeline.saving": "Saving…",
+  "timeline.autoSaved": "Auto-save",
 
   // ── Timeline Graph ──
   "sidebar.timeline": "Timeline",

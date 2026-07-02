@@ -421,11 +421,11 @@ export default function Workspace() {
 
       {/* 右侧文件列表：常驻固定面板，不再随聚焦模式或分类切换隐藏，
           保证布局稳定，避免"活动状态"导致的布局抖动。
-          例外：codex（设定库）分类下，CodexPanel 自身已内嵌右侧实体列表，
-          若同时显示 FileList 会造成右侧双栏堆叠，故此处隐藏。
-          timeline（时间线）分类下，画布容器需独占中右栏空间以呈现完整图谱，
-          同时其 categoryRegistry.showFileList 已为 false，故此处一并隐藏。 */}
-      {!focusMode && activeCategory !== "codex" && activeCategory !== "timeline" && (
+          显示规则由 categoryRegistry.showFileList 统一控制：
+          - codex：CodexPanel 自身已内嵌右侧实体列表，避免双栏堆叠
+          - timeline：画布需独占中右栏以呈现完整图谱
+          - stats/search：统计与搜索需全屏展示，不显示文件列表 */}
+      {!focusMode && getCategoryConfig(activeCategory).showFileList && (
         <div className="relative z-10 flex flex-shrink-0">
           <FileList onCreateFile={handleNewFileRequest} onSelectFile={handleSelectFile} />
         </div>

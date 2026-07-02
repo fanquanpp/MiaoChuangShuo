@@ -295,6 +295,10 @@ select:focus-visible {
 .react-flow__controls {
   display: none !important;
 }
+/* 隐藏 React Flow 右下角官网归属链接(attribution) */
+.react-flow__attribution {
+  display: none !important;
+}
 /* MiniMap 背景统一 */
 .react-flow__minimap {
   background-color: rgba(16, 18, 24, 0.9) !important;
@@ -1375,4 +1379,53 @@ input:focus, textarea:focus, select:focus {
   color: #ff7a6a;
   border-color: rgba(255, 100, 80, 0.4);
   box-shadow: 0 0 0 1px rgba(255, 100, 80, 0.2), 0 4px 12px -4px rgba(255, 100, 80, 0.25);
+}
+
+/* ========== 全局自定义 Tooltip(替代原生 title 属性) ==========
+ * 设计目的: 原生 title 属性存在三大缺陷:
+ *   1. 显示延迟过长(浏览器默认约 500ms+)
+ *   2. 难以重复触发(需完全移出再移入)
+ *   3. 无法自定义样式与定位
+ * 解决方案: GlobalTooltip 组件通过事件委托接管所有 [title] 元素,
+ *   临时移除 title 属性阻止原生提示, 改用此自定义浮层。
+ * 特性: 150ms 显示延迟(可快速重复触发), 即时隐藏, 暗色毛玻璃质感。
+ */
+.nf-global-tooltip {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  max-width: 280px;
+  padding: 5px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: rgb(229, 231, 235);
+  background: rgba(18, 20, 28, 0.92);
+  border: 1px solid rgba(124, 158, 255, 0.25);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* 入场动画: 缩放 + 淡入, 仅 120ms 保证即时反馈 */
+  animation: nf-tooltip-in 0.12s ease-out;
+}
+
+@keyframes nf-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 多行 tooltip 内容(长文本自动换行) */
+.nf-global-tooltip.nf-tooltip-wrap {
+  white-space: normal;
+  word-break: break-all;
 }

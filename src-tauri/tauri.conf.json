@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MiaoChuangShuo",
-  "version": "26.7.11",
+  "version": "26.7.12",
   "identifier": "com.miaochuangshuo.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -29,6 +29,12 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis"],
+    "publisher": "fanquanpp",
+    "copyright": "Copyright (c) 2026 fanquanpp. All rights reserved.",
+    "category": "Productivity",
+    "shortDescription": "喵创说 - 离线小说创作工作站",
+    "longDescription": "喵创说(MiaoChuangShuo)是一款专为小说创作者打造的离线写作工作站，提供项目管理、大纲规划、角色设定、剧情图谱、写作统计等全方位创作工具。基于 Tauri 2.0 + React 技术栈，完全离线可用，保护创作隐私。",
+    "homepage": "https://github.com/fanquanpp/MiaoChuangShuo",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

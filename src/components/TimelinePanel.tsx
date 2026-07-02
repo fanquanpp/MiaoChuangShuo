@@ -34,7 +34,7 @@ import {
   type ReactFlowInstance,
   type ConnectionLineComponent,
 } from "@xyflow/react";
-import { Trash2 } from "lucide-react";
+import { Trash2, Save, Loader2, Check } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 
 import { useAppStore } from "../lib/store";
@@ -152,6 +152,22 @@ export default function TimelinePanel() {
   const redo = useTimelineStore((s) => s.redo);
   const saveNow = useTimelineStore((s) => s.saveNow);
   const debouncedSave = useTimelineStore((s) => s.debouncedSave);
+  // 保存状态订阅: saving 防抖期间为 true, error 保存失败时携带错误信息
+  // 用途: 工具栏右侧渲染保存指示器, 让用户明确感知"自动保存"功能存在且正常工作
+  const saving = useTimelineStore((s) => s.saving);
+  const saveError = useTimelineStore((s) => s.error);
+  // saved 闪烁态: 保存完成(saving: true → false)后短暂显示"已保存"标记, 1.2s 后自动消失
+  const [savedFlash, setSavedFlash] = useState(false);
+  const prevSavingRef = useRef(false);
+  useEffect(() => {
+    // 检测 saving 从 true → false 的下降沿, 触发 savedFlash
+    if (prevSavingRef.current && !saving && !saveError) {
+      setSavedFlash(true);
+      const timer = setTimeout(() => setSavedFlash(false), 1200);
+      return () => clearTimeout(timer);
+    }
+    prevSavingRef.current = saving;
+  }, [saving, saveError]);
 
   const { showToast } = useToast();
   const { t } = useI18n();
@@ -454,11 +470,67 @@ export default function TimelinePanel() {
       className="h-full w-full relative timeline-canvas-root"
       data-tauri-drag-region="false"
       onDragStart={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
     >
       {isEmpty && <TimelineEmpty />}
 
-      <div className="absolute top-3 right-3 z-20 flex gap-2">
+      {/* 顶部右侧工具栏: 保存状态指示器 + 手动保存 + 清空 */}
+      {/* 设计目的: 让用户明确感知"自动保存"功能存在且正常工作, 同时提供手动保存入口 */}
+      <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+        {/* 保存状态指示器: 三态显示(saving 保存中 / savedFlash 已保存 / saveError 保存失败 / idle 待命) */}
+        <div
+          className="flex items-center gap-1.5 h-7 px-2.5 text-xs bg-nf-bg-sidebar border border-nf-border-light text-nf-text-secondary"
+          title={
+            saveError
+              ? t("timeline.toast.saveFailed")
+              : saving
+                ? t("timeline.saving")
+                : savedFlash
+                  ? t("timeline.toast.saved")
+                  : t("timeline.save")
+          }
+        >
+          {saveError ? (
+            // 保存失败: 红色感叹号图标 + 错误文字
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <span className="text-red-400">{t("timeline.toast.saveFailed")}</span>
+            </>
+          ) : saving ? (
+            // 保存中: 蓝色旋转图标 + 保存中文字
+            <>
+              <Loader2 className="w-3 h-3 animate-spin text-fandex-primary" />
+              <span className="text-fandex-primary">{t("timeline.saving")}</span>
+            </>
+          ) : savedFlash ? (
+            // 保存完成(闪烁态): 绿色对勾 + 已保存文字, 1.2s 后消失
+            <>
+              <Check className="w-3 h-3 text-fandex-secondary" />
+              <span className="text-fandex-secondary">{t("timeline.toast.saved")}</span>
+            </>
+          ) : (
+            // 待命态: 灰色圆点 + 自动保存文字, 表明自动保存功能已激活
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+              <span className="text-zinc-500">{t("timeline.autoSaved")}</span>
+            </>
+          )}
+        </div>
+
+        {/* 手动保存按钮: 立即触发 saveNow(Ctrl+S 的等效入口) */}
+        <button
+          onClick={() => {
+            if (currentProject) {
+              saveNow(currentProject.path, currentProject.meta.name);
+              showToast("success", t("timeline.toast.saved"));
+            }
+          }}
+          className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 bg-nf-bg-sidebar border border-nf-border-light rounded-none text-nf-text-secondary hover:text-fandex-primary hover:border-fandex-primary"
+          title={t("timeline.save")}
+        >
+          <Save className="w-3.5 h-3.5" />
+        </button>
+
+        {/* 清空图谱按钮 */}
         <button
           onClick={() => {
             if (confirm(t("timeline.toast.clearConfirm"))) {
@@ -503,7 +575,7 @@ export default function TimelinePanel() {
         className="timeline-flow"
       >
         <Background
-          variant={BackgroundVariant.Dots}
+          variant={BackgroundVariant.Lines}
           gap={28}
           size={1}
           color="rgba(255,255,255,0.05)"
