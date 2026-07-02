@@ -29,6 +29,7 @@ import {
   Folder,
   PanelLeft,
   PanelLeftClose,
+  GitBranch,
 } from "lucide-react";
 import {
   useAppStore,
@@ -49,6 +50,7 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   stats: BarChart3,
   search: Search,
   volumes: BookOpen,
+  timeline: GitBranch,
 };
 
 // 写作主分类：核心写作功能，常驻显示
@@ -58,7 +60,7 @@ const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline"];
 const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex"];
 
 // 工具分类列表
-const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
+const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search", "timeline"];
 
 // 左侧导航栏属性接口
 interface SidebarProps {

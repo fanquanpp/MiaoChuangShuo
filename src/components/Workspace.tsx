@@ -45,6 +45,7 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "4": "stats",
   "5": "search",
   "6": "volumes",
+  "9": "timeline",
 };
 
 /**
