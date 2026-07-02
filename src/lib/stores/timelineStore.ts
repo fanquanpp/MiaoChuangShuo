@@ -58,6 +58,10 @@ interface TimelineState {
   updateNodeData: (nodeId: string, patch: Partial<TimelineNodeData>) => void;
   /** 选中节点 */
   selectNode: (id: string | null) => void;
+  /** 删除节点(级联删除关联边) */
+  deleteNode: (nodeId: string) => void;
+  /** 清空图谱(删除所有节点与边) */
+  clearGraph: () => void;
   /** 折叠/展开 main 节点 */
   toggleCollapse: (nodeId: string) => void;
   /** 撤销(取消待保存 → undo → 触发新的防抖保存) */
@@ -291,6 +295,33 @@ export const useTimelineStore = create<TimelineState>()(
        * 输出: void
        */
       selectNode: (id) => set({ selectedNodeId: id }),
+
+      /**
+       * 删除节点(级联删除关联边)
+       * 输入: nodeId 待删除节点 ID
+       * 输出: void
+       * 流程:
+       *   1. 从 nodes 中移除该节点
+       *   2. 从 edges 中移除所有 source 或 target 等于该 nodeId 的边
+       */
+      deleteNode: (nodeId) => {
+        set((state) => ({
+          nodes: state.nodes.filter((n) => n.id !== nodeId),
+          edges: state.edges.filter(
+            (e) => e.source !== nodeId && e.target !== nodeId
+          ),
+        }));
+      },
+
+      /**
+       * 清空图谱(删除所有节点与边)
+       * 输入: 无
+       * 输出: void
+       * 流程: 清空 nodes 与 edges 数组
+       */
+      clearGraph: () => {
+        set({ nodes: [], edges: [] });
+      },
 
       /**
        * 折叠/展开 main 节点

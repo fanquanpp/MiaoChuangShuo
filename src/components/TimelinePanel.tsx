@@ -30,11 +30,13 @@ import {
   type Node,
   type Edge,
 } from "@xyflow/react";
+import { Trash2 } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 
 import { useAppStore } from "../lib/store";
 import { useTimelineStore, filterCollapsed } from "../lib/stores/timelineStore";
 import { autoLayout } from "../lib/dagreLayout";
+import { clearTimeline } from "../lib/timelineApi";
 import { EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
 import type {
   TimelineNodeType,
@@ -81,6 +83,8 @@ export default function TimelinePanel() {
   const onEdgesChange = useTimelineStore((s) => s.onEdgesChange);
   const addEdge = useTimelineStore((s) => s.addEdge);
   const selectNode = useTimelineStore((s) => s.selectNode);
+  const deleteNode = useTimelineStore((s) => s.deleteNode);
+  const clearGraph = useTimelineStore((s) => s.clearGraph);
   const selectedNodeId = useTimelineStore((s) => s.selectedNodeId);
   const undo = useTimelineStore((s) => s.undo);
   const redo = useTimelineStore((s) => s.redo);
@@ -381,6 +385,25 @@ export default function TimelinePanel() {
     >
       {isEmpty && <TimelineEmpty />}
 
+      <div className="absolute top-3 right-3 z-20 flex gap-2">
+        <button
+          onClick={() => {
+            if (confirm(t("timeline.toast.clearConfirm"))) {
+              clearGraph();
+              if (currentProject) {
+                clearTimeline(currentProject.path).then(() => {
+                  showToast("success", t("timeline.toast.cleared"));
+                });
+              }
+            }
+          }}
+          className="px-2 py-1 text-xs bg-nf-bg-sidebar border border-nf-border-light rounded text-nf-text-secondary hover:text-fandex-tertiary hover:border-fandex-tertiary transition-colors"
+          title="清空图谱"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
       <ReactFlow
         nodes={nodes as unknown as Node[]}
         edges={edges as unknown as Edge[]}
@@ -424,6 +447,16 @@ export default function TimelinePanel() {
           }}
           onEditDetail={() => {
             if (contextMenu.nodeId) selectNode(contextMenu.nodeId);
+            setContextMenu(null);
+          }}
+          onDeleteNode={() => {
+            if (
+              contextMenu.nodeId &&
+              confirm(t("timeline.toast.deleteConfirm"))
+            ) {
+              deleteNode(contextMenu.nodeId);
+              showToast("success", t("timeline.toast.deleted"));
+            }
             setContextMenu(null);
           }}
           onClose={() => setContextMenu(null)}
