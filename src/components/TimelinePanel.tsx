@@ -16,7 +16,7 @@
 //   缺少 `Record<string, unknown>` 索引签名(项目禁用 unknown 规则)。
 // 验证依据: tsc --noEmit 通过。
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import {
   ReactFlow,
@@ -36,12 +36,14 @@ import { useAppStore } from "../lib/store";
 import { useTimelineStore } from "../lib/stores/timelineStore";
 import { autoLayout } from "../lib/dagreLayout";
 import { EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
+import type { TimelineNodeType, TimelineNode as StoryTimelineNode } from "../lib/stores/timelineTypes";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 
 import TimelineNode from "./TimelineNode";
 import TimelineEdge from "./TimelineEdge";
 import TimelineEmpty from "./TimelineEmpty";
+import TimelineContextMenu from "./TimelineContextMenu";
 
 /**
  * 时间线画布容器组件
@@ -74,6 +76,15 @@ export default function TimelinePanel() {
 
   const { showToast } = useToast();
   const { t } = useI18n();
+
+  // 右键菜单状态(null 表示菜单关闭)
+  // 包含菜单位置与触发节点信息(画布空白时 nodeId/nodeType 均为 null)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    nodeId: string | null;
+    nodeType: TimelineNodeType | null;
+  } | null>(null);
 
   // nodeTypes / edgeTypes 必须在组件外定义或 useMemo, 避免每次渲染重新创建导致 React Flow 警告
   const nodeTypes: NodeTypes = useMemo(() => ({ storyNode: TimelineNode }), []);
@@ -110,6 +121,61 @@ export default function TimelinePanel() {
     useTimelineStore.setState({ nodes: layoutedNodes });
     showToast("success", t("timeline.toast.layoutApplied"));
   }, [showToast, t]);
+
+  /**
+   * 创建新节点并可选地连线到父节点
+   * 输入: type 节点类型, position 画布坐标, parentId 父节点 ID(可选)
+   * 输出: void
+   * 流程:
+   *   1. 构造 TimelineNode(含默认值)
+   *   2. 添加到 store.nodes
+   *   3. 若 parentId 存在, 创建对应类型的边
+   */
+  const handleCreateNode = useCallback(
+    (type: TimelineNodeType, position: { x: number; y: number }, parentId?: string) => {
+      const now = new Date().toISOString();
+      const newNode: StoryTimelineNode = {
+        id: `node_${crypto.randomUUID()}`,
+        type: "storyNode",
+        position,
+        data: {
+          title:
+            type === "main"
+              ? "新主线节点"
+              : type === "branch"
+                ? "新分支"
+                : type === "event"
+                  ? "新事件"
+                  : "新结局",
+          nodeType: type,
+          summary: "",
+          coreConflict: "",
+          foreshadowing: "",
+          status: "planned",
+          order: 0,
+          collapsed: false,
+          childCount: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+      };
+
+      useTimelineStore.setState((state) => ({ nodes: [...state.nodes, newNode] }));
+
+      // 若有父节点, 创建连线
+      if (parentId) {
+        const newEdge = {
+          id: `edge_${crypto.randomUUID()}`,
+          source: parentId,
+          target: newNode.id,
+          type: "storyEdge" as const,
+          data: { edgeKind: type },
+        };
+        useTimelineStore.setState((state) => ({ edges: [...state.edges, newEdge] }));
+      }
+    },
+    []
+  );
 
   // 快捷键监听(仅在 activeCategory === "timeline" 时生效)
   useEffect(() => {
@@ -183,6 +249,41 @@ export default function TimelinePanel() {
     addEdge(connection);
   }, [addEdge]);
 
+  /**
+   * 节点右键菜单触发
+   * 输入: event 鼠标事件, node React Flow 节点对象
+   * 输出: void
+   * 流程: 阻止默认菜单, 记录位置与节点类型, 打开自定义菜单
+   */
+  const handleNodeContextMenu = useCallback(
+    (event: ReactMouseEvent, node: Node) => {
+      event.preventDefault();
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: node.id,
+        nodeType: (node.data as { nodeType?: TimelineNodeType })?.nodeType ?? null,
+      });
+    },
+    []
+  );
+
+  /**
+   * 画布空白右键菜单触发
+   * 输入: event 鼠标事件(ReactFlow 传入 native MouseEvent 或 React MouseEvent)
+   * 输出: void
+   * 流程: 阻止默认菜单, 记录位置, nodeType 置空表示画布空白
+   */
+  const handlePaneContextMenu = useCallback((event: MouseEvent | ReactMouseEvent) => {
+    event.preventDefault();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      nodeId: null,
+      nodeType: null,
+    });
+  }, []);
+
   // 是否显示空状态
   const isEmpty = nodes.length === 0 && !loading;
 
@@ -205,6 +306,8 @@ export default function TimelinePanel() {
         onConnect={handleConnect}
         onNodeClick={(_: ReactMouseEvent, node: Node) => selectNode(node.id)}
         onPaneClick={() => selectNode(null)}
+        onNodeContextMenu={handleNodeContextMenu}
+        onPaneContextMenu={handlePaneContextMenu}
         onlyRenderVisibleElements={true}
         minZoom={0.1}
         maxZoom={2}
@@ -221,6 +324,23 @@ export default function TimelinePanel() {
         />
         <Controls />
       </ReactFlow>
+
+      {contextMenu && (
+        <TimelineContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          nodeType={contextMenu.nodeType}
+          onCreateNode={(type, pos) => {
+            handleCreateNode(type, pos, contextMenu.nodeId ?? undefined);
+            setContextMenu(null);
+          }}
+          onEditDetail={() => {
+            if (contextMenu.nodeId) selectNode(contextMenu.nodeId);
+            setContextMenu(null);
+          }}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
