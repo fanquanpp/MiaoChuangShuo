@@ -16,6 +16,7 @@ mod snapshot_commands;
 mod character_commands;
 mod template_schema;
 mod codex_commands;
+mod timeline_commands;
 mod scene_commands;
 
 /// 应用入口函数
@@ -82,6 +83,10 @@ pub fn run() {
             // 智能设定库（Codex）命令
             codex_commands::scan_entity_mentions,
             codex_commands::batch_scan_entities,
+            // 剧情时间线编辑器命令
+            timeline_commands::read_timeline,
+            timeline_commands::save_timeline,
+            timeline_commands::clear_timeline,
             // 场景化叙事工作台命令
             scene_commands::list_scenes,
             scene_commands::save_scenes,
