@@ -258,12 +258,18 @@ function hexToRgbStr(hex: string): string {
  * 输出: 无（副作用：修改 document.documentElement.style 与 class）
  * 流程:
  *   1. 检测当前主题模式（.light 类），按主题选择预设查询路径
- *   2. 解析预设背景色：custom 预设使用 customColor 并派生卡片/侧边栏色；
- *      其他预设直接查表；查表失败时按主题回退到默认预设
- *   3. 注入 CSS 变量：--fandex-bg、--fandex-bg-card、--fandex-bg-sidebar
- *      （亮色主题同样注入内联变量，确保用户选择的亮色预设覆盖 .light 默认值）
+ *   2. 解析预设背景色：custom 预设使用 customColor；其他预设直接查表；查表失败时按主题回退到默认预设
+ *   3. 仅注入主背景变量 --fandex-bg（编辑区/画布跟随背景色调节）
+ *      不再注入 --fandex-bg-card / --fandex-bg-sidebar，让卡片/面板/工具栏/侧边栏
+ *      回归 styles.css 中 :root / .light 的固定默认值，确保 UI 框架色不受背景色调节影响
  *   4. 注入毛玻璃变量：--nf-glass-opacity、--nf-bg-rgb（供 rgba 拼接使用）
  *   5. 应用质感模式：在 root 上切换 .nf-tex-* 类，控制全局面板质感渲染
+ *
+ * 变更记录：
+ *   - 解耦背景色调节与 UI 框架色：背景色调节仅影响主背景（编辑区/画布），
+ *     工具栏/卡片/面板/侧边栏保持固定的主题色，不受背景预设变化影响。
+ *   - 此前注入 --fandex-bg-card / --fandex-bg-sidebar 导致工具栏跟随背景色变化，
+ *     属于设计缺陷，现修正为仅注入 --fandex-bg。
  */
 function applyBackgroundTheme(
   preset: string,
@@ -277,49 +283,25 @@ function applyBackgroundTheme(
   const isLightTheme = root.classList.contains("light");
 
   let bg: string;
-  let cardBg: string;
-  let sidebarBg: string;
 
   if (preset === "custom" && customColor) {
-    // 自定义颜色：以用户选择色为基础，派生略亮/略暗变体
+    // 自定义颜色：以用户选择色作为主背景
     bg = customColor;
-    const rgb = hexToRgbStr(customColor)
-      .split(",")
-      .map((s) => parseInt(s.trim(), 10));
-    if (rgb.length === 3 && rgb.every((n) => !isNaN(n))) {
-      const [r, g, b] = rgb;
-      // 卡片色：各通道提升 10，钳制到 255
-      cardBg = `#${[r + 10, g + 10, b + 10]
-        .map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0"))
-        .join("")}`;
-      // 侧边栏色：各通道降低 4，钳制到 255
-      sidebarBg = `#${[r - 4, g - 4, b - 4]
-        .map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0"))
-        .join("")}`;
-    } else {
-      cardBg = isLightTheme ? "#eeeef4" : "#161821";
-      sidebarBg = isLightTheme ? "#f2f2f8" : "#101218";
-    }
   } else {
     const found = BACKGROUND_PRESETS.find((p) => p.id === preset);
     if (found) {
       bg = found.bg;
-      cardBg = found.cardBg;
-      sidebarBg = found.sidebarBg;
     } else {
       // 回退到当前主题的默认预设
       const fallbackId = getDefaultPresetByMode(isLightTheme ? "light" : "dark");
       const fallback = BACKGROUND_PRESETS.find((p) => p.id === fallbackId);
       bg = fallback?.bg ?? (isLightTheme ? "#f8f8fc" : "#0c0d14");
-      cardBg = fallback?.cardBg ?? (isLightTheme ? "#eeeef4" : "#161821");
-      sidebarBg = fallback?.sidebarBg ?? (isLightTheme ? "#f2f2f8" : "#101218");
     }
   }
 
-  // 注入主背景变量（亮/暗主题均注入，确保选定预设覆盖 .light 默认值）
+  // 仅注入主背景变量（编辑区/画布跟随背景色调节）
+  // 卡片/面板/工具栏/侧边栏的 --fandex-bg-card / --fandex-bg-sidebar 保持 styles.css 固定默认值
   root.style.setProperty("--fandex-bg", bg);
-  root.style.setProperty("--fandex-bg-card", cardBg);
-  root.style.setProperty("--fandex-bg-sidebar", sidebarBg);
   // 毛玻璃透明度：0-1，供 .nf-glass 类使用 rgba 拼接
   root.style.setProperty("--nf-glass-opacity", String(glassOpacity));
   // 主背景 RGB 通道：供毛玻璃面板使用 rgba(var(--nf-bg-rgb), opacity)

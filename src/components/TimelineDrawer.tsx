@@ -180,7 +180,7 @@ export default function TimelineDrawer({ nodeId, onClose }: { nodeId: string; on
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
           <button
             onClick={onClose}
-            className="nf-tool-btn px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+            className="nf-tool-btn h-8 px-4 text-sm flex items-center justify-center gap-1.5 border border-nf-border-light text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
           >
             {t("app.close") || "关闭"}
           </button>

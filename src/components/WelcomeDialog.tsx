@@ -229,7 +229,7 @@ export default function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
           </span>
           <button
             onClick={handleClose}
-            className="nf-tool-btn flex items-center gap-1.5 px-5 py-2 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-all duration-base ease-fandex shadow-sm hover:shadow-md group"
+            className="nf-tool-btn h-8 px-4 text-sm flex items-center justify-center gap-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium transition-all duration-base ease-fandex shadow-sm hover:shadow-md group"
           >
             {t("welcome.startButton")}
             <ArrowRight className="w-3.5 h-3.5 transition-transform duration-fast group-hover:translate-x-0.5" />

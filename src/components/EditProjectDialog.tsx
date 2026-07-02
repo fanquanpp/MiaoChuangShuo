@@ -236,14 +236,14 @@ export default function EditProjectDialog({ project, onClose, onSuccess }: EditP
           <button
             onClick={onClose}
             disabled={saving}
-            className="nf-tool-btn px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition duration-fast disabled:opacity-50"
+            className="nf-tool-btn h-8 px-4 text-sm flex items-center justify-center gap-1.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition duration-fast disabled:opacity-50"
           >
             {t("app.cancel")}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="nf-tool-btn group px-4 py-2 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse flex items-center gap-1.5 transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
+            className="nf-tool-btn group h-8 px-4 text-sm flex items-center justify-center gap-1.5 bg-fandex-primary hover:bg-fandex-primary-hover font-medium text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {saving ? t("app.saving") : t("app.save")}

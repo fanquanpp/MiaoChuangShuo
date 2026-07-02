@@ -11,7 +11,7 @@
 // 4. 高亮当前选中分类
 // 5. 触发分类切换
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   FileText,
   ListTree,
@@ -30,6 +30,9 @@ import {
   PanelLeft,
   PanelLeftClose,
   GitBranch,
+  Trash2,
+  Check,
+  X,
 } from "lucide-react";
 import {
   useAppStore,
@@ -39,7 +42,7 @@ import {
 import { getTypeSpecificDirs } from "../lib/templateRegistry";
 import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
-import { readProjectTree } from "../lib/api";
+import { readProjectTree, createFile, deletePath } from "../lib/api";
 import type { FileNode } from "../lib/api";
 
 // 图标映射
@@ -53,14 +56,14 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   timeline: GitBranch,
 };
 
-// 写作主分类：核心写作功能，常驻显示
-const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline"];
+// 写作主分类：核心写作功能，常驻显示（含剧情图谱，归类到写作）
+const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline"];
 
 // 设定类分类：统一设定库入口（替代原 characters/worldview/glossary/materials 分散入口）
 const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex"];
 
 // 工具分类列表
-const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search", "timeline"];
+const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
 
 // 左侧导航栏属性接口
 interface SidebarProps {
@@ -121,31 +124,101 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
 
   // 读取项目目录树，找出不在标准分类和类型专属目录中的额外目录
   const [extraDirs, setExtraDirs] = useState<string[]>([]);
-  useEffect(() => {
+
+  // 刷新额外目录列表（提取为可复用函数，新建/删除分类后调用）
+  const refreshExtraDirs = useCallback(async () => {
     if (!currentProject) { setExtraDirs([]); return; }
-    (async () => {
-      try {
-        const tree = await readProjectTree(currentProject.path);
-        // 收集所有已知目录名（标准分类 + 类型专属）
-        const knownDirs = new Set<string>();
-        // 标准分类目录
-        for (const dir of Object.values(CATEGORY_DIRS)) {
-          if (dir) knownDirs.add(dir);
-        }
-        // 类型专属目录
-        for (const d of typeSpecificDirs) knownDirs.add(d);
-        // 隐藏目录
-        knownDirs.add(".novelforge");
-        // 找出额外的顶层目录
-        const extras = tree
-          .filter((n: FileNode) => n.is_dir && !knownDirs.has(n.name))
-          .map((n: FileNode) => n.name);
-        setExtraDirs(extras);
-      } catch {
-        setExtraDirs([]);
+    try {
+      const tree = await readProjectTree(currentProject.path);
+      // 收集所有已知目录名（标准分类 + 类型专属）
+      const knownDirs = new Set<string>();
+      for (const dir of Object.values(CATEGORY_DIRS)) {
+        if (dir) knownDirs.add(dir);
       }
-    })();
+      for (const d of typeSpecificDirs) knownDirs.add(d);
+      knownDirs.add(".novelforge");
+      const extras = tree
+        .filter((n: FileNode) => n.is_dir && !knownDirs.has(n.name))
+        .map((n: FileNode) => n.name);
+      setExtraDirs(extras);
+    } catch {
+      setExtraDirs([]);
+    }
   }, [currentProject, typeSpecificDirs]);
+
+  useEffect(() => {
+    refreshExtraDirs();
+  }, [refreshExtraDirs]);
+
+  // ===== 自定义分类新建功能 =====
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const newCategoryInputRef = useRef<HTMLInputElement>(null);
+
+  // 提交新建分类：在项目根目录创建对应目录（通过创建 .gitkeep 占位文件）
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name || !currentProject) return;
+    // 校验名称合法性：禁止路径分隔符与特殊字符
+    if (/[\\/:*?"<>|]/.test(name)) {
+      setIsAddingCategory(false);
+      setNewCategoryName("");
+      return;
+    }
+    // 禁止与已知分类目录重名
+    const knownDirs = new Set<string>();
+    for (const dir of Object.values(CATEGORY_DIRS)) {
+      if (dir) knownDirs.add(dir);
+    }
+    for (const d of typeSpecificDirs) knownDirs.add(d);
+    if (knownDirs.has(name) || extraDirs.includes(name)) {
+      setIsAddingCategory(false);
+      setNewCategoryName("");
+      return;
+    }
+    try {
+      // 创建 .gitkeep 占位文件，后端会自动创建父目录
+      await createFile(currentProject.path, `${name}/.gitkeep`, "");
+      await refreshExtraDirs();
+    } catch {
+      // 静默处理创建失败
+    }
+    setIsAddingCategory(false);
+    setNewCategoryName("");
+  };
+
+  // ===== 自定义分类右键删除功能 =====
+  const [contextMenu, setContextMenu] = useState<{ dirName: string; x: number; y: number } | null>(null);
+
+  // 删除自定义分类目录
+  const handleDeleteCategory = async (dirName: string) => {
+    if (!currentProject) return;
+    const sep = navigator.platform.toLowerCase().includes("win") ? "\\" : "/";
+    const dirPath = `${currentProject.path}${sep}${dirName}`;
+    try {
+      await deletePath(dirPath, currentProject.path);
+      await refreshExtraDirs();
+      // 若删除的是当前激活分类，切回正文
+      if (activeCategory === dirName) {
+        setActiveCategory("manuscript");
+      }
+    } catch {
+      // 静默处理删除失败
+    }
+    setContextMenu(null);
+  };
+
+  // 点击其他区域关闭右键菜单
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClose = () => setContextMenu(null);
+    document.addEventListener("click", handleClose);
+    document.addEventListener("contextmenu", handleClose);
+    return () => {
+      document.removeEventListener("click", handleClose);
+      document.removeEventListener("contextmenu", handleClose);
+    };
+  }, [contextMenu]);
 
   return (
     <div className={`${collapsed ? "w-12 min-w-[48px]" : "w-52 min-w-[200px]"} border-r border-nf-border-light bg-nf-bg-sidebar flex flex-col relative z-10 nf-sidebar-glow transition-all duration-300`}>
@@ -353,50 +426,93 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
           </>
         )}
 
-        {/* 项目自定义目录（非预设的额外目录）- 可折叠 */}
-        {extraDirs.length > 0 && (
-          <>
-            {!collapsed && (
-              <button
-                onClick={() => setCustomExpanded((v) => !v)}
-                title={customExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
-                className="w-full flex items-center gap-1.5 px-3 mt-1 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
-              >
-                {customExpanded ? (
-                  <ChevronDown className="w-3 h-3" />
-                ) : (
-                  <ChevronRight className="w-3 h-3" />
-                )}
-                {t("sidebar.customSection")}
-              </button>
-            )}
-            <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
-              (collapsed || customExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-            }`}>
-              {extraDirs.map((dirName) => {
-                const isActive = activeCategory === dirName;
-                return (
-                  <button
-                    key={dirName}
-                    onClick={() => switchTo(dirName as SidebarCategory)}
-                    title={dirName}
-                    className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
-                      isActive
-                        ? `nf-active bg-fandex-primary/10 text-fandex-primary`
-                        : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
-                    }`}
-                  >
-                    <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                      isActive ? 'scale-110' : 'group-hover:scale-110'
-                    }`} />
-                    {!collapsed && <span className="truncate">{dirName}</span>}
-                  </button>
-                );
-              })}
-            </div>
-            {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
-          </>
+        {/* 项目自定义目录（非预设的额外目录）- 可折叠，始终显示以支持新建 */}
+        {!collapsed && (
+          <div className="flex items-center gap-1 mt-1">
+            <button
+              onClick={() => setCustomExpanded((v) => !v)}
+              title={customExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
+              className="flex-1 flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
+            >
+              {customExpanded ? (
+                <ChevronDown className="w-3 h-3" />
+              ) : (
+                <ChevronRight className="w-3 h-3" />
+              )}
+              {t("sidebar.customSection")}
+            </button>
+            {/* 新建自定义分类按钮 */}
+            <button
+              onClick={() => {
+                setIsAddingCategory(true);
+                setTimeout(() => newCategoryInputRef.current?.focus(), 50);
+              }}
+              title={t("sidebar.newCustomCategory")}
+              className="w-5 h-5 mr-2 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
+        {/* 新建分类输入框（inline 模式，回车确认，Esc/点击取消按钮取消） */}
+        {isAddingCategory && !collapsed && (
+          <div className="px-3 py-1 flex items-center gap-1">
+            <input
+              ref={newCategoryInputRef}
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreateCategory();
+                if (e.key === "Escape") { setIsAddingCategory(false); setNewCategoryName(""); }
+              }}
+              placeholder={t("sidebar.customCategoryName")}
+              className="flex-1 h-6 px-1.5 text-xs bg-nf-bg border border-fandex-primary/40 text-nf-text placeholder:text-nf-text-tertiary focus:outline-none focus:border-fandex-primary"
+            />
+            <button
+              onClick={handleCreateCategory}
+              title={t("app.confirm")}
+              className="w-5 h-5 flex items-center justify-center text-fandex-primary hover:bg-fandex-primary/10 transition-colors duration-fast"
+            >
+              <Check className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => { setIsAddingCategory(false); setNewCategoryName(""); }}
+              title={t("app.cancel")}
+              className="w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary hover:bg-nf-bg-hover transition-colors duration-fast"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
+          (collapsed || customExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}>
+          {extraDirs.map((dirName) => {
+            const isActive = activeCategory === dirName;
+            return (
+              <button
+                key={dirName}
+                onClick={() => switchTo(dirName as SidebarCategory)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ dirName, x: e.clientX, y: e.clientY });
+                }}
+                title={dirName}
+                className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
+                  isActive
+                    ? `nf-active bg-fandex-primary/10 text-fandex-primary`
+                    : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                }`}
+              >
+                <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
+                  isActive ? 'scale-110' : 'group-hover:scale-110'
+                }`} />
+                {!collapsed && <span className="truncate">{dirName}</span>}
+              </button>
+            );
+          })}
+        </div>
+        {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
 
         {/* 工具分组 - 可折叠 */}
         {!collapsed && (
@@ -472,6 +588,30 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
           {!collapsed && t("sidebar.newFile")}
         </button>
       </div>
+
+      {/* 自定义分类右键删除菜单（浮动定位到鼠标位置） */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-[120px] bg-nf-bg-card border border-nf-border-light shadow-xl py-0.5"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button
+            onClick={() => {
+              if (window.confirm(t("sidebar.confirmDeleteCategory").replace("{name}", contextMenu.dirName))) {
+                handleDeleteCategory(contextMenu.dirName);
+              } else {
+                setContextMenu(null);
+              }
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary hover:bg-nf-bg-hover transition-colors duration-fast"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {t("sidebar.deleteCategory")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

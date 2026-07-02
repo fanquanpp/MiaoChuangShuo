@@ -412,7 +412,7 @@ export default function CreateFileWizard({
             <button
               onClick={handlePrev}
               disabled={stepIndex === 0 || creating}
-              className="nf-tool-btn nf-icon-slide flex items-center gap-1 px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover disabled:opacity-30 disabled:cursor-not-allowed"
+              className="nf-tool-btn nf-icon-slide h-7 px-2 text-xs flex items-center justify-center gap-1.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
               {t("wizard.prev")}
@@ -421,7 +421,7 @@ export default function CreateFileWizard({
               <button
                 onClick={handleNext}
                 disabled={!canNext || creating}
-                className="nf-btn-shine nf-icon-slide group flex items-center gap-1 px-4 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse disabled:opacity-50 disabled:cursor-not-allowed"
+                className="nf-btn-shine nf-icon-slide group h-8 px-4 text-sm flex items-center justify-center gap-1.5 bg-fandex-primary hover:bg-fandex-primary-hover font-medium text-nf-text-inverse disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="relative z-10">{t("wizard.next")}</span>
                 <ChevronRight className="w-4 h-4 relative z-10" />
@@ -430,7 +430,7 @@ export default function CreateFileWizard({
               <button
                 onClick={handleFinish}
                 disabled={!fileName.trim() || creating}
-                className="nf-icon-spark group flex items-center gap-1.5 px-4 py-1.5 bg-fandex-secondary hover:bg-fandex-secondary/80 text-sm font-medium text-nf-bg-inverse transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-fandex-secondary/20"
+                className="nf-icon-spark group h-8 px-4 text-sm flex items-center justify-center gap-1.5 bg-fandex-secondary hover:bg-fandex-secondary/80 font-medium text-nf-bg-inverse transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-fandex-secondary/20"
               >
                 {creating ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

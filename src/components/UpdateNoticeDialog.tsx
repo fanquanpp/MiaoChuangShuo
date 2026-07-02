@@ -202,7 +202,7 @@ export default function UpdateNoticeDialog({
           <button
             onClick={handleSkip}
             title={t("update.skipVersionHint")}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs text-nf-text-tertiary hover:text-nf-text-secondary border border-nf-border-light hover:border-nf-border transition duration-fast nf-tool-btn"
+            className="h-8 px-4 text-sm flex items-center justify-center gap-1.5 text-nf-text-tertiary hover:text-nf-text-secondary border border-nf-border-light hover:border-nf-border transition duration-fast nf-tool-btn"
           >
             <SkipForward className="w-3.5 h-3.5" />
             {t("update.skipVersion")}
@@ -212,7 +212,7 @@ export default function UpdateNoticeDialog({
           <button
             onClick={onClose}
             title={t("update.remindLaterHint")}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-nf-border transition duration-fast nf-tool-btn"
+            className="h-8 px-4 text-sm flex items-center justify-center gap-1.5 text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:border-nf-border transition duration-fast nf-tool-btn"
           >
             <Clock className="w-3.5 h-3.5" />
             {t("update.remindLater")}
@@ -221,7 +221,7 @@ export default function UpdateNoticeDialog({
           {/* 立即下载（主按钮） */}
           <button
             onClick={handleDownload}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast ml-auto"
+            className="h-8 px-4 text-sm flex items-center justify-center gap-1.5 font-medium bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast ml-auto"
           >
             <Download className="w-3.5 h-3.5" />
             {t("update.downloadNow")}

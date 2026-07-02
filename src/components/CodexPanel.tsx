@@ -598,14 +598,14 @@ export default function CodexPanel() {
               <button
                 onClick={() => setAddDialogOpen(false)}
                 disabled={creating}
-                className="nf-tool-btn px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
+                className="nf-tool-btn h-8 px-4 text-sm flex items-center justify-center gap-1.5 border border-nf-border-light text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
               >
                 {t("codex.cancel")}
               </button>
               <button
                 onClick={handleCreateEntity}
                 disabled={creating || !newEntityName.trim()}
-                className="nf-tool-btn group flex items-center gap-1.5 px-4 py-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
+                className="nf-tool-btn group h-8 px-4 text-sm flex items-center justify-center gap-1.5 bg-fandex-primary hover:bg-fandex-primary-hover font-medium text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {creating ? t("app.creating") : t("codex.create")}

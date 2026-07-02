@@ -817,7 +817,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
           <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={() => setViewMode("grid")}
-              className={`nf-tool-btn p-1.5 border ${
+              className={`nf-tool-btn h-7 w-7 flex items-center justify-center border ${
                 viewMode === "grid"
                   ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
                   : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
@@ -828,7 +828,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`nf-tool-btn p-1.5 border ${
+              className={`nf-tool-btn h-7 w-7 flex items-center justify-center border ${
                 viewMode === "list"
                   ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary"
                   : "text-nf-text-tertiary hover:text-nf-text border-transparent hover:border-nf-border-light"
@@ -844,7 +844,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
           <div className="grid grid-cols-3 gap-1">
             <button
               onClick={onCreateFile}
-              className="nf-tool-btn flex items-center justify-center gap-1 px-1.5 py-1.5 text-[11px] text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition-all duration-fast"
+              className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition-all duration-fast"
               title={t("filelist.newChapter")}
             >
               <FilePlus className="w-3 h-3 flex-shrink-0" />
@@ -852,7 +852,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
             </button>
             <button
               onClick={() => setShowOutlineToChapters(true)}
-              className="nf-tool-btn flex items-center justify-center gap-1 px-1.5 py-1.5 text-[11px] text-fandex-tertiary border border-fandex-tertiary/50 hover:bg-fandex-tertiary/10 transition-all duration-fast"
+              className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 text-fandex-tertiary border border-fandex-tertiary/50 hover:bg-fandex-tertiary/10 transition-all duration-fast"
               title={t("outlineToChapters.btnTitle")}
             >
               <ListTree className="w-3 h-3 flex-shrink-0" />
@@ -860,7 +860,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
             </button>
             <button
               onClick={() => setShowVolumeGenerator(true)}
-              className="nf-tool-btn flex items-center justify-center gap-1 px-1.5 py-1.5 text-[11px] text-fandex-secondary border border-fandex-secondary/50 hover:bg-fandex-secondary/10 transition-all duration-fast"
+              className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 text-fandex-secondary border border-fandex-secondary/50 hover:bg-fandex-secondary/10 transition-all duration-fast"
               title={t("volumeGen.title")}
             >
               <BookCopy className="w-3 h-3 flex-shrink-0" />
@@ -878,7 +878,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
             <p className="text-sm text-nf-text-tertiary mb-3">{t("filelist.empty")}</p>
             <button
               onClick={onCreateFile}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition duration-fast"
+              className="h-8 px-4 text-sm flex items-center justify-center gap-1.5 text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition duration-fast"
             >
               <FilePlus className="w-4 h-4" />
               {t("filelist.createFirst")}

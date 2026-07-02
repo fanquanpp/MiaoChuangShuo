@@ -154,7 +154,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
             type="button"
             tabIndex={-1}
             title={t("editor.textColor")}
-            className="flex items-center gap-0.5 px-1.5 py-1 text-nf-text-secondary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast"
+            className="h-7 px-1.5 flex items-center gap-0.5 text-nf-text-secondary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast"
           >
             <Palette className="w-3.5 h-3.5" />
             <span
@@ -194,7 +194,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
             type="button"
             tabIndex={-1}
             title={t("editor.highlight")}
-            className="flex items-center gap-0.5 px-1.5 py-1 text-nf-text-secondary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast"
+            className="h-7 px-1.5 flex items-center gap-0.5 text-nf-text-secondary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast"
           >
             <Highlighter className="w-3.5 h-3.5" />
             <span
@@ -277,7 +277,7 @@ function BubbleButton({ onClick, active, title, children }: BubbleButtonProps) {
       onClick={onClick}
       tabIndex={-1}
       title={title}
-      className={`flex items-center justify-center w-6 h-6 transition-colors duration-fast ${
+      className={`h-7 w-7 flex items-center justify-center transition-colors duration-fast ${
         active
           ? "bg-fandex-primary/15 text-fandex-primary"
           : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"

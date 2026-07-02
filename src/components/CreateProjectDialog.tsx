@@ -299,7 +299,7 @@ export default function CreateProjectDialog({
               />
               <button
                 onClick={handlePickDir}
-                className="nf-tool-btn px-3 py-2 bg-nf-bg-hover hover:bg-nf-border-light border border-nf-border-light text-sm text-nf-text flex items-center gap-1.5 transition duration-fast"
+                className="nf-tool-btn h-8 px-4 text-sm flex items-center justify-center gap-1.5 bg-nf-bg-hover hover:bg-nf-border-light border border-nf-border-light text-nf-text transition duration-fast"
               >
                 <FolderOpen className="w-4 h-4" />
                 {t("app.browse")}
@@ -319,14 +319,14 @@ export default function CreateProjectDialog({
         <div className="flex justify-end gap-1 px-6 py-4 border-t border-nf-border-light">
           <button
             onClick={onClose}
-            className="nf-tool-btn px-4 py-2 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition duration-fast"
+            className="nf-tool-btn h-8 px-4 text-sm flex items-center justify-center gap-1.5 text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover border border-nf-border-light transition duration-fast"
           >
             {t("app.cancel")}
           </button>
           <button
             onClick={handleCreate}
             disabled={creating}
-            className="nf-tool-btn group px-4 py-2 bg-fandex-primary hover:bg-fandex-primary-hover text-sm font-medium text-nf-text-inverse flex items-center gap-1.5 transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
+            className="nf-tool-btn group h-8 px-4 text-sm flex items-center justify-center gap-1.5 bg-fandex-primary hover:bg-fandex-primary-hover font-medium text-nf-text-inverse transition duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
             {creating ? t("app.creating") : t("project.createTitle")}

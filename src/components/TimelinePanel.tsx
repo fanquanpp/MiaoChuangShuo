@@ -469,7 +469,7 @@ export default function TimelinePanel() {
               showToast("success", t("timeline.toast.cleared"));
             }
           }}
-          className="nf-tool-btn px-2 py-1 text-xs bg-nf-bg-sidebar border border-nf-border-light rounded-none text-nf-text-secondary hover:text-fandex-tertiary hover:border-fandex-tertiary"
+          className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 bg-nf-bg-sidebar border border-nf-border-light rounded-none text-nf-text-secondary hover:text-fandex-tertiary hover:border-fandex-tertiary"
           title="清空图谱"
         >
           <Trash2 className="w-3.5 h-3.5" />

@@ -522,7 +522,7 @@ export default function Workspace() {
             <div className="flex justify-end px-5 py-3 border-t border-nf-border-light">
               <button
                 onClick={() => setShowFirstFileDialog(false)}
-                className="px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
+                className="h-8 px-4 text-sm flex items-center justify-center gap-1.5 border border-nf-border-light text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover transition duration-fast"
               >
                 {t("app.cancel")}
               </button>

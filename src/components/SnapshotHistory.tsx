@@ -414,7 +414,7 @@ export default function SnapshotHistory({
                         onClick={() => handleRestore(snapshot)}
                         disabled={actionLoading}
                         title={t("snapshot.restore")}
-                        className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition-all duration-fast ease-fandex disabled:opacity-50"
+                        className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 transition-all duration-fast ease-fandex disabled:opacity-50"
                       >
                         <RotateCcw className="w-3 h-3" />
                         {t("snapshot.restore")}
@@ -423,7 +423,7 @@ export default function SnapshotHistory({
                         onClick={() => handleDelete(snapshot)}
                         disabled={actionLoading}
                         title={t("snapshot.delete")}
-                        className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-xs text-fandex-tertiary border border-fandex-tertiary/30 hover:bg-fandex-tertiary/10 transition-all duration-fast ease-fandex disabled:opacity-50 ml-auto"
+                        className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 text-fandex-tertiary border border-fandex-tertiary/30 hover:bg-fandex-tertiary/10 transition-all duration-fast ease-fandex disabled:opacity-50 ml-auto"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>

@@ -93,7 +93,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
 
   // ===== 版本更新检测状态 =====
   // 当前应用版本号（组件挂载时异步获取）
-  const [currentVersion, setCurrentVersion] = useState("26.7.10");
+  const [currentVersion, setCurrentVersion] = useState("26.7.11");
   // 检查中状态（控制按钮 loading 动画）
   const [checking, setChecking] = useState(false);
   // 检测到的新版本信息（null=未检测到或未检查）
@@ -533,7 +533,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
               </div>
               <button
                 onClick={toggleTheme}
-                className="px-3 py-1.5 text-xs border border-nf-border-light hover:border-fandex-tertiary/60 text-nf-text-secondary hover:text-fandex-tertiary transition-all duration-fast"
+                className="h-7 px-2 text-xs flex items-center justify-center gap-1.5 border border-nf-border-light hover:border-fandex-tertiary/60 text-nf-text-secondary hover:text-fandex-tertiary transition-all duration-fast"
               >
                 {theme === "dark" ? t("settings.switchLight") : t("settings.switchDark")}
               </button>
@@ -813,7 +813,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
         <div className="flex items-center justify-end px-6 py-3 border-t border-nf-border-light flex-shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 text-sm bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast"
+            className="h-8 px-4 text-sm flex items-center justify-center gap-1.5 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse transition duration-fast"
           >
             {t("app.confirm")}
           </button>

@@ -1948,6 +1948,10 @@ const enUS: TranslationDict = {
   "sidebar.volumes": "Volumes",
   "sidebar.settings": "Settings",
   "sidebar.customSection": "Custom",
+  "sidebar.newCustomCategory": "New Custom Category",
+  "sidebar.customCategoryName": "Category Name",
+  "sidebar.deleteCategory": "Delete Category",
+  "sidebar.confirmDeleteCategory": "Are you sure you want to delete category \"{name}\"? All files in this directory will be permanently deleted.",
 
   // ── Settings Dialog ──
   "settings.title": "Settings",
