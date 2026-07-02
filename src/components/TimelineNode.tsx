@@ -17,6 +17,7 @@
 import { Handle, Position, useNodesData, type NodeProps } from "@xyflow/react";
 import { NODE_TYPE_COLORS, NODE_STATUS_MAP } from "../lib/stores/timelineTypes";
 import type { TimelineNodeData } from "../lib/stores/timelineTypes";
+import { useTimelineStore } from "../lib/stores/timelineStore";
 
 /**
  * 自定义节点组件(性能优化版)
@@ -38,6 +39,9 @@ export default function TimelineNode({ id, selected }: NodeProps) {
   // 不带泛型时返回 Node | undefined, data 为 Record<string, unknown>
   const nodeData = useNodesData(id);
   if (!nodeData) return null;
+
+  // 获取折叠/展开方法(仅订阅 toggleCollapse, 避免全量订阅)
+  const toggleCollapse = useTimelineStore((s) => s.toggleCollapse);
 
   // 双重断言: 将 Record<string, unknown> 还原为 TimelineNodeData(类型安全由数据源保证)
   const data = nodeData.data as unknown as TimelineNodeData;
@@ -84,6 +88,20 @@ export default function TimelineNode({ id, selected }: NodeProps) {
         <div className="mt-2 text-xs text-nf-text-tertiary line-clamp-2">
           {data.summary}
         </div>
+      )}
+
+      {/* 折叠/展开按钮(仅 main 节点显示, 点击切换 collapsed 字段) */}
+      {data.nodeType === "main" && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleCollapse(id);
+          }}
+          className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary transition-colors"
+          title={data.collapsed ? "展开" : "折叠"}
+        >
+          {data.collapsed ? "+" : "−"}
+        </button>
       )}
 
       {/* 输出锚点 - 右侧 */}

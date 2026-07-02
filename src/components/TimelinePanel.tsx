@@ -33,7 +33,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { useAppStore } from "../lib/store";
-import { useTimelineStore } from "../lib/stores/timelineStore";
+import { useTimelineStore, filterCollapsed } from "../lib/stores/timelineStore";
 import { autoLayout } from "../lib/dagreLayout";
 import { EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
 import type { TimelineNodeType, TimelineNode as StoryTimelineNode } from "../lib/stores/timelineTypes";
@@ -62,8 +62,15 @@ export default function TimelinePanel() {
   const currentProject = useAppStore((s) => s.currentProject);
   const activeCategory = useAppStore((s) => s.activeCategory);
 
-  const nodes = useTimelineStore((s) => s.nodes);
-  const edges = useTimelineStore((s) => s.edges);
+  const allNodes = useTimelineStore((s) => s.nodes);
+  const allEdges = useTimelineStore((s) => s.edges);
+
+  // 应用折叠可达性过滤: BFS 从未折叠 main 节点出发, 隐藏折叠分支的子树
+  const { visibleNodes: nodes, visibleEdges: edges } = useMemo(
+    () => filterCollapsed(allNodes, allEdges),
+    [allNodes, allEdges]
+  );
+
   const loading = useTimelineStore((s) => s.loading);
   const loadGraph = useTimelineStore((s) => s.loadGraph);
   const onNodesChange = useTimelineStore((s) => s.onNodesChange);

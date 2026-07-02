@@ -58,6 +58,8 @@ interface TimelineState {
   updateNodeData: (nodeId: string, patch: Partial<TimelineNodeData>) => void;
   /** 选中节点 */
   selectNode: (id: string | null) => void;
+  /** 折叠/展开 main 节点 */
+  toggleCollapse: (nodeId: string) => void;
   /** 撤销(取消待保存 → undo → 触发新的防抖保存) */
   undo: () => void;
   /** 重做 */
@@ -67,6 +69,79 @@ interface TimelineState {
 /** 防抖定时器引用(模块级单例) */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const SAVE_DEBOUNCE_MS = 500;
+
+/**
+ * 计算折叠后实际显示的节点与边(可达性分析)
+ * 输入: nodes 全部节点, edges 全部边
+ * 输出: { visibleNodes, visibleEdges } 过滤后的可见集合
+ * 流程:
+ *   1. 找出所有 collapsed=true 的 main 节点
+ *   2. 从所有"未折叠的 main 节点"出发, 沿边方向 BFS
+ *   3. 遍历过程中跳过"已折叠的 main 节点"(不穿透其子树)
+ *   4. 所有被 BFS 访问到的节点为可见节点
+ *   5. 两端均可见的边为可见边
+ *
+ * 关键: BFS 处理任意深度的级联隐藏, 避免"悬浮孤岛"问题
+ */
+export function filterCollapsed(
+  nodes: TimelineNode[],
+  edges: TimelineEdge[]
+): {
+  visibleNodes: TimelineNode[];
+  visibleEdges: TimelineEdge[];
+} {
+  // 收集所有已折叠的 main 节点 ID(作为不透明屏障, BFS 不穿透)
+  const collapsedMainIds = new Set(
+    nodes
+      .filter((n) => n.data.nodeType === "main" && n.data.collapsed)
+      .map((n) => n.id)
+  );
+
+  // 无折叠节点时直接返回原始集合, 避免无谓遍历
+  if (collapsedMainIds.size === 0) {
+    return { visibleNodes: nodes, visibleEdges: edges };
+  }
+
+  // 构建邻接表(source → target[]), 仅前向遍历, 不反向
+  const adjacency = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
+    adjacency.get(edge.source)!.push(edge.target);
+  }
+
+  // BFS 初始化: 从所有未折叠的 main 节点出发作为根
+  const visited = new Set<string>();
+  const queue: string[] = [];
+
+  for (const node of nodes) {
+    if (node.data.nodeType === "main" && !node.data.collapsed) {
+      visited.add(node.id);
+      queue.push(node.id);
+    }
+  }
+
+  // BFS 主体: 沿边遍历可达节点, 遇到已折叠 main 节点时停止向下穿透
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    // 已折叠的 main 节点作为屏障, 不展开其子树
+    if (collapsedMainIds.has(current)) continue;
+
+    for (const neighbor of adjacency.get(current) ?? []) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  // 过滤: 仅保留可达节点 + 两端均可达的边
+  const visibleNodes = nodes.filter((n) => visited.has(n.id));
+  const visibleEdges = edges.filter(
+    (e) => visited.has(e.source) && visited.has(e.target)
+  );
+
+  return { visibleNodes, visibleEdges };
+}
 
 export const useTimelineStore = create<TimelineState>()(
   temporal(
@@ -216,6 +291,23 @@ export const useTimelineStore = create<TimelineState>()(
        * 输出: void
        */
       selectNode: (id) => set({ selectedNodeId: id }),
+
+      /**
+       * 折叠/展开 main 节点
+       * 输入: nodeId 节点 ID
+       * 输出: void
+       * 流程: 切换 collapsed 字段(仅 main 节点有效), 其他类型节点忽略
+       *       折叠状态变化由 zundo 追踪, 产生一次历史步骤
+       */
+      toggleCollapse: (nodeId) => {
+        set((state) => ({
+          nodes: state.nodes.map((n) =>
+            n.id === nodeId && n.data.nodeType === "main"
+              ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } }
+              : n
+          ),
+        }));
+      },
 
       /**
        * 撤销操作
