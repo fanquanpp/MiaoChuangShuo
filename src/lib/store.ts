@@ -27,7 +27,8 @@ export type SidebarCategory =
   | "codex"
   | "volumes"
   | "stats"
-  | "search";
+  | "search"
+  | "timeline";
 
 // 分类中文名称
 export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
@@ -37,6 +38,7 @@ export const CATEGORY_NAMES: Record<SidebarCategory, string> = {
   volumes: "分卷",
   stats: "统计",
   search: "搜索",
+  timeline: "剧情图谱",
 };
 
 // 分类对应目录名
@@ -47,6 +49,7 @@ export const CATEGORY_DIRS: Record<SidebarCategory, string> = {
   volumes: "卷宗",
   stats: "",
   search: "",
+  timeline: "剧情图谱",
 };
 
 // 分类图标名 (lucide-react)
@@ -57,6 +60,7 @@ export const CATEGORY_ICONS: Record<SidebarCategory, string> = {
   volumes: "BookOpen",
   stats: "BarChart3",
   search: "Search",
+  timeline: "GitBranch",
 };
 
 // 组合后的完整 App 状态类型
