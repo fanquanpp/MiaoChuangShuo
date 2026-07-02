@@ -23,7 +23,7 @@
 // 结论: 保留无泛型方案(useNodesData(id) + 双重断言), 微调建议 1 不采纳。
 
 import { Handle, Position, useNodesData, type NodeProps } from "@xyflow/react";
-import { NODE_TYPE_COLORS, NODE_STATUS_MAP } from "../lib/stores/timelineTypes";
+import { NODE_TYPE_COLORS, NODE_STATUS_MAP, EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
 import type { TimelineNodeData } from "../lib/stores/timelineTypes";
 import { useTimelineStore } from "../lib/stores/timelineStore";
 
@@ -58,76 +58,105 @@ export default function TimelineNode({ id, selected }: NodeProps) {
   const statusInfo = NODE_STATUS_MAP[data.status];
   const showFoldBadge = data.nodeType === "main" && data.collapsed && (data.childCount ?? 0) > 0;
 
+  // 节点类型强调色(复用 EDGE_TYPE_COLORS, 避免重复定义颜色映射)
+  // 用途: 顶部装饰条 / 左侧边线 / 选中态外发光, 提升类型识别度与视觉质感
+  const accent = EDGE_TYPE_COLORS[data.nodeType];
+
   return (
     <div
       className={`
-        relative px-4 py-3 rounded-none border-l-2 backdrop-blur-md shadow-md transition-all duration-150
-        ${colors.border}
-        ${selected ? "ring-2 ring-fandex-primary/50 scale-[1.02]" : "hover:shadow-lg hover:-translate-y-0.5"}
+        relative rounded-none backdrop-blur-md transition-all duration-200 ease-fandex overflow-hidden
+        ${selected
+          ? "scale-[1.02]"
+          : "hover:-translate-y-0.5"
+        }
       `}
       style={{
-        width: data.nodeType === "main" ? 256 : 180,
-        // 磨砂玻璃 65% 透明度: nf-bg-card 基色 rgba(22,24,33) 以 0.65 不透明度叠加
+        width: data.nodeType === "main" ? 256 : 184,
+        // 磨砂玻璃 65% 透明度(硬约束保留): nf-bg-card 基色 rgba(22,24,33) 以 0.65 不透明度叠加
         backgroundColor: "rgba(22, 24, 33, 0.65)",
-        borderLeftColor: "var(--fandex-primary)",
+        // 多层阴影提升质感: 外阴影(深度) + 1px 描边(轮廓) + 内顶部高光(立体感)
+        // 选中态追加强调色外发光环, 强化焦点反馈
+        boxShadow: selected
+          ? `0 10px 28px rgba(0,0,0,0.45), 0 0 0 1px ${accent}aa, 0 0 0 4px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.05)`
+          : `0 4px 12px rgba(0,0,0,0.32), 0 0 0 1px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.03)`,
+        // 左侧 2px 强调色边线(类型识别主信号, 取代原 border-l-2 + 单一 primary 色)
+        borderLeft: `2px solid ${accent}`,
+        // 顶部 1px 强调色渐变线(辅信号, 增加层次感与现代感)
+        borderTop: `1px solid ${accent}66`,
       }}
     >
-      {/* 输入锚点 - 左侧(增大至 4x4, hover 放大, 提升连线体验) */}
+      {/* 输入锚点 - 左侧(居中贴边, hover 放大, 提升连线体验) */}
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-4 !h-4 !bg-fandex-primary/80 !border-2 !border-nf-bg hover:!w-5 hover:!h-5 hover:!bg-fandex-primary transition-all duration-fast"
+        className="!w-3.5 !h-3.5 !border-2 !border-nf-bg hover:!w-4 hover:!h-4 transition-all duration-fast"
+        style={{ left: -7, backgroundColor: accent }}
       />
 
-      {/* 标题 */}
-      <div className={`text-sm font-bold font-display ${colors.text} truncate mb-1`}>
-        {data.title}
-      </div>
+      {/* 顶部强调色装饰条(渐变收束, 强化类型识别与视觉层次) */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none"
+        style={{ background: `linear-gradient(90deg, ${accent}, ${accent}55 70%, transparent)` }}
+      />
 
-      {/* 节点类型标签 + 状态徽章(几何直角) */}
-      <div className="flex items-center gap-1.5">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-none ${colors.badge} text-white`}>
-          {data.nodeType === "main" && "主线"}
-          {data.nodeType === "branch" && "分支"}
-          {data.nodeType === "event" && "事件"}
-          {data.nodeType === "ending" && "结局"}
-        </span>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-none ${statusInfo.color} text-white`}>
-          {statusInfo.label}
-        </span>
-      </div>
-
-      {/* 摘要预览(仅显示前 50 字, line-clamp-2 限制 2 行) */}
-      {data.summary && (
-        <div className="mt-2 text-xs text-nf-text-tertiary line-clamp-2">
-          {data.summary}
+      {/* 内容区(统一内边距, 优化排版节奏) */}
+      <div className="px-3.5 py-2.5">
+        {/* 标题行: 标题 + 折叠按钮(仅 main 节点) */}
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className={`text-sm font-bold font-display ${colors.text} truncate flex-1 leading-tight`}>
+            {data.title}
+          </div>
+          {/* 折叠/展开按钮(仅 main 节点显示, 点击切换 collapsed 字段) */}
+          {data.nodeType === "main" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCollapse(id);
+              }}
+              className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-fandex-primary/10 transition-colors duration-fast"
+              title={data.collapsed ? "展开" : "折叠"}
+            >
+              {data.collapsed ? "+" : "−"}
+            </button>
+          )}
         </div>
-      )}
 
-      {/* 折叠/展开按钮(仅 main 节点显示, 点击切换 collapsed 字段) */}
-      {data.nodeType === "main" && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleCollapse(id);
-          }}
-          className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary transition-colors"
-          title={data.collapsed ? "展开" : "折叠"}
-        >
-          {data.collapsed ? "+" : "−"}
-        </button>
-      )}
+        {/* 节点类型标签 + 状态徽章(几何直角, 强调色填充提升识别度) */}
+        <div className="flex items-center gap-1.5">
+          <span
+            className="text-[10px] px-1.5 py-0.5 font-medium tracking-wide text-white"
+            style={{ backgroundColor: accent }}
+          >
+            {data.nodeType === "main" && "主线"}
+            {data.nodeType === "branch" && "分支"}
+            {data.nodeType === "event" && "事件"}
+            {data.nodeType === "ending" && "结局"}
+          </span>
+          <span className={`text-[10px] px-1.5 py-0.5 font-medium ${statusInfo.color} text-white`}>
+            {statusInfo.label}
+          </span>
+        </div>
 
-      {/* 输出锚点 - 右侧(增大至 4x4, hover 放大) */}
+        {/* 摘要预览(仅显示前 50 字, line-clamp-2 限制 2 行, 优化行高) */}
+        {data.summary && (
+          <div className="mt-1.5 text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
+            {data.summary}
+          </div>
+        )}
+      </div>
+
+      {/* 输出锚点 - 右侧(居中贴边, hover 放大) */}
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-4 !h-4 !bg-fandex-primary/80 !border-2 !border-nf-bg hover:!w-5 hover:!h-5 hover:!bg-fandex-primary transition-all duration-fast"
+        className="!w-3.5 !h-3.5 !border-2 !border-nf-bg hover:!w-4 hover:!h-4 transition-all duration-fast"
+        style={{ right: -7, backgroundColor: accent }}
       />
 
-      {/* 折叠角标(仅 main 节点折叠时显示) */}
+      {/* 折叠角标(仅 main 节点折叠时显示, 微调尺寸与位置) */}
       {showFoldBadge && (
-        <div className="absolute -top-2 -right-2 w-6 h-6 rounded-none bg-fandex-tertiary text-white text-[10px] font-bold flex items-center justify-center shadow-md">
+        <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-none bg-fandex-tertiary text-white text-[10px] font-bold flex items-center justify-center shadow-md">
           +{data.childCount}
         </div>
       )}

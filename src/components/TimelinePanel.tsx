@@ -24,12 +24,15 @@ import {
   BackgroundVariant,
   MiniMap,
   ConnectionMode,
+  Position,
+  getBezierPath,
   type Connection,
   type NodeTypes,
   type EdgeTypes,
   type Node,
   type Edge,
   type ReactFlowInstance,
+  type ConnectionLineComponent,
 } from "@xyflow/react";
 import { Trash2 } from "lucide-react";
 import "@xyflow/react/dist/style.css";
@@ -51,6 +54,65 @@ import TimelineEdge from "./TimelineEdge";
 import TimelineEmpty from "./TimelineEmpty";
 import TimelineContextMenu from "./TimelineContextMenu";
 import TimelineDrawer from "./TimelineDrawer";
+
+/**
+ * 自定义连接线组件(拖拽过程中的临时连线)
+ * 输入: ConnectionLineComponentProps (fromX/fromY/fromPosition 起点坐标与 Handle 位置, toX/toY 鼠标当前位置)
+ * 输出: SVG 路径(贝塞尔曲线 + 起点圆点)
+ * 流程:
+ *   1. 读取起点 Handle 位置(fromPosition)
+ *   2. 根据起点位置推导终点控制点方向(对称方向), 确保贝塞尔曲线从用户实际拖拽的 Handle 出发
+ *   3. 调用 getBezierPath 计算路径
+ *   4. 渲染虚线路径 + 起点圆点(视觉锚点)
+ *
+ * 修复记录: 原使用默认 ConnectionLine, 在 ConnectionMode.Loose 下从 target handle(左侧)拖拽时,
+ *           贝塞尔曲线控制点方向未与起点 Handle 位置对齐, 导致连线视觉上从节点右端出发。
+ *           现通过显式传递 fromPosition 与对称推导的 toPosition, 确保连线从用户拖拽的 Handle 出发。
+ */
+const TimelineConnectionLine: ConnectionLineComponent = ({
+  fromX,
+  fromY,
+  fromPosition,
+  toX,
+  toY,
+}) => {
+  // 根据起点 Handle 位置推导终点控制点方向(对称方向)
+  // 起点在左 → 终点控制点在右; 起点在右 → 终点控制点在左; 上下同理
+  const toPosition =
+    fromPosition === Position.Left
+      ? Position.Right
+      : fromPosition === Position.Right
+        ? Position.Left
+        : fromPosition === Position.Top
+          ? Position.Bottom
+          : Position.Top;
+
+  // 计算贝塞尔曲线路径(显式传入起点与终点的 Handle 位置, 确保方向正确)
+  const [edgePath] = getBezierPath({
+    sourceX: fromX,
+    sourceY: fromY,
+    sourcePosition: fromPosition,
+    targetX: toX,
+    targetY: toY,
+    targetPosition: toPosition,
+  });
+
+  return (
+    <g>
+      {/* 虚线连接路径(主色蓝 + 半透明, 拖拽态视觉反馈) */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="#6EA8FE"
+        strokeWidth={2}
+        strokeDasharray="5,5"
+        opacity={0.7}
+      />
+      {/* 起点圆点(视觉锚点, 明确标识连线起始位置) */}
+      <circle cx={fromX} cy={fromY} r={3} fill="#6EA8FE" opacity={0.9} />
+    </g>
+  );
+};
 
 /**
  * 时间线画布容器组件
@@ -437,9 +499,15 @@ export default function TimelinePanel() {
         maxZoom={2}
         defaultEdgeOptions={{ type: "storyEdge" }}
         connectionMode={ConnectionMode.Loose}
+        connectionLineComponent={TimelineConnectionLine}
         className="timeline-flow"
       >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={28}
+          size={1}
+          color="rgba(255,255,255,0.05)"
+        />
         <MiniMap
           nodeColor={(node) => {
             const nodeType = (node.data as { nodeType?: string } | undefined)?.nodeType ?? "main";

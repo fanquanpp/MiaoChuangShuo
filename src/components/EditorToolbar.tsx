@@ -61,7 +61,8 @@ interface ToolbarButtonProps {
 
 // 工具栏按钮 - 统一直角几何风格
 // 关键设计：tabIndex={-1} 防止 Tab 键焦点跳到工具栏按钮，保证写作时焦点常驻编辑器
-// 视觉风格：FANDEX 直角按钮，激活态文字变色 + 淡色背景块，悬停微抬升
+// 视觉风格：FANDEX 直角按钮，统一 28x28 正方形容器，激活态文字变色 + 淡色背景块，悬停微抬升
+// 尺寸规范: h-7 w-7 (28x28px) 固定容器 + w-4 h-4 图标, 确保所有工具按钮视觉一致
 export function ToolbarButton({
   onClick,
   active,
@@ -74,13 +75,13 @@ export function ToolbarButton({
       onClick={onClick}
       title={title}
       tabIndex={-1}
-      className={`nf-tool-btn relative p-1 ease-fandex border border-transparent group transition-all duration-fast ${
+      className={`nf-tool-btn relative h-7 w-7 flex items-center justify-center ease-fandex border border-transparent group transition-all duration-fast ${
         active
           ? "text-fandex-primary bg-fandex-primary/10"
           : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover hover:-translate-y-0.5"
       }`}
     >
-      <span className="transition-transform duration-fast group-active:scale-90 block">
+      <span className="transition-transform duration-fast group-active:scale-90 flex items-center justify-center">
         {children}
       </span>
     </button>
@@ -89,7 +90,7 @@ export function ToolbarButton({
 
 // 分隔符 - 纯单线，紧凑记事本风格
 export function Divider() {
-  return <div className="w-px h-3.5 bg-nf-border-light/50 mx-1" />;
+  return <div className="w-px h-5 bg-nf-border-light/50 mx-1.5" />;
 }
 
 // 注：COLOR_PRESETS 和 HIGHLIGHT_PRESETS 已移至 EditorBubbleMenu 组件
@@ -139,7 +140,7 @@ function Dropdown({ trigger, children, panelWidth = "w-56", active = false, titl
         onClick={() => setOpen((prev) => !prev)}
         title={title}
         tabIndex={-1}
-        className={`nf-tool-btn relative p-1 transition-all duration-fast ease-fandex border border-transparent flex items-center gap-0.5 group ${
+        className={`nf-tool-btn relative h-7 px-1.5 transition-all duration-fast ease-fandex border border-transparent flex items-center gap-0.5 group ${
           active || open
             ? "text-fandex-primary bg-fandex-primary/10"
             : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover hover:-translate-y-0.5"
@@ -265,7 +266,7 @@ function FontSizeAdjuster() {
   const DEFAULT_SIZE = 17;
 
   return (
-    <div className="flex items-center gap-0.5 px-1 py-0.5 border border-nf-border-light/40 bg-nf-bg-card/50">
+    <div className="flex items-center h-7 border border-nf-border-light/40 bg-nf-bg-card/50">
       {/* 缩小字号 */}
       <button
         type="button"
@@ -273,7 +274,7 @@ function FontSizeAdjuster() {
         disabled={fontSize <= 12}
         title={t("shortcuts.fontSizeDecrease")}
         tabIndex={-1}
-        className="nf-tool-btn p-1 text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover hover:-translate-y-0.5 transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover hover:-translate-y-0.5 transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
       >
         <ZoomOut className="w-4 h-4" />
       </button>
@@ -283,7 +284,7 @@ function FontSizeAdjuster() {
         onClick={() => setFontSize(DEFAULT_SIZE)}
         title={t("shortcuts.fontSizeReset")}
         tabIndex={-1}
-        className="nf-tool-btn px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-all duration-fast min-w-[28px] text-center"
+        className="nf-tool-btn h-7 px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-all duration-fast min-w-[32px] text-center flex items-center justify-center"
       >
         {fontSize}
       </button>
@@ -294,7 +295,7 @@ function FontSizeAdjuster() {
         disabled={fontSize >= 28}
         title={t("shortcuts.fontSizeIncrease")}
         tabIndex={-1}
-        className="nf-tool-btn p-1 text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover hover:-translate-y-0.5 transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover hover:-translate-y-0.5 transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
       >
         <ZoomIn className="w-4 h-4" />
       </button>
@@ -401,13 +402,13 @@ function SessionStats({
         onClick={onTogglePause}
         title={paused ? t("editor.sessionResume") : t("editor.sessionPause")}
         tabIndex={-1}
-        className={`nf-tool-btn p-1 transition-all duration-fast ease-fandex border ${
+        className={`nf-tool-btn h-7 w-7 flex items-center justify-center transition-all duration-fast ease-fandex border ${
           paused
             ? "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/40"
             : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light hover:-translate-y-0.5"
         }`}
       >
-        {paused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+        {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
       </button>
       {/* 会话字数 */}
       <span className={`tabular-nums font-medium ${wordsColor}`}>
@@ -429,13 +430,13 @@ function SessionStats({
         onClick={handleOpenDialog}
         title={t("editor.setTarget")}
         tabIndex={-1}
-        className={`nf-tool-btn flex items-center gap-1.5 px-1 py-0.5 transition-all duration-fast ease-fandex border ${
+        className={`nf-tool-btn flex items-center gap-1.5 h-7 px-1.5 transition-all duration-fast ease-fandex border ${
           wordTarget > 0
             ? "bg-fandex-primary/10 border-fandex-primary/30 hover:bg-fandex-primary/15 hover:-translate-y-0.5"
             : "border-transparent hover:bg-nf-bg-hover border-transparent hover:-translate-y-0.5"
         }`}
       >
-        <Target className={`w-3 h-3 ${wordTarget > 0 ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
+        <Target className={`w-3.5 h-3.5 ${wordTarget > 0 ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
         {wordTarget > 0 ? (
           <>
             <div className="w-16 h-1.5 bg-nf-bg-hover border border-nf-border-light/40 overflow-hidden">
@@ -459,9 +460,9 @@ function SessionStats({
           onClick={() => setResetConfirmOpen(true)}
           title={t("editor.sessionReset")}
           tabIndex={-1}
-          className="nf-tool-btn p-1 text-nf-text-tertiary hover:text-fandex-tertiary hover:-translate-y-0.5 transition-all duration-fast"
+          className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary hover:-translate-y-0.5 transition-all duration-fast"
         >
-          <RotateCcw className="w-3 h-3" />
+          <RotateCcw className="w-3.5 h-3.5" />
         </button>
       )}
 
@@ -751,9 +752,9 @@ export default function EditorToolbar({
               onClick={onExportTxt}
               title={t("editor.exportTxt")}
               tabIndex={-1}
-              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 hover:-translate-y-0.5 transition-all duration-fast ease-fandex"
+              className="nf-tool-btn flex items-center gap-1 h-7 px-2 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 hover:-translate-y-0.5 transition-all duration-fast ease-fandex"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               TXT
             </button>
           )}
@@ -763,7 +764,7 @@ export default function EditorToolbar({
             disabled={!dirty || saving}
             title={t("app.save")}
             tabIndex={-1}
-            className={`nf-tool-btn flex items-center gap-1 px-2.5 py-1 ease-fandex transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed ${
+            className={`nf-tool-btn flex items-center gap-1 h-7 px-2.5 text-xs ease-fandex transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed ${
               dirty
                 ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm hover:shadow-md hover:-translate-y-0.5'
                 : 'bg-fandex-primary/40 text-nf-text-inverse/60'
@@ -783,9 +784,9 @@ export default function EditorToolbar({
           行内格式（粗体/斜体/下划线/删除线/代码/颜色/链接）已移至 EditorBubbleMenu，
           此处仅保留段落级操作，大幅减少按钮数量，解决工具栏溢出问题。 */}
       {!focusMode && (
-        <div className="flex flex-wrap items-center gap-1 px-4 py-1.5 border-t border-nf-border-light/50">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-1.5 border-t border-nf-border-light/50">
           {/* 标题段落组 */}
-          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
+          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
             <HeadingDropdown editor={editor} />
             <ToolbarButton
               onClick={() => editor?.chain().focus().setHorizontalRule().run()}
@@ -795,31 +796,32 @@ export default function EditorToolbar({
               <Minus className="w-4 h-4" />
             </ToolbarButton>
             {/* 中文引号独立按钮组：双引号 / 单引号 / 直角引号，分别用 FANDEX 三色区分 */}
+            {/* 字符采用 text-[13px] 居中, 视觉大小与 w-4 h-4 图标对齐 */}
             <ToolbarButton
               onClick={handleQuickQuote}
               active={false}
               title={t("editor.doubleQuote")}
             >
-              <span className="text-sm leading-none font-serif text-fandex-primary">{"\u201c"}{"\u201d"}</span>
+              <span className="text-[13px] leading-none font-serif text-fandex-primary">{"\u201c"}{"\u201d"}</span>
             </ToolbarButton>
             <ToolbarButton
               onClick={handleSingleQuote}
               active={false}
               title={t("editor.singleQuote")}
             >
-              <span className="text-sm leading-none font-serif text-fandex-secondary">{"\u2018"}{"\u2019"}</span>
+              <span className="text-[13px] leading-none font-serif text-fandex-secondary">{"\u2018"}{"\u2019"}</span>
             </ToolbarButton>
             <ToolbarButton
               onClick={handleCornerQuote}
               active={false}
               title={t("editor.cornerQuote")}
             >
-              <span className="text-sm leading-none font-serif text-fandex-tertiary">{"\u300c"}{"\u300d"}</span>
+              <span className="text-[13px] leading-none font-serif text-fandex-tertiary">{"\u300c"}{"\u300d"}</span>
             </ToolbarButton>
           </div>
           <Divider />
           {/* 对齐组 */}
-          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
+          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
             <ToolbarButton
               onClick={() => editor?.chain().focus().setTextAlign("left").run()}
               active={editor?.isActive({ textAlign: "left" }) || false}
@@ -851,7 +853,7 @@ export default function EditorToolbar({
           </div>
           <Divider />
           {/* 插入组：诗歌 / 歌词（表格已移除，链接和颜色已移至 BubbleMenu） */}
-          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
+          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
             <ToolbarButton
               onClick={handlePoetryToggle}
               active={isPoetryActive()}
@@ -869,7 +871,7 @@ export default function EditorToolbar({
           </div>
           <Divider />
           {/* 操作历史组 + 快照 + 查找替换 */}
-          <div className="flex items-center gap-0.5 bg-nf-bg-card/50 px-1 py-0.5 border border-nf-border-light/40">
+          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
             <ToolbarButton
               onClick={() => editor?.chain().focus().undo().run()}
               active={false}
