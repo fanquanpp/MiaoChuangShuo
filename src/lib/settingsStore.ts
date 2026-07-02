@@ -259,17 +259,17 @@ function hexToRgbStr(hex: string): string {
  * 流程:
  *   1. 检测当前主题模式（.light 类），按主题选择预设查询路径
  *   2. 解析预设背景色：custom 预设使用 customColor；其他预设直接查表；查表失败时按主题回退到默认预设
- *   3. 仅注入主背景变量 --fandex-bg（编辑区/画布跟随背景色调节）
- *      不再注入 --fandex-bg-card / --fandex-bg-sidebar，让卡片/面板/工具栏/侧边栏
- *      回归 styles.css 中 :root / .light 的固定默认值，确保 UI 框架色不受背景色调节影响
+ *   3. 注入主背景变量 --fandex-bg，以及对应的 --fandex-bg-card / --fandex-bg-sidebar
+ *      使侧边栏/卡片/面板跟随背景预设变化，保持视觉协调
  *   4. 注入毛玻璃变量：--nf-glass-opacity、--nf-bg-rgb（供 rgba 拼接使用）
  *   5. 应用质感模式：在 root 上切换 .nf-tex-* 类，控制全局面板质感渲染
  *
  * 变更记录：
- *   - 解耦背景色调节与 UI 框架色：背景色调节仅影响主背景（编辑区/画布），
- *     工具栏/卡片/面板/侧边栏保持固定的主题色，不受背景预设变化影响。
- *   - 此前注入 --fandex-bg-card / --fandex-bg-sidebar 导致工具栏跟随背景色变化，
- *     属于设计缺陷，现修正为仅注入 --fandex-bg。
+ *   - 恢复注入 --fandex-bg-sidebar / --fandex-bg-card：此前为避免工具栏跟随背景色变化
+ *     而移除了侧边栏变量注入，导致侧边栏无法通过主题控制更改颜色。
+ *     现修正为从预设中读取 sidebarBg / cardBg 并注入，确保侧边栏随主题预设联动。
+ *   - custom 预设无预定义 sidebarBg / cardBg，使用 customColor 作为基色，
+ *     避免自定义背景色时侧边栏颜色脱节。
  */
 function applyBackgroundTheme(
   preset: string,
@@ -283,25 +283,36 @@ function applyBackgroundTheme(
   const isLightTheme = root.classList.contains("light");
 
   let bg: string;
+  let sidebarBg: string;
+  let cardBg: string;
 
   if (preset === "custom" && customColor) {
-    // 自定义颜色：以用户选择色作为主背景
+    // 自定义颜色：以用户选择色作为主背景，侧边栏与卡片沿用同色避免脱节
     bg = customColor;
+    sidebarBg = customColor;
+    cardBg = customColor;
   } else {
     const found = BACKGROUND_PRESETS.find((p) => p.id === preset);
     if (found) {
       bg = found.bg;
+      sidebarBg = found.sidebarBg;
+      cardBg = found.cardBg;
     } else {
       // 回退到当前主题的默认预设
       const fallbackId = getDefaultPresetByMode(isLightTheme ? "light" : "dark");
       const fallback = BACKGROUND_PRESETS.find((p) => p.id === fallbackId);
       bg = fallback?.bg ?? (isLightTheme ? "#f8f8fc" : "#0c0d14");
+      sidebarBg = fallback?.sidebarBg ?? (isLightTheme ? "#f2f2f8" : "#101218");
+      cardBg = fallback?.cardBg ?? (isLightTheme ? "#eeeef4" : "#161821");
     }
   }
 
-  // 仅注入主背景变量（编辑区/画布跟随背景色调节）
-  // 卡片/面板/工具栏/侧边栏的 --fandex-bg-card / --fandex-bg-sidebar 保持 styles.css 固定默认值
+  // 注入主背景变量（编辑区/画布跟随背景色调节）
   root.style.setProperty("--fandex-bg", bg);
+  // 注入侧边栏背景变量：使侧边栏随主题预设联动（修复侧边栏无法通过主题控制更改颜色）
+  root.style.setProperty("--fandex-bg-sidebar", sidebarBg);
+  // 注入卡片/面板背景变量：保持卡片与背景预设的视觉协调
+  root.style.setProperty("--fandex-bg-card", cardBg);
   // 毛玻璃透明度：0-1，供 .nf-glass 类使用 rgba 拼接
   root.style.setProperty("--nf-glass-opacity", String(glassOpacity));
   // 主背景 RGB 通道：供毛玻璃面板使用 rgba(var(--nf-bg-rgb), opacity)

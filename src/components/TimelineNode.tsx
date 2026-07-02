@@ -66,7 +66,7 @@ export default function TimelineNode({ id, selected }: NodeProps) {
     <div
       className={`
         nf-card-sheen nf-card-dots nf-hover-float group relative rounded-none backdrop-blur-md
-        transition-all duration-200 ease-fandex overflow-hidden border
+        transition-all duration-200 ease-fandex overflow-visible border
         ${selected
           ? "scale-[1.02] border-fandex-primary/70"
           : "border-nf-border-light/60 hover:border-fandex-primary/40"

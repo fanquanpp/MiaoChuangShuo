@@ -308,6 +308,22 @@ select:focus-visible {
   stroke-width: 2.5 !important;
 }
 
+/* 时间线节点连线锚点(Handle)可交互性修复
+ * 原因: .nf-card-sheen 自身定义了 overflow: hidden, 会裁剪位于容器外的 Handle 锚点,
+ *   导致连线功能失效。此处针对时间线画布内的节点覆盖为 overflow: visible,
+ *   既保留其他场景下 .nf-card-sheen 的高光裁剪效果, 又恢复时间线节点的连线能力。
+ * 同时提升 Handle 的 z-index 与指针穿透能力, 确保连线拖拽稳定启动。 */
+.timeline-canvas-root .nf-card-sheen {
+  overflow: visible;
+}
+.timeline-canvas-root .react-flow__handle {
+  z-index: 10;
+}
+.timeline-canvas-root .react-flow__handle.connectingfrom,
+.timeline-canvas-root .react-flow__handle.connectionindicator {
+  pointer-events: all;
+}
+
 /* 遮罩层增强模糊，使背景内容更柔和 */
 .nf-glass-overlay {
   backdrop-filter: blur(4px) saturate(120%);

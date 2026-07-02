@@ -576,7 +576,7 @@ export default function TimelinePanel() {
       >
         <Background
           variant={BackgroundVariant.Lines}
-          gap={28}
+          gap={16}
           size={1}
           color="rgba(255,255,255,0.05)"
         />
