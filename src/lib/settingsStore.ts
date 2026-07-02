@@ -45,10 +45,6 @@ interface SettingsState {
   indentEnabled: boolean;
   /** 首行缩进宽度（全角空格数，1-4） */
   indentWidth: number;
-  /** 焦点暗化：非当前段落降低透明度 */
-  focusDim: boolean;
-  /** 焦点暗化透明度（0-1，越低越暗） */
-  focusDimOpacity: number;
   /** 打字音效开关 */
   typingSound: boolean;
   /** 字数目标（本次会话，0=未设定） */
@@ -89,8 +85,6 @@ interface SettingsState {
   setAutoTemplateFill: (enabled: boolean) => void;
   setIndentEnabled: (enabled: boolean) => void;
   setIndentWidth: (width: number) => void;
-  setFocusDim: (enabled: boolean) => void;
-  setFocusDimOpacity: (opacity: number) => void;
   setTypingSound: (enabled: boolean) => void;
   setSessionWordTarget: (target: number) => void;
   setSnapshotEnabled: (enabled: boolean) => void;
@@ -130,8 +124,6 @@ interface SettingsData {
   autoTemplateFill: boolean;
   indentEnabled: boolean;
   indentWidth: number;
-  focusDim: boolean;
-  focusDimOpacity: number;
   typingSound: boolean;
   sessionWordTarget: number;
   snapshotEnabled: boolean;
@@ -159,8 +151,6 @@ const DEFAULT_SETTINGS: SettingsData = {
   autoTemplateFill: true,
   indentEnabled: true,
   indentWidth: 2,
-  focusDim: false,
-  focusDimOpacity: 0.35,
   typingSound: false,
   sessionWordTarget: 0,
   snapshotEnabled: true,
@@ -412,19 +402,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const data = { ...get(), indentWidth: clamped };
     saveSettings(data);
     set({ indentWidth: clamped });
-  },
-
-  setFocusDim: (enabled) => {
-    const data = { ...get(), focusDim: enabled };
-    saveSettings(data);
-    set({ focusDim: enabled });
-  },
-
-  setFocusDimOpacity: (opacity) => {
-    const clamped = Math.max(0.1, Math.min(0.7, opacity));
-    const data = { ...get(), focusDimOpacity: clamped };
-    saveSettings(data);
-    set({ focusDimOpacity: clamped });
   },
 
   setTypingSound: (enabled) => {

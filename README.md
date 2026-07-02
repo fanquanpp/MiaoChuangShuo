@@ -39,12 +39,6 @@
 - 搜索过滤与点击跳转:快速定位实体在正文中的出现位置
 - 多目录命名兼容:角色 / 人物、世界观 / 设定、术语 / 名词、素材 / 资料
 
-### 场景化叙事工作台
-- yWriter 风格场景字段:Viewpoint(视点)/ Goal(目标)/ Conflict(冲突)/ Outcome(结果)/ Notes(备注)
-- 自动场景解析:识别章节文件中的 `## 场景N:标题` 标记
-- 元数据持久化:场景字段保存至 `.novelforge/scenes/` 目录
-- 失焦自动保存:编辑器底部可折叠面板,专注创作无干扰
-
 ### AI 辅助创作中心(接口预留)
 - 6 项 AI 功能规划:续写 / 摘要 / 润色 / 大纲生成 / 角色建议 / 一致性检查
 - 标准化命令骨架:8 个后端 Tauri 命令预留,统一返回未实装提示
@@ -107,6 +101,9 @@
 - 悬停阴影增强:卡片悬浮态层次感更强
 - 扫描目录作为默认存储路径:用户设置后新建项目自动填充,无需重复选择
 - 品牌栏拼音化 + 小点装饰:避免中文路径编码问题
+- 右键上下文菜单:项目卡片支持右键打开/编辑设定/删除三项操作
+- 编辑项目设定:支持修改名称、题材、作者、描述(文体类型与路径创建后只读)
+- 全屏切换:主页全屏按钮(OS 级全屏,Tauri 2.0 Capability 权限模型)
 
 ### 剧情时间线编辑器
 - **剧情时间线编辑器**(Alt+9): 可视化画布组织主线/分支/事件/结局节点,支持拖拽、连线、折叠、自动布局、撤销重做,自动生成 txt 摘要
@@ -171,7 +168,6 @@ MiaoChuangShuo/
 │   │   ├── FindReplace.tsx           # 查找替换面板
 │   │   ├── OutlineView.tsx           # 大纲视图
 │   │   ├── CodexPanel.tsx            # 智能设定库面板
-│   │   ├── SceneWorkbench.tsx        # 场景化叙事工作台
 │   │   ├── AiAssistantPanel.tsx      # AI 辅助创作中心
 │   │   ├── ForeshadowingPanel.tsx    # 伏笔追踪面板
 │   │   ├── CharacterHoverCard.tsx    # 角色悬停卡片
@@ -182,6 +178,9 @@ MiaoChuangShuo/
 │   │   ├── WelcomeDialog.tsx         # 首次欢迎页
 │   │   ├── UpdateNoticeDialog.tsx    # 版本更新提示弹窗
 │   │   ├── SettingsDialog.tsx        # 设置对话框(含背景主题/更新检测)
+│   │   ├── CreateProjectDialog.tsx   # 创建项目对话框
+│   │   ├── EditProjectDialog.tsx     # 编辑项目设定对话框
+│   │   ├── ProjectCard.tsx           # 项目卡片(含右键上下文菜单)
 │   │   ├── TimelinePanel.tsx         # 剧情时间线画布容器
 │   │   ├── TimelineNode.tsx          # 自定义节点组件
 │   │   ├── TimelineEdge.tsx         # 自定义连线组件
@@ -192,7 +191,6 @@ MiaoChuangShuo/
 │   ├── lib/                          # 核心库
 │   │   ├── api.ts                    # Tauri 命令封装
 │   │   ├── codexApi.ts               # 智能设定库 API
-│   │   ├── sceneApi.ts               # 场景工作台 API
 │   │   ├── aiApi.ts                  # AI 辅助 API
 │   │   ├── updateChecker.ts          # 版本更新检测模块
 │   │   ├── store.ts                  # 全局状态
@@ -215,7 +213,6 @@ MiaoChuangShuo/
 │       ├── character_commands.rs     # 角色联动
 │       ├── foreshadowing_commands.rs # 伏笔追踪
 │       ├── codex_commands.rs         # 智能设定库
-│       ├── scene_commands.rs         # 场景化叙事工作台
 │       ├── ai_commands.rs            # AI 辅助命令骨架
 │       ├── timeline_commands.rs      # 时间线后端命令
 │       └── lib.rs                    # 应用入口
@@ -247,6 +244,7 @@ npm run tauri build
 
 ## 版本历程
 
+- **v26.7.9**:全屏按钮修复(Tauri 2.0 capability 权限补全)+ 项目卡片右键上下文菜单(打开/编辑/删除)+ 编辑项目设定对话框(复用 CreateProjectDialog 视觉风格,文体类型与路径只读)+ 后端 update_project_meta 命令(原子写入 + 字数重统计)+ 引号独立按钮 + 工具栏视觉与交互统一 + 删除场景化叙事工作台
 - **v26.7.8**:新增剧情时间线编辑器(Alt+9)+ 可视化画布组织主线/分支/事件/结局节点 + 拖拽优化(zundo pause/resume 单次入栈)+ BFS 折叠算法 + 自动布局(dagre) + 撤销重做(zundo) + 原子写入 + 崩溃恢复 + 环检测 + schema 迁移 + 自动生成 txt 摘要
 - **v26.7.7**:主题预设重构(暗色森林绿/暗紫替换为亮色晨光白/米黄)+ 主题切换自动同步默认预设 + 面板质感系统 + 分卷生成器章节命名 + UI 几何风格统一
 - **v26.7.6**:主题切换修复(settingsStore 与 themeStore 双轨冲突)+ 侧边栏全模块折叠 + CodexPanel 布局修复 + 褐色背景清除 + 移除首次启动快捷键弹窗

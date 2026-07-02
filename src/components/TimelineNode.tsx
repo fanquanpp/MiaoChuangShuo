@@ -61,17 +61,22 @@ export default function TimelineNode({ id, selected }: NodeProps) {
   return (
     <div
       className={`
-        relative px-4 py-3 rounded-lg border-2 shadow-md transition-all duration-150
-        ${colors.border} ${colors.bg}
-        ${selected ? "ring-2 ring-fandex-primary/50 scale-[1.02]" : "hover:shadow-lg"}
+        relative px-4 py-3 rounded-none border-l-2 backdrop-blur-md shadow-md transition-all duration-150
+        ${colors.border}
+        ${selected ? "ring-2 ring-fandex-primary/50 scale-[1.02]" : "hover:shadow-lg hover:-translate-y-0.5"}
       `}
-      style={{ width: data.nodeType === "main" ? 256 : 180 }}
+      style={{
+        width: data.nodeType === "main" ? 256 : 180,
+        // 磨砂玻璃 65% 透明度: nf-bg-card 基色 rgba(22,24,33) 以 0.65 不透明度叠加
+        backgroundColor: "rgba(22, 24, 33, 0.65)",
+        borderLeftColor: "var(--fandex-primary)",
+      }}
     >
-      {/* 输入锚点 - 左侧 */}
+      {/* 输入锚点 - 左侧(增大至 4x4, hover 放大, 提升连线体验) */}
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-2.5 !h-2.5 !bg-fandex-primary !border-2 !border-nf-bg"
+        className="!w-4 !h-4 !bg-fandex-primary/80 !border-2 !border-nf-bg hover:!w-5 hover:!h-5 hover:!bg-fandex-primary transition-all duration-fast"
       />
 
       {/* 标题 */}
@@ -79,15 +84,15 @@ export default function TimelineNode({ id, selected }: NodeProps) {
         {data.title}
       </div>
 
-      {/* 节点类型标签 + 状态徽章 */}
+      {/* 节点类型标签 + 状态徽章(几何直角) */}
       <div className="flex items-center gap-1.5">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded ${colors.badge} text-white`}>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-none ${colors.badge} text-white`}>
           {data.nodeType === "main" && "主线"}
           {data.nodeType === "branch" && "分支"}
           {data.nodeType === "event" && "事件"}
           {data.nodeType === "ending" && "结局"}
         </span>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusInfo.color} text-white`}>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-none ${statusInfo.color} text-white`}>
           {statusInfo.label}
         </span>
       </div>
@@ -113,16 +118,16 @@ export default function TimelineNode({ id, selected }: NodeProps) {
         </button>
       )}
 
-      {/* 输出锚点 - 右侧 */}
+      {/* 输出锚点 - 右侧(增大至 4x4, hover 放大) */}
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-2.5 !h-2.5 !bg-fandex-primary !border-2 !border-nf-bg"
+        className="!w-4 !h-4 !bg-fandex-primary/80 !border-2 !border-nf-bg hover:!w-5 hover:!h-5 hover:!bg-fandex-primary transition-all duration-fast"
       />
 
       {/* 折叠角标(仅 main 节点折叠时显示) */}
       {showFoldBadge && (
-        <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-fandex-tertiary text-white text-[10px] font-bold flex items-center justify-center shadow-md">
+        <div className="absolute -top-2 -right-2 w-6 h-6 rounded-none bg-fandex-tertiary text-white text-[10px] font-bold flex items-center justify-center shadow-md">
           +{data.childCount}
         </div>
       )}

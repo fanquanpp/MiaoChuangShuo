@@ -58,7 +58,6 @@ import { VSShortcuts } from "../lib/vscodeShortcuts";
 import { AutoPair } from "../lib/autoPair";
 import { LineHighlight } from "../lib/lineHighlight";
 import { SmartTab } from "../lib/smartTab";
-import { FocusDim } from "../lib/focusDim";
 import { FontSizeShortcut } from "../lib/fontSizeShortcut";
 import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
@@ -70,7 +69,6 @@ import EditorBubbleMenu from "./EditorBubbleMenu";
 import SnapshotHistory from "./SnapshotHistory";
 import CharacterHoverCard from "./CharacterHoverCard";
 import FindReplace from "./FindReplace";
-import SceneWorkbench from "./SceneWorkbench";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -191,8 +189,6 @@ export default function NovelEditor({
   const diaryAutoDate = useSettingsStore((s) => s.diaryAutoDate);
   const indentEnabled = useSettingsStore((s) => s.indentEnabled);
   const indentWidth = useSettingsStore((s) => s.indentWidth);
-  const focusDim = useSettingsStore((s) => s.focusDim);
-  const focusDimOpacity = useSettingsStore((s) => s.focusDimOpacity);
   const snapshotEnabled = useSettingsStore((s) => s.snapshotEnabled);
   const snapshotMinInterval = useSettingsStore((s) => s.snapshotMinInterval);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
@@ -348,8 +344,6 @@ export default function NovelEditor({
       LineHighlight.configure({ enabled: true, className: "current-paragraph" }),
       // VSCode 风格智能选中缩进（Tab/Shift+Tab 批量缩进多段）
       SmartTab.configure({ enabled: true, indentChar: "\u3000" }),
-      // 焦点暗化：非当前段落降低透明度（iA Writer 风格）
-      FocusDim.configure({ enabled: focusDim, dimOpacity: focusDimOpacity, scope: "paragraph" }),
       // 字号快捷键:Ctrl+= 放大 / Ctrl+- 缩小 / Ctrl+0 重置
       FontSizeShortcut.configure({ enabled: true }),
     ];
@@ -378,7 +372,7 @@ export default function NovelEditor({
 
     exts.push(PoetryFormat.configure({ enabled: true }));
     return exts;
-  }, [isProse, isScript, isDialogue, characters, t, indentEnabled, indentWidth, focusDim, focusDimOpacity]);
+  }, [isProse, isScript, isDialogue, characters, t, indentEnabled, indentWidth]);
 
   // 创建编辑器实例（Office 级富文本模式）
   const editor = useEditor({
@@ -842,8 +836,6 @@ export default function NovelEditor({
         onToggleSessionPause={session.togglePause}
         onSetSessionTarget={session.updateWordTarget}
         onResetSession={session.resetSession}
-        focusDim={focusDim}
-        onToggleFocusDim={() => useSettingsStore.getState().setFocusDim(!focusDim)}
         showSnapshotHistory={showSnapshotHistory}
         onToggleSnapshotHistory={() => setShowSnapshotHistory((prev) => !prev)}
         showFindReplace={showFindReplace}
@@ -916,9 +908,6 @@ export default function NovelEditor({
         characterName={hoverCard.name}
         projectPath={currentProject?.path || ""}
       />
-
-      {/* 场景化叙事工作台：编辑器底部可折叠面板，管理场景字段元数据 */}
-      <SceneWorkbench filePath={filePath} />
     </div>
   );
 }

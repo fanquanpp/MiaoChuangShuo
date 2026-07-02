@@ -39,6 +39,7 @@ const zhCN: TranslationDict = {
   "app.close": "关闭",
   "app.browse": "浏览",
   "app.creating": "创建中…",
+  "app.saving": "保存中…",
   "app.done": "完成",
   "common.loading": "加载中…",
   "common.close": "关闭",
@@ -123,6 +124,10 @@ const zhCN: TranslationDict = {
   "projectcard.authorLabel": "作者",
   "projectcard.genreLabel": "题材",
   "projectcard.createdLabel": "创建时间",
+  // 项目卡片右键菜单
+  "projectcard.ctxOpen": "打开项目",
+  "projectcard.ctxEdit": "编辑项目设定",
+  "projectcard.ctxDelete": "删除项目",
 
   // ── 项目对话框 ──
   "project.createTitle": "创建新项目",
@@ -147,6 +152,11 @@ const zhCN: TranslationDict = {
   "project.deleteConfirmMsg": "确定要删除项目「{name}」吗？\n\n项目将被移至回收站，你可以从回收站中恢复。",
   "project.deleteSuccess": "项目「{name}」已删除",
   "project.deleteFailed": "删除项目失败：{error}",
+  // 编辑项目设定对话框
+  "project.editTitle": "编辑项目设定",
+  "project.editSuccess": "项目设定已更新",
+  "project.editFailed": "更新项目设定失败：{error}",
+  "project.editTypeLocked": "文体类型在创建后不可更改",
 
   // ── 工作台 ──
   "workspace.newFile": "新建文件",
@@ -554,15 +564,6 @@ const zhCN: TranslationDict = {
   "codex.useWizard": "使用模板向导",
   "codex.quickAdd": "快速新增",
 
-  // 场景化叙事工作台
-  "scene.title": "场景工作台",
-  "scene.loading": "正在解析场景...",
-  "scene.empty": "当前文件未检测到场景标记",
-  "scene.emptyHint": "使用 `## 场景N：标题` 格式添加场景",
-  "scene.untitled": "未命名场景",
-  "scene.loadFailed": "场景加载失败：{error}",
-  "scene.saveFailed": "场景保存失败：{error}",
-
   // 卡片模板 - 角色卡默认字段
   "card.characterAppearance": "【外貌】\n",
   "card.characterPersonality": "【性格】\n",
@@ -598,11 +599,9 @@ const zhCN: TranslationDict = {
   "welcome.intro": "喵创说 是一款面向小说兴趣创作者的免费开源工具。我们希望帮助你跨过文本构建与整理的门槛，放心大胆地迈出创作第一步。无需注册，完全本地运行，你的故事由你掌控。",
   "welcome.featuresTitle": "核心功能",
   "welcome.featureEditorTitle": "沉浸式编辑器",
-  "welcome.featureEditorDesc": "Office 级富文本、焦点暗化、首行缩进，专注写作本身",
+  "welcome.featureEditorDesc": "Office 级富文本、首行缩进，专注写作本身",
   "welcome.featureCodexTitle": "智能设定库",
   "welcome.featureCodexDesc": "统一管理角色、世界观、术语、素材，自动追踪在正文中的出现",
-  "welcome.featureFocusTitle": "场景化叙事",
-  "welcome.featureFocusDesc": "场景化叙事工作台，让故事结构清晰可见",
   "welcome.featureSnapshotTitle": "版本快照",
   "welcome.featureSnapshotDesc": "每次保存自动创建快照，随时回溯历史版本，无惧误删",
   "welcome.stepsTitle": "快速上手",
@@ -711,8 +710,6 @@ const zhCN: TranslationDict = {
   "command.darkToLight": "暗 → 亮",
   "command.lightToDark": "亮 → 暗",
   "command.recent": "最近使用",
-  "command.enableFocusDim": "启用焦点昏暗",
-  "command.disableFocusDim": "关闭焦点昏暗",
   "command.enableAutosave": "启用自动保存",
   "command.disableAutosave": "关闭自动保存",
   "command.enableSnapshot": "启用版本快照",
@@ -836,8 +833,6 @@ const zhCN: TranslationDict = {
   "editor.paragraph": "正文",
   "editor.headingLevel": "标题层级",
   "editor.findReplace": "查找替换",
-  "editor.focusDim": "焦点暗化",
-  "editor.focusDimHint": "焦点暗化:非当前段落自动降低透明度,聚焦当前写作段落,提升沉浸感",
 
   // ── 查找替换面板 ──
   "findReplace.find": "查找",
@@ -1128,6 +1123,7 @@ const enUS: TranslationDict = {
   "app.close": "Close",
   "app.browse": "Browse",
   "app.creating": "Creating…",
+  "app.saving": "Saving…",
   "app.done": "Done",
   "common.loading": "Loading…",
   "common.close": "Close",
@@ -1212,6 +1208,10 @@ const enUS: TranslationDict = {
   "projectcard.authorLabel": "Author",
   "projectcard.genreLabel": "Genre",
   "projectcard.createdLabel": "Created",
+  // Project card context menu
+  "projectcard.ctxOpen": "Open Project",
+  "projectcard.ctxEdit": "Edit Project Settings",
+  "projectcard.ctxDelete": "Delete Project",
 
   // ── Project Dialog ──
   "project.createTitle": "New Project",
@@ -1236,6 +1236,11 @@ const enUS: TranslationDict = {
   "project.deleteConfirmMsg": "Are you sure you want to delete \"{name}\"?\n\nThe project will be moved to the Recycle Bin and can be restored from there.",
   "project.deleteSuccess": "Project \"{name}\" deleted",
   "project.deleteFailed": "Failed to delete project: {error}",
+  // Edit project settings dialog
+  "project.editTitle": "Edit Project Settings",
+  "project.editSuccess": "Project settings updated",
+  "project.editFailed": "Failed to update project settings: {error}",
+  "project.editTypeLocked": "Literary form cannot be changed after creation",
 
   // ── Workspace ──
   "workspace.newFile": "New File",
@@ -1643,15 +1648,6 @@ const enUS: TranslationDict = {
   "codex.useWizard": "Use Template Wizard",
   "codex.quickAdd": "Quick Add",
 
-  // Scene narrative workbench
-  "scene.title": "Scene Workbench",
-  "scene.loading": "Parsing scenes...",
-  "scene.empty": "No scene markers detected in current file",
-  "scene.emptyHint": "Use `## Scene N: title` format to add scenes",
-  "scene.untitled": "Untitled Scene",
-  "scene.loadFailed": "Scene load failed: {error}",
-  "scene.saveFailed": "Scene save failed: {error}",
-
   // Card templates - Character card default fields
   "card.characterAppearance": "[Appearance]\n",
   "card.characterPersonality": "[Personality]\n",
@@ -1687,11 +1683,9 @@ const enUS: TranslationDict = {
   "welcome.intro": "MiaoChuangShuo is a free and open-source tool for hobbyist novel creators. We help you cross the threshold of text structuring and organization, so you can confidently take the first step of your creation. No registration required, fully local, your story is yours to control.",
   "welcome.featuresTitle": "Core Features",
   "welcome.featureEditorTitle": "Immersive Editor",
-  "welcome.featureEditorDesc": "Office-grade rich text, focus dimming, first-line indent, focused on writing itself",
+  "welcome.featureEditorDesc": "Office-grade rich text, first-line indent, focused on writing itself",
   "welcome.featureCodexTitle": "Smart Codex",
   "welcome.featureCodexDesc": "Unified management of characters, worldview, terms, and materials, with automatic occurrence tracking",
-  "welcome.featureFocusTitle": "Scene-based Narrative",
-  "welcome.featureFocusDesc": "Scene-based narrative workbench, making story structure clearly visible",
   "welcome.featureSnapshotTitle": "Version Snapshots",
   "welcome.featureSnapshotDesc": "Auto-create snapshots on every save, trace back to historical versions anytime, no fear of accidental deletion",
   "welcome.stepsTitle": "Quick Start",
@@ -1801,8 +1795,6 @@ const enUS: TranslationDict = {
   "command.darkToLight": "Dark → Light",
   "command.lightToDark": "Light → Dark",
   "command.recent": "Recent",
-  "command.enableFocusDim": "Enable Focus Dim",
-  "command.disableFocusDim": "Disable Focus Dim",
   "command.enableAutosave": "Enable Autosave",
   "command.disableAutosave": "Disable Autosave",
   "command.enableSnapshot": "Enable Snapshots",
@@ -1934,8 +1926,6 @@ const enUS: TranslationDict = {
   "editor.paragraph": "Paragraph",
   "editor.headingLevel": "Heading Level",
   "editor.findReplace": "Find & Replace",
-  "editor.focusDim": "Focus Dim",
-  "editor.focusDimHint": "Focus Dim: dims non-active paragraphs to highlight the current paragraph for better immersion",
 
   // ── Find & Replace panel ──
   "findReplace.find": "Find",

@@ -21,7 +21,6 @@
 import type { Editor } from "@tiptap/core";
 import { useState, useRef, useEffect } from "react";
 import {
-  Quote,
   Undo,
   Redo,
   Save,
@@ -29,7 +28,6 @@ import {
   Download,
   Music,
   Pilcrow,
-  Eye,
   Pause,
   Play,
   Target,
@@ -61,9 +59,9 @@ interface ToolbarButtonProps {
   children: React.ReactNode;
 }
 
-// 工具栏按钮 - 紧凑纯文本风格
+// 工具栏按钮 - 统一直角几何风格
 // 关键设计：tabIndex={-1} 防止 Tab 键焦点跳到工具栏按钮，保证写作时焦点常驻编辑器
-// 视觉风格：极简记事本风格，激活态仅文字变色，无底部指示线、无背景块
+// 视觉风格：FANDEX 直角按钮，激活态文字变色 + 淡色背景块，悬停微抬升
 export function ToolbarButton({
   onClick,
   active,
@@ -76,13 +74,13 @@ export function ToolbarButton({
       onClick={onClick}
       title={title}
       tabIndex={-1}
-      className={`nf-tool-btn relative p-1 ease-fandex border border-transparent group ${
+      className={`nf-tool-btn relative p-1 ease-fandex border border-transparent group transition-all duration-fast ${
         active
-          ? "text-fandex-primary"
-          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
+          ? "text-fandex-primary bg-fandex-primary/10"
+          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover hover:-translate-y-0.5"
       }`}
     >
-      <span className="transition-transform duration-fast group-active:scale-95 block">
+      <span className="transition-transform duration-fast group-active:scale-90 block">
         {children}
       </span>
     </button>
@@ -141,14 +139,14 @@ function Dropdown({ trigger, children, panelWidth = "w-56", active = false, titl
         onClick={() => setOpen((prev) => !prev)}
         title={title}
         tabIndex={-1}
-        className={`relative p-1 transition-all duration-base ease-fandex border border-transparent flex items-center gap-0.5 ${
+        className={`nf-tool-btn relative p-1 transition-all duration-fast ease-fandex border border-transparent flex items-center gap-0.5 group ${
           active || open
-            ? "text-fandex-primary"
-            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
+            ? "text-fandex-primary bg-fandex-primary/10"
+            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover hover:-translate-y-0.5"
         }`}
       >
         {trigger}
-        <ChevronDown className="w-3 h-3 opacity-60" />
+        <ChevronDown className="w-3 h-3 opacity-60 transition-transform duration-fast group-hover:opacity-100" />
       </button>
       {open && (
         <div
@@ -267,7 +265,7 @@ function FontSizeAdjuster() {
   const DEFAULT_SIZE = 17;
 
   return (
-    <div className="flex items-center gap-0.5 px-1 py-0.5 border border-nf-border-light/40 bg-nf-bg-card/40">
+    <div className="flex items-center gap-0.5 px-1 py-0.5 border border-nf-border-light/40 bg-nf-bg-card/50">
       {/* 缩小字号 */}
       <button
         type="button"
@@ -275,9 +273,9 @@ function FontSizeAdjuster() {
         disabled={fontSize <= 12}
         title={t("shortcuts.fontSizeDecrease")}
         tabIndex={-1}
-        className="p-1 text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
+        className="nf-tool-btn p-1 text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover hover:-translate-y-0.5 transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
       >
-        <ZoomOut className="w-3.5 h-3.5" />
+        <ZoomOut className="w-4 h-4" />
       </button>
       {/* 当前字号（点击重置为默认） */}
       <button
@@ -285,7 +283,7 @@ function FontSizeAdjuster() {
         onClick={() => setFontSize(DEFAULT_SIZE)}
         title={t("shortcuts.fontSizeReset")}
         tabIndex={-1}
-        className="px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-colors duration-fast min-w-[28px] text-center"
+        className="nf-tool-btn px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-all duration-fast min-w-[28px] text-center"
       >
         {fontSize}
       </button>
@@ -296,9 +294,9 @@ function FontSizeAdjuster() {
         disabled={fontSize >= 28}
         title={t("shortcuts.fontSizeIncrease")}
         tabIndex={-1}
-        className="p-1 text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
+        className="nf-tool-btn p-1 text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover hover:-translate-y-0.5 transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
       >
-        <ZoomIn className="w-3.5 h-3.5" />
+        <ZoomIn className="w-4 h-4" />
       </button>
     </div>
   );
@@ -403,10 +401,10 @@ function SessionStats({
         onClick={onTogglePause}
         title={paused ? t("editor.sessionResume") : t("editor.sessionPause")}
         tabIndex={-1}
-        className={`p-1 transition-all duration-base ease-fandex border ${
+        className={`nf-tool-btn p-1 transition-all duration-fast ease-fandex border ${
           paused
             ? "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/40"
-            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light"
+            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light hover:-translate-y-0.5"
         }`}
       >
         {paused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
@@ -431,10 +429,10 @@ function SessionStats({
         onClick={handleOpenDialog}
         title={t("editor.setTarget")}
         tabIndex={-1}
-        className={`flex items-center gap-1.5 px-1 py-0.5 transition-all duration-base ease-fandex border ${
+        className={`nf-tool-btn flex items-center gap-1.5 px-1 py-0.5 transition-all duration-fast ease-fandex border ${
           wordTarget > 0
-            ? "bg-fandex-primary/10 border-fandex-primary/30 hover:bg-fandex-primary/15"
-            : "border-transparent hover:bg-nf-bg-hover border-transparent"
+            ? "bg-fandex-primary/10 border-fandex-primary/30 hover:bg-fandex-primary/15 hover:-translate-y-0.5"
+            : "border-transparent hover:bg-nf-bg-hover border-transparent hover:-translate-y-0.5"
         }`}
       >
         <Target className={`w-3 h-3 ${wordTarget > 0 ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
@@ -461,7 +459,7 @@ function SessionStats({
           onClick={() => setResetConfirmOpen(true)}
           title={t("editor.sessionReset")}
           tabIndex={-1}
-          className="p-1 text-nf-text-tertiary hover:text-fandex-tertiary transition duration-fast"
+          className="nf-tool-btn p-1 text-nf-text-tertiary hover:text-fandex-tertiary hover:-translate-y-0.5 transition-all duration-fast"
         >
           <RotateCcw className="w-3 h-3" />
         </button>
@@ -598,9 +596,6 @@ interface EditorToolbarProps {
   onToggleSessionPause: () => void;
   onSetSessionTarget: (target: number) => void;
   onResetSession?: () => void;
-  // 专注模式快捷切换
-  focusDim: boolean;
-  onToggleFocusDim: () => void;
   // 版本快照历史
   showSnapshotHistory?: boolean;
   onToggleSnapshotHistory?: () => void;
@@ -628,8 +623,6 @@ export default function EditorToolbar({
   onToggleSessionPause,
   onSetSessionTarget,
   onResetSession,
-  focusDim,
-  onToggleFocusDim,
   showSnapshotHistory = false,
   onToggleSnapshotHistory,
   showFindReplace = false,
@@ -741,18 +734,6 @@ export default function EditorToolbar({
           onResetSession={onResetSession}
         />
         <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary flex-shrink-0">
-          {/* 专注模式快捷切换：焦点暗化（非当前段落降低透明度） */}
-          {!focusMode && (
-            <div className="flex items-center gap-0.5 p-0.5 border border-nf-border-light/40 bg-nf-bg-card/40">
-              <ToolbarButton
-                onClick={onToggleFocusDim}
-                active={focusDim}
-                title={`${t("editor.focusDim")} - ${t("editor.focusDimHint")}`}
-              >
-                <Eye className="w-3.5 h-3.5" />
-              </ToolbarButton>
-            </div>
-          )}
           {/* 字数统计:增加微胶囊背景 */}
           <span className="tabular-nums px-2 py-0.5 bg-nf-bg-card/60 border border-nf-border-light/40 text-nf-text-secondary">
             {t("editor.wordCount", { count: wordCount })}
@@ -770,9 +751,9 @@ export default function EditorToolbar({
               onClick={onExportTxt}
               title={t("editor.exportTxt")}
               tabIndex={-1}
-              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 ease-fandex"
+              className="nf-tool-btn flex items-center gap-1 px-2 py-1 text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 hover:-translate-y-0.5 transition-all duration-fast ease-fandex"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-4 h-4" />
               TXT
             </button>
           )}
@@ -782,16 +763,16 @@ export default function EditorToolbar({
             disabled={!dirty || saving}
             title={t("app.save")}
             tabIndex={-1}
-            className={`nf-tool-btn flex items-center gap-1 px-2.5 py-1 ease-fandex disabled:opacity-30 disabled:cursor-not-allowed ${
+            className={`nf-tool-btn flex items-center gap-1 px-2.5 py-1 ease-fandex transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed ${
               dirty
-                ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm hover:shadow-md'
+                ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm hover:shadow-md hover:-translate-y-0.5'
                 : 'bg-fandex-primary/40 text-nf-text-inverse/60'
             }`}
           >
             {saving ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Save className="w-3.5 h-3.5" />
+              <Save className="w-4 h-4" />
             )}
             {t("app.save")}
           </button>
@@ -811,38 +792,30 @@ export default function EditorToolbar({
               active={false}
               title={t("editor.horizontalRuleHint")}
             >
-              <Minus className="w-3.5 h-3.5" />
+              <Minus className="w-4 h-4" />
             </ToolbarButton>
-            {/* 中文引号下拉菜单：提供中文双引号、中文单引号、直角引号三种包裹方式 */}
-            <Dropdown
-              trigger={<Quote className="w-3.5 h-3.5" />}
-              title={t("editor.chineseQuoteHint")}
-              panelWidth="w-44"
+            {/* 中文引号独立按钮组：双引号 / 单引号 / 直角引号，分别用 FANDEX 三色区分 */}
+            <ToolbarButton
+              onClick={handleQuickQuote}
+              active={false}
+              title={t("editor.doubleQuote")}
             >
-              <div className="py-1">
-                <button
-                  onClick={handleQuickQuote}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-nf-text hover:bg-nf-bg-hover transition duration-fast"
-                >
-                  <Quote className="w-3.5 h-3.5 text-fandex-primary" />
-                  <span>{t("editor.doubleQuote")}</span>
-                </button>
-                <button
-                  onClick={handleSingleQuote}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-nf-text hover:bg-nf-bg-hover transition duration-fast"
-                >
-                  <Quote className="w-3.5 h-3.5 text-fandex-secondary" />
-                  <span>{t("editor.singleQuote")}</span>
-                </button>
-                <button
-                  onClick={handleCornerQuote}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-nf-text hover:bg-nf-bg-hover transition duration-fast"
-                >
-                  <Quote className="w-3.5 h-3.5 text-fandex-tertiary" />
-                  <span>{t("editor.cornerQuote")}</span>
-                </button>
-              </div>
-            </Dropdown>
+              <span className="text-sm leading-none font-serif text-fandex-primary">{"\u201c"}{"\u201d"}</span>
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={handleSingleQuote}
+              active={false}
+              title={t("editor.singleQuote")}
+            >
+              <span className="text-sm leading-none font-serif text-fandex-secondary">{"\u2018"}{"\u2019"}</span>
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={handleCornerQuote}
+              active={false}
+              title={t("editor.cornerQuote")}
+            >
+              <span className="text-sm leading-none font-serif text-fandex-tertiary">{"\u300c"}{"\u300d"}</span>
+            </ToolbarButton>
           </div>
           <Divider />
           {/* 对齐组 */}
@@ -852,14 +825,14 @@ export default function EditorToolbar({
               active={editor?.isActive({ textAlign: "left" }) || false}
               title={t("editor.alignLeftHint")}
             >
-              <AlignLeft className="w-3.5 h-3.5" />
+              <AlignLeft className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor?.chain().focus().setTextAlign("center").run()}
               active={editor?.isActive({ textAlign: "center" }) || false}
               title={t("editor.alignCenterHint")}
             >
-              <AlignCenter className="w-3.5 h-3.5" />
+              <AlignCenter className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor?.chain().focus().setTextAlign("right").run()}
@@ -873,7 +846,7 @@ export default function EditorToolbar({
               active={editor?.isActive({ textAlign: "justify" }) || false}
               title={t("editor.alignJustifyHint")}
             >
-              <AlignJustify className="w-3.5 h-3.5" />
+              <AlignJustify className="w-4 h-4" />
             </ToolbarButton>
           </div>
           <Divider />
@@ -909,14 +882,14 @@ export default function EditorToolbar({
               active={false}
               title={t("editor.redoHint")}
             >
-              <Redo className="w-3.5 h-3.5" />
+              <Redo className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => onToggleSnapshotHistory?.()}
               active={showSnapshotHistory}
               title={t("snapshot.toggleHistoryHint")}
             >
-              <History className="w-3.5 h-3.5" />
+              <History className="w-4 h-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => onToggleFindReplace?.()}

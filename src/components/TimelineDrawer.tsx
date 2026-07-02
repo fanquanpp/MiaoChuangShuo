@@ -109,65 +109,82 @@ export default function TimelineDrawer({ nodeId, onClose }: { nodeId: string; on
   const fields = buildDrawerFields(t);
 
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-80 bg-nf-bg-sidebar border-l border-nf-border-light shadow-2xl flex flex-col z-30">
-      {/* 头部 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-nf-border-light">
-        <h3 className="text-sm font-bold text-nf-text">{t("timeline.drawer.title")}</h3>
-        <button
-          onClick={onClose}
-          className="text-nf-text-tertiary hover:text-nf-text transition-colors"
-          aria-label="close drawer"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="nf-glass-panel w-full max-w-md bg-nf-bg-card border border-nf-border-light shadow-lg flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+        {/* 头部 */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-nf-border-light">
+          <h3 className="text-sm font-semibold font-display text-nf-text">{t("timeline.drawer.title")}</h3>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition duration-fast"
+            aria-label="close dialog"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-      {/* 表单字段 */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {fields.map((field) => (
-          <div key={field.key}>
-            <label className="block text-xs text-nf-text-secondary mb-1">{field.label}</label>
-            {field.type === "text" && (
-              <input
-                type="text"
-                value={(draft[field.key] as string) ?? ""}
-                onChange={(e) => {
-                  const newDraft = { ...draft, [field.key]: e.target.value };
-                  setDraft(newDraft);
-                  commitToStore({ [field.key]: e.target.value });
-                }}
-                className="w-full px-2 py-1.5 text-sm bg-nf-bg border border-nf-border-light rounded text-nf-text focus:outline-none focus:border-fandex-primary"
-              />
-            )}
-            {field.type === "textarea" && (
-              <textarea
-                value={(draft[field.key] as string) ?? ""}
-                onChange={(e) => {
-                  const newDraft = { ...draft, [field.key]: e.target.value };
-                  setDraft(newDraft);
-                  commitToStore({ [field.key]: e.target.value });
-                }}
-                rows={4}
-                className="w-full px-2 py-1.5 text-sm bg-nf-bg border border-nf-border-light rounded text-nf-text focus:outline-none focus:border-fandex-primary resize-none"
-              />
-            )}
-            {field.type === "select" && (
-              <select
-                value={(draft[field.key] as string) ?? "planned"}
-                onChange={(e) => {
-                  const newDraft = { ...draft, [field.key]: e.target.value as NodeStatus };
-                  setDraft(newDraft);
-                  commitToStore({ [field.key]: e.target.value as NodeStatus });
-                }}
-                className="w-full px-2 py-1.5 text-sm bg-nf-bg border border-nf-border-light rounded text-nf-text focus:outline-none focus:border-fandex-primary"
-              >
-                {field.options?.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        ))}
+        {/* 表单字段 */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          {fields.map((field) => (
+            <div key={field.key}>
+              <label className="block text-xs text-nf-text-secondary mb-1">{field.label}</label>
+              {field.type === "text" && (
+                <input
+                  type="text"
+                  value={(draft[field.key] as string) ?? ""}
+                  onChange={(e) => {
+                    const newDraft = { ...draft, [field.key]: e.target.value };
+                    setDraft(newDraft);
+                    commitToStore({ [field.key]: e.target.value });
+                  }}
+                  className="w-full px-2 py-1.5 text-sm bg-nf-bg border border-nf-border-light rounded-none text-nf-text focus:outline-none focus:border-fandex-primary transition duration-fast"
+                />
+              )}
+              {field.type === "textarea" && (
+                <textarea
+                  value={(draft[field.key] as string) ?? ""}
+                  onChange={(e) => {
+                    const newDraft = { ...draft, [field.key]: e.target.value };
+                    setDraft(newDraft);
+                    commitToStore({ [field.key]: e.target.value });
+                  }}
+                  rows={4}
+                  className="w-full px-2 py-1.5 text-sm bg-nf-bg border border-nf-border-light rounded-none text-nf-text focus:outline-none focus:border-fandex-primary resize-none transition duration-fast"
+                />
+              )}
+              {field.type === "select" && (
+                <select
+                  value={(draft[field.key] as string) ?? "planned"}
+                  onChange={(e) => {
+                    const newDraft = { ...draft, [field.key]: e.target.value as NodeStatus };
+                    setDraft(newDraft);
+                    commitToStore({ [field.key]: e.target.value as NodeStatus });
+                  }}
+                  className="w-full px-2 py-1.5 text-sm bg-nf-bg border border-nf-border-light rounded-none text-nf-text focus:outline-none focus:border-fandex-primary transition duration-fast"
+                >
+                  {field.options?.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* 底部操作栏 */}
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
+          <button
+            onClick={onClose}
+            className="nf-tool-btn px-3 py-1.5 text-sm text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+          >
+            {t("app.close") || "关闭"}
+          </button>
+        </div>
       </div>
     </div>
   );

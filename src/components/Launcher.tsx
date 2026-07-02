@@ -57,6 +57,7 @@ import {
 } from "../lib/api";
 import ProjectCard, { type ProjectData } from "./ProjectCard";
 import CreateProjectDialog from "./CreateProjectDialog";
+import EditProjectDialog from "./EditProjectDialog";
 import TemplateManager from "./TemplateManager";
 import { ProjectGridSkeleton } from "./SkeletonComponents";
 import { useI18n } from "../lib/i18n";
@@ -107,8 +108,10 @@ export default function Launcher() {
   const [selectedType, setSelectedType] = useState<ProjectType>("standard");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("26.7.8");
+  const [appVersion, setAppVersion] = useState("26.7.9");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
+  // 编辑项目对话框目标：非 null 时渲染 EditProjectDialog
+  const [editTarget, setEditTarget] = useState<ProjectInfo | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [selectedCustomTemplate, setSelectedCustomTemplate] = useState<CustomTemplate | null>(null);
@@ -147,8 +150,9 @@ export default function Launcher() {
       const next = !isFullscreen;
       await appWindow.setFullscreen(next);
       setIsFullscreen(next);
-    } catch {
-      // 非 Tauri 环境静默忽略
+    } catch (err) {
+      // 非 Tauri 环境或权限不足时静默忽略,仅在控制台输出便于调试
+      console.warn("toggleFullscreen failed:", err);
     }
   }, [isFullscreen]);
 
@@ -584,6 +588,20 @@ export default function Launcher() {
     }
   }, [deleteTarget, t, showToast]);
 
+  /**
+   * 编辑项目设定成功回调
+   * 输入: updated 后端返回的最新 ProjectInfo
+   * 输出: 无
+   * 流程: 关闭对话框 + 用最新信息替换列表中对应项 + 提示成功
+   */
+  const handleEditSuccess = useCallback((updated: ProjectInfo) => {
+    setEditTarget(null);
+    setProjects((prev) =>
+      prev.map((p) => (p.path === updated.path ? updated : p))
+    );
+    showToast("success", t("project.editSuccess"));
+  }, [t, showToast]);
+
   const hasProjects = projects.length > 0;
   const hasSearchResults = sortedProjects.length > 0;
   const isSearching = searchQuery.trim().length > 0;
@@ -992,6 +1010,7 @@ export default function Launcher() {
                       project={toProjectData(p)}
                       projectInfo={p}
                       onDelete={handleDeleteProject}
+                      onEdit={setEditTarget}
                     />
                   </div>
                 ))}
@@ -1032,6 +1051,15 @@ export default function Launcher() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {/* 编辑项目设定对话框：由项目卡片右键菜单"编辑"触发 */}
+      {editTarget && (
+        <EditProjectDialog
+          project={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSuccess={handleEditSuccess}
+        />
+      )}
 
       {/* 从压缩包导入项目对话框 */}
       <ProjectArchiveDialog

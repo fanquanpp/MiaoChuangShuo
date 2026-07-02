@@ -26,7 +26,6 @@ import {
   Moon,
   Keyboard,
   Save,
-  Sparkles,
   RotateCcw,
   History,
   Download,
@@ -190,14 +189,6 @@ export default function CommandPalette({
         keywords: ["快捷键", "shortcuts", "键盘"],
         action: () => { onClose(); window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" })); },
         icon: Keyboard,
-      },
-      {
-        id: "toggle-focus-dim",
-        label: settings.focusDim ? t("command.disableFocusDim") : t("command.enableFocusDim"),
-        category: t("command.categoryEditor"),
-        keywords: ["昏暗", "专注", "focus", "dim"],
-        action: () => settings.setFocusDim(!settings.focusDim),
-        icon: Sparkles,
       },
       {
         id: "toggle-autosave",

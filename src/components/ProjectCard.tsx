@@ -3,10 +3,10 @@
 // 功能概述：
 // 渲染单张项目卡片，采用低宽型设计减少垂直空白，增加信息密度。
 // 左侧渐变色条 + 右侧信息区的横向布局。
-// 支持键盘导航和删除操作。
+// 支持键盘导航、删除操作与右键上下文菜单（打开/编辑/删除）。
 
-import { memo, useCallback } from "react";
-import { Clock, BarChart3, BookOpen, Trash2, Calendar, User, Tag } from "lucide-react";
+import { memo, useCallback, useState, useEffect } from "react";
+import { Clock, BarChart3, BookOpen, Trash2, Calendar, User, Tag, Pencil, FolderOpen } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import type { ProjectInfo } from "../lib/api";
 import { useI18n } from "../lib/i18n";
@@ -37,26 +37,38 @@ export interface ProjectCardProps {
   project: ProjectData;
   projectInfo?: ProjectInfo;
   onDelete?: (project: ProjectInfo) => void;
+  /** 编辑项目设定回调（由右键菜单触发） */
+  onEdit?: (project: ProjectInfo) => void;
+}
+
+/** 右键菜单位置类型 */
+interface ContextMenuPos {
+  x: number;
+  y: number;
 }
 
 /**
  * 项目卡片实现组件
  * 输入:
  *   - project: 卡片展示数据（名称、类型、字数等）
- *   - projectInfo: 原始项目信息（用于打开/删除操作）
+ *   - projectInfo: 原始项目信息（用于打开/删除/编辑操作）
  *   - onDelete: 删除回调（可选）
- * 输出: JSX 卡片元素
+ *   - onEdit: 编辑项目设定回调（可选）
+ * 输出: JSX 卡片元素（含可选右键菜单浮层）
  * 流程:
  *   1. 点击卡片时，若当前已有打开项目则走切换流程，否则直接打开
  *   2. 支持键盘 Enter/Space 触发点击（无障碍）
  *   3. 删除按钮悬浮显示，阻止事件冒泡避免触发卡片点击
+ *   4. 右键触发上下文菜单：打开/编辑/删除三项
  */
-function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
+function ProjectCardImpl({ project, projectInfo, onDelete, onEdit }: ProjectCardProps) {
   const { handleSwitchProject } = useAutoSaveOnExit();
   const { t } = useI18n();
+  // 右键菜单位置，null 表示未显示
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuPos | null>(null);
 
-  /** 卡片点击：打开项目或切换项目 */
-  const handleClick = useCallback(() => {
+  /** 打开项目（卡片点击或右键菜单"打开"） */
+  const openProject = useCallback(() => {
     if (!projectInfo) return;
     const currentProject = useAppStore.getState().currentProject;
     if (currentProject) {
@@ -65,6 +77,11 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
       useAppStore.getState().openProject(projectInfo);
     }
   }, [handleSwitchProject, projectInfo]);
+
+  /** 卡片点击：打开项目或切换项目 */
+  const handleClick = useCallback(() => {
+    openProject();
+  }, [openProject]);
 
   /** 键盘事件：Enter/Space 触发点击 */
   const handleKeyDown = useCallback(
@@ -102,13 +119,43 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
     [projectInfo, onDelete]
   );
 
+  /**
+   * 右键事件：阻止浏览器默认菜单，记录屏幕坐标并显示自定义菜单
+   * 流程: preventDefault + stopPropagation 后设置 ctxMenu 状态
+   */
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (!projectInfo) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setCtxMenu({ x: e.clientX, y: e.clientY });
+    },
+    [projectInfo]
+  );
+
+  // Escape 键关闭右键菜单（capture 阶段优先拦截）
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setCtxMenu(null);
+      }
+    };
+    window.addEventListener("keydown", handleEscape, true);
+    return () => window.removeEventListener("keydown", handleEscape, true);
+  }, [ctxMenu]);
+
   return (
+    <>
     <div
       role="button"
       tabIndex={0}
       aria-label={t("projectcard.openProject") + ": " + project.name}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
+      onContextMenu={handleContextMenu}
       className="nf-card-sheen nf-card-dots nf-hover-float group relative bg-nf-bg-card backdrop-blur-none border border-nf-border-light hover:border-fandex-primary/50 cursor-pointer flex overflow-hidden focus:outline-none focus:ring-1 focus:ring-fandex-primary focus:ring-inset hover:shadow-xl hover:shadow-black/40 hover:-translate-y-0.5 transition-all duration-base"
       style={{ backgroundColor: 'var(--fandex-bg-card)' }}
     >
@@ -234,6 +281,68 @@ function ProjectCardImpl({ project, projectInfo, onDelete }: ProjectCardProps) {
       {/* 底部进度条装饰 - 加粗并增加光晕 */}
       <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-fandex-primary via-fandex-secondary to-fandex-tertiary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
+
+    {/* 右键上下文菜单：打开/编辑/删除三项
+     * 复用 TimelineContextMenu 模式：全屏透明遮罩(z-40) + 菜单本体(z-50)
+     * 点击遮罩/Escape/点击菜单项均触发关闭 */}
+    {ctxMenu && projectInfo && (
+      <>
+        {/* 全屏透明遮罩：捕获外部点击关闭菜单 */}
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setCtxMenu(null)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setCtxMenu(null);
+          }}
+        />
+        {/* 菜单本体：几何直角美学，与项目设计语言统一 */}
+        <div
+          className="fixed z-50 min-w-[180px] py-1 bg-nf-bg-sidebar border border-nf-border-light rounded-none shadow-xl"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* 打开项目 */}
+          <button
+            onClick={() => {
+              setCtxMenu(null);
+              openProject();
+            }}
+            className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-sm text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text transition-colors duration-fast"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-fandex-primary/80" />
+            {t("projectcard.ctxOpen")}
+          </button>
+          {/* 编辑项目设定 */}
+          {onEdit && (
+            <button
+              onClick={() => {
+                setCtxMenu(null);
+                onEdit(projectInfo);
+              }}
+              className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-sm text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text transition-colors duration-fast"
+            >
+              <Pencil className="w-3.5 h-3.5 text-fandex-secondary/80" />
+              {t("projectcard.ctxEdit")}
+            </button>
+          )}
+          {/* 删除项目（红色警示色） */}
+          {onDelete && (
+            <button
+              onClick={() => {
+                setCtxMenu(null);
+                onDelete(projectInfo);
+              }}
+              className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-sm text-nf-text-secondary hover:bg-red-500/10 hover:text-red-400 transition-colors duration-fast"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {t("projectcard.ctxDelete")}
+            </button>
+          )}
+        </div>
+      </>
+    )}
+    </>
   );
 }
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MiaoChuangShuo",
-  "version": "26.7.8",
+  "version": "26.7.9",
   "identifier": "com.miaochuangshuo.app",
   "build": {
     "beforeDevCommand": "npm run dev",

@@ -22,13 +22,14 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
-  Controls,
   MiniMap,
+  ConnectionMode,
   type Connection,
   type NodeTypes,
   type EdgeTypes,
   type Node,
   type Edge,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import { Trash2 } from "lucide-react";
 import "@xyflow/react/dist/style.css";
@@ -36,7 +37,6 @@ import "@xyflow/react/dist/style.css";
 import { useAppStore } from "../lib/store";
 import { useTimelineStore, filterCollapsed } from "../lib/stores/timelineStore";
 import { autoLayout } from "../lib/dagreLayout";
-import { clearTimeline } from "../lib/timelineApi";
 import { EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
 import type {
   TimelineNodeType,
@@ -103,6 +103,10 @@ export default function TimelinePanel() {
     nodeType: TimelineNodeType | null;
   } | null>(null);
 
+  // ReactFlow 实例引用(用于 screenToFlowPosition 坐标转换)
+  // 用途: 右键新建节点时将屏幕坐标转为画布坐标, 确保节点在右键处创建而非默认左上角
+  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+
   // nodeTypes / edgeTypes 必须在组件外定义或 useMemo, 避免每次渲染重新创建导致 React Flow 警告
   const nodeTypes: NodeTypes = useMemo(() => ({ storyNode: TimelineNode }), []);
   const edgeTypes: EdgeTypes = useMemo(() => ({ storyEdge: TimelineEdge }), []);
@@ -151,15 +155,22 @@ export default function TimelinePanel() {
 
   /**
    * 创建新节点并可选地连线到父节点
-   * 输入: type 节点类型, position 画布坐标, parentId 父节点 ID(可选)
+   * 输入: type 节点类型, screenPosition 屏幕坐标(右键位置), parentId 父节点 ID(可选)
    * 输出: void
    * 流程:
-   *   1. 构造 TimelineNode(含默认值)
-   *   2. 添加到 store.nodes
-   *   3. 若 parentId 存在, 创建对应类型的边
+   *   1. 通过 screenToFlowPosition 将屏幕坐标转为画布坐标(支持画布平移/缩放后精准定位)
+   *   2. 构造 TimelineNode(含默认值)
+   *   3. 添加到 store.nodes
+   *   4. 若 parentId 存在, 创建对应类型的边
+   *
+   * 修复记录: 原实现直接使用屏幕坐标作为节点 position, 导致画布平移/缩放后
+   *           新建节点始终出现在左上角而非右键位置。现通过 reactFlowInstance
+   *           的 screenToFlowPosition 方法完成正确的坐标转换。
    */
   const handleCreateNode = useCallback(
-    (type: TimelineNodeType, position: { x: number; y: number }, parentId?: string) => {
+    (type: TimelineNodeType, screenPosition: { x: number; y: number }, parentId?: string) => {
+      // 坐标转换: 屏幕坐标 → 画布坐标(支持画布平移/缩放)
+      const position = reactFlowInstance.current?.screenToFlowPosition(screenPosition) ?? screenPosition;
       const now = new Date().toISOString();
       const newNode: StoryTimelineNode = {
         id: `node_${crypto.randomUUID()}`,
@@ -378,7 +389,7 @@ export default function TimelinePanel() {
 
   return (
     <div
-      className="h-full w-full relative"
+      className="h-full w-full relative timeline-canvas-root"
       data-tauri-drag-region="false"
       onDragStart={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
@@ -389,15 +400,14 @@ export default function TimelinePanel() {
         <button
           onClick={() => {
             if (confirm(t("timeline.toast.clearConfirm"))) {
+              // 仅清空内存状态(zundo 自动追踪, 支持 Ctrl+Z 撤销)
+              // 不再立即调用 clearTimeline 删除后端文件,
+              // 由 debouncedSave 将空状态写入 timeline.json(等价效果且支持撤销恢复)
               clearGraph();
-              if (currentProject) {
-                clearTimeline(currentProject.path).then(() => {
-                  showToast("success", t("timeline.toast.cleared"));
-                });
-              }
+              showToast("success", t("timeline.toast.cleared"));
             }
           }}
-          className="px-2 py-1 text-xs bg-nf-bg-sidebar border border-nf-border-light rounded text-nf-text-secondary hover:text-fandex-tertiary hover:border-fandex-tertiary transition-colors"
+          className="nf-tool-btn px-2 py-1 text-xs bg-nf-bg-sidebar border border-nf-border-light rounded-none text-nf-text-secondary hover:text-fandex-tertiary hover:border-fandex-tertiary"
           title="清空图谱"
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -412,6 +422,9 @@ export default function TimelinePanel() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
+        onInit={(instance) => {
+          reactFlowInstance.current = instance;
+        }}
         onNodeClick={(_: ReactMouseEvent, node: Node) => selectNode(node.id)}
         onNodeDoubleClick={(_: ReactMouseEvent, node: Node) => selectNode(node.id)}
         onPaneClick={() => selectNode(null)}
@@ -423,7 +436,8 @@ export default function TimelinePanel() {
         minZoom={0.1}
         maxZoom={2}
         defaultEdgeOptions={{ type: "storyEdge" }}
-        className="bg-nf-bg"
+        connectionMode={ConnectionMode.Loose}
+        className="timeline-flow"
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <MiniMap
@@ -432,8 +446,8 @@ export default function TimelinePanel() {
             return EDGE_TYPE_COLORS[nodeType as keyof typeof EDGE_TYPE_COLORS] ?? "#6EA8FE";
           }}
           maskColor="rgba(0,0,0,0.4)"
+          className="!bg-nf-bg-sidebar"
         />
-        <Controls />
       </ReactFlow>
 
       {contextMenu && (

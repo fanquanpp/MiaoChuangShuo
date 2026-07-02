@@ -1,7 +1,7 @@
 {
   "name": "miaochuangshuo",
   "private": true,
-  "version": "26.7.8",
+  "version": "26.7.9",
   "type": "module",
   "description": "喵创说 - 离线小说创作工作站",
   "scripts": {

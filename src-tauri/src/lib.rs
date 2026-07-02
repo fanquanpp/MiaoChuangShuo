@@ -17,7 +17,6 @@ mod character_commands;
 mod template_schema;
 mod codex_commands;
 mod timeline_commands;
-mod scene_commands;
 
 /// 应用入口函数
 /// 输入: 无
@@ -41,6 +40,7 @@ pub fn run() {
             fs_commands::import_project,
             fs_commands::pick_directory,
             fs_commands::delete_project,
+            fs_commands::update_project_meta,
             // 文件操作命令
             fs_commands::read_project_tree,
             fs_commands::read_file,
@@ -87,11 +87,6 @@ pub fn run() {
             timeline_commands::read_timeline,
             timeline_commands::save_timeline,
             timeline_commands::clear_timeline,
-            // 场景化叙事工作台命令
-            scene_commands::list_scenes,
-            scene_commands::save_scenes,
-            scene_commands::update_scene_field,
-            scene_commands::list_scene_files,
         ])
         .setup(|_app| {
             Ok(())

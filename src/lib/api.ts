@@ -158,6 +158,32 @@ export async function deleteProject(projectPath: string): Promise<void> {
   return invoke<void>("delete_project", { projectPath });
 }
 
+// 更新项目元数据（编辑项目设定）
+// 输入:
+//   projectPath 项目根目录路径
+//   name 项目名称
+//   genre 题材（可为空字符串）
+//   author 作者
+//   description 描述
+// 输出: Promise<ProjectInfo> 更新后的项目信息（含重新统计的字数与章节数）
+// 流程: 调用 Rust 后端 update_project_meta 命令，原子写入元数据文件
+// 注意: 仅更新元数据字段，不重命名项目目录；后端会自动刷新 updated_at 与字数统计
+export async function updateProjectMeta(
+  projectPath: string,
+  name: string,
+  genre: string,
+  author: string,
+  description: string
+): Promise<ProjectInfo> {
+  return invoke<ProjectInfo>("update_project_meta", {
+    projectPath,
+    name,
+    genre,
+    author,
+    description,
+  });
+}
+
 // 打开目录选择对话框
 // 输入: 无
 // 输出: Promise<string | null> 选中目录路径

@@ -281,6 +281,29 @@ select:focus-visible {
   transition: background 0.25s ease;
 }
 
+/* ========== React Flow 画布背景统一(覆盖默认白色) ========== */
+/* 修复: ReactFlow 内部 .react-flow__pane 默认白色背景, 与项目暗色主题不统一 */
+.timeline-canvas-root,
+.timeline-flow {
+  background-color: rgb(var(--nf-bg-rgb, 12, 13, 20)) !important;
+}
+.react-flow__pane,
+.react-flow__renderer {
+  background-color: transparent !important;
+}
+/* 控制按钮(放大/缩小/锁定)隐藏: 用户反馈为"广告按钮", 已移除 Controls 组件 */
+.react-flow__controls {
+  display: none !important;
+}
+/* MiniMap 背景统一 */
+.react-flow__minimap {
+  background-color: rgba(16, 18, 24, 0.9) !important;
+}
+/* 连线时拖拽预览线加粗, 提升可见性 */
+.react-flow__connectionline {
+  stroke-width: 2.5 !important;
+}
+
 /* 遮罩层增强模糊，使背景内容更柔和 */
 .nf-glass-overlay {
   backdrop-filter: blur(4px) saturate(120%);

@@ -16,7 +16,6 @@ import {
   X,
   BookOpen,
   Library,
-  Eye,
   History,
   PenLine,
   Keyboard,
@@ -83,7 +82,6 @@ export default function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
   const features = [
     { icon: BookOpen, color: "text-fandex-primary", title: t("welcome.featureEditorTitle"), desc: t("welcome.featureEditorDesc") },
     { icon: Library, color: "text-fandex-secondary", title: t("welcome.featureCodexTitle"), desc: t("welcome.featureCodexDesc") },
-    { icon: Eye, color: "text-fandex-tertiary", title: t("welcome.featureFocusTitle"), desc: t("welcome.featureFocusDesc") },
     { icon: History, color: "text-fandex-primary", title: t("welcome.featureSnapshotTitle"), desc: t("welcome.featureSnapshotDesc") },
   ];
 

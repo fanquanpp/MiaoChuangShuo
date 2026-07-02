@@ -724,6 +724,82 @@ pub fn delete_project(project_path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| format!("删除项目失败: {}", e))
 }
 
+/// 更新项目元数据（编辑项目设定）
+/// 输入:
+///   project_path 项目根目录路径
+///   name 项目名称
+///   genre 题材（可为空字符串）
+///   author 作者
+///   description 描述
+/// 输出: Result<ProjectInfo, String> 更新后的项目信息
+/// 流程:
+///   1. 校验项目路径有效且为有效项目
+///   2. 校验新名称合法性
+///   3. 读取现有元数据（保留 created_at/version/project_type 不可变字段）
+///   4. 更新可编辑字段与 updated_at 时间戳
+///   5. 重新统计字数与章节数，同步到 meta
+///   6. 原子写入元数据文件（临时文件 + rename，防止写入中途崩溃损坏 JSON）
+///   7. 返回更新后的 ProjectInfo
+/// 注意: 仅更新元数据字段，不重命名项目目录，避免破坏现有路径引用
+#[tauri::command]
+pub fn update_project_meta(
+    project_path: String,
+    name: String,
+    genre: String,
+    author: String,
+    description: String,
+) -> Result<ProjectInfo, String> {
+    let path = validate_project_path(&project_path)?;
+    let meta_path = path.join(".novelforge").join("project.json");
+    if !meta_path.exists() {
+        return Err("不是有效的 喵创说 项目（缺少元数据文件）".to_string());
+    }
+
+    // 校验项目名称合法性
+    let name_trimmed = name.trim();
+    if name_trimmed.is_empty() {
+        return Err("项目名称不能为空".to_string());
+    }
+    let invalid_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
+    if name_trimmed.chars().any(|c| invalid_chars.contains(&c)) {
+        return Err("项目名称包含非法字符".to_string());
+    }
+
+    // 读取现有元数据，保留 created_at/version/project_type 等不可变字段
+    let mut meta = read_project_meta(&path)?;
+    meta.name = name_trimmed.to_string();
+    meta.genre = genre;
+    meta.author = author.trim().to_string();
+    meta.description = description.trim().to_string();
+    // 更新最后修改时间（ISO 8601）
+    meta.updated_at = chrono::Local::now().to_rfc3339();
+
+    // 重新统计字数与章节数，同步到 meta 内嵌字段
+    let word_count = count_project_words(&path);
+    let chapter_count = count_project_chapters(&path);
+    meta.word_count = word_count;
+
+    // 原子写入元数据文件：先写入临时文件，再 rename 替换
+    // 防止写入中途崩溃导致 project.json 损坏
+    let meta_json = serde_json::to_string_pretty(&meta)
+        .map_err(|e| format!("序列化元数据失败: {}", e))?;
+    let tmp_path = meta_path.with_extension("json.tmp");
+    fs::write(&tmp_path, meta_json)
+        .map_err(|e| format!("写入元数据失败: {}", e))?;
+    fs::rename(&tmp_path, &meta_path).map_err(|e| {
+        // rename 失败时清理临时文件，避免残留
+        let _ = fs::remove_file(&tmp_path);
+        format!("替换元数据文件失败: {}", e)
+    })?;
+
+    Ok(ProjectInfo {
+        path: path.to_string_lossy().to_string(),
+        meta,
+        word_count,
+        chapter_count,
+    })
+}
+
 /// 搜索结果项结构
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SearchResult {
