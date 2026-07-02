@@ -93,7 +93,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
 
   // ===== 版本更新检测状态 =====
   // 当前应用版本号（组件挂载时异步获取）
-  const [currentVersion, setCurrentVersion] = useState("26.7.6");
+  const [currentVersion, setCurrentVersion] = useState("26.7.8");
   // 检查中状态（控制按钮 loading 动画）
   const [checking, setChecking] = useState(false);
   // 检测到的新版本信息（null=未检测到或未检查）
