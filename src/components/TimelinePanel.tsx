@@ -44,6 +44,7 @@ import TimelineNode from "./TimelineNode";
 import TimelineEdge from "./TimelineEdge";
 import TimelineEmpty from "./TimelineEmpty";
 import TimelineContextMenu from "./TimelineContextMenu";
+import TimelineDrawer from "./TimelineDrawer";
 
 /**
  * 时间线画布容器组件
@@ -69,6 +70,7 @@ export default function TimelinePanel() {
   const onEdgesChange = useTimelineStore((s) => s.onEdgesChange);
   const addEdge = useTimelineStore((s) => s.addEdge);
   const selectNode = useTimelineStore((s) => s.selectNode);
+  const selectedNodeId = useTimelineStore((s) => s.selectedNodeId);
   const undo = useTimelineStore((s) => s.undo);
   const redo = useTimelineStore((s) => s.redo);
   const saveNow = useTimelineStore((s) => s.saveNow);
@@ -305,6 +307,7 @@ export default function TimelinePanel() {
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
         onNodeClick={(_: ReactMouseEvent, node: Node) => selectNode(node.id)}
+        onNodeDoubleClick={(_: ReactMouseEvent, node: Node) => selectNode(node.id)}
         onPaneClick={() => selectNode(null)}
         onNodeContextMenu={handleNodeContextMenu}
         onPaneContextMenu={handlePaneContextMenu}
@@ -339,6 +342,13 @@ export default function TimelinePanel() {
             setContextMenu(null);
           }}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {selectedNodeId && (
+        <TimelineDrawer
+          nodeId={selectedNodeId}
+          onClose={() => selectNode(null)}
         />
       )}
     </div>
