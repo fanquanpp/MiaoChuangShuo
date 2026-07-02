@@ -36,7 +36,11 @@ import { useAppStore } from "../lib/store";
 import { useTimelineStore, filterCollapsed } from "../lib/stores/timelineStore";
 import { autoLayout } from "../lib/dagreLayout";
 import { EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
-import type { TimelineNodeType, TimelineNode as StoryTimelineNode } from "../lib/stores/timelineTypes";
+import type {
+  TimelineNodeType,
+  TimelineNode as StoryTimelineNode,
+  TimelineEdge as StoryTimelineEdge,
+} from "../lib/stores/timelineTypes";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 
@@ -110,6 +114,16 @@ export default function TimelinePanel() {
   // 使用 Zustand 默认 subscribe + 手动比较(不依赖 subscribeWithSelector 中间件)
   const projectRef = useRef(currentProject);
   projectRef.current = currentProject;
+
+  // 拖拽前状态快照引用(含 nodes/edges 快照)
+  // 用途: onNodeDragStop 时手动推入 zundo pastStates, 实现"整段拖拽仅 1 条历史记录"
+  // 为何需要在 dragStart 捕获: zundo 的 pastStates 仅记录 setState 前的快照,
+  //   pause() 后中间帧不入栈, resume() 后也无法自动补录 pre-drag 状态,
+  //   故需在拖拽开始前显式保存, 拖拽结束时手动写入 pastStates。
+  const preDragSnapshotRef = useRef<{
+    nodes: StoryTimelineNode[];
+    edges: StoryTimelineEdge[];
+  } | null>(null);
 
   useEffect(() => {
     const unsub = useTimelineStore.subscribe((state, prevState) => {
@@ -253,6 +267,68 @@ export default function TimelinePanel() {
     return () => window.removeEventListener("keydown", handler, true);
   }, [activeCategory, currentProject, saveNow, undo, redo, selectNode, handleAutoLayout]);
 
+  /**
+   * 拖拽性能优化(zundo pause/resume)
+   * 原理:
+   *   1. onNodeDragStart: 暂停 zundo 历史追踪, 同时捕获 pre-drag 状态快照
+   *   2. onNodeDrag: 正常应用位置变更到 store(由 onNodesChange 处理, 保证 UI 流畅)
+   *   3. onNodeDragStop: 恢复 zundo 追踪 → 手动将 pre-drag 快照推入 pastStates
+   * 效果: 拖拽过程产生 60+ 次 position 更新, 但仅入栈 1 条历史记录
+   *
+   * 关键: 受控模式下必须正常更新 store, 否则节点会弹回原位
+   *
+   * 【Skill 偏差报备】
+   * 原 Skill/计划要求调用 `useTimelineStore.temporal.getState().set()` 手动入栈。
+   * 偏差原因: 经查 zundo v2.3.0 的 TemporalState 接口仅有 pause/resume/undo/redo/
+   *   clear/setOnSave 方法, 不存在 set() 方法(见 node_modules/zundo/dist/index.d.ts)。
+   * 偏差调整: 改用"捕获快照 + 手动推入 pastStates"方案实现等价效果:
+   *   - dragStart 时通过 useTimelineStore.getState() 捕获 pre-drag 状态
+   *   - dragStop 时通过 useTimelineStore.temporal.setState() 直接追加到 pastStates,
+   *     并清空 futureStates(新历史分支), 同时遵守 limit=100 上限。
+   * 验证依据: tsc --noEmit 通过, undo/redo 行为与 zundo 语义一致。
+   */
+  const handleNodeDragStart = useCallback(() => {
+    // 捕获 pre-drag 状态快照(仅保留 partialize 关心的字段: nodes/edges)
+    const state = useTimelineStore.getState();
+    preDragSnapshotRef.current = {
+      nodes: state.nodes,
+      edges: state.edges,
+    };
+    // 暂停 zundo 追踪: 后续的 set() 调用不会产生历史记录
+    useTimelineStore.temporal.getState().pause();
+  }, []);
+
+  const handleNodeDragStop = useCallback(() => {
+    // 恢复 zundo 追踪
+    useTimelineStore.temporal.getState().resume();
+
+    // 手动将 pre-drag 快照推入 pastStates, 形成一步历史记录
+    // (pause 期间 60+ 次位置更新均未入栈, 此处仅入栈 1 条)
+    const snapshot = preDragSnapshotRef.current;
+    if (snapshot) {
+      const temporalState = useTimelineStore.temporal.getState();
+      // 复制当前 pastStates, 遵守 limit=100 上限(与 timelineStore.ts 配置一致)
+      const LIMIT = 100;
+      const pastStates = temporalState.pastStates.slice();
+      if (pastStates.length >= LIMIT) {
+        pastStates.shift();
+      }
+      pastStates.push(snapshot);
+      // 写入 temporal store: 追加快照 + 清空 futureStates(新分支不可重做)
+      useTimelineStore.temporal.setState({
+        pastStates,
+        futureStates: [],
+      });
+      // 重置快照引用, 避免下次拖拽误用
+      preDragSnapshotRef.current = null;
+    }
+
+    // 触发防抖保存
+    if (currentProject) {
+      debouncedSave(currentProject.path, currentProject.meta.name);
+    }
+  }, [currentProject, debouncedSave]);
+
   // onConnect: 创建新连线(已含自环/重复校验)
   const handleConnect = useCallback((connection: Connection) => {
     addEdge(connection);
@@ -318,6 +394,8 @@ export default function TimelinePanel() {
         onPaneClick={() => selectNode(null)}
         onNodeContextMenu={handleNodeContextMenu}
         onPaneContextMenu={handlePaneContextMenu}
+        onNodeDragStart={handleNodeDragStart}
+        onNodeDragStop={handleNodeDragStop}
         onlyRenderVisibleElements={true}
         minZoom={0.1}
         maxZoom={2}

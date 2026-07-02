@@ -13,6 +13,14 @@
 // 经 tsc 验证,改用 NodeProps 不带泛型参数(默认 Node 类型),
 // 内部通过 `as unknown as TimelineNodeData` 双重断言恢复业务字段类型安全。
 // 偏差依据: 实际 tsc 报错 TS2344, 与 Skill 指引不符, 按工具验证结果调整。
+//
+// 【微调建议 1 验证记录】
+// Task 4.4 尝试 useNodesData<TimelineNode>(id) 泛型(认为 useNodesData 可能不强制 Record 约束)。
+// 验证结果: 失败。useNodesData 的签名同样为 `useNodesData<NodeType extends Node>`,
+//   与 NodeProps 同源约束, 触发同一 TS2344 错误:
+//   "Type 'TimelineNodeData' is not assignable to type 'Record<string, unknown>'.
+//    Index signature for type 'string' is missing in type 'TimelineNodeData'."
+// 结论: 保留无泛型方案(useNodesData(id) + 双重断言), 微调建议 1 不采纳。
 
 import { Handle, Position, useNodesData, type NodeProps } from "@xyflow/react";
 import { NODE_TYPE_COLORS, NODE_STATUS_MAP } from "../lib/stores/timelineTypes";
@@ -31,8 +39,9 @@ import { useTimelineStore } from "../lib/stores/timelineStore";
  *   5. 渲染折叠角标(仅 main 节点且 collapsed=true)
  *   6. 渲染 Handle 锚点(左侧 target, 右侧 source)
  *
- * 关键: 因 NodeProps 泛型约束与项目禁用 unknown 规则冲突, 此处使用默认 Node 类型,
- *       通过双重断言恢复业务字段类型(Node.data: Record<string, unknown> -> TimelineNodeData)
+ * 关键: 因 NodeProps/useNodesData 泛型约束与项目禁用 unknown 规则冲突,
+ *       此处使用默认 Node 类型, 通过双重断言恢复业务字段类型
+ *       (Node.data: Record<string, unknown> -> TimelineNodeData)
  */
 export default function TimelineNode({ id, selected }: NodeProps) {
   // 仅订阅当前节点的 data 字段变化(避免其他节点变化触发重渲染)
