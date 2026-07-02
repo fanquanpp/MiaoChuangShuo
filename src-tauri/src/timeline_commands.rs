@@ -393,20 +393,27 @@ pub fn validate_graph(graph: &TimelineGraph) -> Result<(), String> {
 /// schema 版本迁移函数
 /// 输入: graph 原始图谱, target_version 目标版本
 /// 输出: Result<TimelineGraph, String> 迁移后的图谱
-/// 流程: 按版本号顺序应用迁移函数
-/// 注: 当前仅版本 1, 预留迁移框架
+/// 流程:
+///   1. 若当前版本 >= 目标版本, 无需迁移直接返回
+///   2. 若当前版本 < 目标版本, 按版本号匹配迁移函数
+///   3. 当前仅支持 schema v1, 无更低版本迁移路径, 低版本数据返回错误
+/// 注: 未来新增版本时, 在 match 中补充对应的 migrate_vN_to_vN+1 函数
+///     多步迁移可改造为 while 循环 + match 结构迭代应用
 pub fn migrate_schema(graph: TimelineGraph, target_version: i32) -> Result<TimelineGraph, String> {
-    let mut current = graph;
-    let mut current_version = current.schema_version;
+    let current = graph;
 
-    while current_version < target_version {
-        current = match current_version {
-            // 0 => migrate_v0_to_v1(current)?,  // 未来迁移示例
-            _ => return Err(format!("无法从版本 {} 迁移", current_version)),
-        };
-        current_version = current.schema_version;
+    // 当前版本已达目标, 无需迁移
+    if current.schema_version >= target_version {
+        return Ok(current);
     }
 
-    current.schema_version = target_version;
-    Ok(current)
+    // 按版本号匹配迁移函数
+    // 当前仅支持 schema v1, 无更低版本的迁移路径
+    match current.schema_version {
+        // 0 => return Ok(migrate_v0_to_v1(current)?),  // 未来迁移示例(预留)
+        v => Err(format!(
+            "无法从版本 {} 迁移到 {}（无可用迁移路径）",
+            v, target_version
+        )),
+    }
 }
