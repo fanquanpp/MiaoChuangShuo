@@ -108,6 +108,9 @@
 - 扫描目录作为默认存储路径:用户设置后新建项目自动填充,无需重复选择
 - 品牌栏拼音化 + 小点装饰:避免中文路径编码问题
 
+### 剧情时间线编辑器
+- **剧情时间线编辑器**(Alt+9): 可视化画布组织主线/分支/事件/结局节点,支持拖拽、连线、折叠、自动布局、撤销重做,自动生成 txt 摘要
+
 ## 下载安装
 
 前往 [Releases 页面](https://github.com/fanquanpp/MiaoChuangShuo/releases) 下载最新版本:
@@ -134,6 +137,15 @@
 | Ctrl+Shift+L | 歌词排版 |
 | Tab / Shift+Tab | 批量缩进 / 取消缩进 |
 | Esc | 关闭对话框 / 退出专注模式 |
+| Alt+9 | 剧情时间线 |
+
+> 时间线面板内快捷键:
+>
+> | 快捷键 | 功能 |
+> |--------|------|
+> | Ctrl+S | 保存时间线(自动防抖) |
+> | Ctrl+L | 自动布局 |
+> | Ctrl+Z / Ctrl+Y | 撤销 / 重做 |
 
 ## 技术栈
 
@@ -170,6 +182,12 @@ MiaoChuangShuo/
 │   │   ├── WelcomeDialog.tsx         # 首次欢迎页
 │   │   ├── UpdateNoticeDialog.tsx    # 版本更新提示弹窗
 │   │   ├── SettingsDialog.tsx        # 设置对话框(含背景主题/更新检测)
+│   │   ├── TimelinePanel.tsx         # 剧情时间线画布容器
+│   │   ├── TimelineNode.tsx          # 自定义节点组件
+│   │   ├── TimelineEdge.tsx         # 自定义连线组件
+│   │   ├── TimelineDrawer.tsx       # 节点详情抽屉
+│   │   ├── TimelineContextMenu.tsx   # 右键菜单
+│   │   ├── TimelineEmpty.tsx         # 空状态提示
 │   │   └── ...
 │   ├── lib/                          # 核心库
 │   │   ├── api.ts                    # Tauri 命令封装
@@ -182,6 +200,10 @@ MiaoChuangShuo/
 │   │   ├── categoryRegistry.ts       # 分类注册表
 │   │   ├── i18n.tsx                  # 国际化(中英文双语)
 │   │   ├── templateSchema.ts         # 模板字段架构
+│   │   ├── stores/timelineTypes.ts   # 时间线类型定义
+│   │   ├── stores/timelineStore.ts   # 时间线状态管理(Zustand + zundo)
+│   │   ├── dagreLayout.ts            # 自动布局算法
+│   │   ├── timelineApi.ts            # Tauri 命令封装
 │   │   └── ...
 │   └── ...
 ├── src-tauri/                        # Rust 后端
@@ -195,6 +217,7 @@ MiaoChuangShuo/
 │       ├── codex_commands.rs         # 智能设定库
 │       ├── scene_commands.rs         # 场景化叙事工作台
 │       ├── ai_commands.rs            # AI 辅助命令骨架
+│       ├── timeline_commands.rs      # 时间线后端命令
 │       └── lib.rs                    # 应用入口
 └── ...
 ```
@@ -223,6 +246,14 @@ npm run tauri build
 构建产物位于 `src-tauri/target/release/bundle/`。
 
 ## 版本历程
+
+### v26.7.8
+- 新增剧情时间线编辑器（Alt+9）
+- 支持可视化画布组织主线/分支/事件/结局节点
+- 拖拽优化（zundo pause/resume 单次入栈）
+- BFS 折叠算法、自动布局（dagre）、撤销重做（zundo）
+- 原子写入 + 崩溃恢复 + 环检测 + schema 迁移
+- 自动生成 txt 摘要
 
 - **v26.7.4**:编辑器纯文本记事本风格重构(标题/引用块/工具栏移除块级装饰,贴近 Word 文档式排版)+ 诗歌/歌词改为行内 Mark(选中文本即可应用,纯文字属性)+ 删除独立打字机模式模块 + 工具栏紧凑化 + 代码精简约 800 行
 - **v26.7.3**:主页状态栏优化(呼吸绿点 + 双行布局)+ 按钮酷炫悬停动效(高亮扫光/图标旋转/边框光晕)+ 项目卡片背景装饰升级(点阵网格 + 同心圆羽毛笔 + 几何菱形三层装饰)
