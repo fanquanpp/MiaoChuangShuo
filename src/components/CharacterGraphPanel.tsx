@@ -53,6 +53,7 @@ import { useI18n } from "../lib/i18n";
 import CharacterGraphNodeComponent from "./CharacterGraphNode";
 import CharacterGraphEdgeComponent from "./CharacterGraphEdge";
 import CharacterGraphDrawer from "./CharacterGraphDrawer";
+import CharacterGraphEdgeDrawer from "./CharacterGraphEdgeDrawer";
 import CharacterGraphContextMenu, {
   type ContextMenuState,
   type ContextMenuActions,
@@ -183,6 +184,8 @@ export default function CharacterGraphPanel() {
   const deleteNode = useCharacterGraphStore((s) => s.deleteNode);
   const clearGraph = useCharacterGraphStore((s) => s.clearGraph);
   const selectedNodeId = useCharacterGraphStore((s) => s.selectedNodeId);
+  const selectedEdgeId = useCharacterGraphStore((s) => s.selectedEdgeId);
+  const selectEdge = useCharacterGraphStore((s) => s.selectEdge);
   const undo = useCharacterGraphStore((s) => s.undo);
   const redo = useCharacterGraphStore((s) => s.redo);
   const saveNow = useCharacterGraphStore((s) => s.saveNow);
@@ -555,6 +558,8 @@ export default function CharacterGraphPanel() {
         onNodeClick={(_: ReactMouseEvent, node: Node) => selectNode(node.id)}
         onNodeDoubleClick={(_: ReactMouseEvent, node: Node) => selectNode(node.id)}
         onPaneClick={() => selectNode(null)}
+        onEdgeClick={(_: ReactMouseEvent, edge: Edge) => selectEdge(edge.id)}
+        onEdgeDoubleClick={(_: ReactMouseEvent, edge: Edge) => selectEdge(edge.id)}
         onNodeContextMenu={handleNodeContextMenu}
         onPaneContextMenu={handlePaneContextMenu}
         onNodeDragStart={handleNodeDragStart}
@@ -591,6 +596,14 @@ export default function CharacterGraphPanel() {
         <CharacterGraphDrawer
           nodeId={selectedNodeId}
           onClose={() => selectNode(null)}
+        />
+      )}
+
+      {/* 连线详情抽屉(双击连线或点击关系标签触发, 编辑关系类型与描述) */}
+      {selectedEdgeId && (
+        <CharacterGraphEdgeDrawer
+          edgeId={selectedEdgeId}
+          onClose={() => selectEdge(null)}
         />
       )}
     </div>

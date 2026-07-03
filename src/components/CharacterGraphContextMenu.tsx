@@ -86,8 +86,9 @@ export default function CharacterGraphContextMenu({
     if (!state) return;
     const menu = menuRef.current;
     // 菜单预估尺寸(实际尺寸在首次渲染后才能获取, 此处用预估值的回退策略)
+    // 统一全项目右键菜单宽度 180px
     const MENU_WIDTH = 180;
-    const MENU_HEIGHT = 200;
+    const MENU_HEIGHT = 220;
     const rect = menu?.getBoundingClientRect();
     const width = rect?.width ?? MENU_WIDTH;
     const height = rect?.height ?? MENU_HEIGHT;

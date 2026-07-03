@@ -8,6 +8,7 @@
 import { type EdgeProps, getBezierPath, EdgeLabelRenderer } from "@xyflow/react";
 import { RELATION_TYPE_COLORS, RELATION_TYPE_LABELS } from "../lib/stores/characterGraphTypes";
 import type { CharacterGraphEdge, RelationType } from "../lib/stores/characterGraphTypes";
+import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
 
 /**
  * 自定义连线组件
@@ -33,6 +34,9 @@ export default function CharacterGraphEdgeComponent(props: EdgeProps<CharacterGr
     data,
     selected,
   } = props;
+
+  // 获取 selectEdge 方法(用于中点关系标签点击触发连线抽屉编辑)
+  const selectEdge = useCharacterGraphStore((s) => s.selectEdge);
 
   // 关系类型默认 other(data 可能未初始化时回退)
   const relationType: RelationType = data?.relationType ?? "other";
@@ -70,7 +74,12 @@ export default function CharacterGraphEdgeComponent(props: EdgeProps<CharacterGr
           className="nodrag nopan"
         >
           <span
-            className="inline-block px-1.5 py-0.5 text-[10px] font-medium text-white border border-nf-bg shadow-sm cursor-pointer hover:scale-105 transition-transform"
+            onClick={(e) => {
+              // 点击关系标签触发连线抽屉编辑(关系类型与描述)
+              e.stopPropagation();
+              selectEdge(id);
+            }}
+            className="inline-block px-1.5 py-0.5 text-[10px] font-medium text-white border border-nf-bg shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
             style={{ backgroundColor: color }}
             title={data?.description || label}
           >

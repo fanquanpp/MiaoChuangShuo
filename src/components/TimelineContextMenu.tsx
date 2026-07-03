@@ -113,7 +113,7 @@ export default function TimelineContextMenu({
       />
       {/* 菜单本体(几何直角, 与项目美学统一) */}
       <div
-        className="fixed z-50 min-w-[160px] py-1 bg-nf-bg-sidebar border border-nf-border-light rounded-none shadow-xl"
+        className="fixed z-50 min-w-[180px] py-1 bg-nf-bg-sidebar border border-nf-border-light rounded-none shadow-xl"
         style={{ left: x, top: y }}
         onClick={(e) => e.stopPropagation()}
       >

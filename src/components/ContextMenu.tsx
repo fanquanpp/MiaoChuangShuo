@@ -123,7 +123,7 @@ export default function ContextMenu({ open, x, y, items, onClose }: ContextMenuP
   return (
     <div
       ref={menuRef}
-      className="nf-glass-panel fixed z-[100] min-w-[160px] py-1 bg-nf-bg-card border border-nf-border-light shadow-2xl"
+      className="nf-glass-panel fixed z-[100] min-w-[180px] py-1 bg-nf-bg-card border border-nf-border-light shadow-2xl"
       style={{ left: adjustedPos.x, top: adjustedPos.y }}
     >
       {items.map((item) => {

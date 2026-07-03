@@ -1,379 +1,388 @@
 <div align="center">
 
-# 🐱 MiaoChuangShuo（喵创说）
+# MiaoChuangShuo
 
-> **喵趣创想，放胆述说**
+**基于 Tauri 2.0 + React 18 的离线长篇创作工作站**
 
-一款为长篇创作者打造的离线小说创作工作站
+面向百万字级长篇小说创作场景, 采用前后端分离的桌面端架构, 将 UI 渲染与文件 IO、图谱计算等重型任务严格解耦, 保证主线程不阻塞。
 
-[![Version](https://img.shields.io/badge/version-26.7.15-blue)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078d7)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
-[![Tauri](https://img.shields.io/badge/Tauri-2.0-orange)](https://tauri.app/)
-[![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
-[![License](https://img.shields.io/badge/license-Personal%20Use-yellow)](#许可证)
-
-[功能特性](#-核心特性) • [下载安装](#-下载安装) • [快捷键](#⌨️-快捷键) • [技术栈](#-技术栈) • [开发指南](#-开发)
+[![Version](https://img.shields.io/badge/version-26.7.18-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
+[![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
+[![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078d7?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 
 </div>
 
 ---
 
-## 📖 项目简介
+## 一、系统架构设计
 
-**喵创说（MiaoChuangShuo）** 是一款专为小说创作者打造的**离线写作工作站**。我们将项目管理、章节编辑、角色设定、版本快照、剧情时间线等创作所需的全部能力，整合到一个轻量的桌面应用中。
+本项目采用桌面端 C/S 变体架构: 前端 Webview 负责渲染与交互, Rust 原生后端承载文件系统操作、图谱计算、模板生成等重型计算。两层通过 Tauri IPC 桥接层进行异步序列化通信。
 
-> 💡 **不依赖云端，不需注册，打开即写。**
-> 
-> 让有想法的人不因复杂的文本构建与整理而难以迈出第一步。
+```mermaid
+graph TD
+    subgraph 前端渲染层 Webview
+        UI[React 18 响应式 UI] --> Editor[TipTap 富文本编辑器]
+        UI --> Graph[React Flow 图谱引擎]
+        UI --> State[Zustand 全局状态]
+    end
 
----
+    subgraph IPC 桥接层
+        State <-->|Tauri Command API| Bridge[invoke / emit]
+    end
 
-## ✨ 核心特性
+    subgraph Rust 核心计算层
+        Bridge --> FS[文件系统 IO]
+        Bridge --> Template[项目模板生成器]
+        Bridge --> GraphCalc[图谱持久化与 DAG 校验]
+        Bridge --> Snapshot[增量快照管理]
+        Bridge --> WordCount[字数统计引擎]
+    end
 
-### 🎯 创作工作台
+    subgraph 本地持久化层
+        FS --> TXT[(TXT 文本文件)]
+        GraphCalc --> JSON[(JSON 图谱数据)]
+        Snapshot --> ZIP[(快照归档)]
+    end
+```
 
-- **三栏布局**：左侧分类导航 + 中间编辑区 + 右侧文件列表
-- **专注模式**（F11）：隐藏侧边栏与文件列表，沉浸式写作
-- **专注计时器**（Ctrl+Shift+T）：番茄钟式写作节奏管理
-- **命令面板**（Ctrl+K）：快速执行任意操作
-- **侧边栏精简架构**：8 大分类入口（正文 / 大纲 / 设定库 / 卷宗 / 统计 / 搜索 / 剧情图谱 / 人物关系图）
-- **整体折叠与分组折叠**：侧边栏整体折叠与设定类分组折叠，自适应窄屏创作环境
+### 架构设计要点
 
-### ✍️ 编辑器体验
-
-- **Office 级富文本**：21 项 TipTap 扩展，支持标题层级、列表、表格、链接、高亮、对齐、字体颜色、上下标等
-- **纯文本记事本风格**：标题 / 引用块 / 工具栏均采用极简纯文本视觉，无块级装饰，贴近 Word 文档式排版习惯
-- **诗歌 / 歌词行内 Mark**：选中文本即可应用诗歌 / 歌词样式，纯文字属性（斜体 + 字间距），不引入块级装饰
-- **首行缩进**：中文段落自动两字符缩进
-- **角色名补全**：输入对话时自动轮换填充角色名（Ctrl+Shift+N）
-- **智能配对**：括号与引号自动配对，支持全角 / 半角
-- **当前段落高亮**：光标所在段落左侧色条标注
-- **批量缩进**：Tab / Shift+Tab 多行批量缩进
-- **气泡菜单**：选中文本即浮现格式化工具栏
-- **查找替换**（Ctrl+F / Ctrl+H）：支持正则表达式
-- **VSCode 风格快捷键**：熟悉的高效操作体验
-- **HTML 持久化**：富文本格式完整保留，向后兼容纯文本 .txt
-- **纯阅读模式**：一键切换只读模式，隐藏格式工具栏与 BubbleMenu，适合阅读已写内容
-
-### 📚 智能设定库 Codex
-
-- **实体出现追踪**：扫描正文中所有角色 / 世界观 / 术语 / 素材的提及位置与次数
-- **双栏面板布局**：左侧按类型分组的实体列表，右侧出现追踪详情
-- **搜索过滤与点击跳转**：快速定位实体在正文中的出现位置
-- **多目录命名兼容**：角色 / 人物、世界观 / 设定、术语 / 名词、素材 / 资料
-
-### 👤 角色系统
-
-- **角色卡片管理**：结构化字段，可视化浏览
-- **角色出场统计**：扫描全文统计每个角色的出现次数与分布
-- **全局改名**：一键替换项目内所有角色名
-- **角色悬停卡片**：正文中的角色名悬停显示角色摘要
-
-### 📸 版本快照
-
-- **自动创建文件快照**：每次保存自动生成历史版本
-- **一键恢复历史版本**：恢复前自动生成 pre-restore 兜底快照
-- **快照统计与清理**：可视化快照管理
-
-### 📁 项目管理
-
-- **8 种文体模板**：标准长篇、短篇小说、日记体、对话体、长篇分卷、同世界观系列、剧本式、诗歌体
-- **项目导入导出**：.novelforge 归档格式
-- **自定义模板**：保存常用目录结构
-- **分卷章节批量生成**：自动编号、卷首语、卷尾语
-- **章节智能排序**：正文分类按章节序号数值升序排列（第1章→第2章→…→第10章），卷首语固定顶部、卷尾语固定底部，递归子目录同步排序
-- **模块化模板向导**：4 步创建文件，Chip 式模块选择
-- **自定义工具设定拓展**：扫描项目额外目录并渲染到导航
-- **编辑项目设定**：支持修改名称、题材、作者、描述（文体类型与路径创建后只读）
-
-### 🕐 剧情时间线编辑器
-
-- **可视化画布**（Alt+9）：组织主线 / 分支 / 事件 / 结局节点
-- **拖拽与连线**：自由编排剧情走向，连接线方向精准对齐 Handle 位置
-- **同向端点连接**：完整记录 sourceHandle / targetHandle 标识，支持 source→source / target→target 等同向端点连接场景，避免 React Flow Loose 模式下的自动翻转问题
-- **动态连线预览**：拖拽过程中根据鼠标位置实时推导终点控制点方向，预览曲线与最终落点方向一致
-- **端口视觉区分**：左侧输入端口（绿色 fandex-secondary）与右侧输出端口（节点类型强调色）色彩区分，明确连线方向语义
-- **线网格背景**：低对比度细密线网格画布背景，缓解视觉疲劳
-- **分支折叠 / 展开**：BFS 可达性算法，聚焦当前分支
-- **自动布局**：dagre 层次有向图算法
-- **撤销重做**：zundo 时间旅行状态管理
-- **节点详情抽屉**：双击节点编辑标题、状态、摘要、核心冲突、伏笔备注
-- **右键菜单**：节点删除、画布清空
-- **自动保存**：500ms 防抖自动持久化，工具栏三态保存指示器（保存中 / 已保存 / 失败），Ctrl+S 手动保存
-- **节点玻璃质感**：仿项目卡片美术风格，nf-card-sheen 点阵装饰 + 底部渐变进度条
-- **高光裁剪隔离**：外层 overflow-visible 保留 Handle 可交互性，内层 overflow-hidden 严格裁剪高光反光效果，防止视觉污染画布
-- **自动生成 txt 摘要**：节点信息导出为纯文本
-- **环检测**：DFS 三色标记法防止循环依赖
-- **原子写入**：临时文件 + 重命名，防止 JSON 损坏
-
-### 🧑‍🤝‍🧑 人物关系图编辑器
-
-- **可视化关系画布**（Alt+7）：以图谱形式呈现角色之间的人物关系网络
-- **角色节点卡片**：显示角色姓名、身份标识、标签（最多 3 个）、简介预览，左右 Handle 锚点支持双向关系连线
-- **关系类型连线**：8 种预设关系类型（师徒 / 敌对 / 亲属 / 朋友 / 恋人 / 上下级 / 同袍 / 其他），连线中点渲染关系标签，按类型区分颜色
-- **节点详情抽屉**：双击节点编辑角色姓名、身份、标签（逗号分隔）、简介
-- **右键菜单**：添加角色节点、编辑详情、删除节点
-- **自动布局**：dagre LR 方向层次布局
-- **撤销重做**：zundo 时间旅行状态管理，拖拽优化（pause/resume + 手动入栈）
-- **自动保存**：防抖自动持久化，三态保存指示器，Ctrl+S 手动保存
-- **允许环形关系**：人物关系图天然允许循环（如 A 是 B 的师父，B 是 A 的挚友），不做环检测
-- **原子写入**：临时文件 + 重命名，防止 JSON 损坏
-- **架构复用**：与 Timeline 图谱组件同源架构，独立的状态管理（characterGraphStore）与后端命令（character_graph_commands）
-
-### 🔗 模块联动
-
-- **大纲生成章节**：从大纲文件批量生成章节
-- **全局搜索替换**：跨文件查找与批量替换
-- **写作统计**：英雄区核心指标卡（总字数 / 章节数 / 日均字数 / 创作天数）+ 字数分布可视化（横向比例条 + 三列图例）+ 章节排行 TOP10 + 创作效率分析（平均章节字数 / 设定正文比 / 文件总数）+ 玻璃质感卡片与悬停光晕动效
-
-### 🎨 全局交互优化
-
-- **全局自定义 Tooltip 系统**：替代原生 HTML title 属性，150ms 高灵敏显示延迟，支持快速重复触发，暗色毛玻璃质感浮层，自动边缘检测定位
-- **卡片视图无缝网格**：文件卡片去除间距，扩大为无缝拼接，玻璃质感统一
-- **创建向导取消机制**：ESC 键关闭 + 底部显式取消按钮，双重关闭入口
-
-### 🌈 外观与主题
-
-- **背景预设色板**：5 套精心调校的主题（深空黑 / 墨水蓝 / 午夜蓝 / 晨光白 / 米黄）
-- **自定义背景色**：用户可选择任意 hex 颜色作为编辑区主背景
-- **主题联动**：背景预设变化时，主背景 / 卡片 / 侧边栏同步联动，保持视觉协调
-- **毛玻璃透明度调节**：面板背景通透感可调（0.3-1.0），实时预览效果
-- **质感模式**：纯色 / 磨砂玻璃 / 纸质书 / 高斯模糊四种全局面板质感
-- **动态 CSS 变量注入**：主题切换即时生效，无需重启
-
-### 🔄 版本更新检测
-
-- **GitHub Releases API 集成**：自动检查最新正式版本
-- **语义化版本比较**：准确判断版本新旧关系
-- **启动时自动检查**：可配置开关，遵循离线优先原则（默认关闭）
-- **24 小时频率限制**：避免频繁请求 GitHub API
-- **跳过此版本**：用户可主动跳过特定版本的更新提示
-- **三键操作**：立即下载 / 稍后提醒 / 跳过此版本
-- **系统浏览器跳转**：通过 Tauri shell.open 在默认浏览器中打开下载页面
-
-### 👋 首次欢迎页
-
-- **首次启动自动弹出**：功能介绍 + 上手教程 + 快捷键速览
-- **主页「回顾」按钮**：随时重新查看欢迎页内容
-
-### 🏠 主页与项目卡片
-
-- **项目卡片信息密度提升**：显示字数、章节数、创建时间、作者、题材、最后更新时间
-- **SVG 背景装饰图案**：羽毛笔 + 圆点装饰，不占位仅在空白区域显示
-- **悬停阴影增强**：卡片悬浮态层次感更强
-- **扫描目录作为默认存储路径**：用户设置后新建项目自动填充，无需重复选择
-- **品牌栏拼音化 + 小点装饰**：避免中文路径编码问题
-- **右键上下文菜单**：项目卡片支持右键打开 / 编辑设定 / 删除三项操作
-- **全屏切换**：主页全屏按钮（OS 级全屏，Tauri 2.0 Capability 权限模型）
+| 设计决策 | 实现方式 | 技术收益 |
+|---------|---------|---------|
+| 轻重分离 | 前端仅负责 UI 渲染, 文件 IO、正则匹配、DAG 校验全部下放至 Rust | 主线程保持 60fps, 长文档滚动不卡顿 |
+| 类型安全 IPC | Rust 端 `#[serde(rename_all = "camelCase")]` 与前端 TypeScript 类型对齐 | 杜绝前后端字段大小写不匹配导致的反序列化错误 |
+| 原子写入策略 | 临时文件写入 + rename 原子替换, 写入前清理 `.tmp` 残留 | 防止崩溃或断电导致 JSON 文件损坏 |
+| 受控图谱 | React Flow 受控模式 + zundo pause/resume 精细化历史记录 | 拖拽节点时不产生过量撤销历史条目 |
 
 ---
 
-## 📥 下载安装
+## 二、技术栈选型
 
-前往 [Releases 页面](https://github.com/fanquanpp/MiaoChuangShuo/releases) 下载最新版本：
-
-| 安装包类型 | 说明 |
-|-----------|------|
-| **MSI 安装包** | Windows 标准安装程序 |
-| **NSIS 安装程序** | 轻量级安装程序 |
-
-> ✅ 支持 **Windows 10/11 x64**
-
----
-
-## ⌨️ 快捷键
-
-### 全局快捷键
-
-| 快捷键 | 功能 |
-|--------|------|
-| `Ctrl+K` | 命令面板 |
-| `Ctrl+S` | 保存文件 |
-| `Ctrl+F` | 查找 |
-| `Ctrl+H` | 查找替换 |
-| `F11` | 专注模式 |
-| `Ctrl+Shift+T` | 专注计时器 |
-| `Alt+1` | 正文 |
-| `Alt+2` | 大纲 |
-| `Alt+3` | 设定库 |
-| `Alt+4` | 统计 |
-| `Alt+5` | 搜索 |
-| `Alt+6` | 卷宗 |
-| `Alt+7` | 人物关系图 |
-| `Alt+9` | 剧情时间线 |
-| `Ctrl+Shift+N` | 角色名补全 |
-| `Ctrl+Q` | 快速加引号 |
-| `Ctrl+Shift+P` | 诗歌排版 |
-| `Ctrl+Shift+L` | 歌词排版 |
-| `Tab` / `Shift+Tab` | 批量缩进 / 取消缩进 |
-| `Esc` | 关闭对话框 / 退出专注模式 |
-
-### 时间线面板快捷键
-
-| 快捷键 | 功能 |
-|--------|------|
-| `Ctrl+S` | 保存时间线（自动防抖） |
-| `Ctrl+L` | 自动布局 |
-| `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 |
-
-### 人物关系图面板快捷键
-
-| 快捷键 | 功能 |
-|--------|------|
-| `Ctrl+S` | 保存关系图（自动防抖） |
-| `Ctrl+L` | 自动布局 |
-| `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 |
+| 层级 | 技术选型 | 选型理由 |
+|------|---------|---------|
+| 桌面框架 | Tauri 2.0 | 相比 Electron 内存占用降低约 80%, 安装包体积从 100MB+ 缩减至 10MB 以内, 原生支持 Rust 后端 |
+| 前端框架 | React 18 + Vite 8 | 函数组件 + Hooks 模式适合构建复杂编辑器状态逻辑; Vite 提供毫秒级 HMR |
+| 类型系统 | TypeScript 6 (strict) | 全量启用 strict 模式, 禁用 `any`/`unknown`, 通过 `Omit` 模式重建泛型类型避免索引签名污染 |
+| 富文本引擎 | TipTap 2 (基于 ProseMirror) | 摒弃 `contenteditable` 直操作, 采用 Document Model 数据驱动, 支持自定义节点/标记扩展 |
+| 状态管理 | Zustand 5 + zundo 2 | Zustand 轻量无 Provider; zundo temporal 中间件提供时间旅行式撤销/重做, 精确控制历史边界 |
+| 图谱引擎 | @xyflow/react 12 + @dagrejs/dagre 1 | React Flow 提供受控节点/边系统; dagre 计算 LR 方向 DAG 自动布局 |
+| 样式方案 | Tailwind CSS 3 + FANDEX 设计令牌 | 原子化 CSS 零运行时开销; 自定义 `nf-*` 命名空间避免与内置工具冲突 |
+| 动画方案 | Framer Motion | 弹簧物理动画 (spring config: duration 0.4, bounce 0.15) 用于模板展开与卡片悬停 |
+| 命令面板 | cmdk 1 | 提供类 VS Code 的 Ctrl+K 命令面板, 支持模糊搜索与分组 |
+| 图标系统 | lucide-react | 统一 SVG 图标源, 按需引入, 无字体图标渲染开销 |
+| 后端语言 | Rust (stable) + Tauri Command | 内存安全保证本地数据不损坏; 零成本抽象提供原生级文件 IO 性能 |
 
 ---
 
-## 🛠 技术栈
+## 三、核心模块与技术实现
 
-| 类别 | 技术 |
-|------|------|
-| **桌面框架** | Tauri 2.0（Rust 后端） |
-| **前端框架** | React 18 + TypeScript |
-| **编辑器** | TipTap v2.27（ProseMirror） |
-| **样式方案** | Tailwind CSS + FANDEX 设计令牌 |
-| **状态管理** | Zustand（Slice 模式）+ zundo（时间旅行） |
-| **画布引擎** | @xyflow/react + @dagrejs/dagre |
-| **国际化** | 中英文双语 |
+### 3.1 富文本编辑器引擎
+
+**技术挑战**: 长篇小说单文档可达百万字级别, 传统 DOM 渲染在节点数超过 10 万时触发严重重排/重绘。
+
+**解决方案**:
+- 基于 TipTap 扩展机制构建自定义编辑器 `NovelEditor.tsx`, 通过 Document Model 数据驱动渲染, 仅更新变更的文档片段
+- 自定义扩展模块: `autoPair.ts`(中文引号自动配对)、`indentParagraph.ts`(首行缩进)、`poetryFormat.ts`(诗歌排版)、`lineHighlight.ts`(当前行高亮)、`smartTab.ts`(智能 Tab 角色名选择)
+- 输入法组合输入 (IME) 事件重构, 利用微任务队列延迟状态树更新, 避免组合输入中断
+- `EditorBubbleMenu.tsx` 提供选区浮层工具栏, `EditorToolbar.tsx` 提供完整格式工具栏
+
+### 3.2 图谱可视化引擎
+
+**技术挑战**: 剧情时间线与人物关系图需要同时支持手动拖拽与自动布局, 且自动布局后不同类型节点不能互相遮挡。
+
+**解决方案**:
+- 基于 `@xyflow/react` 受控模式构建两套图谱系统: `TimelinePanel.tsx`(剧情时间线) 与 `CharacterGraphPanel.tsx`(人物关系图)
+- `dagreLayout.ts` 实现分区布局算法: 有连线节点进入 dagre LR 布局 (nodesep=100, ranksep=140), 孤立节点按类型分组后网格化排列在主图下方, 从根源消除遮挡
+- 自定义节点组件 `TimelineNode.tsx`/`CharacterGraphNode.tsx` 承载业务数据渲染, 自定义边组件 `TimelineEdge.tsx`/`CharacterGraphEdge.tsx` 实现关系标签中点渲染与点击编辑
+- Rust 后端 `timeline_commands.rs` 实现有向无环图 (DAG) 校验, 采用 DFS 三色标记法防止循环依赖
+- 节点详情抽屉 `TimelineDrawer.tsx`/`CharacterGraphDrawer.tsx` 支持双向联动编辑, 边详情抽屉 `CharacterGraphEdgeDrawer.tsx` 支持关系类型与描述的自定义编辑
+
+### 3.3 撤销/重做系统
+
+**技术挑战**: 富文本编辑器与图谱拖拽共享同一状态树, 需要精确控制历史记录边界, 避免拖拽过程产生过量历史条目。
+
+**解决方案**:
+- 采用 zundo temporal 中间件包裹 Zustand store, 提供时间旅行式状态回溯
+- React Flow 受控模式下, 节点拖拽开始时调用 `pause()` 暂停历史记录, 拖拽结束后调用 `resume()` 提交单条历史
+- `SnapshotHistory.tsx` 提供可视化历史快照面板, 支持跨时间点跳转
+
+### 3.4 本地数据持久化
+
+**技术挑战**: 离线场景下数据完整性依赖本地文件系统, 直接覆盖写容易在崩溃时导致数据损坏。
+
+**解决方案**:
+- Rust 后端 `fs_commands.rs` 封装所有文件 IO, 采用临时文件 + rename 原子写入策略
+- 写入前自动清理 `.tmp` 残留文件, 防止上次崩溃遗留的临时文件干扰
+- 图谱数据以 JSON 格式持久化, Rust 端 `#[serde(rename_all = "camelCase")]` 确保与前端 camelCase 字段对齐
+- `snapshot_commands.rs` 实现增量快照归档, 支持项目级版本回溯
+
+### 3.5 跨层类型安全
+
+**技术挑战**: `@xyflow/react` v12 的 `NodeData extends Record<string, unknown>` 约束要求添加 `[key: string]: unknown` 索引签名, 与项目禁用 `unknown` 的规则冲突。
+
+**解决方案**:
+- 采用 `Omit<RFNode, "data" | "type">` 模式剥离基类型的 data/type 字段, 重新挂载业务类型
+- 前后端 IPC 类型通过 Rust serde 序列化特性与 TypeScript 接口手工对齐, 关键结构体标注 `#[serde(rename_all = "camelCase")]`
+- 全量启用 TypeScript strict 模式, ESLint 强制禁用 `any`/`unknown`, 所有函数参数与返回值显式标注
 
 ---
 
-## 📂 项目结构
+## 四、代码结构
+
+项目遵循分层架构原则, 前后端代码严格解耦, 每个模块承担单一职责。
 
 ```
 MiaoChuangShuo/
-├── src/                              # 前端源码
-│   ├── components/                   # UI 组件
-│   │   ├── Launcher.tsx              # 启动器（项目管理 + 自动更新检查）
-│   │   ├── Workspace.tsx             # 工作台（三栏布局）
-│   │   ├── GlobalTooltip.tsx         # 全局自定义 Tooltip（替代原生 title）
-│   │   ├── NovelEditor.tsx           # 小说编辑器（Office 级富文本）
-│   │   ├── EditorToolbar.tsx         # 编辑器工具栏（含纯阅读模式）
-│   │   ├── EditorBubbleMenu.tsx      # 编辑器气泡菜单
-│   │   ├── FindReplace.tsx           # 查找替换面板
-│   │   ├── CodexPanel.tsx            # 智能设定库面板
-│   │   ├── CharacterHoverCard.tsx    # 角色悬停卡片
-│   │   ├── SnapshotHistory.tsx       # 版本快照历史
-│   │   ├── CreateFileWizard.tsx      # 新建文件向导
-│   │   ├── GlobalSearch.tsx          # 全局搜索
-│   │   ├── WritingStats.tsx          # 写作统计
-│   │   ├── WelcomeDialog.tsx         # 首次欢迎页
-│   │   ├── UpdateNoticeDialog.tsx    # 版本更新提示弹窗
-│   │   ├── SettingsDialog.tsx        # 设置对话框（含背景主题/更新检测）
-│   │   ├── CreateProjectDialog.tsx   # 创建项目对话框
-│   │   ├── EditProjectDialog.tsx     # 编辑项目设定对话框
-│   │   ├── ProjectCard.tsx           # 项目卡片（含右键上下文菜单）
-│   │   ├── VolumeManager.tsx         # 分卷管理
-│   │   ├── VolumeChapterGenerator.tsx # 分卷章节批量生成器
-│   │   ├── TimelinePanel.tsx         # 剧情时间线画布容器
-│   │   ├── TimelineNode.tsx          # 自定义节点组件
-│   │   ├── TimelineEdge.tsx          # 自定义连线组件
-│   │   ├── TimelineDrawer.tsx        # 节点详情抽屉
-│   │   ├── TimelineContextMenu.tsx   # 右键菜单
-│   │   ├── TimelineEmpty.tsx         # 空状态提示
-│   │   ├── CharacterGraphPanel.tsx   # 人物关系图画布容器
-│   │   ├── CharacterGraphNode.tsx    # 角色节点组件
-│   │   ├── CharacterGraphEdge.tsx    # 关系连线组件
-│   │   ├── CharacterGraphDrawer.tsx  # 角色详情抽屉
-│   │   └── ...
-│   ├── lib/                          # 核心库
-│   │   ├── api.ts                    # Tauri 命令封装
-│   │   ├── codexApi.ts               # 智能设定库 API
-│   │   ├── timelineApi.ts            # 时间线 API
-│   │   ├── characterGraphApi.ts      # 人物关系图 API
-│   │   ├── updateChecker.ts          # 版本更新检测模块
-│   │   ├── store.ts                  # 全局状态（Zustand Slice 模式）
-│   │   ├── settingsStore.ts          # 应用设置（含背景主题/更新配置）
-│   │   ├── themeStore.ts             # 主题状态管理
-│   │   ├── categoryRegistry.ts       # 分类注册表
-│   │   ├── i18n.tsx                  # 国际化（中英文双语）
-│   │   ├── templateSchema.ts         # 模板字段架构
-│   │   ├── stores/timelineTypes.ts   # 时间线类型定义
-│   │   ├── stores/timelineStore.ts   # 时间线状态管理（Zustand + zundo）
-│   │   ├── stores/characterGraphTypes.ts # 人物关系图类型定义
-│   │   ├── stores/characterGraphStore.ts # 人物关系图状态管理（Zustand + zundo）
-│   │   ├── dagreLayout.ts            # 自动布局算法
-│   │   └── ...
-│   └── ...
-├── src-tauri/                        # Rust 后端
-│   └── src/
-│       ├── fs_commands.rs            # 文件系统命令（CRUD/搜索/统计/导入导出/分卷生成）
-│       ├── project_template.rs       # 项目模板与目录结构
-│       ├── template_schema.rs        # 模块化模板字段架构
-│       ├── snapshot_commands.rs      # 版本快照系统
-│       ├── character_commands.rs     # 角色联动命令
-│       ├── codex_commands.rs         # 智能设定库命令
-│       ├── timeline_commands.rs      # 剧情时间线命令
-│       ├── character_graph_commands.rs # 人物关系图命令
-│       └── lib.rs                    # 应用入口（插件与命令注册）
-└── ...
+├── src-tauri/                          # Rust 后端核心
+│   ├── src/
+│   │   ├── lib.rs                      # Tauri 命令注册入口
+│   │   ├── main.rs                     # 程序入口
+│   │   ├── fs_commands.rs              # 文件系统 IO (原子写入、目录扫描)
+│   │   ├── project_template.rs         # 项目模板生成器 (按题材生成子目录结构)
+│   │   ├── template_schema.rs          # 模板 Schema 定义与校验
+│   │   ├── codex_commands.rs           # 设定库命令 (扫描、解析、分组)
+│   │   ├── character_commands.rs       # 角色管理命令
+│   │   ├── character_graph_commands.rs # 人物关系图持久化
+│   │   ├── timeline_commands.rs        # 剧情时间线持久化与 DAG 校验
+│   │   ├── snapshot_commands.rs        # 增量快照管理
+│   │   └── word_count.rs              # 字数统计引擎
+│   ├── Cargo.toml
+│   ├── build.rs
+│   └── tauri.conf.json
+├── src/                                # React 前端
+│   ├── components/                     # UI 组件层
+│   │   ├── Launcher.tsx                # 主布局与项目看板
+│   │   ├── ProjectCard.tsx             # 项目卡片
+│   │   ├── Workspace.tsx               # 三栏工作台布局
+│   │   ├── NovelEditor.tsx             # TipTap 编辑器
+│   │   ├── Sidebar.tsx                 # 分类侧边栏
+│   │   ├── FileList.tsx                # 文件列表
+│   │   ├── TimelinePanel.tsx           # 剧情图谱画布
+│   │   ├── TimelineNode.tsx            # 剧情自定义节点
+│   │   ├── TimelineEdge.tsx            # 剧情自定义连线
+│   │   ├── TimelineDrawer.tsx          # 剧情节点详情抽屉
+│   │   ├── TimelineContextMenu.tsx     # 剧图右键菜单
+│   │   ├── CharacterGraphPanel.tsx     # 人物关系图画布
+│   │   ├── CharacterGraphNode.tsx      # 人物自定义节点
+│   │   ├── CharacterGraphEdge.tsx      # 人物关系连线
+│   │   ├── CharacterGraphEdgeDrawer.tsx# 关系详情编辑抽屉
+│   │   ├── CharacterGraphDrawer.tsx    # 人物节点详情抽屉
+│   │   ├── CharacterGraphContextMenu.tsx# 人图右键菜单
+│   │   ├── CharacterHoverCard.tsx      # 角色悬浮卡片
+│   │   ├── CodexPanel.tsx             # 智能设定库面板
+│   │   ├── CommandPalette.tsx          # cmdk 命令面板
+│   │   ├── SnapshotHistory.tsx         # 版本快照面板
+│   │   ├── WritingStats.tsx            # 写作统计面板
+│   │   ├── GlobalSearch.tsx            # 全局搜索
+│   │   ├── FindReplace.tsx             # 查找替换面板
+│   │   ├── EditorToolbar.tsx           # 编辑器工具栏
+│   │   ├── EditorBubbleMenu.tsx        # 选区浮层菜单
+│   │   ├── CreateProjectDialog.tsx     # 项目创建对话框
+│   │   ├── CreateFileWizard.tsx        # 四步文件创建向导
+│   │   ├── VolumeManager.tsx           # 卷宗管理
+│   │   ├── VolumeChapterGenerator.tsx  # 卷章批量生成
+│   │   ├── OutlineToChapters.tsx       # 大纲转章节
+│   │   ├── TemplateManager.tsx         # 模板管理
+│   │   ├── SettingsDialog.tsx          # 设置对话框
+│   │   ├── ShortcutPanel.tsx           # 快捷键面板
+│   │   ├── FocusTimer.tsx              # 聚焦计时器
+│   │   ├── ErrorBoundary.tsx           # 渲染异常边界
+│   │   ├── ContextMenu.tsx             # 通用右键菜单
+│   │   └── ...                         # 其他辅助组件
+│   ├── hooks/                          # 自定义 Hooks
+│   │   ├── useAutoSaveOnExit.ts        # 退出自动保存
+│   │   └── useWritingSession.ts        # 写作会话统计
+│   ├── lib/                            # Service 与 Data 层
+│   │   ├── stores/                     # Zustand 状态切片
+│   │   │   ├── store.ts                # 全局 store 组合
+│   │   │   ├── projectSlice.ts         # 项目状态切片
+│   │   │   ├── categorySlice.ts        # 分类状态切片
+│   │   │   ├── viewSlice.ts            # 视图状态切片
+│   │   │   ├── timelineStore.ts        # 剧情图谱状态
+│   │   │   ├── timelineTypes.ts        # 剧情类型定义
+│   │   │   ├── characterGraphStore.ts  # 人物关系图状态
+│   │   │   ├── characterGraphTypes.ts  # 人图类型定义
+│   │   │   └── types.ts                # 公共类型
+│   │   ├── api.ts                      # Tauri IPC 统一封装
+│   │   ├── i18n.tsx                    # 国际化 (中/英)
+│   │   ├── dagreLayout.ts              # dagre 自动布局算法
+│   │   ├── timelineApi.ts              # 剧情图谱 API 封装
+│   │   ├── characterGraphApi.ts        # 人图 API 封装
+│   │   ├── codexApi.ts                 # 设定库 API 封装
+│   │   ├── settingsStore.ts            # 设置持久化
+│   │   ├── themeStore.ts               # 主题管理
+│   │   ├── updateChecker.ts            # 版本更新检测
+│   │   ├── wordCounter.ts              # 前端字数统计
+│   │   ├── templateRegistry.ts         # 模板注册中心
+│   │   ├── templateSchema.ts           # 模板 Schema
+│   │   ├── categoryRegistry.ts         # 分类注册中心
+│   │   ├── fileTreeUtils.ts            # 文件树工具
+│   │   ├── recentFiles.ts              # 最近文件管理
+│   │   ├── autoPair.ts                 # 引号自动配对
+│   │   ├── characterMention.ts         # 角色 @ 提及
+│   │   ├── indentParagraph.ts          # 首行缩进
+│   │   ├── poetryFormat.ts             # 诗歌排版
+│   │   ├── lineHighlight.ts            # 行高亮
+│   │   ├── smartTab.ts                 # 智能 Tab
+│   │   ├── fontSizeShortcut.ts         # 字号快捷键
+│   │   ├── vscodeShortcuts.ts          # VS Code 快捷键映射
+│   │   └── toast.tsx                   # 轻提示组件
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── styles.css
+├── package.json
+├── vite.config.ts
+├── tailwind.config.js
+├── tsconfig.json
+└── README.md
 ```
 
 ---
 
-## 💻 开发
+## 五、工程化保障
 
-### 环境要求
+### 5.1 代码规范
 
-- Node.js 18+
-- Rust（stable 工具链）
-- Windows 10/11（主开发平台）
+- **前端**: TypeScript strict 模式全量启用, 禁用 `any`/`unknown` 类型, 所有函数参数与返回值显式标注
+- **后端**: Rust 编译器保证内存安全, `cargo check` 强制零警告
+- **命名空间隔离**: Tailwind 自定义颜色使用 `nf-text`/`nf-bg`/`nf-border` 命名空间, 避免与内置 `text`/`bg`/`border` 工具冲突
 
-### 本地运行
+### 5.2 构建校验链
 
-```bash
-npm install
-npm run tauri dev
-```
-
-### 构建发布
+每次有效代码变更提交前, 必须通过以下三项校验:
 
 ```bash
+# 1. TypeScript 类型检查 + Vite 构建
+npm run build
+
+# 2. Rust 后端编译检查
+cargo check --manifest-path src-tauri/Cargo.toml
+
+# 3. Tauri 生产构建 (生成 MSI + NSIS 安装包)
 npm run tauri build
 ```
 
-构建产物位于 `src-tauri/target/release/bundle/`。
+### 5.3 版本号同步机制
+
+版本号采用 `YY.MM.修改序号` 格式 (如 `26.7.18`), 以下 6 个位置必须保持同步:
+
+| 文件 | 字段 |
+|------|------|
+| `package.json` | `version` |
+| `src-tauri/Cargo.toml` | `version` |
+| `src-tauri/tauri.conf.json` | `version` |
+| `src/lib/updateChecker.ts` | `FALLBACK_VERSION` |
+| `src/components/Launcher.tsx` | `appVersion` useState 初始值 |
+| `src/components/SettingsDialog.tsx` | `currentVersion` useState 初始值 |
+
+### 5.4 提交规范
+
+遵循 Conventional Commits 规范, commit message 必须包含修改目的、修改范围、影响说明三项内容, 禁止无意义描述。
 
 ---
 
-## 📝 版本历程
+## 六、技术特色
 
-- **v26.7.17**：cmdk 运行时错误修复 + 角色关系图 i18n/右键修复 + 4 项代码质量优化。
-  - 修复 cmdk useCommandState 在 Command 组件外部调用导致 store 为 null 抛错，引发无法进入项目页面（改用受控 search state 判断空查询）
-  - 修复人物关系图侧边栏按钮文本缺失（补充 i18n key sidebar.characterGraph 中英文翻译）
-  - 修复人物关系图右键菜单无反应（移除 CharacterGraphPanel 中重复的 document contextmenu 监听器，避免与 React 合成事件时序冲突导致菜单打开后立即关闭）
-  - 角色改名增加词边界检测，避免子串误伤（如"林"不再误伤"林中漫步"）
-  - 角色悬停卡性能优化（60ms 固定节流改为 requestAnimationFrame 调度，约 16ms/帧更流畅）
-  - 搜索结果硬限从 200 条提升至 1000 条，支持大型长篇项目
-  - 抽取共享 word_count.rs 模块，消除 fs_commands 与 snapshot_commands 中重复的字数统计实现
-- **v26.7.16**：命令面板重构为 cmdk 驱动。引入 cmdk（@pacocoursey/cmdk）替代原 450 行手写模糊匹配 + 键盘导航逻辑 + cmdk 内置 fuzzy 算法（连续字符匹配与排序，替代原 .includes() 简单子串）+ 键盘环绕导航（loop 模式，到末尾后回到首项）+ 完整 ARIA 无障碍属性 + useCommandState 钩子检测空查询条件渲染「最近使用」分组（保留 localStorage 持久化前 5 条与 FANDEX 暗色主题样式覆盖：.nf-cmdk-item 选中态使用 fandex-primary 高亮、最近使用分组标题使用 fandex-secondary）+ 通过闭包捕获命令对象绕开 cmdk 仅传 value 字符串的限制
-- **v26.7.15**：新增人物关系图编辑器 + 图谱连线逻辑修复 + 按钮悬停动效优化。新增人物关系图功能（Alt+7，复用 Timeline 图谱架构，8 种预设关系类型连线，角色节点卡片含姓名/身份/标签/简介，独立 characterGraphStore 状态管理与 character_graph_commands 后端命令，允许环形关系，dagre LR 自动布局）+ 修复剧情图谱同向端点连接错误（addEdge 完整记录 sourceHandle/targetHandle 标识，Handle 添加唯一 id 属性，后端 PersistedEdge 持久化 Handle 字段，支持 source→source / target→target 同向连接场景）+ 修复连线动画方向不一致（TimelineConnectionLine / CharacterConnectionLine 根据鼠标位置动态推导 toPosition，替代原起点对称方向固定逻辑）+ 移除按钮悬停放大效果（删除 .nf-hover-float:hover translateY、.nf-icon-spark:hover scale(1.2)、.nf-icon-slide:hover scale(1.05) 及所有 Tailwind hover:scale-* 类，保留 active 按压缩小与 GlobalTooltip 功能）
-- **v26.7.14**：四项 UI/交互缺陷修复。剧情图谱节点连线端口视觉区分（左侧输入端口绿色 fandex-secondary + 右侧输出端口节点类型强调色，明确连线方向语义）+ 节点卡片高光溢出裁剪（重构双层结构：外层 overflow-visible 保留 Handle 可交互性，内层 overflow-hidden 严格裁剪高光反光效果，删除 CSS overflow 覆盖规则）+ 自定义分类新建弹窗 i18n 修复（zhCN 字典补充 4 个缺失键：sidebar.newCustomCategory/customCategoryName/deleteCategory/confirmDeleteCategory，placeholder 与 title 不再暴露技术变量名）+ 右侧章节列表排序逻辑修复（TreeNodeList/TreeNodeGrid 递归渲染子目录时应用 extractChapterNumber 排序，卷首语固定顶部、卷尾语固定底部、正文章节按数值升序，递归传递 isManuscript 属性）
-- **v26.7.13**：图谱连线功能修复（移除节点容器 overflow-hidden，恢复 Handle 锚点可交互性，CSS 强制 pointer-events:all 与 z-index 提升）+ 侧边栏主题联动修复（恢复注入 --fandex-bg-sidebar/--fandex-bg-card，预设切换时侧边栏随主题联动）+ 图谱背景网格缩小（gap 28→16，缓解视觉疲劳）+ 分卷章节排序逻辑修复（与 FileList 一致，未识别章节排到末尾而非首位，避免误判为结尾章节导致位置错乱）
-- **v26.7.12**：写作统计 UI/UX 全面迭代（英雄区四列核心指标 + 字数分布可视化 + 章节排行 TOP10 + 创作效率分析 + 玻璃质感卡片）+ 全局自定义 Tooltip 系统（替代原生 title 属性，150ms 高灵敏显示，快速重复触发，毛玻璃浮层）+ 剧情图谱修复与增强（连线功能修复 + 线网格背景 + 三态保存指示器 + 节点玻璃质感重设计 + 隐藏 attribution 链接）+ 文件卡片无缝网格 + 玻璃质感重设计 + 创建向导 ESC 键关闭 + 底部取消按钮 + 应用元数据完善（publisher=fanquanpp）+ 应用图标重设计（猫脸 + 钢笔笔尖 + 墨水溅射）
-- **v26.7.11**：删除场景化叙事工作台 + 引号独立按钮（Unicode 字符 + FANDEX 色彩编码）+ 工具栏视觉统一（激活背景块 + 悬停提升 + 图标尺寸一致）+ TimelinePanel 类型错误修复（ConnectionMode 字符串转枚举）
-- **v26.7.10**：时间线画布视觉重构 + 编辑器工具栏统一。修复节点连接线方向错误（自定义 ConnectionLine 组件，显式对齐 Handle 位置，解决从左侧 Handle 拖拽时连线显示在右侧的问题）+ 优化画布背景点阵（降低对比度与密度，缓解视觉疲劳）+ 重构节点卡片美术（多层阴影 + 顶部强调色装饰条 + 类型化边线，提升质感与类型识别度）+ 统一编辑器工具栏按钮尺寸（28x28 正方形容器，图标与字符视觉对齐，分组容器高度一致）
-- **v26.7.9**：全屏按钮修复（Tauri 2.0 capability 权限补全）+ 项目卡片右键上下文菜单（打开 / 编辑 / 删除）+ 编辑项目设定对话框（复用 CreateProjectDialog 视觉风格，文体类型与路径只读）+ 后端 update_project_meta 命令（原子写入 + 字数重统计）+ 引号独立按钮 + 工具栏视觉与交互统一 + 删除场景化叙事工作台
-- **v26.7.8**：新增剧情时间线编辑器（Alt+9）+ 可视化画布组织主线 / 分支 / 事件 / 结局节点 + 拖拽优化（zundo pause/resume 单次入栈）+ BFS 折叠算法 + 自动布局（dagre）+ 撤销重做（zundo）+ 原子写入 + 崩溃恢复 + 环检测 + schema 迁移 + 自动生成 txt 摘要
-- **v26.7.7**：主题预设重构（暗色森林绿 / 暗紫替换为亮色晨光白 / 米黄）+ 主题切换自动同步默认预设 + 面板质感系统 + 分卷生成器章节命名 + UI 几何风格统一
-- **v26.7.6**：主题切换修复（settingsStore 与 themeStore 双轨冲突）+ 侧边栏全模块折叠 + CodexPanel 布局修复 + 褐色背景清除 + 移除首次启动快捷键弹窗
-- **v26.7.5**：系统性清理假功能与无效模块 + UI 风格统一至 FANDEX 直角美学 + 交互逻辑修复
-- **v26.7.4**：编辑器纯文本记事本风格重构（标题 / 引用块 / 工具栏移除块级装饰，贴近 Word 文档式排版）+ 诗歌 / 歌词改为行内 Mark（选中文本即可应用，纯文字属性）+ 删除独立打字机模式模块 + 工具栏紧凑化 + 代码精简约 800 行
-- **v26.7.3**：主页状态栏优化（呼吸绿点 + 双行布局）+ 按钮酷炫悬停动效（高亮扫光 / 图标旋转 / 边框光晕）+ 项目卡片背景装饰升级（点阵网格 + 同心圆羽毛笔 + 几何菱形三层装饰）
-- **v26.7.2**：品牌名拼音化 + 删除 AI 风格提示 + 项目卡片信息扩展（创建时间 / 作者 / 题材 / SVG 装饰图案 / 阴影增强）+ 侧边栏底部按钮布局重排 + 章节名称完整显示 + 扫描目录作为新建项目默认路径 + GitHub 仓库重命名为 MiaoChuangShuo
+### 6.1 Windows HVCI 兼容性
+
+Windows 11 HVCI (内存完整性) 会阻断 Rust 的 `Command::output()` 重叠 IO 操作。后端文件系统命令采用 `spawn()` + `read_to_end()` 同步 IO 替代重叠 IO, 保证在开启内存完整性的设备上正常运行。
+
+### 6.2 图谱分区布局算法
+
+`dagreLayout.ts` 实现的分区布局算法解决了传统 dagre 全量布局中孤立节点与有连线节点互相遮挡的问题:
+
+1. **节点分组**: 遍历边列表, 将节点拆分为"有连线"与"孤立"两组
+2. **主图布局**: 有连线节点进入 dagre LR 布局, 主线节点 Y 坐标强制对齐, `nodesep=100`/`ranksep=140` 增大间距
+3. **孤立节点网格**: 孤立节点按 `main -> branch -> event -> ending` 类型分组, 在主图下方 (Y=600 起) 网格化排列, 每行最多 6 个
+4. **坐标转换**: dagre 返回中心点坐标, 转换为 React Flow 所需的左上角坐标
+
+### 6.3 React Flow 类型重建
+
+为绕过 `@xyflow/react` v12 的 `NodeData extends Record<string, unknown>` 约束, 采用 `Omit` 模式重建类型:
+
+```typescript
+type RFNodeBase = Omit<RFNode, "data" | "type">;
+export type TimelineNode = RFNodeBase & {
+  data: TimelineNodeData;
+  type: "storyNode";
+};
+```
+
+此模式保留了 React Flow 节点的所有位置/尺寸字段, 同时用业务类型替换 data/type, 避免引入 `unknown` 索引签名。
+
+### 6.4 原子写入防损坏
+
+Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
+
+1. 写入 `.tmp` 临时文件
+2. 写入完成后 rename 替换目标文件
+3. 写入前清理上次崩溃可能遗留的 `.tmp` 残留
+
+该策略保证即使在写入过程中崩溃或断电, 目标文件要么是完整的旧版本, 要么是完整的新版本, 不会出现半写入的损坏状态。
+
+### 6.5 DAG 循环依赖校验
+
+剧情时间线支持分支结构, 但禁止循环依赖。Rust 后端 `timeline_commands.rs` 采用 DFS 三色标记法 (白/灰/黑) 在持久化前校验图谱无环, 检测到回边时拒绝写入并返回错误。
 
 ---
 
-## 📄 许可证
+## 七、快速开始
 
-本项目仅供个人使用。
+### 环境要求
+
+- Node.js >= 18
+- Rust (stable, 需安装 rustup)
+- Windows 10/11 x64
+
+### 本地开发
+
+```bash
+# 安装前端依赖
+npm install
+
+# 启动开发服务器 (Tauri 自动编译 Rust 后端)
+npm run tauri dev
+```
+
+### 构建生产安装包
+
+```bash
+# 生成 MSI + NSIS 安装包
+npm run tauri build
+```
+
+构建产物位于 `src-tauri/target/release/bundle/` 目录下。
 
 ---
 
-<div align="center">
+## 八、项目事项
 
-**Made with ❤️ by fanquanpp**
+### 8.1 安装包命名
 
-</div>
+安装包 `productName` 使用拼音 `MiaoChuangShuo` 而非中文字符, 避免 Windows 路径编码问题。GitHub Release 上传时使用纯英文文件名, 避免 gh CLI 在 Windows 上丢失中文字符。
+
+### 8.2 图标系统
+
+应用图标通过 `npx tauri icon` 从源图 (`icon_source.png`) 一次性生成全平台图标 (Windows .ico / macOS .icns / Linux .png / iOS / Android), 保证视觉一致性。
+
+### 8.3 国际化
+
+`i18n.tsx` 基于 React Context 实现轻量国际化, 支持中/英文切换, 所有用户可见文案集中管理于翻译字典, 组件通过 `useI18n()` Hook 获取翻译函数。
+
+### 8.4 设计令牌
+
+FANDEX 设计令牌集成于 Tailwind 配置, 定义三主色:
+- 主色 `#6EA8FE` (蓝, 主线/师徒关系)
+- 次色 `#55EFC4` (绿, 分支/亲属关系)
+- 三色 `#F09070` (橙, 事件/同门关系)
+
+辅以灰色系 (`zinc-*`) 构建暗色主题, 对标 VS Code / Godot 编辑器的视觉风格。
+
+---
+
+## 九、许可协议
+
+本项目仅供个人使用, 未经授权不得用于商业用途。

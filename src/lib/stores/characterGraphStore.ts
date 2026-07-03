@@ -45,6 +45,8 @@ interface CharacterGraphState {
   edges: CharacterGraphEdge[];
   /** 当前选中节点 ID(用于抽屉联动) */
   selectedNodeId: string | null;
+  /** 当前选中边 ID(用于连线抽屉联动, 点击中点关系标签触发) */
+  selectedEdgeId: string | null;
   /** 是否正在加载 */
   loading: boolean;
   /** 是否正在保存(防抖期间为 true) */
@@ -70,6 +72,8 @@ interface CharacterGraphState {
   updateEdgeData: (edgeId: string, patch: Partial<{ relationType: string; description: string }>) => void;
   /** 选中节点 */
   selectNode: (id: string | null) => void;
+  /** 选中边(用于连线抽屉联动) */
+  selectEdge: (id: string | null) => void;
   /** 删除节点(级联删除关联边) */
   deleteNode: (nodeId: string) => void;
   /** 清空图谱(删除所有节点与边) */
@@ -90,6 +94,7 @@ export const useCharacterGraphStore = create<CharacterGraphState>()(
       nodes: [],
       edges: [],
       selectedNodeId: null,
+      selectedEdgeId: null,
       loading: false,
       saving: false,
       error: null,
@@ -265,6 +270,13 @@ export const useCharacterGraphStore = create<CharacterGraphState>()(
        * 输出: void
        */
       selectNode: (id) => set({ selectedNodeId: id }),
+
+      /**
+       * 选中边(用于连线抽屉联动)
+       * 输入: id 边 ID 或 null
+       * 输出: void
+       */
+      selectEdge: (id) => set({ selectedEdgeId: id }),
 
       /**
        * 删除节点(级联删除关联边)
