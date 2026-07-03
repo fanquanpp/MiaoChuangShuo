@@ -1,10 +1,45 @@
 <div align="center">
 
-# MiaoChuangShuo
+# 喵创说 (MiaoChuangShuo)
 
 **基于 Tauri 2.0 + React 18 的离线长篇创作工作站**
 
 面向百万字级长篇小说创作场景, 采用前后端分离的桌面端架构, 将 UI 渲染与文件 IO、图谱计算等重型任务严格解耦, 保证主线程不阻塞。
+
+</div>
+
+---
+
+## 软件简介
+
+喵创说是一款专为独立与业余长篇创作者打造的本地化创作工作站, 坚持"完全离线、完全免费、数据归创作者所有"三大原则。项目针对长篇叙事工作流的特殊需求, 将富文本编辑、剧情时间线、人物关系图、智能设定库、伏笔追踪、命令面板六大核心模块集成于单一桌面应用, 让创作者无需在多个软件之间切换即可完成完整的长篇创作流程。
+
+### 核心定位
+
+- **面向人群**: 独立网文作者、业余小说爱好者、长篇连载作者、隐私敏感创作者、断网环境创作者、写作学习者
+- **产品形态**: Windows 桌面端应用 (基于 Tauri 2.0, 安装包 10MB 以内)
+- **核心价值**: 让长篇创作从碎片化走向工程化, 让创作工具回归创作者手中
+- **公益属性**: 完全免费提供给独立与业余创作者群体, 服务无法承担云工具订阅费用的创作者, 数据 100% 本地存储, 不收集任何用户数据
+
+### 技术特色
+
+| 维度 | 实现 |
+|------|------|
+| 轻量化 | Tauri + Rust 替代 Electron, 安装包体积降低约 80%, 内存占用大幅减少 |
+| 性能 | Rust 后端承载文件 IO、DAG 校验、字数统计, 前端保持 60fps 流畅滚动 |
+| 安全 | 临时文件 + rename 原子写入, 防止崩溃导致数据损坏 |
+| 隐私 | 完全离线运行, 无需账号登录, 数据主权 100% 归创作者 |
+| 工程 | TypeScript strict 模式全量启用, 前后端类型对齐, Conventional Commits 规范 |
+
+### 项目主页
+
+- **在线展示**: [https://fanquanpp.github.io/MiaoChuangShuo/](https://fanquanpp.github.io/MiaoChuangShuo/)
+- **源码仓库**: [https://github.com/fanquanpp/MiaoChuangShuo](https://github.com/fanquanpp/MiaoChuangShuo)
+- **发布下载**: [https://github.com/fanquanpp/MiaoChuangShuo/releases](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+
+---
+
+<div align="center">
 
 [![Version](https://img.shields.io/badge/version-26.7.18-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
