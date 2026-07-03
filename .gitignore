@@ -23,6 +23,11 @@ src-tauri/gen/schemas/
 # 系统文件
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# 报名用 base64 单文件 (本地使用, 不入库, 仅作 TRAE 报名上传)
+docs/MiaoChuangShuo-TRAE-Registration.html
+docs/inline_images.py
 
 # 日志
 *.log
