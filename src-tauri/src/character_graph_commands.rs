@@ -12,6 +12,8 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 
 /// 角色关系类型枚举(与前端 RelationType 一一对应)
+/// 注意: 关系类型枚举值序列化为小写字符串(如 "master"/"enemy"),
+///       与前端 TS 联合类型字面量完全匹配, 不使用 camelCase 转换。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum RelationType {
@@ -44,7 +46,10 @@ impl RelationType {
 }
 
 /// 角色节点业务数据载荷(与前端 CharacterGraphNodeData 字段一致)
+/// serde rename_all = "camelCase": 前端 TS 接口使用驼峰命名(accentColor/sourceFile/createdAt/updatedAt),
+///   Rust 端字段使用 snake_case, 通过此属性自动双向转换, 保证反序列化不报 "missing field" 错误。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CharacterNodeData {
     pub name: String,
     #[serde(default)]
@@ -57,7 +62,9 @@ pub struct CharacterNodeData {
     pub accent_color: String,
     #[serde(default)]
     pub source_file: String,
+    #[serde(default)]
     pub created_at: String,
+    #[serde(default)]
     pub updated_at: String,
 }
 
@@ -74,15 +81,23 @@ pub struct NodePosition {
 }
 
 /// 持久化节点结构(包含位置与业务数据)
+/// rename_all = "camelCase" 与前端 React Flow Node 结构对齐
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PersistedNode {
     pub id: String,
     pub position: NodePosition,
     pub data: CharacterNodeData,
+    /// 节点类型标识(前端 React Flow Node.type, 如 "characterNode")
+    /// 使用 default + skip_serializing_if 保证旧数据(无此字段)可读取, 且不写出空值
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
 }
 
 /// 边业务数据载荷(与前端 Edge.data 字段一致, 必须包裹在 data 内)
+/// rename_all = "camelCase": relation_type ↔ relationType 双向匹配
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PersistedEdgeData {
     pub relation_type: RelationType,
     #[serde(default)]
@@ -90,23 +105,32 @@ pub struct PersistedEdgeData {
 }
 
 /// 持久化边结构(匹配 React Flow Edge 结构, 含 data 包裹层)
+/// rename_all = "camelCase" 统一处理 sourceHandle/targetHandle 与 type 字段,
+///   移除单独的 rename 属性, 由 rename_all 统一管理, 避免属性重复。
 /// source_handle/target_handle: Handle 唯一标识(如 "left-target"/"right-source"),
 ///   用于精确追踪连线参与的具体 Handle, 支持同向端点连接的渲染。
 ///   使用 #[serde(default)] 保证旧版数据(无此字段)可正常反序列化。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PersistedEdge {
     pub id: String,
     pub source: String,
     pub target: String,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sourceHandle")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_handle: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "targetHandle")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_handle: Option<String>,
     pub data: PersistedEdgeData,
+    /// 边类型标识(前端 React Flow Edge.type, 如 "characterEdge")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
 }
 
 /// 人物关系图谱根结构(对应 character_graph.json 文件)
+/// rename_all = "camelCase": 前端 CharacterGraph 接口使用 schemaVersion/projectId/projectName/updatedAt,
+///   Rust 端字段使用 snake_case, 通过此属性自动双向转换。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CharacterGraph {
     pub schema_version: i32,
     pub project_id: String,

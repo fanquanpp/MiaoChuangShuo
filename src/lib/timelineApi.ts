@@ -26,11 +26,24 @@ export async function readTimeline(projectRoot: string): Promise<TimelineGraph> 
  * 输入: projectRoot 项目根路径, graph 图谱数据
  * 输出: Promise<void>
  * 流程: 调用 Tauri save_timeline 命令(含数据校验与原子写入)
+ * 错误诊断: 捕获完整错误对象并输出结构化日志, 便于排查后端反序列化/IO/权限问题
  */
 export async function saveTimeline(projectRoot: string, graph: TimelineGraph): Promise<void> {
   try {
     await invoke("save_timeline", { projectRoot, graph });
   } catch (err) {
+    // 结构化错误日志: 输出命令名/项目路径/图谱字段键/完整错误对象
+    // 便于快速定位是 "command not found" 还是 "missing field xxx" 还是 IO 错误
+    console.error("[Timeline] 保存失败详情:", {
+      command: "save_timeline",
+      projectRoot,
+      graphKeys: Object.keys(graph),
+      nodeCount: graph.nodes.length,
+      edgeCount: graph.edges.length,
+      error: err,
+      errorType: typeof err,
+      errorString: String(err),
+    });
     throw new Error(`保存剧情图谱失败: ${String(err)}`);
   }
 }

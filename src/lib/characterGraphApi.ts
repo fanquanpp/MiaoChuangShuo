@@ -31,6 +31,7 @@ export async function readCharacterGraph(projectRoot: string): Promise<Character
  * 输入: projectRoot 项目根路径, graph 图谱数据
  * 输出: Promise<void>
  * 流程: 调用 Tauri save_character_graph 命令(含数据校验与原子写入)
+ * 错误诊断: 捕获完整错误对象并输出结构化日志, 便于排查后端反序列化/IO/权限问题
  */
 export async function saveCharacterGraph(
   projectRoot: string,
@@ -39,6 +40,18 @@ export async function saveCharacterGraph(
   try {
     await invoke("save_character_graph", { projectRoot, graph });
   } catch (err) {
+    // 结构化错误日志: 输出命令名/项目路径/图谱字段键/完整错误对象
+    // 便于快速定位是 "command not found" 还是 "missing field xxx" 还是 IO 错误
+    console.error("[CharacterGraph] 保存失败详情:", {
+      command: "save_character_graph",
+      projectRoot,
+      graphKeys: Object.keys(graph),
+      nodeCount: graph.nodes.length,
+      edgeCount: graph.edges.length,
+      error: err,
+      errorType: typeof err,
+      errorString: String(err),
+    });
     throw new Error(`保存人物关系图失败: ${String(err)}`);
   }
 }

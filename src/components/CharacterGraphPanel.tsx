@@ -36,9 +36,6 @@ import {
   Save,
   Loader2,
   Check,
-  UserPlus,
-  Edit3,
-  X,
 } from "lucide-react";
 import dagre from "@dagrejs/dagre";
 import "@xyflow/react/dist/style.css";
@@ -56,6 +53,10 @@ import { useI18n } from "../lib/i18n";
 import CharacterGraphNodeComponent from "./CharacterGraphNode";
 import CharacterGraphEdgeComponent from "./CharacterGraphEdge";
 import CharacterGraphDrawer from "./CharacterGraphDrawer";
+import CharacterGraphContextMenu, {
+  type ContextMenuState,
+  type ContextMenuActions,
+} from "./CharacterGraphContextMenu";
 
 /**
  * 自定义连接线组件(拖拽过程中的临时连线)
@@ -151,12 +152,8 @@ function autoCharacterLayout(
   });
 }
 
-/** 右键菜单状态(null 表示菜单关闭) */
-interface ContextMenuState {
-  x: number;
-  y: number;
-  nodeId: string | null;
-}
+/** 右键菜单状态(null 表示菜单关闭) - 复用 CharacterGraphContextMenu 组件的类型 */
+// ContextMenuState 已从 CharacterGraphContextMenu 导入, 此处仅保留注释说明
 
 /**
  * 人物关系图画布容器组件
@@ -169,6 +166,7 @@ interface ContextMenuState {
  *   4. 注册快捷键监听(Ctrl+S/L/Z/Y, Escape)
  *   5. 隔离 Tauri 拖拽冲突(data-tauri-drag-region="false")
  *   6. 监听 nodes/edges 变化自动触发防抖保存
+ *   7. 集成独立 CharacterGraphContextMenu 组件处理右键菜单
  */
 export default function CharacterGraphPanel() {
   const currentProject = useAppStore((s) => s.currentProject);
@@ -284,6 +282,46 @@ export default function CharacterGraphPanel() {
     };
     useCharacterGraphStore.setState((state) => ({ nodes: [...state.nodes, newNode] }));
   }, [t]);
+
+  /**
+   * 重置视图(居中并自适应缩放)
+   * 输入: 无
+   * 输出: void
+   * 流程: 调用 ReactFlowInstance.fitView 将所有节点居中显示并适配缩放比例
+   */
+  const handleResetView = useCallback(() => {
+    reactFlowInstance.current?.fitView({ padding: 0.2, duration: 300 });
+  }, []);
+
+  /**
+   * 从指定节点开始连线(选中该节点, 提示用户拖拽到目标节点)
+   * 输入: nodeId 起始节点 ID
+   * 输出: void
+   * 流程: 选中起始节点, 后续用户手动拖拽 Handle 完成连线
+   *       注: React Flow 的连线由 Handle 拖拽触发, 此处仅提供入口提示
+   */
+  const handleConnectFrom = useCallback((nodeId: string) => {
+    selectNode(nodeId);
+    showToast("info", t("characterGraph.ctx.connectFrom"));
+  }, [selectNode, showToast, t]);
+
+  /**
+   * 右键菜单操作回调集合(传递给 CharacterGraphContextMenu 组件)
+   * 使用 useMemo 避免每次渲染创建新对象导致子组件不必要重渲染
+   */
+  const contextMenuActions: ContextMenuActions = useMemo(() => ({
+    onCreateNode: handleCreateNode,
+    onEditNode: selectNode,
+    onDeleteNode: (nodeId: string) => {
+      if (confirm(t("characterGraph.toast.deleteConfirm"))) {
+        deleteNode(nodeId);
+        showToast("success", t("characterGraph.toast.deleted"));
+      }
+    },
+    onAutoLayout: handleAutoLayout,
+    onResetView: handleResetView,
+    onConnectFrom: handleConnectFrom,
+  }), [handleCreateNode, selectNode, deleteNode, showToast, t, handleAutoLayout, handleResetView, handleConnectFrom]);
 
   // 快捷键监听(仅在 activeCategory === "characterGraph" 时生效)
   useEffect(() => {
@@ -411,14 +449,14 @@ export default function CharacterGraphPanel() {
     setContextMenu({ x: event.clientX, y: event.clientY, nodeId: null });
   }, []);
 
-  // 点击其他区域关闭右键菜单
+  // 点击其他区域关闭右键菜单的逻辑已迁移至 CharacterGraphContextMenu 组件内部,
+  // 此处仅保留 Escape 关闭逻辑(与快捷键监听中的 Escape 处理合并)
   useEffect(() => {
     if (!contextMenu) return;
+    // 右键菜单打开期间, 额外监听 contextmenu 事件以支持右键切换菜单位置
     const handleClose = () => setContextMenu(null);
-    document.addEventListener("click", handleClose);
     document.addEventListener("contextmenu", handleClose);
     return () => {
-      document.removeEventListener("click", handleClose);
       document.removeEventListener("contextmenu", handleClose);
     };
   }, [contextMenu]);
@@ -549,57 +587,12 @@ export default function CharacterGraphPanel() {
         />
       </ReactFlow>
 
-      {/* 右键菜单(内联实现) */}
-      {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[160px] bg-nf-bg-card border border-nf-border-light shadow-lg py-1"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* 添加角色节点(画布空白与节点右键均可用) */}
-          <button
-            onClick={() => {
-              handleCreateNode({ x: contextMenu.x, y: contextMenu.y });
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary hover:bg-fandex-primary/5 transition-colors duration-fast"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            {t("characterGraph.ctx.addNode")}
-          </button>
-
-          {/* 编辑详情(仅节点右键可用) */}
-          {contextMenu.nodeId && (
-            <button
-              onClick={() => {
-                selectNode(contextMenu.nodeId);
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-primary hover:bg-fandex-primary/5 transition-colors duration-fast"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              {t("characterGraph.ctx.editDetail")}
-            </button>
-          )}
-
-          {/* 删除节点(仅节点右键可用) */}
-          {contextMenu.nodeId && (
-            <button
-              onClick={() => {
-                if (contextMenu.nodeId && confirm(t("characterGraph.toast.deleteConfirm"))) {
-                  deleteNode(contextMenu.nodeId);
-                  showToast("success", t("characterGraph.toast.deleted"));
-                }
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-nf-text-secondary hover:text-fandex-tertiary hover:bg-fandex-tertiary/5 transition-colors duration-fast"
-            >
-              <X className="w-3.5 h-3.5" />
-              {t("characterGraph.ctx.deleteNode")}
-            </button>
-          )}
-        </div>
-      )}
+      {/* 右键菜单(独立组件, 含边界检测/Esc关闭/点击外部关闭) */}
+      <CharacterGraphContextMenu
+        state={contextMenu}
+        actions={contextMenuActions}
+        onClose={() => setContextMenu(null)}
+      />
 
       {selectedNodeId && (
         <CharacterGraphDrawer
