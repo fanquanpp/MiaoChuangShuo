@@ -33,9 +33,11 @@
 
 ### 项目主页
 
-- **在线展示**: [https://fanquanpp.github.io/MiaoChuangShuo/](https://fanquanpp.github.io/MiaoChuangShuo/)
+- **在线展示 (报名网页)**: [https://fanquanpp.github.io/MiaoChuangShuo/docs/](https://fanquanpp.github.io/MiaoChuangShuo/docs/)
 - **源码仓库**: [https://github.com/fanquanpp/MiaoChuangShuo](https://github.com/fanquanpp/MiaoChuangShuo)
 - **发布下载**: [https://github.com/fanquanpp/MiaoChuangShuo/releases](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+
+> 访问在线展示链接可查看完整产品介绍与界面预览, 含 15 张功能截图与 8 大章节内容说明。
 
 ---
 
