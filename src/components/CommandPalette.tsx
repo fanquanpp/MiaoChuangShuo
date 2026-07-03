@@ -19,7 +19,6 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { useCommandState } from "cmdk";
 import {
   Search,
   ArrowRight,
@@ -270,9 +269,10 @@ export default function CommandPalette({
       .filter((c): c is Command => c !== undefined);
   }, [recentIds, allCommands]);
 
-  // 通过 cmdk 状态钩子获取当前搜索词，用于决定是否展示「最近使用」分组
-  const currentSearch = useCommandState((state) => state.search);
-  const showRecent = !currentSearch.trim() && recentCommands.length > 0;
+  // 通过受控 search state 判断是否展示「最近使用」分组（空查询时置顶）
+  // 注意：不能使用 cmdk 的 useCommandState 钩子，该钩子必须在 <Command> 子树内调用，
+  // 在组件函数体顶层调用会导致 store 为 null 抛错，触发 ErrorBoundary 渲染异常。
+  const showRecent = !search.trim() && recentCommands.length > 0;
 
   // 最近使用命令的 ID 集合（用于从常规分组中排除）
   const recentIdSet = useMemo(() => new Set(recentCommands.map((c) => c.id)), [recentCommands]);

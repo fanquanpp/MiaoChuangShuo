@@ -133,29 +133,12 @@ fn write_snapshot_index(
         .map_err(|e| format!("写入快照索引失败: {}", e))
 }
 
-/// 简单中文字数统计（与 fs_commands 保持一致）
+/// 简单中文字数统计（委托至共享 word_count 模块）
 /// 输入: text 文本内容
 /// 输出: u64 字数
+/// 说明: 原重复实现已迁移至 word_count::count_words, 此处保留包装函数避免大量调用点改动
 fn count_words_simple(text: &str) -> u64 {
-    let mut count: u64 = 0;
-    let mut in_word = false;
-    for ch in text.chars() {
-        if ('\u{4E00}'..='\u{9FFF}').contains(&ch)
-            || ('\u{3400}'..='\u{4DBF}').contains(&ch)
-            || ('\u{F900}'..='\u{FAFF}').contains(&ch)
-        {
-            count += 1;
-            in_word = false;
-        } else if ch.is_alphabetic() {
-            if !in_word {
-                count += 1;
-                in_word = true;
-            }
-        } else {
-            in_word = false;
-        }
-    }
-    count
+    crate::word_count::count_words(text)
 }
 
 /// 计算文件相对路径

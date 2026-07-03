@@ -181,6 +181,67 @@ pub fn count_character_appearances(
 }
 
 /**
+ * 判断字符是否为中文字符(用于角色名边界检测)
+ * 输入: ch 待判断字符
+ * 输出: bool 是否为中文汉字
+ * 说明: 覆盖基本汉字区、扩展A区、兼容汉字区
+ */
+fn is_chinese_char(ch: char) -> bool {
+    ('\u{4E00}'..='\u{9FFF}').contains(&ch)
+        || ('\u{3400}'..='\u{4DBF}').contains(&ch)
+        || ('\u{F900}'..='\u{FAFF}').contains(&ch)
+}
+
+/**
+ * 带词边界检测的角色名替换
+ * 输入: content 原始文本, old_name 旧角色名, new_name 新角色名
+ * 输出: (新文本, 实际替换次数)
+ * 流程:
+ *   1. 遍历 content 中所有 old_name 匹配位置
+ *   2. 对每个匹配, 检查前一个字符与后一个字符是否为中文汉字
+ *   3. 若前后字符均为非中文汉字, 视为完整词匹配, 执行替换
+ *   4. 若前后字符中存在中文汉字, 视为更长词的子串, 跳过替换
+ * 说明: 此策略为保守安全策略, 可能漏替换(如"林黛玉花"中的"林黛玉"),
+ *   但避免误伤(如"林"不会误伤"林中漫步"), 漏替换由作者手动补充更安全
+ */
+fn replace_name_with_boundary(content: &str, old_name: &str, new_name: &str) -> (String, u64) {
+    let mut result = String::with_capacity(content.len());
+    let mut last_end = 0;
+    let mut count: u64 = 0;
+    let old_bytes = old_name.as_bytes();
+
+    // 遍历所有匹配位置
+    let mut search_start = 0;
+    while search_start <= content.len() - old_bytes.len() {
+        if let Some(pos) = content[search_start..].find(old_name) {
+            let abs_pos = search_start + pos;
+            // 检查前一个字符(若存在)是否为中文汉字
+            let prev_ch = content[..abs_pos].chars().last();
+            let prev_is_chinese = prev_ch.map_or(false, is_chinese_char);
+            // 检查后一个字符(若存在)是否为中文汉字
+            let after_start = abs_pos + old_bytes.len();
+            let next_ch = content[after_start..].chars().next();
+            let next_is_chinese = next_ch.map_or(false, is_chinese_char);
+
+            if !prev_is_chinese && !next_is_chinese {
+                // 完整词匹配, 执行替换
+                result.push_str(&content[last_end..abs_pos]);
+                result.push_str(new_name);
+                last_end = after_start;
+                count += 1;
+            }
+            // 无论是否替换, 都跳过当前匹配位置继续搜索
+            search_start = abs_pos + old_bytes.len();
+        } else {
+            break;
+        }
+    }
+    // 追加剩余内容
+    result.push_str(&content[last_end..]);
+    (result, count)
+}
+
+/**
  * 在项目所有 .txt 文件中全局替换角色名
  * 输入: project_path 项目根路径, old_name 旧角色名, new_name 新角色名
  * 输出: Result<RenameResult, String> 修改文件数与替换次数
@@ -188,10 +249,10 @@ pub fn count_character_appearances(
  *   1. 校验新旧名称非空且不同
  *   2. canonicalize 项目根路径
  *   3. 递归收集所有 .txt 文件
- *   4. 逐文件读取、替换、写回（仅在有变更时写入）
+ *   4. 逐文件读取、带词边界检测替换、写回（仅在有变更时写入）
  *   5. 返回修改的文件列表与替换总次数
- * 安全说明: 替换为简单字符串替换，存在子串误伤风险（如"林"会误伤"林中"），
- *   建议前端提示作者改名前先保存以创建版本快照，便于回滚
+ * 安全说明: 采用词边界检测, 避免子串误伤(如"林"不会误伤"林中漫步"),
+ *   建议前端提示作者改名前先保存以创建版本快照, 便于回滚
  */
 #[tauri::command]
 pub fn rename_character_in_project(
@@ -234,13 +295,11 @@ pub fn rename_character_in_project(
             Err(_) => continue,
         };
 
-        // 统计替换次数
-        let count = content.matches(old_name.as_str()).count() as u64;
+        // 带词边界检测的替换, 避免子串误伤
+        let (new_content, count) = replace_name_with_boundary(&content, &old_name, &new_name);
         if count == 0 {
             continue;
         }
-
-        let new_content = content.replace(old_name.as_str(), new_name.as_str());
 
         // 写回文件
         if let Err(e) = fs::write(file_path, &new_content) {

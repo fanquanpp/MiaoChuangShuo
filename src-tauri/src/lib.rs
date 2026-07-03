@@ -18,6 +18,7 @@ mod template_schema;
 mod codex_commands;
 mod timeline_commands;
 mod character_graph_commands;
+mod word_count;
 
 /// 应用入口函数
 /// 输入: 无

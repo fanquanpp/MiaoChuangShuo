@@ -687,13 +687,16 @@ export default function NovelEditor({
       return;
     }
     const editorDom = editor.view.dom;
-    // 节流时间戳：每 60ms 最多检测一次，避免高频 mousemove 造成性能问题
-    let lastCheckTime = 0;
+    // requestAnimationFrame 节流：浏览器自动调度至最佳渲染时机（约 16ms/帧），
+    // 避免高频 mousemove 阻塞主线程，同时比固定 60ms 节流更流畅。
+    // rAFPending 标记确保同一帧内仅执行一次检测
+    let rAFPending = false;
+    let lastMouseEvent: MouseEvent | null = null;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const now = Date.now();
-      if (now - lastCheckTime < 60) return;
-      lastCheckTime = now;
+    const performHoverCheck = () => {
+      rAFPending = false;
+      const e = lastMouseEvent;
+      if (!e) return;
 
       // 通过坐标获取光标位置的文本节点与偏移（Chromium 支持 caretRangeFromPoint）
       const range = document.caretRangeFromPoint(e.clientX, e.clientY);
@@ -759,6 +762,14 @@ export default function NovelEditor({
         }
         setHoverCard((prev) => (prev.open ? { ...prev, open: false } : prev));
         hoverShownNameRef.current = "";
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      lastMouseEvent = e;
+      if (!rAFPending) {
+        rAFPending = true;
+        requestAnimationFrame(performHoverCheck);
       }
     };
 

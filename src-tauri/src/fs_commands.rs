@@ -422,31 +422,12 @@ fn count_words_recursive(dir: &Path, total: &mut u64) {
     }
 }
 
-/// 统计中文字符与英文单词数
+/// 统计中文字符与英文单词数（委托至共享 word_count 模块）
 /// 输入: text 文本内容
 /// 输出: u64 字数
-/// 流程: 遍历字符，中文字符计数，英文连续字母作为一个单词
+/// 说明: 原重复实现已迁移至 word_count::count_words, 此处保留包装函数避免大量调用点改动
 fn count_chinese_and_words(text: &str) -> u64 {
-    let mut count: u64 = 0;
-    let mut in_word = false;
-    for ch in text.chars() {
-        // 中文字符范围(基本汉字 + 扩展)
-        if ('\u{4E00}'..='\u{9FFF}').contains(&ch)
-            || ('\u{3400}'..='\u{4DBF}').contains(&ch)
-            || ('\u{F900}'..='\u{FAFF}').contains(&ch)
-        {
-            count += 1;
-            in_word = false;
-        } else if ch.is_alphabetic() {
-            if !in_word {
-                count += 1;
-                in_word = true;
-            }
-        } else {
-            in_word = false;
-        }
-    }
-    count
+    crate::word_count::count_words(text)
 }
 
 /// 打开目录选择对话框
@@ -838,8 +819,9 @@ pub fn search_in_project(
         query.to_lowercase()
     };
     search_recursive(&root, &root, &search_query, case_sensitive, &mut results);
-    // 限制最大结果数为 200 条，避免性能问题
-    results.truncate(200);
+    // 限制最大结果数为 1000 条, 平衡性能与大型项目完整搜索需求
+    // (原 200 条上限对数百章节长篇项目不足, 此处提升至 1000)
+    results.truncate(1000);
     Ok(results)
 }
 

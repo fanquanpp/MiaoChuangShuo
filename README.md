@@ -340,6 +340,14 @@ npm run tauri build
 
 ## 📝 版本历程
 
+- **v26.7.17**：cmdk 运行时错误修复 + 角色关系图 i18n/右键修复 + 4 项代码质量优化。
+  - 修复 cmdk useCommandState 在 Command 组件外部调用导致 store 为 null 抛错，引发无法进入项目页面（改用受控 search state 判断空查询）
+  - 修复人物关系图侧边栏按钮文本缺失（补充 i18n key sidebar.characterGraph 中英文翻译）
+  - 修复人物关系图右键菜单无反应（移除 CharacterGraphPanel 中重复的 document contextmenu 监听器，避免与 React 合成事件时序冲突导致菜单打开后立即关闭）
+  - 角色改名增加词边界检测，避免子串误伤（如"林"不再误伤"林中漫步"）
+  - 角色悬停卡性能优化（60ms 固定节流改为 requestAnimationFrame 调度，约 16ms/帧更流畅）
+  - 搜索结果硬限从 200 条提升至 1000 条，支持大型长篇项目
+  - 抽取共享 word_count.rs 模块，消除 fs_commands 与 snapshot_commands 中重复的字数统计实现
 - **v26.7.16**：命令面板重构为 cmdk 驱动。引入 cmdk（@pacocoursey/cmdk）替代原 450 行手写模糊匹配 + 键盘导航逻辑 + cmdk 内置 fuzzy 算法（连续字符匹配与排序，替代原 .includes() 简单子串）+ 键盘环绕导航（loop 模式，到末尾后回到首项）+ 完整 ARIA 无障碍属性 + useCommandState 钩子检测空查询条件渲染「最近使用」分组（保留 localStorage 持久化前 5 条与 FANDEX 暗色主题样式覆盖：.nf-cmdk-item 选中态使用 fandex-primary 高亮、最近使用分组标题使用 fandex-secondary）+ 通过闭包捕获命令对象绕开 cmdk 仅传 value 字符串的限制
 - **v26.7.15**：新增人物关系图编辑器 + 图谱连线逻辑修复 + 按钮悬停动效优化。新增人物关系图功能（Alt+7，复用 Timeline 图谱架构，8 种预设关系类型连线，角色节点卡片含姓名/身份/标签/简介，独立 characterGraphStore 状态管理与 character_graph_commands 后端命令，允许环形关系，dagre LR 自动布局）+ 修复剧情图谱同向端点连接错误（addEdge 完整记录 sourceHandle/targetHandle 标识，Handle 添加唯一 id 属性，后端 PersistedEdge 持久化 Handle 字段，支持 source→source / target→target 同向连接场景）+ 修复连线动画方向不一致（TimelineConnectionLine / CharacterConnectionLine 根据鼠标位置动态推导 toPosition，替代原起点对称方向固定逻辑）+ 移除按钮悬停放大效果（删除 .nf-hover-float:hover translateY、.nf-icon-spark:hover scale(1.2)、.nf-icon-slide:hover scale(1.05) 及所有 Tailwind hover:scale-* 类，保留 active 按压缩小与 GlobalTooltip 功能）
 - **v26.7.14**：四项 UI/交互缺陷修复。剧情图谱节点连线端口视觉区分（左侧输入端口绿色 fandex-secondary + 右侧输出端口节点类型强调色，明确连线方向语义）+ 节点卡片高光溢出裁剪（重构双层结构：外层 overflow-visible 保留 Handle 可交互性，内层 overflow-hidden 严格裁剪高光反光效果，删除 CSS overflow 覆盖规则）+ 自定义分类新建弹窗 i18n 修复（zhCN 字典补充 4 个缺失键：sidebar.newCustomCategory/customCategoryName/deleteCategory/confirmDeleteCategory，placeholder 与 title 不再暴露技术变量名）+ 右侧章节列表排序逻辑修复（TreeNodeList/TreeNodeGrid 递归渲染子目录时应用 extractChapterNumber 排序，卷首语固定顶部、卷尾语固定底部、正文章节按数值升序，递归传递 isManuscript 属性）

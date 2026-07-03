@@ -467,6 +467,8 @@ const zhCN: TranslationDict = {
 
   // ── 剧情图谱（graph timeline） ──
   "sidebar.timeline": "剧情图谱",
+  // ── 人物关系图 ──
+  "sidebar.characterGraph": "人物关系图",
   "timeline.emptyHint": "右键画布添加第一个节点",
   "timeline.emptySubHint": "或使用 Ctrl+L 整理布局",
   "timeline.ctx.addMain": "添加主线节点",
@@ -1598,6 +1600,7 @@ const enUS: TranslationDict = {
 
   // ── Timeline Graph ──
   "sidebar.timeline": "Timeline",
+  "sidebar.characterGraph": "Character Graph",
   "timeline.emptyHint": "Right-click canvas to add the first node",
   "timeline.emptySubHint": "Or use Ctrl+L to layout",
   "timeline.ctx.addMain": "Add Main Node",

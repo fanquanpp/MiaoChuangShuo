@@ -449,17 +449,10 @@ export default function CharacterGraphPanel() {
     setContextMenu({ x: event.clientX, y: event.clientY, nodeId: null });
   }, []);
 
-  // 点击其他区域关闭右键菜单的逻辑已迁移至 CharacterGraphContextMenu 组件内部,
-  // 此处仅保留 Escape 关闭逻辑(与快捷键监听中的 Escape 处理合并)
-  useEffect(() => {
-    if (!contextMenu) return;
-    // 右键菜单打开期间, 额外监听 contextmenu 事件以支持右键切换菜单位置
-    const handleClose = () => setContextMenu(null);
-    document.addEventListener("contextmenu", handleClose);
-    return () => {
-      document.removeEventListener("contextmenu", handleClose);
-    };
-  }, [contextMenu]);
+  // 右键菜单关闭逻辑完全由 CharacterGraphContextMenu 组件内部处理
+  // (含 Esc 键、点击外部、再次右键切换位置)
+  // 此处不再绑定 document contextmenu 监听器, 避免与 React 合成事件时序冲突
+  // 导致菜单打开后立即被关闭(表现为右键无反应)
 
   // 是否显示空状态
   const isEmpty = nodes.length === 0 && !loading;
