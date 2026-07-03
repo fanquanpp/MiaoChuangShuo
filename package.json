@@ -1,7 +1,7 @@
 {
   "name": "miaochuangshuo",
   "private": true,
-  "version": "26.7.15",
+  "version": "26.7.16",
   "type": "module",
   "description": "喵创说 - 离线小说创作工作站",
   "scripts": {
@@ -50,6 +50,7 @@
     "@tiptap/extension-underline": "^2.27.2",
     "@tiptap/react": "^2.5.0",
     "@xyflow/react": "^12.11.1",
+    "cmdk": "^1.1.1",
     "lucide-react": "^1.22.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

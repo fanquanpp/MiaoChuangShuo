@@ -1447,3 +1447,70 @@ input:focus, textarea:focus, select:focus {
   white-space: normal;
   word-break: break-all;
 }
+
+/*
+ * cmdk 命令面板样式覆盖
+ * 对齐 FANDEX 暗色主题：直角美学、三色品牌体系、毛玻璃质感
+ * 选中态使用 fandex-primary 高亮，最近使用分组使用 fandex-secondary
+ */
+
+/* 命令项基础样式：flex 布局、间距、过渡 */
+.nf-cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: rgb(var(--nf-text-rgb, 200, 200, 210));
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+  border-radius: 0;
+}
+
+/* 选中态：fandex-primary 半透明背景 + 主色文字 */
+.nf-cmdk-item[data-selected] {
+  background: rgba(110, 168, 254, 0.1);
+  color: #6EA8FE;
+}
+
+/* 选中态图标变为主色 */
+.nf-cmdk-item[data-selected] [data-cmdk-icon] {
+  color: #6EA8FE;
+}
+
+/* 箭头指示器：默认隐藏，选中态显示 */
+.nf-cmdk-arrow {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.nf-cmdk-item[data-selected] .nf-cmdk-arrow {
+  opacity: 1;
+}
+
+/* 未选中项 hover 态 */
+.nf-cmdk-item:not([data-selected]):hover {
+  background: rgb(var(--nf-bg-hover-rgb, 30, 32, 44));
+}
+
+/* 分组标题：小号大写、字间距加宽 */
+.nf-cmdk-group [cmdk-group-heading] {
+  padding: 0.25rem 1rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgb(var(--nf-text-tertiary-rgb, 120, 120, 135));
+}
+
+/* 最近使用分组标题使用 fandex-secondary 高亮 */
+.nf-cmdk-group-recent [cmdk-group-heading] {
+  color: #55EFC4;
+}
+
+/* 分组容器：隐藏的分组不占位 */
+.nf-cmdk-group[hidden] {
+  display: none;
+}

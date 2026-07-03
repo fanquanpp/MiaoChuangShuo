@@ -6,13 +6,20 @@
 // 写作目标设定、自动保存、模板设置、专注模式等。
 //
 // 模块职责：
-// 1. 命令注册与模糊搜索（含 label、keywords、category 三维匹配）
-// 2. 键盘上下导航 + 回车执行 + Escape 关闭
-// 3. 最近使用记录（localStorage 持久化前 5 条）
+// 1. 命令注册与模糊搜索（由 cmdk 内置 fuzzy 算法驱动，匹配 label 与 keywords）
+// 2. 键盘上下导航 + 回车执行 + Escape 关闭（cmdk 内置，支持 loop 环绕）
+// 3. 最近使用记录（localStorage 持久化前 5 条，空查询时置顶展示）
 // 4. 命令图标可视化展示
 // 5. 快捷键提示展示
+//
+// 重构说明（v26.7.16）：
+//   原 450 行手写模糊匹配（.includes()）与键盘导航逻辑已由 cmdk 接管。
+//   cmdk 提供更精准的 fuzzy 匹配、分组过滤、键盘环绕导航与 ARIA 无障碍支持。
+//   保留 FANDEX 暗色主题样式与最近使用记录功能。
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { Command as CommandPrimitive } from "cmdk";
+import { useCommandState } from "cmdk";
 import {
   Search,
   ArrowRight,
@@ -109,7 +116,7 @@ function saveRecentCommand(id: string): void {
 }
 
 /**
- * 全局命令面板组件
+ * 全局命令面板组件（cmdk 驱动）
  * 输入:
  *   open 是否打开
  *   onClose 关闭回调
@@ -118,9 +125,9 @@ function saveRecentCommand(id: string): void {
  * 输出: JSX 浮层面板（未打开时返回 null）
  * 流程:
  *   1. 构建命令列表：分类切换、新建文件、全局搜索、导出、主题切换、写作目标等
- *   2. 根据用户输入进行模糊搜索（匹配 label、keywords、category）
- *   3. 无查询时优先展示最近使用记录
- *   4. 键盘导航：↑↓ 选择、Enter 执行、Escape 关闭
+ *   2. cmdk 内置 fuzzy 搜索自动匹配 label 与 keywords
+ *   3. 无查询时优先展示最近使用记录分组（置顶）
+ *   4. 键盘导航由 cmdk 内置：↑↓ 选择（loop 环绕）、Enter 执行、Escape 关闭
  *   5. 执行命令后记录到最近使用列表并自动关闭
  */
 export default function CommandPalette({
@@ -131,8 +138,7 @@ export default function CommandPalette({
   onExportProject,
 }: CommandPaletteProps) {
   const { t } = useI18n();
-  const [query, setQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const setActiveCategory = useAppStore((s) => s.setActiveCategory);
@@ -257,55 +263,34 @@ export default function CommandPalette({
     }
   }, [open]);
 
-  // 最近使用命令列表
+  // 最近使用命令列表（仅在无搜索词时展示）
   const recentCommands = useMemo(() => {
-    if (query.trim()) return [];
     return recentIds
       .map((id) => allCommands.find((c) => c.id === id))
       .filter((c): c is Command => c !== undefined);
-  }, [recentIds, allCommands, query]);
+  }, [recentIds, allCommands]);
 
-  // 搜索过滤结果
-  const filtered = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return allCommands.filter(
-      (cmd) =>
-        cmd.label.toLowerCase().includes(q) ||
-        cmd.keywords.some((k) => k.toLowerCase().includes(q)) ||
-        cmd.category.toLowerCase().includes(q)
-    );
-  }, [query, allCommands]);
+  // 通过 cmdk 状态钩子获取当前搜索词，用于决定是否展示「最近使用」分组
+  const currentSearch = useCommandState((state) => state.search);
+  const showRecent = !currentSearch.trim() && recentCommands.length > 0;
 
-  // 当前展示列表：
-  // - 有查询：仅显示过滤结果
-  // - 无查询 + 有最近使用：最近使用置顶（单独分组）+ 其余全部命令（去重）
-  // - 无查询 + 无最近使用：显示全部命令
-  const displayList = useMemo(() => {
-    if (query.trim()) return filtered;
-    if (recentCommands.length === 0) return allCommands;
-    const recentIdsSet = new Set(recentCommands.map((c) => c.id));
-    const rest = allCommands.filter((c) => !recentIdsSet.has(c.id));
-    // 将最近使用命令的 category 临时改为「最近使用」分组，置顶展示
-    const recentTagged = recentCommands.map((c) => ({ ...c, category: t("command.recent") }));
-    return [...recentTagged, ...rest];
-  }, [query, filtered, recentCommands, allCommands, t]);
+  // 最近使用命令的 ID 集合（用于从常规分组中排除）
+  const recentIdSet = useMemo(() => new Set(recentCommands.map((c) => c.id)), [recentCommands]);
 
-  // 重置选择与查询
+  // 常规命令（排除最近使用项，避免 value 重复）
+  const regularCommands = useMemo(() => {
+    if (showRecent) {
+      return allCommands.filter((c) => !recentIdSet.has(c.id));
+    }
+    return allCommands;
+  }, [allCommands, showRecent, recentIdSet]);
+
+  // 重置搜索词
   useEffect(() => {
-    setSelectedIndex(0);
-    setQuery("");
-    if (open && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+    if (!open) {
+      setSearch("");
     }
   }, [open]);
-
-  // Clamp selectedIndex when results shrink
-  useEffect(() => {
-    if (selectedIndex >= displayList.length && displayList.length > 0) {
-      setSelectedIndex(0);
-    }
-  }, [displayList.length, selectedIndex]);
 
   /**
    * 执行命令并记录到最近使用
@@ -321,41 +306,56 @@ export default function CommandPalette({
     [onClose]
   );
 
-  // 键盘导航
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, displayList.length - 1));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.max(prev - 1, 0));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (displayList[selectedIndex]) {
-          executeCommand(displayList[selectedIndex]);
-        }
-      } else if (e.key === "Escape") {
-        onClose();
-      }
-    },
-    [displayList, selectedIndex, onClose, executeCommand]
-  );
+  if (!open) return null;
 
-  // 按分类分组展示
-  const grouped = useMemo(() => {
+  /**
+   * 渲染单个命令项
+   * 输入: cmd 命令对象
+   * 输出: Command.Item JSX
+   * 说明:
+   *   - value 使用 cmd.label 供 cmdk 文本匹配
+   *   - keywords 传递给 cmdk 扩展匹配范围
+   *   - onSelect 通过闭包捕获 cmd 对象，忽略 value 参数
+   */
+  const renderItem = (cmd: Command) => {
+    const Icon = cmd.icon;
+    return (
+      <CommandPrimitive.Item
+        key={cmd.id}
+        value={cmd.label}
+        keywords={cmd.keywords}
+        onSelect={() => executeCommand(cmd)}
+        className="nf-cmdk-item"
+      >
+        {Icon && <Icon className="w-4 h-4 flex-shrink-0 text-nf-text-tertiary" data-cmdk-icon />}
+        <span className="flex-1 truncate">{cmd.label}</span>
+        {cmd.shortcut && (
+          <kbd className="px-1.5 py-0.5 bg-nf-bg-hover border border-nf-border-light text-[10px] font-mono text-nf-text-tertiary flex-shrink-0">
+            {cmd.shortcut}
+          </kbd>
+        )}
+        <ArrowRight className="w-3.5 h-3.5 text-fandex-primary flex-shrink-0 nf-cmdk-arrow" />
+      </CommandPrimitive.Item>
+    );
+  };
+
+  /**
+   * 按分类分组渲染命令
+   * 输入: commands 命令列表
+   * 输出: 多个 Command.Group JSX
+   */
+  const renderGroups = (commands: Command[]) => {
     const groups: Record<string, Command[]> = {};
-    for (const cmd of displayList) {
+    for (const cmd of commands) {
       if (!groups[cmd.category]) groups[cmd.category] = [];
       groups[cmd.category].push(cmd);
     }
-    return groups;
-  }, [displayList]);
-
-  // 扁平化用于键盘索引
-  const flatList: Command[] = displayList;
-
-  if (!open) return null;
+    return Object.entries(groups).map(([groupName, cmds]) => (
+      <CommandPrimitive.Group key={groupName} heading={groupName} className="nf-cmdk-group">
+        {cmds.map(renderItem)}
+      </CommandPrimitive.Group>
+    ));
+  };
 
   return (
     <div
@@ -365,78 +365,44 @@ export default function CommandPalette({
       }}
     >
       <div className="nf-glass-panel w-full max-w-lg border border-nf-border-light shadow-2xl overflow-hidden">
-        {/* 搜索框 */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-nf-border-light">
-          <Search className="w-4 h-4 text-nf-text-tertiary flex-shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedIndex(0);
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder={t("command.placeholder")}
-            className="flex-1 bg-transparent text-sm text-nf-text placeholder-nf-text-tertiary outline-none"
-            aria-label={t("command.searchLabel")}
-          />
-          <kbd className="px-1.5 py-0.5 bg-nf-bg-hover border border-nf-border-light text-[10px] font-mono text-nf-text-tertiary flex-shrink-0">
-            ESC
-          </kbd>
-        </div>
+        <CommandPrimitive
+          label={t("command.searchLabel")}
+          loop
+          className="flex flex-col"
+        >
+          {/* 搜索框 */}
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-nf-border-light">
+            <Search className="w-4 h-4 text-nf-text-tertiary flex-shrink-0" />
+            <CommandPrimitive.Input
+              ref={inputRef}
+              value={search}
+              onValueChange={setSearch}
+              placeholder={t("command.placeholder")}
+              className="flex-1 bg-transparent text-sm text-nf-text placeholder-nf-text-tertiary outline-none"
+              aria-label={t("command.searchLabel")}
+            />
+            <kbd className="px-1.5 py-0.5 bg-nf-bg-hover border border-nf-border-light text-[10px] font-mono text-nf-text-tertiary flex-shrink-0">
+              ESC
+            </kbd>
+          </div>
 
-        {/* 命令列表（分组展示，最近使用分组自动置顶） */}
-        <div className="max-h-[340px] overflow-y-auto py-1">
-          {displayList.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-nf-text-tertiary">
+          {/* 命令列表（cmdk 自动过滤与排序） */}
+          <CommandPrimitive.List className="max-h-[340px] overflow-y-auto py-1">
+            <CommandPrimitive.Empty className="px-4 py-8 text-center text-sm text-nf-text-tertiary">
               {t("command.noMatch")}
-            </div>
-          ) : (
-            Object.entries(grouped).map(([groupName, cmds]) => {
-              // 「最近使用」分组使用次色高亮，其余分组使用三级文字色
-              const isRecentGroup = groupName === t("command.recent");
-              return (
-              <div key={groupName}>
-                <div className={`px-4 py-1 text-[10px] font-medium uppercase tracking-wider ${isRecentGroup ? "text-fandex-secondary" : "text-nf-text-tertiary"}`}>
-                  {groupName}
-                </div>
-                {cmds.map((cmd) => {
-                  // 计算在 flatList 中的索引
-                  const flatIdx = flatList.findIndex((c) => c.id === cmd.id);
-                  const Icon = cmd.icon;
-                  return (
-                    <button
-                      key={cmd.id}
-                      ref={(el) => { if (flatIdx === selectedIndex && el) el.scrollIntoView({ block: "nearest" }); }}
-                      onClick={() => executeCommand(cmd)}
-                      onMouseEnter={() => setSelectedIndex(flatIdx)}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition duration-fast ${
-                        flatIdx === selectedIndex
-                          ? "bg-fandex-primary/10 text-fandex-primary"
-                          : "text-nf-text hover:bg-nf-bg-hover"
-                      }`}
-                    >
-                      {Icon && (
-                        <Icon className={`w-4 h-4 flex-shrink-0 ${flatIdx === selectedIndex ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
-                      )}
-                      <span className="flex-1 truncate">{cmd.label}</span>
-                      {cmd.shortcut && (
-                        <kbd className="px-1.5 py-0.5 bg-nf-bg-hover border border-nf-border-light text-[10px] font-mono text-nf-text-tertiary flex-shrink-0">
-                          {cmd.shortcut}
-                        </kbd>
-                      )}
-                      {flatIdx === selectedIndex && (
-                        <ArrowRight className="w-3.5 h-3.5 text-fandex-primary flex-shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              );
-            })
-          )}
-        </div>
+            </CommandPrimitive.Empty>
+
+            {/* 最近使用分组（仅无搜索词时置顶展示） */}
+            {showRecent && (
+              <CommandPrimitive.Group heading={t("command.recent")} className="nf-cmdk-group nf-cmdk-group-recent">
+                {recentCommands.map(renderItem)}
+              </CommandPrimitive.Group>
+            )}
+
+            {/* 常规分组 */}
+            {renderGroups(regularCommands)}
+          </CommandPrimitive.List>
+        </CommandPrimitive>
 
         {/* 底部提示 */}
         <div className="flex items-center gap-4 px-4 py-2 border-t border-nf-border-light text-[10px] text-nf-text-tertiary">
