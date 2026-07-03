@@ -471,10 +471,10 @@
         }
 
         /* ============================================================
-         * 痛点对比 (2 列)
+         * 用户需求与方案 (2 列)
          * ============================================================ */
         .compare-card-pain {
-            border-left: 2px solid var(--color-tertiary);
+            border-left: 2px solid var(--color-secondary);
         }
 
         .compare-card-solution {
@@ -874,7 +874,7 @@
         </div>
         <ul class="nav-links">
             <li><a href="#creative" class="nav-link active">创意</a></li>
-            <li><a href="#problem" class="nav-link">痛点</a></li>
+            <li><a href="#problem" class="nav-link">需求</a></li>
             <li><a href="#screenshots" class="nav-link">界面预览</a></li>
             <li><a href="#features" class="nav-link">核心功能</a></li>
             <li><a href="#architecture" class="nav-link">技术架构</a></li>
@@ -943,13 +943,13 @@
                 <div class="card">
                     <div class="card-title">想解决什么问题</div>
                     <div class="card-desc">
-                        独立与业余长篇创作者长期面临困境: 云写作工具强制联网且存在数据隐私风险, 通用文本编辑器又缺少剧情线、人物关系、伏笔追踪等长篇专属能力。百万字级创作中, 剧情分支混乱、人物关系难以对齐、伏笔挖坑不回收, 创作流程被迫分散在多个软件之间。
+                        长篇创作是一个系统性工程, 涉及剧情线推进、人物关系维护、伏笔埋设与回收、世界观设定管理等多个维度。喵创说希望为有写作兴趣与意向的用户提供尝试的机会, 帮助他们迈出写作第一步。通过将编辑、剧情、人物、设定、伏笔五大模块集成于单一工作站, 让创作者在一个界面内即可完成完整的长篇叙事工作流, 专注于故事本身。
                     </div>
                 </div>
                 <div class="card">
                     <div class="card-title">为什么会想到做这个</div>
                     <div class="card-desc">
-                        自己作为有长期写作习惯的爱好者, 曾在断网环境下被云工具锁死无法继续创作, 也曾因通用编辑器缺少伏笔管理导致长篇作品挖坑不填。市面上的专业创作软件普遍订阅制, 业余创作者难以承担长期成本。于是想做一个完全本地化、零门槛、专为长篇叙事工作流设计的桌面工作站。
+                        喵创说的诞生初衷很简单——希望降低长篇创作的工具门槛, 让更多有故事的人能够拿起键盘开始创作。我们希望提供一个完全本地化、零门槛、专为长篇叙事工作流设计的桌面工作站, 让创作者无需在多个软件之间切换, 在一个专注的环境中完成从灵感迸发到成稿的全流程, 让创作回归专注本身。
                     </div>
                 </div>
             </div>
@@ -959,33 +959,33 @@
             </div>
         </section>
 
-        <!-- ==================== 二、痛点与方案 ==================== -->
+        <!-- ==================== 二、用户需求与方案 ==================== -->
         <section class="section" id="problem">
             <div class="section-header">
-                <span class="section-tag section-tag-tertiary">02 · 目标用户及痛点</span>
-                <span class="section-count">Problem &amp; Solution</span>
+                <span class="section-tag section-tag-tertiary">02 · 目标用户及需求</span>
+                <span class="section-count">Users &amp; Solution</span>
             </div>
             <div class="grid grid-2">
-                <div class="card compare-card-pain">
-                    <div class="card-title" style="color: var(--color-tertiary);">当前痛点</div>
+                <div class="card compare-card-solution">
+                    <div class="card-title" style="color: var(--color-secondary);">用户需求</div>
                     <ul class="compare-list">
-                        <li><span class="compare-icon-pain">×</span>云写作工具强制联网, 断网即失写作能力</li>
-                        <li><span class="compare-icon-pain">×</span>云端存储存在隐私泄露风险, 失去作品控制权</li>
-                        <li><span class="compare-icon-pain">×</span>通用编辑器缺少长篇专属功能</li>
-                        <li><span class="compare-icon-pain">×</span>专业创作软件订阅费用高, 业余者难承担</li>
-                        <li><span class="compare-icon-pain">×</span>百万字文档渲染卡顿, 影响创作节奏</li>
-                        <li><span class="compare-icon-pain">×</span>Electron 类应用安装包臃肿, 内存占用大</li>
+                        <li><span class="compare-icon-solution">✓</span>一站式完成长篇创作全部环节, 减少多软件切换消耗</li>
+                        <li><span class="compare-icon-solution">✓</span>创作内容完全存储于本地, 数据主权归创作者</li>
+                        <li><span class="compare-icon-solution">✓</span>提供剧情线、人物关系、伏笔追踪等长篇专属能力</li>
+                        <li><span class="compare-icon-solution">✓</span>完全免费, 降低长篇创作门槛, 服务更多创作者</li>
+                        <li><span class="compare-icon-solution">✓</span>百万字长文档保持流畅滚动与编辑体验</li>
+                        <li><span class="compare-icon-solution">✓</span>轻量化安装包, 减少系统资源占用</li>
                     </ul>
                 </div>
                 <div class="card compare-card-solution">
-                    <div class="card-title" style="color: var(--color-secondary);">喵创说的解法</div>
+                    <div class="card-title" style="color: var(--color-primary);">喵创说的解法</div>
                     <ul class="compare-list">
-                        <li><span class="compare-icon-solution">✓</span>完全离线运行, 无需账号无需登录</li>
+                        <li><span class="compare-icon-solution">✓</span>编辑、剧情、人物、设定、伏笔五大模块集成于单一工作站</li>
                         <li><span class="compare-icon-solution">✓</span>所有数据以 TXT / JSON 存于本地, 主权归创作者</li>
                         <li><span class="compare-icon-solution">✓</span>内置剧情时间线、人物关系图、设定库、伏笔追踪</li>
                         <li><span class="compare-icon-solution">✓</span>免费提供, 服务独立与业余创作者群体</li>
                         <li><span class="compare-icon-solution">✓</span>Tauri + Rust 后端, 前端保持 60fps</li>
-                        <li><span class="compare-icon-solution">✓</span>安装包 10MB 内, 内存占用相比 Electron 降低 80%</li>
+                        <li><span class="compare-icon-solution">✓</span>安装包 10MB 内, 轻量化部署, 减少系统资源占用</li>
                     </ul>
                 </div>
             </div>
@@ -1227,7 +1227,7 @@
                 <div class="card persona-card">
                     <div class="persona-name">业余小说爱好者</div>
                     <div class="persona-tag">Weekend Creator</div>
-                    <div class="persona-scene">周末创作, 难以承担专业软件订阅费用。喵创说免费可用, 零门槛上手, 适合碎片化创作节奏。</div>
+                    <div class="persona-scene">周末创作, 希望尝试系统化的长篇工作流。喵创说免费可用, 零门槛上手, 适合灵活的创作节奏。</div>
                 </div>
                 <div class="card persona-card">
                     <div class="persona-name">长篇连载作者</div>
@@ -1237,12 +1237,12 @@
                 <div class="card persona-card">
                     <div class="persona-name">隐私敏感创作者</div>
                     <div class="persona-tag">Privacy First</div>
-                    <div class="persona-scene">对未发表作品有强烈隐私需求, 拒绝上传云端。喵创说完全离线运行, 数据 100% 本地, 拥有完整数据主权。</div>
+                    <div class="persona-scene">对未发表作品有强烈隐私需求, 希望内容完全掌握在自己手中。喵创说完全离线运行, 数据 100% 本地, 拥有完整数据主权。</div>
                 </div>
                 <div class="card persona-card">
                     <div class="persona-name">断网环境创作者</div>
                     <div class="persona-tag">Offline Writer</div>
-                    <div class="persona-scene">出差、高铁、咖啡馆等不稳定网络环境。喵创说无需联网即可使用全部功能, 不会因网络中断失去写作能力。</div>
+                    <div class="persona-scene">出差、高铁、咖啡馆等不稳定网络环境。喵创说无需联网即可使用全部功能, 网络中断也不影响创作进程。</div>
                 </div>
                 <div class="card persona-card">
                     <div class="persona-name">写作学习者</div>
@@ -1261,30 +1261,30 @@
             <div class="grid grid-3">
                 <div class="card value-card-efficiency">
                     <div class="value-label">Efficiency / 效率提升</div>
-                    <div class="card-title">让长篇创作从碎片化走向工程化</div>
+                    <div class="card-title">让长篇创作从分散走向集成</div>
                     <div class="value-desc">
-                        传统写作工具将精力分散在文档、Excel、思维导图之间。喵创说将<strong>编辑、剧情、人物、设定、伏笔</strong>五大模块集成于单一工作站, Rust 后端承载重型计算, 百万字保持 60fps。
+                        喵创说将<strong>编辑、剧情、人物、设定、伏笔</strong>五大模块集成于单一工作站, 配合 Ctrl+K 命令面板与 VS Code 风格快捷键, 让创作者在一个界面内完成完整工作流。Rust 后端承载重型计算, 百万字保持 60fps。
                     </div>
                 </div>
                 <div class="card value-card-social">
                     <div class="value-label">Social / 社会价值</div>
                     <div class="card-title">让创作工具回归创作者手中</div>
                     <div class="value-desc">
-                        喵创说<strong>免费提供</strong>给独立与业余创作者群体, 坚持<strong>完全本地化</strong>, 数据主权 100% 归创作者。降低长篇创作门槛, 这是参与社会公益附加赛题的核心立意。
+                        喵创说<strong>免费提供</strong>给独立与业余创作者群体, 坚持<strong>完全本地化</strong>, 数据主权 100% 归创作者。希望帮助有写作兴趣与意向的用户迈出写作第一步, 这是参与社会公益附加赛题的核心立意。
                     </div>
                 </div>
                 <div class="card value-card-business">
                     <div class="value-label">Business / 商业价值</div>
                     <div class="card-title">验证 Tauri 桌面应用新范式</div>
                     <div class="value-desc">
-                        以 Tauri 2.0 + Rust 替代 Electron, 安装包从 100MB+ 缩减至 10MB 内, 内存降低约 80%。验证<strong>"轻前端 + 重 Rust 后端"</strong>桌面应用新范式。
+                        以 Tauri 2.0 + Rust 构建轻量化桌面应用, 安装包控制在 10MB 内, 资源占用大幅减少。验证<strong>"轻前端 + 重 Rust 后端"</strong>桌面应用新范式。
                     </div>
                 </div>
             </div>
 
             <div class="admonition admonition-important">
                 <div class="admonition-title">社会公益附加赛题立意</div>
-                <p>喵创说坚持完全免费、完全本地化、不收集任何用户数据三大原则, 服务那些无法承担云工具订阅费用的独立与业余创作者群体。让创作工具回归创作者手中, 让更多有故事的人能够拿起键盘开始创作, 为内容创作生态贡献一份力量。</p>
+                <p>喵创说坚持完全免费、完全本地化、不收集任何用户数据三大原则, 希望降低长篇创作的工具门槛, 让更多有故事的人能够拿起键盘开始创作。我们希望帮助有写作兴趣与意向的用户迈出写作第一步, 为内容创作生态贡献一份力量。让创作工具回归创作者手中, 是本项目的核心公益立意。</p>
             </div>
         </section>
 
