@@ -868,6 +868,10 @@ const zhCN: TranslationDict = {
   "sidebar.volumes": "分卷",
   "sidebar.settings": "设置",
   "sidebar.customSection": "自定义",
+  "sidebar.newCustomCategory": "新建自定义分类",
+  "sidebar.customCategoryName": "请输入分类名称",
+  "sidebar.deleteCategory": "删除分类",
+  "sidebar.confirmDeleteCategory": "确定要删除分类「{name}」吗？该目录下的所有文件将被永久删除。",
 
   // ── 设置对话框 ──
   "settings.title": "设置",

@@ -253,8 +253,15 @@ function TreeNodeList({
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
-        {expanded &&
-          node.children?.map((child) => (
+        {expanded && node.children && (
+          // 正文分类: 按 extractChapterNumber 排序(卷首语 -2 → 正文章节按数值 → 卷尾语 Infinity)
+          // 非正文分类: 保持原始顺序
+          (isManuscript
+            ? [...node.children].sort(
+                (a, b) => extractChapterNumber(a.name) - extractChapterNumber(b.name)
+              )
+            : node.children
+          ).map((child) => (
             <TreeNodeList
               key={child.relative_path}
               node={child}
@@ -266,8 +273,10 @@ function TreeNodeList({
               onContextMenu={onContextMenu}
               t={t}
               activeFileWordCount={activeFileWordCount}
+              isManuscript={isManuscript}
             />
-          ))}
+          ))
+        )}
       </div>
     );
   }
@@ -419,9 +428,16 @@ function TreeNodeGrid({
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
-        {expanded && (
+        {expanded && node.children && (
           <div className="grid grid-cols-2 gap-1 bg-nf-bg border border-nf-border-light pl-2">
-            {node.children?.map((child) => (
+            {/* 正文分类: 按 extractChapterNumber 排序(卷首语 -2 → 正文章节按数值 → 卷尾语 Infinity) */}
+            {/* 非正文分类: 保持原始顺序 */}
+            {(isManuscript
+              ? [...node.children].sort(
+                  (a, b) => extractChapterNumber(a.name) - extractChapterNumber(b.name)
+                )
+              : node.children
+            ).map((child) => (
               <TreeNodeGrid
                 key={child.relative_path}
                 node={child}
@@ -433,6 +449,7 @@ function TreeNodeGrid({
                 onContextMenu={onContextMenu}
                 activeFileWordCount={activeFileWordCount}
                 t={t}
+                isManuscript={isManuscript}
               />
             ))}
           </div>

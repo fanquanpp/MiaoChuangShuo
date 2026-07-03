@@ -65,7 +65,7 @@ export default function TimelineNode({ id, selected }: NodeProps) {
   return (
     <div
       className={`
-        nf-card-sheen nf-card-dots nf-hover-float group relative rounded-none backdrop-blur-md
+        nf-hover-float group relative rounded-none backdrop-blur-md
         transition-all duration-200 ease-fandex overflow-visible border
         ${selected
           ? "scale-[1.02] border-fandex-primary/70"
@@ -83,12 +83,12 @@ export default function TimelineNode({ id, selected }: NodeProps) {
           : `0 4px 12px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.03)`,
       }}
     >
-      {/* 输入锚点 - 左侧(居中贴边, hover 放大, 提升连线体验) */}
+      {/* 输入锚点 - 左侧(绿色 fandex-secondary, 与右侧输出端口视觉区分, 明确"流入"语义) */}
       <Handle
         type="target"
         position={Position.Left}
         className="!w-3.5 !h-3.5 !border-2 !border-nf-bg hover:!w-4 hover:!h-4 transition-all duration-fast"
-        style={{ left: -7, backgroundColor: accent }}
+        style={{ left: -7, backgroundColor: "var(--fandex-secondary)" }}
       />
 
       {/* 右下角微型装饰:呼应项目卡片的同心圆+几何元素,极低透明度不影响内容 */}
@@ -104,53 +104,62 @@ export default function TimelineNode({ id, selected }: NodeProps) {
         <circle cx="80" cy="80" r="12" stroke="currentColor" strokeWidth="0.6" className="text-fandex-tertiary" opacity="0.7" />
       </svg>
 
-      {/* 内容区(统一内边距, 优化排版节奏, z 层级高于装饰) */}
-      <div className="px-3.5 py-2.5 relative z-[1]">
-        {/* 标题行: 标题 + 折叠按钮(仅 main 节点) */}
-        <div className="flex items-start justify-between gap-2 mb-1.5">
-          <div className={`text-sm font-bold font-display ${colors.text} truncate flex-1 leading-tight`}>
-            {data.title}
+      {/* 内层裁剪容器: overflow-hidden 限制高光反光效果在卡片边界内, 避免溢出污染画布 */}
+      <div className="nf-card-sheen nf-card-dots relative overflow-hidden">
+        {/* 内容区(统一内边距, 优化排版节奏, z 层级高于装饰) */}
+        <div className="px-3.5 py-2.5 relative z-[1]">
+          {/* 标题行: 标题 + 折叠按钮(仅 main 节点) */}
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <div className={`text-sm font-bold font-display ${colors.text} truncate flex-1 leading-tight`}>
+              {data.title}
+            </div>
+            {/* 折叠/展开按钮(仅 main 节点显示, 点击切换 collapsed 字段) */}
+            {data.nodeType === "main" && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleCollapse(id);
+                }}
+                className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-fandex-primary/10 transition-colors duration-fast"
+                title={data.collapsed ? "展开" : "折叠"}
+              >
+                {data.collapsed ? "+" : "−"}
+              </button>
+            )}
           </div>
-          {/* 折叠/展开按钮(仅 main 节点显示, 点击切换 collapsed 字段) */}
-          {data.nodeType === "main" && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleCollapse(id);
-              }}
-              className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-fandex-primary/10 transition-colors duration-fast"
-              title={data.collapsed ? "展开" : "折叠"}
+
+          {/* 节点类型标签 + 状态徽章(几何直角, 强调色填充提升识别度) */}
+          <div className="flex items-center gap-1.5">
+            <span
+              className="text-[10px] px-1.5 py-0.5 font-medium tracking-wide text-white"
+              style={{ backgroundColor: accent }}
             >
-              {data.collapsed ? "+" : "−"}
-            </button>
+              {data.nodeType === "main" && "主线"}
+              {data.nodeType === "branch" && "分支"}
+              {data.nodeType === "event" && "事件"}
+              {data.nodeType === "ending" && "结局"}
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 font-medium ${statusInfo.color} text-white`}>
+              {statusInfo.label}
+            </span>
+          </div>
+
+          {/* 摘要预览(仅显示前 50 字, line-clamp-2 限制 2 行, 优化行高) */}
+          {data.summary && (
+            <div className="mt-1.5 text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
+              {data.summary}
+            </div>
           )}
         </div>
 
-        {/* 节点类型标签 + 状态徽章(几何直角, 强调色填充提升识别度) */}
-        <div className="flex items-center gap-1.5">
-          <span
-            className="text-[10px] px-1.5 py-0.5 font-medium tracking-wide text-white"
-            style={{ backgroundColor: accent }}
-          >
-            {data.nodeType === "main" && "主线"}
-            {data.nodeType === "branch" && "分支"}
-            {data.nodeType === "event" && "事件"}
-            {data.nodeType === "ending" && "结局"}
-          </span>
-          <span className={`text-[10px] px-1.5 py-0.5 font-medium ${statusInfo.color} text-white`}>
-            {statusInfo.label}
-          </span>
-        </div>
-
-        {/* 摘要预览(仅显示前 50 字, line-clamp-2 限制 2 行, 优化行高) */}
-        {data.summary && (
-          <div className="mt-1.5 text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
-            {data.summary}
-          </div>
-        )}
+        {/* 底部进度条装饰:呼应项目卡片美术,悬停时显现 */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+          style={{ background: `linear-gradient(90deg, ${accent}, ${accent}55 70%, transparent)` }}
+        />
       </div>
 
-      {/* 输出锚点 - 右侧(居中贴边, hover 放大) */}
+      {/* 输出锚点 - 右侧(accent 强调色, 与左侧绿色输入端口视觉区分, 明确"流出"语义) */}
       <Handle
         type="source"
         position={Position.Right}
@@ -158,13 +167,7 @@ export default function TimelineNode({ id, selected }: NodeProps) {
         style={{ right: -7, backgroundColor: accent }}
       />
 
-      {/* 底部进度条装饰:呼应项目卡片美术,悬停时显现 */}
-      <div
-        className="absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-        style={{ background: `linear-gradient(90deg, ${accent}, ${accent}55 70%, transparent)` }}
-      />
-
-      {/* 折叠角标(仅 main 节点折叠时显示, 微调尺寸与位置) */}
+      {/* 折叠角标(仅 main 节点折叠时显示, 微调尺寸与位置; 置于外层避免被 overflow-hidden 裁剪) */}
       {showFoldBadge && (
         <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-none bg-fandex-tertiary text-white text-[10px] font-bold flex items-center justify-center shadow-md">
           +{data.childCount}
