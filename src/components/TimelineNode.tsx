@@ -83,10 +83,13 @@ export default function TimelineNode({ id, selected }: NodeProps) {
           : `0 4px 12px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.03)`,
       }}
     >
-      {/* 输入锚点 - 左侧(绿色 fandex-secondary, 与右侧输出端口视觉区分, 明确"流入"语义) */}
+      {/* 输入锚点 - 左侧(绿色 fandex-secondary, 与右侧输出端口视觉区分, 明确"流入"语义)
+       * id="left-target": Handle 唯一标识, 供 React Flow 精确追踪连线参与的具体 Handle,
+       * 配合 timelineStore.addEdge 记录的 sourceHandle/targetHandle, 实现同向端点连接的精确渲染 */}
       <Handle
         type="target"
         position={Position.Left}
+        id="left-target"
         className="!w-3.5 !h-3.5 !border-2 !border-nf-bg hover:!w-4 hover:!h-4 transition-all duration-fast"
         style={{ left: -7, backgroundColor: "var(--fandex-secondary)" }}
       />
@@ -159,10 +162,13 @@ export default function TimelineNode({ id, selected }: NodeProps) {
         />
       </div>
 
-      {/* 输出锚点 - 右侧(accent 强调色, 与左侧绿色输入端口视觉区分, 明确"流出"语义) */}
+      {/* 输出锚点 - 右侧(accent 强调色, 与左侧绿色输入端口视觉区分, 明确"流出"语义)
+       * id="right-source": Handle 唯一标识, 与左侧 left-target 配对,
+       * 供 React Flow 精确追踪连线参与的具体 Handle */}
       <Handle
         type="source"
         position={Position.Right}
+        id="right-source"
         className="!w-3.5 !h-3.5 !border-2 !border-nf-bg hover:!w-4 hover:!h-4 transition-all duration-fast"
         style={{ right: -7, backgroundColor: accent }}
       />

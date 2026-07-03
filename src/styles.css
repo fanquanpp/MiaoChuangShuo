@@ -944,15 +944,17 @@ input:focus, textarea:focus, select:focus {
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* 通用 hover 浮起:卡片、可点击容器 */
+/* 通用 hover 反馈:卡片、可点击容器
+ * 修复记录: 原实现使用 transform: translateY(-2px) 产生悬停上浮效果,
+ *   按用户要求移除所有悬停放大/位移变换(scale > 1 / translate),
+ *   改为仅通过 box-shadow 提供悬停反馈,保留按压态(active scale < 1)不变。 */
 .nf-hover-float {
   transition:
-    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.22s ease,
     border-color 0.22s ease;
 }
 .nf-hover-float:hover {
-  transform: translateY(-2px);
+  box-shadow: var(--fandex-shadow-md);
 }
 
 /* ========== 工具栏按钮统一悬浮态 ========== */
@@ -1046,12 +1048,13 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* 次按钮图标位移:悬停时图标向右轻移，增强方向感
- * 用法:加在按钮上，按钮内首个 svg/icon 会触发位移 */
+ * 修复记录: 原悬停态含 scale(1.05) 放大效果, 按用户要求移除 scale > 1 变换,
+ *   仅保留 translateX 位移, 按压态 active scale(0.96) 保留。 */
 .nf-icon-slide > svg:first-child {
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .nf-icon-slide:hover > svg:first-child {
-  transform: translateX(2px) scale(1.05);
+  transform: translateX(2px);
 }
 .nf-icon-slide:active > svg:first-child {
   transform: translateX(1px) scale(0.96);
@@ -1074,12 +1077,13 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* 星光脉动:适用于带 Sparkles 图标的按钮
- * 悬停时图标缩放+轻微旋转，模拟星光闪烁 */
+ * 修复记录: 原悬停态含 scale(1.2) 放大效果, 按用户要求移除 scale > 1 变换,
+ *   仅保留 rotate(15deg) 旋转与 drop-shadow 光晕, 按压态 active scale(0.95) 保留。 */
 .nf-icon-spark > svg:first-child {
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
 }
 .nf-icon-spark:hover > svg:first-child {
-  transform: scale(1.2) rotate(15deg);
+  transform: rotate(15deg);
   filter: drop-shadow(0 0 4px rgba(78, 230, 176, 0.6));
 }
 .nf-icon-spark:active > svg:first-child {

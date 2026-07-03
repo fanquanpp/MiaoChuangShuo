@@ -264,15 +264,15 @@ function ProjectCardImpl({ project, projectInfo, onDelete, onEdit }: ProjectCard
         {/* 底部行：统计信息 - 增加间距与图标精致度 */}
         <div className="flex items-center gap-4 text-xs text-nf-text-tertiary">
           <div className="flex items-center gap-1.5" title={t("projectcard.totalWords")}>
-            <BarChart3 className="w-3.5 h-3.5 text-fandex-primary/70 transition-transform duration-fast group-hover:scale-110" />
+            <BarChart3 className="w-3.5 h-3.5 text-fandex-primary/70 transition-transform duration-fast" />
             <span className="tabular-nums">{project.words}</span>
           </div>
           <div className="flex items-center gap-1.5" title={t("projectcard.chapters")}>
-            <BookOpen className="w-3.5 h-3.5 text-fandex-secondary/70 transition-transform duration-fast group-hover:scale-110" />
+            <BookOpen className="w-3.5 h-3.5 text-fandex-secondary/70 transition-transform duration-fast" />
             <span className="tabular-nums">{project.chapters} {t("projectcard.chapterUnit")}</span>
           </div>
           <div className="flex items-center gap-1.5 ml-auto" title={t("projectcard.lastUpdate")}>
-            <Clock className="w-3.5 h-3.5 text-fandex-tertiary/70 transition-transform duration-fast group-hover:scale-110" />
+            <Clock className="w-3.5 h-3.5 text-fandex-tertiary/70 transition-transform duration-fast" />
             <span className="truncate">{project.updated}</span>
           </div>
         </div>

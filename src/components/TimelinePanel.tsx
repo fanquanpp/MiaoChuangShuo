@@ -61,13 +61,16 @@ import TimelineDrawer from "./TimelineDrawer";
  * 输出: SVG 路径(贝塞尔曲线 + 起点圆点)
  * 流程:
  *   1. 读取起点 Handle 位置(fromPosition)
- *   2. 根据起点位置推导终点控制点方向(对称方向), 确保贝塞尔曲线从用户实际拖拽的 Handle 出发
+ *   2. 根据鼠标当前位置(toX/toY)相对起点(fromX/fromY)的方位, 动态推导终点控制点方向
  *   3. 调用 getBezierPath 计算路径
  *   4. 渲染虚线路径 + 起点圆点(视觉锚点)
  *
- * 修复记录: 原使用默认 ConnectionLine, 在 ConnectionMode.Loose 下从 target handle(左侧)拖拽时,
- *           贝塞尔曲线控制点方向未与起点 Handle 位置对齐, 导致连线视觉上从节点右端出发。
- *           现通过显式传递 fromPosition 与对称推导的 toPosition, 确保连线从用户拖拽的 Handle 出发。
+ * 修复记录(Bug 2: 连线动画方向与实际结果不一致):
+ *   原实现固定使用起点对称方向作为 toPosition(起点在左 → 终点在右),
+ *   导致从 A.right 拖向 B.left 时, 拖拽过程中曲线视觉上从 A.right 连向 B.right(对称方向),
+ *   与最终连线结果(A.right → B.left)不一致。
+ *   现根据鼠标位置动态推导 toPosition: 鼠标在起点左侧时终点控制点在左, 右侧时在右,
+ *   使拖拽预览曲线方向与最终落点 Handle 方向一致。
  */
 const TimelineConnectionLine: ConnectionLineComponent = ({
   fromX,
@@ -76,18 +79,20 @@ const TimelineConnectionLine: ConnectionLineComponent = ({
   toX,
   toY,
 }) => {
-  // 根据起点 Handle 位置推导终点控制点方向(对称方向)
-  // 起点在左 → 终点控制点在右; 起点在右 → 终点控制点在左; 上下同理
+  // 动态推导终点控制点方向: 基于鼠标位置(toX/toY)相对起点(fromX/fromY)的方位
+  // 当鼠标在起点左侧(toX < fromX)时, 终点控制点应在左侧(Position.Left),
+  // 使贝塞尔曲线从起点向左延伸, 视觉上"指向"鼠标方向, 与最终落点 Handle 方向一致。
+  // 上下方向同理(本画布节点仅左右 Handle, 但保留上下推导以备扩展)。
   const toPosition =
-    fromPosition === Position.Left
-      ? Position.Right
-      : fromPosition === Position.Right
+    fromPosition === Position.Left || fromPosition === Position.Right
+      ? toX < fromX
         ? Position.Left
-        : fromPosition === Position.Top
-          ? Position.Bottom
-          : Position.Top;
+        : Position.Right
+      : toY < fromY
+        ? Position.Top
+        : Position.Bottom;
 
-  // 计算贝塞尔曲线路径(显式传入起点与终点的 Handle 位置, 确保方向正确)
+  // 计算贝塞尔曲线路径(起点方向用 fromPosition, 终点方向用动态推导的 toPosition)
   const [edgePath] = getBezierPath({
     sourceX: fromX,
     sourceY: fromY,

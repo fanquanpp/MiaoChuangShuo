@@ -33,6 +33,7 @@ import {
   Trash2,
   Check,
   X,
+  Users,
 } from "lucide-react";
 import {
   useAppStore,
@@ -54,10 +55,11 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   search: Search,
   volumes: BookOpen,
   timeline: GitBranch,
+  characterGraph: Users,
 };
 
-// 写作主分类：核心写作功能，常驻显示（含剧情图谱，归类到写作）
-const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline"];
+// 写作主分类：核心写作功能，常驻显示（含剧情图谱/人物关系图，归类到写作）
+const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline", "characterGraph"];
 
 // 设定类分类：统一设定库入口（替代原 characters/worldview/glossary/materials 分散入口）
 const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex"];
@@ -303,7 +305,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                 }`}
               >
                 <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                  isActive ? 'scale-110' : 'group-hover:scale-110'
+                  isActive ? 'scale-110' : ''
                 }`} />
                 {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
               </button>
@@ -347,7 +349,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                 }`}
               >
                 <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                  isActive ? 'scale-110' : 'group-hover:scale-110'
+                  isActive ? 'scale-110' : ''
                 }`} />
                 {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
               </button>
@@ -371,7 +373,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
               }`}
             >
               <BookOpen className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                activeCategory === "volumes" ? 'scale-110' : 'group-hover:scale-110'
+                activeCategory === "volumes" ? 'scale-110' : ''
               }`} />
               {!collapsed && <span className="truncate">{t("sidebar.volumes")}</span>}
             </button>
@@ -413,7 +415,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                     }`}
                   >
                     <Layers className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                      isActive ? 'scale-110' : 'group-hover:scale-110'
+                      isActive ? 'scale-110' : ''
                     }`} />
                     {!collapsed && <span className="truncate">{dirName}</span>}
                   </button>
@@ -505,7 +507,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                 }`}
               >
                 <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                  isActive ? 'scale-110' : 'group-hover:scale-110'
+                  isActive ? 'scale-110' : ''
                 }`} />
                 {!collapsed && <span className="truncate">{dirName}</span>}
               </button>
@@ -547,7 +549,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                 }`}
               >
                 <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                  isActive ? 'scale-110' : 'group-hover:scale-110'
+                  isActive ? 'scale-110' : ''
                 }`} />
                 {!collapsed && <span className="truncate">{t(`sidebar.${cat}`)}</span>}
               </button>
@@ -566,7 +568,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
             title={t("sidebar.openAppearanceSettings")}
             className={`flex items-center justify-center gap-1.5 py-2 text-xs text-nf-text-secondary hover:text-fandex-tertiary border border-nf-border-light hover:border-fandex-tertiary/60 hover:bg-nf-bg-hover transition-all duration-base ease-fandex ${collapsed ? "w-full" : "flex-1"}`}
           >
-            <Palette className="w-4 h-4 transition-transform duration-fast hover:scale-110" />
+            <Palette className="w-4 h-4 transition-transform duration-fast" />
             {!collapsed && t("sidebar.themeSettings")}
           </button>
           <button

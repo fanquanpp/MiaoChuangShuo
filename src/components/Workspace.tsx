@@ -37,6 +37,7 @@ import { isTemplateSupported, getTemplateCategory } from "../lib/templateSchema"
 import { findDirByName } from "../lib/fileTreeUtils";
 import CodexPanel from "./CodexPanel";
 import TimelinePanel from "./TimelinePanel";
+import CharacterGraphPanel from "./CharacterGraphPanel";
 
 /** Alt+数字键 → 侧边栏分类映射 */
 const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
@@ -46,6 +47,7 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "4": "stats",
   "5": "search",
   "6": "volumes",
+  "7": "characterGraph",
   "9": "timeline",
 };
 
@@ -384,6 +386,8 @@ export default function Workspace() {
         return <CodexPanel />;
       case "timeline":
         return <TimelinePanel />;
+      case "characterGraph":
+        return <CharacterGraphPanel />;
       default:
         return (
           <NovelEditor

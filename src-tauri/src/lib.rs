@@ -17,6 +17,7 @@ mod character_commands;
 mod template_schema;
 mod codex_commands;
 mod timeline_commands;
+mod character_graph_commands;
 
 /// 应用入口函数
 /// 输入: 无
@@ -87,6 +88,10 @@ pub fn run() {
             timeline_commands::read_timeline,
             timeline_commands::save_timeline,
             timeline_commands::clear_timeline,
+            // 人物关系图编辑器命令
+            character_graph_commands::read_character_graph,
+            character_graph_commands::save_character_graph,
+            character_graph_commands::clear_character_graph,
         ])
         .setup(|_app| {
             Ok(())

@@ -6,7 +6,7 @@
 
 一款为长篇创作者打造的离线小说创作工作站
 
-[![Version](https://img.shields.io/badge/version-26.7.14-blue)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/badge/version-26.7.15-blue)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078d7)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-orange)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
@@ -36,7 +36,7 @@
 - **专注模式**（F11）：隐藏侧边栏与文件列表，沉浸式写作
 - **专注计时器**（Ctrl+Shift+T）：番茄钟式写作节奏管理
 - **命令面板**（Ctrl+K）：快速执行任意操作
-- **侧边栏精简架构**：7 大分类入口（正文 / 大纲 / 设定库 / 卷宗 / 统计 / 搜索 / 时间线）
+- **侧边栏精简架构**：8 大分类入口（正文 / 大纲 / 设定库 / 卷宗 / 统计 / 搜索 / 剧情图谱 / 人物关系图）
 - **整体折叠与分组折叠**：侧边栏整体折叠与设定类分组折叠，自适应窄屏创作环境
 
 ### ✍️ 编辑器体验
@@ -90,6 +90,8 @@
 
 - **可视化画布**（Alt+9）：组织主线 / 分支 / 事件 / 结局节点
 - **拖拽与连线**：自由编排剧情走向，连接线方向精准对齐 Handle 位置
+- **同向端点连接**：完整记录 sourceHandle / targetHandle 标识，支持 source→source / target→target 等同向端点连接场景，避免 React Flow Loose 模式下的自动翻转问题
+- **动态连线预览**：拖拽过程中根据鼠标位置实时推导终点控制点方向，预览曲线与最终落点方向一致
 - **端口视觉区分**：左侧输入端口（绿色 fandex-secondary）与右侧输出端口（节点类型强调色）色彩区分，明确连线方向语义
 - **线网格背景**：低对比度细密线网格画布背景，缓解视觉疲劳
 - **分支折叠 / 展开**：BFS 可达性算法，聚焦当前分支
@@ -103,6 +105,20 @@
 - **自动生成 txt 摘要**：节点信息导出为纯文本
 - **环检测**：DFS 三色标记法防止循环依赖
 - **原子写入**：临时文件 + 重命名，防止 JSON 损坏
+
+### 🧑‍🤝‍🧑 人物关系图编辑器
+
+- **可视化关系画布**（Alt+7）：以图谱形式呈现角色之间的人物关系网络
+- **角色节点卡片**：显示角色姓名、身份标识、标签（最多 3 个）、简介预览，左右 Handle 锚点支持双向关系连线
+- **关系类型连线**：8 种预设关系类型（师徒 / 敌对 / 亲属 / 朋友 / 恋人 / 上下级 / 同袍 / 其他），连线中点渲染关系标签，按类型区分颜色
+- **节点详情抽屉**：双击节点编辑角色姓名、身份、标签（逗号分隔）、简介
+- **右键菜单**：添加角色节点、编辑详情、删除节点
+- **自动布局**：dagre LR 方向层次布局
+- **撤销重做**：zundo 时间旅行状态管理，拖拽优化（pause/resume + 手动入栈）
+- **自动保存**：防抖自动持久化，三态保存指示器，Ctrl+S 手动保存
+- **允许环形关系**：人物关系图天然允许循环（如 A 是 B 的师父，B 是 A 的挚友），不做环检测
+- **原子写入**：临时文件 + 重命名，防止 JSON 损坏
+- **架构复用**：与 Timeline 图谱组件同源架构，独立的状态管理（characterGraphStore）与后端命令（character_graph_commands）
 
 ### 🔗 模块联动
 
@@ -183,6 +199,7 @@
 | `Alt+4` | 统计 |
 | `Alt+5` | 搜索 |
 | `Alt+6` | 卷宗 |
+| `Alt+7` | 人物关系图 |
 | `Alt+9` | 剧情时间线 |
 | `Ctrl+Shift+N` | 角色名补全 |
 | `Ctrl+Q` | 快速加引号 |
@@ -196,6 +213,14 @@
 | 快捷键 | 功能 |
 |--------|------|
 | `Ctrl+S` | 保存时间线（自动防抖） |
+| `Ctrl+L` | 自动布局 |
+| `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 |
+
+### 人物关系图面板快捷键
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl+S` | 保存关系图（自动防抖） |
 | `Ctrl+L` | 自动布局 |
 | `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 |
 
@@ -248,11 +273,16 @@ MiaoChuangShuo/
 │   │   ├── TimelineDrawer.tsx        # 节点详情抽屉
 │   │   ├── TimelineContextMenu.tsx   # 右键菜单
 │   │   ├── TimelineEmpty.tsx         # 空状态提示
+│   │   ├── CharacterGraphPanel.tsx   # 人物关系图画布容器
+│   │   ├── CharacterGraphNode.tsx    # 角色节点组件
+│   │   ├── CharacterGraphEdge.tsx    # 关系连线组件
+│   │   ├── CharacterGraphDrawer.tsx  # 角色详情抽屉
 │   │   └── ...
 │   ├── lib/                          # 核心库
 │   │   ├── api.ts                    # Tauri 命令封装
 │   │   ├── codexApi.ts               # 智能设定库 API
 │   │   ├── timelineApi.ts            # 时间线 API
+│   │   ├── characterGraphApi.ts      # 人物关系图 API
 │   │   ├── updateChecker.ts          # 版本更新检测模块
 │   │   ├── store.ts                  # 全局状态（Zustand Slice 模式）
 │   │   ├── settingsStore.ts          # 应用设置（含背景主题/更新配置）
@@ -262,6 +292,8 @@ MiaoChuangShuo/
 │   │   ├── templateSchema.ts         # 模板字段架构
 │   │   ├── stores/timelineTypes.ts   # 时间线类型定义
 │   │   ├── stores/timelineStore.ts   # 时间线状态管理（Zustand + zundo）
+│   │   ├── stores/characterGraphTypes.ts # 人物关系图类型定义
+│   │   ├── stores/characterGraphStore.ts # 人物关系图状态管理（Zustand + zundo）
 │   │   ├── dagreLayout.ts            # 自动布局算法
 │   │   └── ...
 │   └── ...
@@ -274,6 +306,7 @@ MiaoChuangShuo/
 │       ├── character_commands.rs     # 角色联动命令
 │       ├── codex_commands.rs         # 智能设定库命令
 │       ├── timeline_commands.rs      # 剧情时间线命令
+│       ├── character_graph_commands.rs # 人物关系图命令
 │       └── lib.rs                    # 应用入口（插件与命令注册）
 └── ...
 ```
@@ -307,6 +340,7 @@ npm run tauri build
 
 ## 📝 版本历程
 
+- **v26.7.15**：新增人物关系图编辑器 + 图谱连线逻辑修复 + 按钮悬停动效优化。新增人物关系图功能（Alt+7，复用 Timeline 图谱架构，8 种预设关系类型连线，角色节点卡片含姓名/身份/标签/简介，独立 characterGraphStore 状态管理与 character_graph_commands 后端命令，允许环形关系，dagre LR 自动布局）+ 修复剧情图谱同向端点连接错误（addEdge 完整记录 sourceHandle/targetHandle 标识，Handle 添加唯一 id 属性，后端 PersistedEdge 持久化 Handle 字段，支持 source→source / target→target 同向连接场景）+ 修复连线动画方向不一致（TimelineConnectionLine / CharacterConnectionLine 根据鼠标位置动态推导 toPosition，替代原起点对称方向固定逻辑）+ 移除按钮悬停放大效果（删除 .nf-hover-float:hover translateY、.nf-icon-spark:hover scale(1.2)、.nf-icon-slide:hover scale(1.05) 及所有 Tailwind hover:scale-* 类，保留 active 按压缩小与 GlobalTooltip 功能）
 - **v26.7.14**：四项 UI/交互缺陷修复。剧情图谱节点连线端口视觉区分（左侧输入端口绿色 fandex-secondary + 右侧输出端口节点类型强调色，明确连线方向语义）+ 节点卡片高光溢出裁剪（重构双层结构：外层 overflow-visible 保留 Handle 可交互性，内层 overflow-hidden 严格裁剪高光反光效果，删除 CSS overflow 覆盖规则）+ 自定义分类新建弹窗 i18n 修复（zhCN 字典补充 4 个缺失键：sidebar.newCustomCategory/customCategoryName/deleteCategory/confirmDeleteCategory，placeholder 与 title 不再暴露技术变量名）+ 右侧章节列表排序逻辑修复（TreeNodeList/TreeNodeGrid 递归渲染子目录时应用 extractChapterNumber 排序，卷首语固定顶部、卷尾语固定底部、正文章节按数值升序，递归传递 isManuscript 属性）
 - **v26.7.13**：图谱连线功能修复（移除节点容器 overflow-hidden，恢复 Handle 锚点可交互性，CSS 强制 pointer-events:all 与 z-index 提升）+ 侧边栏主题联动修复（恢复注入 --fandex-bg-sidebar/--fandex-bg-card，预设切换时侧边栏随主题联动）+ 图谱背景网格缩小（gap 28→16，缓解视觉疲劳）+ 分卷章节排序逻辑修复（与 FileList 一致，未识别章节排到末尾而非首位，避免误判为结尾章节导致位置错乱）
 - **v26.7.12**：写作统计 UI/UX 全面迭代（英雄区四列核心指标 + 字数分布可视化 + 章节排行 TOP10 + 创作效率分析 + 玻璃质感卡片）+ 全局自定义 Tooltip 系统（替代原生 title 属性，150ms 高灵敏显示，快速重复触发，毛玻璃浮层）+ 剧情图谱修复与增强（连线功能修复 + 线网格背景 + 三态保存指示器 + 节点玻璃质感重设计 + 隐藏 attribution 链接）+ 文件卡片无缝网格 + 玻璃质感重设计 + 创建向导 ESC 键关闭 + 底部取消按钮 + 应用元数据完善（publisher=fanquanpp）+ 应用图标重设计（猫脸 + 钢笔笔尖 + 墨水溅射）

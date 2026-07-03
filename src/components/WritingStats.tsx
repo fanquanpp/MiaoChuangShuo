@@ -305,7 +305,7 @@ export default function WritingStats() {
                   <div className="relative z-[1] flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-nf-text-tertiary">{card.label}</span>
-                      <Icon className={`w-4 h-4 ${card.color} transition-transform duration-base group-hover:scale-110`} />
+                      <Icon className={`w-4 h-4 ${card.color} transition-transform duration-base`} />
                     </div>
                     <div className="flex items-baseline gap-1">
                       <span className={`text-2xl font-bold font-display tabular-nums ${card.color}`}>
@@ -490,7 +490,7 @@ export default function WritingStats() {
                         className="group flex items-center gap-3 p-3 border border-nf-border-light/50 bg-nf-bg/40 hover:border-nf-border-light hover:bg-nf-bg-hover/40 transition-all duration-fast"
                       >
                         <div className="w-8 h-8 flex items-center justify-center border border-fandex-primary/30 bg-fandex-primary/5 flex-shrink-0">
-                          <Icon className="w-4 h-4 text-fandex-primary transition-transform duration-base group-hover:scale-110" />
+                          <Icon className="w-4 h-4 text-fandex-primary transition-transform duration-base" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-nf-text-tertiary truncate">{card.label}</div>

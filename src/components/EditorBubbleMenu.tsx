@@ -171,7 +171,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
                 tabIndex={-1}
                 title={color}
                 onClick={() => editor.chain().focus().setColor(color).run()}
-                className="w-4 h-4 border border-nf-border-light/40 hover:scale-110 transition-transform duration-fast"
+                className="w-4 h-4 border border-nf-border-light/40 transition-transform duration-fast"
                 style={{ backgroundColor: color }}
               />
             ))}
@@ -181,7 +181,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
               tabIndex={-1}
               title={t("editor.clearColor")}
               onClick={() => editor.chain().focus().unsetColor().run()}
-              className="w-4 h-4 border border-nf-border-light/40 hover:scale-110 transition-transform duration-fast flex items-center justify-center text-[8px] text-nf-text-tertiary bg-nf-bg-hover"
+              className="w-4 h-4 border border-nf-border-light/40 transition-transform duration-fast flex items-center justify-center text-[8px] text-nf-text-tertiary bg-nf-bg-hover"
             >
               ×
             </button>
@@ -211,7 +211,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
                 tabIndex={-1}
                 title={color}
                 onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-                className="w-4 h-4 border border-nf-border-light/40 hover:scale-110 transition-transform duration-fast"
+                className="w-4 h-4 border border-nf-border-light/40 transition-transform duration-fast"
                 style={{ backgroundColor: color }}
               />
             ))}
@@ -221,7 +221,7 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
               tabIndex={-1}
               title={t("editor.clearHighlight")}
               onClick={() => editor.chain().focus().unsetHighlight().run()}
-              className="w-4 h-4 border border-nf-border-light/40 hover:scale-110 transition-transform duration-fast flex items-center justify-center text-[8px] text-nf-text-tertiary bg-nf-bg-hover"
+              className="w-4 h-4 border border-nf-border-light/40 transition-transform duration-fast flex items-center justify-center text-[8px] text-nf-text-tertiary bg-nf-bg-hover"
             >
               ×
             </button>

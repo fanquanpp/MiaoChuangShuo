@@ -90,11 +90,18 @@ pub struct PersistedEdgeData {
 }
 
 /// 持久化边结构(匹配 React Flow Edge 结构, 含 data 包裹层)
+/// source_handle/target_handle: Handle 唯一标识(如 "left-target"/"right-source"),
+///   用于精确追踪连线参与的具体 Handle, 支持同向端点连接的渲染。
+///   使用 #[serde(default)] 保证旧版数据(无此字段)可正常反序列化。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistedEdge {
     pub id: String,
     pub source: String,
     pub target: String,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sourceHandle")]
+    pub source_handle: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "targetHandle")]
+    pub target_handle: Option<String>,
     pub data: PersistedEdgeData,
 }
 

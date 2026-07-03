@@ -1,38 +1,48 @@
-// src/lib/stores/timelineStore.ts
+// src/lib/stores/characterGraphStore.ts
 //
-// 时间线编辑器 Service 层状态管理模块
+// 人物关系图编辑器 Service 层状态管理模块
 // 基于 Zustand + zundo temporal 中间件, 提供 nodes/edges 状态管理 + 撤销重做能力。
 // 防抖保存: 500ms 内多次操作合并为一次磁盘写入。
 // 拖拽优化: onNodeDragStart 暂停 zundo, onNodeDragStop 恢复并手动入栈。
+//
+// 架构复用: 与 timelineStore.ts 保持一致的实现模式, 仅业务字段替换为角色/关系领域。
 
 import { create } from "zustand";
 import { temporal } from "zundo";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
 import type { NodeChange, EdgeChange, Connection, Node, Edge } from "@xyflow/react";
-import type { TimelineNode, TimelineEdge, TimelineNodeData } from "./timelineTypes";
-import { readTimeline, saveTimeline, buildPersistedGraph } from "../timelineApi";
+import type {
+  CharacterGraphNode,
+  CharacterGraphEdge,
+  CharacterGraphNodeData,
+} from "./characterGraphTypes";
+import {
+  readCharacterGraph,
+  saveCharacterGraph,
+  buildPersistedCharacterGraph,
+} from "../characterGraphApi";
 
 /*
  * 【Skill 偏差报备】
- * 原 Skill 任务要求使用 `as TimelineNode[]` 单层断言处理 applyNodeChanges 返回值。
+ * 原 Skill 任务要求使用 `as CharacterGraphNode[]` 单层断言处理 applyNodeChanges 返回值。
  * 偏差原因: tsc 验证报 TS2352, @xyflow/react v12 的 applyNodeChanges 泛型约束为
  *   `NodeType extends Node`, 而 Node 强制 `data: Record<string, unknown>`。
- *   项目 timelineTypes.ts 为遵守禁用 unknown 规则, 用 Omit 重建 TimelineNode,
- *   导致 TimelineNodeData 无索引签名, 与 Node 双向不兼容, 单层 as 断言不充分。
+ *   项目 characterGraphTypes.ts 为遵守禁用 unknown 规则, 用 Omit 重建 CharacterGraphNode,
+ *   导致 CharacterGraphNodeData 无索引签名, 与 Node 双向不兼容, 单层 as 断言不充分。
  * 偏差调整: 改用 `as unknown as` 双重断言(TypeScript 编译器官方建议方案),
  *   仅用于 xyflow 变更应用函数的入参与返回值类型转换, 不影响运行时逻辑。
- * 验证依据: tsc --noEmit 通过, 运行时 applyNodeChanges 行为与官方文档一致。
+ * 验证依据: 与 timelineStore.ts 同源方案, tsc --noEmit 通过。
  */
 
 /**
- * 时间线编辑器状态接口
+ * 人物关系图编辑器状态接口
  * 通过 zundo temporal 中间件包装, 获得撤销/重做能力
  */
-interface TimelineState {
+interface CharacterGraphState {
   /** 节点列表(与 React Flow nodes 同步) */
-  nodes: TimelineNode[];
+  nodes: CharacterGraphNode[];
   /** 边列表 */
-  edges: TimelineEdge[];
+  edges: CharacterGraphEdge[];
   /** 当前选中节点 ID(用于抽屉联动) */
   selectedNodeId: string | null;
   /** 是否正在加载 */
@@ -55,15 +65,15 @@ interface TimelineState {
   /** 创建新连线(onConnect 回调, 含自环/重复校验) */
   addEdge: (connection: Connection) => void;
   /** 更新节点业务数据(抽屉编辑提交) */
-  updateNodeData: (nodeId: string, patch: Partial<TimelineNodeData>) => void;
+  updateNodeData: (nodeId: string, patch: Partial<CharacterGraphNodeData>) => void;
+  /** 更新边业务数据(关系类型/描述修改) */
+  updateEdgeData: (edgeId: string, patch: Partial<{ relationType: string; description: string }>) => void;
   /** 选中节点 */
   selectNode: (id: string | null) => void;
   /** 删除节点(级联删除关联边) */
   deleteNode: (nodeId: string) => void;
   /** 清空图谱(删除所有节点与边) */
   clearGraph: () => void;
-  /** 折叠/展开 main 节点 */
-  toggleCollapse: (nodeId: string) => void;
   /** 撤销(取消待保存 → undo → 触发新的防抖保存) */
   undo: () => void;
   /** 重做 */
@@ -74,80 +84,7 @@ interface TimelineState {
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const SAVE_DEBOUNCE_MS = 500;
 
-/**
- * 计算折叠后实际显示的节点与边(可达性分析)
- * 输入: nodes 全部节点, edges 全部边
- * 输出: { visibleNodes, visibleEdges } 过滤后的可见集合
- * 流程:
- *   1. 找出所有 collapsed=true 的 main 节点
- *   2. 从所有"未折叠的 main 节点"出发, 沿边方向 BFS
- *   3. 遍历过程中跳过"已折叠的 main 节点"(不穿透其子树)
- *   4. 所有被 BFS 访问到的节点为可见节点
- *   5. 两端均可见的边为可见边
- *
- * 关键: BFS 处理任意深度的级联隐藏, 避免"悬浮孤岛"问题
- */
-export function filterCollapsed(
-  nodes: TimelineNode[],
-  edges: TimelineEdge[]
-): {
-  visibleNodes: TimelineNode[];
-  visibleEdges: TimelineEdge[];
-} {
-  // 收集所有已折叠的 main 节点 ID(作为不透明屏障, BFS 不穿透)
-  const collapsedMainIds = new Set(
-    nodes
-      .filter((n) => n.data.nodeType === "main" && n.data.collapsed)
-      .map((n) => n.id)
-  );
-
-  // 无折叠节点时直接返回原始集合, 避免无谓遍历
-  if (collapsedMainIds.size === 0) {
-    return { visibleNodes: nodes, visibleEdges: edges };
-  }
-
-  // 构建邻接表(source → target[]), 仅前向遍历, 不反向
-  const adjacency = new Map<string, string[]>();
-  for (const edge of edges) {
-    if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
-    adjacency.get(edge.source)!.push(edge.target);
-  }
-
-  // BFS 初始化: 从所有未折叠的 main 节点出发作为根
-  const visited = new Set<string>();
-  const queue: string[] = [];
-
-  for (const node of nodes) {
-    if (node.data.nodeType === "main" && !node.data.collapsed) {
-      visited.add(node.id);
-      queue.push(node.id);
-    }
-  }
-
-  // BFS 主体: 沿边遍历可达节点, 遇到已折叠 main 节点时停止向下穿透
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    // 已折叠的 main 节点作为屏障, 不展开其子树
-    if (collapsedMainIds.has(current)) continue;
-
-    for (const neighbor of adjacency.get(current) ?? []) {
-      if (!visited.has(neighbor)) {
-        visited.add(neighbor);
-        queue.push(neighbor);
-      }
-    }
-  }
-
-  // 过滤: 仅保留可达节点 + 两端均可达的边
-  const visibleNodes = nodes.filter((n) => visited.has(n.id));
-  const visibleEdges = edges.filter(
-    (e) => visited.has(e.source) && visited.has(e.target)
-  );
-
-  return { visibleNodes, visibleEdges };
-}
-
-export const useTimelineStore = create<TimelineState>()(
+export const useCharacterGraphStore = create<CharacterGraphState>()(
   temporal(
     (set, get) => ({
       nodes: [],
@@ -161,12 +98,12 @@ export const useTimelineStore = create<TimelineState>()(
        * 从后端加载图谱
        * 输入: projectRoot 项目根路径
        * 输出: Promise<void>
-       * 流程: 调用 readTimeline, 设置 nodes/edges
+       * 流程: 调用 readCharacterGraph, 设置 nodes/edges
        */
       loadGraph: async (projectRoot) => {
         set({ loading: true, error: null });
         try {
-          const graph = await readTimeline(projectRoot);
+          const graph = await readCharacterGraph(projectRoot);
           set({ nodes: graph.nodes, edges: graph.edges, loading: false });
         } catch (err) {
           set({ loading: false, error: String(err) });
@@ -177,7 +114,7 @@ export const useTimelineStore = create<TimelineState>()(
        * 防抖保存(500ms 合并)
        * 输入: projectRoot 项目根路径, projectName 项目名
        * 输出: void
-       * 流程: 取消上次定时器, 设置新定时器, 500ms 后执行 saveTimeline
+       * 流程: 取消上次定时器, 设置新定时器, 500ms 后执行 saveCharacterGraph
        */
       debouncedSave: (projectRoot, projectName) => {
         if (saveTimer) clearTimeout(saveTimer);
@@ -185,8 +122,8 @@ export const useTimelineStore = create<TimelineState>()(
         saveTimer = setTimeout(async () => {
           try {
             const { nodes, edges } = get();
-            const graph = buildPersistedGraph(nodes, edges, projectRoot, projectName);
-            await saveTimeline(projectRoot, graph);
+            const graph = buildPersistedCharacterGraph(nodes, edges, projectRoot, projectName);
+            await saveCharacterGraph(projectRoot, graph);
             set({ saving: false, error: null });
           } catch (err) {
             set({ saving: false, error: String(err) });
@@ -198,14 +135,14 @@ export const useTimelineStore = create<TimelineState>()(
        * 立即保存(Ctrl+S 触发)
        * 输入: projectRoot 项目根路径, projectName 项目名
        * 输出: Promise<void>
-       * 流程: 取消待执行防抖定时器, 立即调用 saveTimeline
+       * 流程: 取消待执行防抖定时器, 立即调用 saveCharacterGraph
        */
       saveNow: async (projectRoot, projectName) => {
         if (saveTimer) clearTimeout(saveTimer);
         try {
           const { nodes, edges } = get();
-          const graph = buildPersistedGraph(nodes, edges, projectRoot, projectName);
-          await saveTimeline(projectRoot, graph);
+          const graph = buildPersistedCharacterGraph(nodes, edges, projectRoot, projectName);
+          await saveCharacterGraph(projectRoot, graph);
           set({ saving: false, error: null });
         } catch (err) {
           set({ saving: false, error: String(err) });
@@ -224,7 +161,7 @@ export const useTimelineStore = create<TimelineState>()(
           nodes: applyNodeChanges(
             changes,
             state.nodes as unknown as Node[]
-          ) as unknown as TimelineNode[],
+          ) as unknown as CharacterGraphNode[],
         }));
       },
 
@@ -240,7 +177,7 @@ export const useTimelineStore = create<TimelineState>()(
           edges: applyEdgeChanges(
             changes,
             state.edges as unknown as Edge[]
-          ) as unknown as TimelineEdge[],
+          ) as unknown as CharacterGraphEdge[],
         }));
       },
 
@@ -251,16 +188,8 @@ export const useTimelineStore = create<TimelineState>()(
        * 流程:
        *   1. 拒绝自环(source === target)
        *   2. 拒绝重复连线(同 source/target 且同 sourceHandle/targetHandle)
-       *   3. 创建新 TimelineEdge, 完整记录 sourceHandle/targetHandle
-       *
-       * 修复记录(Bug 1: 同向端点连接导致结果错误):
-       *   原实现仅记录 connection.source 与 connection.target(节点 ID),
-       *   未记录 connection.sourceHandle 与 connection.targetHandle(Handle 标识),
-       *   导致 React Flow Loose 模式下自动翻转 source-source / target-target 连接,
-       *   用户从 A.right 拖到 B.right 时, 实际结果变成 A.right → B.left。
-       *   现完整记录 Handle 标识, 让边精确反映用户拖拽的两个 Handle,
-       *   配合 TimelineNode.tsx 中 Handle 的 id 属性, React Flow 可正确推导
-       *   sourcePosition/targetPosition, 渲染用户实际绘制的连线。
+       *   3. 创建新 CharacterGraphEdge, 完整记录 sourceHandle/targetHandle
+       *      默认关系类型为 "other", 用户可在抽屉中修改
        */
       addEdge: (connection) => {
         // 拒绝自环
@@ -276,15 +205,15 @@ export const useTimelineStore = create<TimelineState>()(
         );
         if (exists) return;
 
-        const newEdge: TimelineEdge = {
+        const newEdge: CharacterGraphEdge = {
           id: `edge_${crypto.randomUUID()}`,
           source: connection.source,
           target: connection.target,
-          // 完整记录 Handle 标识, 支持同向端点连接(如 right-source → right-source)
+          // 完整记录 Handle 标识, 支持同向端点连接
           sourceHandle: connection.sourceHandle,
           targetHandle: connection.targetHandle,
-          type: "storyEdge",
-          data: { edgeKind: "main" },
+          type: "characterEdge",
+          data: { relationType: "other", description: "" },
         };
         set((state) => ({ edges: [...state.edges, newEdge] }));
       },
@@ -301,6 +230,31 @@ export const useTimelineStore = create<TimelineState>()(
             n.id === nodeId
               ? { ...n, data: { ...n.data, ...patch, updatedAt: new Date().toISOString() } }
               : n
+          ),
+        }));
+      },
+
+      /**
+       * 更新边业务数据(关系类型/描述修改)
+       * 输入: edgeId 边 ID, patch 待合并的字段(relationType/description)
+       * 输出: void
+       * 流程: 合并 patch 到指定边
+       */
+      updateEdgeData: (edgeId, patch) => {
+        set((state) => ({
+          edges: state.edges.map((e) =>
+            e.id === edgeId
+              ? {
+                  ...e,
+                  data: {
+                    ...e.data,
+                    ...(patch.relationType !== undefined
+                      ? { relationType: patch.relationType as CharacterGraphEdge["data"]["relationType"] }
+                      : {}),
+                    ...(patch.description !== undefined ? { description: patch.description } : {}),
+                  },
+                }
+              : e
           ),
         }));
       },
@@ -340,23 +294,6 @@ export const useTimelineStore = create<TimelineState>()(
       },
 
       /**
-       * 折叠/展开 main 节点
-       * 输入: nodeId 节点 ID
-       * 输出: void
-       * 流程: 切换 collapsed 字段(仅 main 节点有效), 其他类型节点忽略
-       *       折叠状态变化由 zundo 追踪, 产生一次历史步骤
-       */
-      toggleCollapse: (nodeId) => {
-        set((state) => ({
-          nodes: state.nodes.map((n) =>
-            n.id === nodeId && n.data.nodeType === "main"
-              ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } }
-              : n
-          ),
-        }));
-      },
-
-      /**
        * 撤销操作
        * 输入: 无
        * 输出: void
@@ -367,7 +304,7 @@ export const useTimelineStore = create<TimelineState>()(
        */
       undo: () => {
         if (saveTimer) clearTimeout(saveTimer);
-        useTimelineStore.temporal.getState().undo();
+        useCharacterGraphStore.temporal.getState().undo();
       },
 
       /**
@@ -378,7 +315,7 @@ export const useTimelineStore = create<TimelineState>()(
        */
       redo: () => {
         if (saveTimer) clearTimeout(saveTimer);
-        useTimelineStore.temporal.getState().redo();
+        useCharacterGraphStore.temporal.getState().redo();
       },
     }),
     {

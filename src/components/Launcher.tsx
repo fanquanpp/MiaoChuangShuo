@@ -108,7 +108,7 @@ export default function Launcher() {
   const [selectedType, setSelectedType] = useState<ProjectType>("standard");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("26.7.14");
+  const [appVersion, setAppVersion] = useState("26.7.15");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
   // 编辑项目对话框目标：非 null 时渲染 EditProjectDialog
   const [editTarget, setEditTarget] = useState<ProjectInfo | null>(null);
@@ -681,7 +681,7 @@ export default function Launcher() {
             onClick={handleNewProjectClick}
             className="nf-btn-shine group w-full flex items-center gap-2.5 px-4 py-3 bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse font-medium text-sm transition-all duration-base ease-fandex shadow-sm hover:shadow-md"
           >
-            <BookOpen className="w-4 h-4 transition-transform duration-base ease-fandex group-hover:scale-110" />
+            <BookOpen className="w-4 h-4 transition-transform duration-base ease-fandex" />
             {t("launcher.createNew")}
             {/* 箭头:展开时旋转 90 度朝下,悬停时额外右移,增强方向感 */}
             <ArrowRight className={`w-3.5 h-3.5 ml-auto transition-transform duration-base ease-fandex group-hover:translate-x-0.5 ${typePanelExpanded ? 'rotate-90' : ''}`} />
