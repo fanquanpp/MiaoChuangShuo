@@ -38,6 +38,7 @@ import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 import { useSettingsStore, toChineseNumber, type ChapterFormat } from "../lib/settingsStore";
+import { useUILayoutStore } from "../lib/uiStore";
 import ConfirmDialog from "./ConfirmDialog";
 import OutlineToChapters from "./OutlineToChapters";
 import VolumeChapterGenerator from "./VolumeChapterGenerator";
@@ -546,8 +547,11 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
   const currentProject = useAppStore((s) => s.currentProject);
   const { t } = useI18n();
   const { showToast } = useToast();
-  // 默认列表视图:章节以列表排列更紧凑,避免卡片占用过多垂直空间
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  // 文件列表视图模式：从持久化 store 读取，保留用户上次选择
+  const fileListViewMode = useUILayoutStore((s) => s.fileListViewMode);
+  const setFileListViewMode = useUILayoutStore((s) => s.setFileListViewMode);
+  const viewMode = fileListViewMode;
+  const setViewMode = setFileListViewMode;
   const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
   const [renameTarget, setRenameTarget] = useState<FileNode | null>(null);
   // 右键上下文菜单状态

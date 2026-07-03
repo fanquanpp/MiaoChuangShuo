@@ -1,6 +1,6 @@
 [package]
 name = "miaochuangshuo"
-version = "26.7.18"
+version = "26.7.19"
 description = "喵创说 - 离线小说创作工作站"
 authors = ["MiaoChuangShuo"]
 edition = "2021"

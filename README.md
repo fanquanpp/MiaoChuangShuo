@@ -43,7 +43,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-26.7.18-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/badge/version-26.7.19-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)

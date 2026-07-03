@@ -45,6 +45,7 @@ import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
 import { readProjectTree, createFile, deletePath } from "../lib/api";
 import type { FileNode } from "../lib/api";
+import { useUILayoutStore } from "../lib/uiStore";
 
 // 图标映射
 const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string }>> = {
@@ -99,15 +100,21 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
   const { t } = useI18n();
   const { handleBackToLauncher } = useAutoSaveOnExit();
 
-  // 各分组折叠状态：默认展开，用户可点击分组标题折叠以聚焦特定模块
-  const [writingExpanded, setWritingExpanded] = useState(true);
-  const [settingsExpanded, setSettingsExpanded] = useState(true);
-  const [extensionExpanded, setExtensionExpanded] = useState(true);
-  const [customExpanded, setCustomExpanded] = useState(true);
-  const [toolExpanded, setToolExpanded] = useState(true);
+  // 各分组折叠状态：从持久化 store 读取，保留用户上次设置
+  const writingExpanded = useUILayoutStore((s) => s.sidebarWritingExpanded);
+  const setWritingExpanded = useUILayoutStore((s) => s.setSidebarWritingExpanded);
+  const settingsExpanded = useUILayoutStore((s) => s.sidebarSettingsExpanded);
+  const setSettingsExpanded = useUILayoutStore((s) => s.setSidebarSettingsExpanded);
+  const extensionExpanded = useUILayoutStore((s) => s.sidebarExtensionExpanded);
+  const setExtensionExpanded = useUILayoutStore((s) => s.setSidebarExtensionExpanded);
+  const customExpanded = useUILayoutStore((s) => s.sidebarCustomExpanded);
+  const setCustomExpanded = useUILayoutStore((s) => s.setSidebarCustomExpanded);
+  const toolExpanded = useUILayoutStore((s) => s.sidebarToolExpanded);
+  const setToolExpanded = useUILayoutStore((s) => s.setSidebarToolExpanded);
 
-  // 侧边栏整体折叠状态：折叠后仅显示图标列，单次会话内有效，不做持久化
-  const [collapsed, setCollapsed] = useState(false);
+  // 侧边栏整体折叠状态：持久化到 localStorage，跨会话保留用户偏好
+  const collapsed = useUILayoutStore((s) => s.sidebarCollapsed);
+  const setCollapsed = useUILayoutStore((s) => s.setSidebarCollapsed);
 
   // 分类切换：优先使用外部传入的保存后切换回调
   const switchTo = onSwitchCategory || setActiveCategory;
@@ -239,7 +246,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         {/* 折叠/展开切换按钮:固定右上角,提升 z 层级避免被相邻元素覆盖,
             折叠态下居中显示为顶部控件 */}
         <button
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
           className={`absolute top-2 ${collapsed ? "left-1/2 -translate-x-1/2" : "right-2"} z-30 w-6 h-6 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast`}
         >
@@ -273,7 +280,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         {/* 写作主分类组：正文、大纲 - 可折叠，聚焦核心写作 */}
         {!collapsed && (
           <button
-            onClick={() => setWritingExpanded((v) => !v)}
+            onClick={() => setWritingExpanded(!writingExpanded)}
             title={writingExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
             className="w-full flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
           >
@@ -317,7 +324,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         {/* 整体折叠时隐藏分组折叠按钮(已是最简形态) */}
         {!collapsed && (
           <button
-            onClick={() => setSettingsExpanded((v) => !v)}
+            onClick={() => setSettingsExpanded(!settingsExpanded)}
             title={settingsExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
             className="w-full flex items-center gap-1.5 px-3 mt-2 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
           >
@@ -386,7 +393,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
           <>
             {!collapsed && (
               <button
-                onClick={() => setExtensionExpanded((v) => !v)}
+                onClick={() => setExtensionExpanded(!extensionExpanded)}
                 title={extensionExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
                 className="w-full flex items-center gap-1.5 px-3 mt-1 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
               >
@@ -432,7 +439,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         {!collapsed && (
           <div className="flex items-center gap-1 mt-1">
             <button
-              onClick={() => setCustomExpanded((v) => !v)}
+              onClick={() => setCustomExpanded(!customExpanded)}
               title={customExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
               className="flex-1 flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
             >
@@ -519,7 +526,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         {/* 工具分组 - 可折叠 */}
         {!collapsed && (
           <button
-            onClick={() => setToolExpanded((v) => !v)}
+            onClick={() => setToolExpanded(!toolExpanded)}
             title={toolExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
             className="w-full flex items-center gap-1.5 px-3 mt-1 py-1 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider hover:text-nf-text-secondary transition-colors duration-fast"
           >
