@@ -78,10 +78,10 @@ export function ToolbarButton({
       className={`nf-tool-btn relative h-7 w-7 flex items-center justify-center ease-fandex border border-transparent group transition-all duration-fast ${
         active
           ? "text-fandex-primary bg-fandex-primary/10"
-          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover hover:-translate-y-0.5"
+          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
       }`}
     >
-      <span className="transition-transform duration-fast group-active:scale-90 flex items-center justify-center">
+      <span className="flex items-center justify-center">
         {children}
       </span>
     </button>
@@ -143,7 +143,7 @@ function Dropdown({ trigger, children, panelWidth = "w-56", active = false, titl
         className={`nf-tool-btn relative h-7 px-1.5 transition-all duration-fast ease-fandex border border-transparent flex items-center gap-0.5 group ${
           active || open
             ? "text-fandex-primary bg-fandex-primary/10"
-            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover hover:-translate-y-0.5"
+            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
         }`}
       >
         {trigger}
@@ -274,7 +274,7 @@ function FontSizeAdjuster() {
         disabled={fontSize <= 12}
         title={t("shortcuts.fontSizeDecrease")}
         tabIndex={-1}
-        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover hover:-translate-y-0.5 transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ZoomOut className="w-4 h-4" />
       </button>
@@ -295,7 +295,7 @@ function FontSizeAdjuster() {
         disabled={fontSize >= 28}
         title={t("shortcuts.fontSizeIncrease")}
         tabIndex={-1}
-        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover hover:-translate-y-0.5 transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ZoomIn className="w-4 h-4" />
       </button>
@@ -405,7 +405,7 @@ function SessionStats({
         className={`nf-tool-btn h-7 w-7 flex items-center justify-center transition-all duration-fast ease-fandex border ${
           paused
             ? "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/40"
-            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light hover:-translate-y-0.5"
+            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light"
         }`}
       >
         {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
@@ -432,8 +432,8 @@ function SessionStats({
         tabIndex={-1}
         className={`nf-tool-btn flex items-center gap-1.5 h-7 px-1.5 transition-all duration-fast ease-fandex border ${
           wordTarget > 0
-            ? "bg-fandex-primary/10 border-fandex-primary/30 hover:bg-fandex-primary/15 hover:-translate-y-0.5"
-            : "border-transparent hover:bg-nf-bg-hover border-transparent hover:-translate-y-0.5"
+            ? "bg-fandex-primary/10 border-fandex-primary/30 hover:bg-fandex-primary/15"
+            : "border-transparent hover:bg-nf-bg-hover border-transparent"
         }`}
       >
         <Target className={`w-3.5 h-3.5 ${wordTarget > 0 ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
@@ -460,7 +460,7 @@ function SessionStats({
           onClick={() => setResetConfirmOpen(true)}
           title={t("editor.sessionReset")}
           tabIndex={-1}
-          className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary hover:-translate-y-0.5 transition-all duration-fast"
+          className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary transition-all duration-fast"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
@@ -752,7 +752,7 @@ export default function EditorToolbar({
               onClick={onExportTxt}
               title={t("editor.exportTxt")}
               tabIndex={-1}
-              className="nf-tool-btn flex items-center gap-1 h-7 px-2 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 hover:-translate-y-0.5 transition-all duration-fast ease-fandex"
+              className="nf-tool-btn flex items-center gap-1 h-7 px-2 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 transition-all duration-fast ease-fandex"
             >
               <Download className="w-3.5 h-3.5" />
               TXT
@@ -766,7 +766,7 @@ export default function EditorToolbar({
             tabIndex={-1}
             className={`nf-tool-btn flex items-center gap-1 h-7 px-2.5 text-xs ease-fandex transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed ${
               dirty
-                ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm hover:shadow-md hover:-translate-y-0.5'
+                ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm'
                 : 'bg-fandex-primary/40 text-nf-text-inverse/60'
             }`}
           >

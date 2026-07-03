@@ -1,44 +1,41 @@
 // src/components/CharacterGraphNode.tsx
 //
 // 人物关系图编辑器自定义节点组件
-// 基于 React Flow NodeProps, 使用 useNodesData 选择性订阅按节点 ID 订阅,
-// 避免全量重渲染。渲染角色姓名、身份标签、标签数组、简介预览、Handle 锚点。
+// 基于 React Flow NodeProps, 通过 Zustand store 按 ID 订阅节点数据,
+// 渲染角色姓名、身份标签、标签数组、简介预览、Handle 锚点。
 //
-// 【Skill 偏差报备】
-// 原 Skill/计划要求使用 NodeProps<CharacterGraphNode> 和 useNodesData<CharacterGraphNode> 泛型形式,
-// 因 @xyflow/react v12.11.1 的 NodeProps 泛型约束要求 Node.data: Record<string, unknown>,
-// 而 CharacterGraphNodeData 接口未声明 index signature(项目禁用 unknown 规则),
-// 触发 TS2344 错误。经 tsc 验证,改用 NodeProps 不带泛型参数(默认 Node 类型),
-// 内部通过 `as unknown as CharacterGraphNodeData` 双重断言恢复业务字段类型安全。
-// 偏差依据: 与 TimelineNode.tsx 同源方案, tsc --noEmit 通过。
+// 【实现说明】
+// 原实现使用 useNodesData(id) 从 React Flow 内部 store 读取节点数据,
+// 但在受控模式下, store 中 nodes 变化后 useNodesData 可能无法及时感知 data 字段的更新,
+// 导致抽屉编辑姓名后节点卡片仍显示旧值。改用 Zustand 直接订阅确保数据同步。
+// NodeProps 仍使用默认 Node 类型(因 @xyflow/react v12 泛型约束与禁用 unknown 规则冲突),
+// 但 id 与 selected 字段由 React Flow 正确注入。
 
-import { Handle, Position, useNodesData, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CharacterGraphNodeData } from "../lib/stores/characterGraphTypes";
 import { DEFAULT_NODE_ACCENT } from "../lib/stores/characterGraphTypes";
+import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
 
 /**
- * 自定义节点组件(性能优化版)
- * 输入: NodeProps (默认 Node 类型, 因泛型约束冲突无法使用 NodeProps<CharacterGraphNode>)
+ * 自定义节点组件
+ * 输入: NodeProps (默认 Node 类型, id 与 selected 由 React Flow 注入)
  * 输出: JSX 角色节点卡片
  * 流程:
- *   1. 通过 useNodesData 按 ID 订阅, 避免全量重渲染
- *   2. 双重断言将 Record<string, unknown> 还原为 CharacterGraphNodeData
- *   3. 读取节点强调色(默认主色蓝)
- *   4. 渲染卡片边框、背景、姓名、身份标签、标签数组、简介预览
- *   5. 渲染 Handle 锚点(左侧 target, 右侧 source)
- *
- * 关键: 因 NodeProps/useNodesData 泛型约束与项目禁用 unknown 规则冲突,
- *       此处使用默认 Node 类型, 通过双重断言恢复业务字段类型
- *       (Node.data: Record<string, unknown> -> CharacterGraphNodeData)
+ *   1. 通过 Zustand store 按 ID 订阅节点数据, 确保 data 变化时及时重渲染
+ *   2. 读取节点强调色(默认主色蓝)
+ *   3. 渲染卡片边框、背景、姓名、身份标签、标签数组、简介预览
+ *   4. 渲染 Handle 锚点(左侧 target, 右侧 source)
  */
 export default function CharacterGraphNode({ id, selected }: NodeProps) {
-  // 仅订阅当前节点的 data 字段变化(避免其他节点变化触发重渲染)
-  // 不带泛型时返回 Node | undefined, data 为 Record<string, unknown>
-  const nodeData = useNodesData(id);
-  if (!nodeData) return null;
+  // 直接从 Zustand store 按 ID 订阅节点数据
+  // 修复记录: 原实现使用 useNodesData(id) 从 React Flow 内部 store 读取,
+  //   但在受控模式下, store 中 nodes 变化后 useNodesData 可能无法及时感知 data 字段的更新,
+  //   导致抽屉编辑姓名后节点卡片仍显示旧值。改用 Zustand 直接订阅确保数据同步。
+  // 性能: useCharacterGraphStore 选择器仅当目标节点引用变化时触发重渲染, 其他节点变化不影响本组件。
+  const node = useCharacterGraphStore((s) => s.nodes.find((n) => n.id === id));
+  if (!node) return null;
 
-  // 双重断言: 将 Record<string, unknown> 还原为 CharacterGraphNodeData(类型安全由数据源保证)
-  const data = nodeData.data as unknown as CharacterGraphNodeData;
+  const data: CharacterGraphNodeData = node.data;
   // 强调色: 优先使用节点自定义颜色, 缺省时回退到主色蓝
   const accent = data.accentColor || DEFAULT_NODE_ACCENT;
 
