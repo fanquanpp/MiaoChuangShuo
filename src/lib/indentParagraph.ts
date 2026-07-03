@@ -11,9 +11,11 @@
 // 3. 自动插入全角空格缩进
 // 4. 防止重复插入（段落已以全角空格开头则跳过）
 // 5. 跳过空行分隔符（前一段落为空时不缩进，避免段落间空行被缩进）
+// 6. 仅在用户实际输入文字时触发（纯删除/段落结构变更不触发，避免删除空格后被重新插入）
 
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { ReplaceStep } from "@tiptap/pm/transform";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import type { Node } from "@tiptap/pm/model";
 
@@ -35,11 +37,12 @@ function getIndentText(width: number): string {
 // 输出: TipTap Extension 实例
 // 流程:
 //   1. 监听编辑器事务，过滤非文档变更事务
-//   2. 定位光标所在段落
-//   3. 检查段落是否已有缩进（以全角空格开头则跳过）
-//   4. 检查光标是否在段首附近（偏移量 <= 缩进宽度 + 容差）
-//   5. 检查前一段落是否有内容（空行作为段落分隔符不缩进）
-//   6. 插入指定宽度的全角空格缩进
+//   2. 检测事务是否包含实际文字插入（纯删除/仅段落结构变更不触发）
+//   3. 定位光标所在段落
+//   4. 检查段落是否已有缩进（以全角空格开头则跳过）
+//   5. 检查光标是否在段首附近（偏移量 <= 缩进宽度 + 容差）
+//   6. 检查前一段落是否有内容（空行作为段落分隔符不缩进）
+//   7. 插入指定宽度的全角空格缩进
 export const IndentParagraph = Extension.create<IndentParagraphOptions>({
   name: "indentParagraph",
 
@@ -67,6 +70,32 @@ export const IndentParagraph = Extension.create<IndentParagraphOptions>({
           // 检查是否有文档结构变化（覆盖键盘输入、Enter 分段、粘贴等所有文本变更场景）
           const docChanged = transactions.some((tr) => tr.docChanged);
           if (!docChanged) return null;
+
+          // 检查事务是否包含实际文字插入操作
+          // 仅在用户输入非空白文字时才触发自动缩进
+          // 这样可以避免以下问题：
+          //   - 用户按 Backspace 删除空格后被自动重新插入（无法回到上一行）
+          //   - 用户按 Enter 创建新段落时立即插入空格（用户可能想合并段落）
+          // 纯删除操作（step.slice.size === 0）和仅插入段落结构的操作都不触发
+          const hasTextInsertion = transactions.some((tr) => {
+            return tr.steps.some((step) => {
+              if (!(step instanceof ReplaceStep)) return false;
+              // 纯删除操作（slice 为空）不触发
+              if (step.slice.size === 0) return false;
+              // 检查插入的内容是否包含非空白文本节点
+              let hasText = false;
+              step.slice.content.descendants((node: Node) => {
+                if (node.isText && node.text && node.text.trim() !== "") {
+                  hasText = true;
+                  return false;
+                }
+                return true;
+              });
+              return hasText;
+            });
+          });
+
+          if (!hasTextInsertion) return null;
 
           const { selection } = newState;
           const $head = selection.$head;
