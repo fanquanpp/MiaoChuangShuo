@@ -13,26 +13,36 @@ export interface CategorySlice {
   selectedFile: FileNode | null;
   /** 当前编辑文件的实时字数（由编辑器 onUpdate 推送） */
   activeFileWordCount: number;
+  /**
+   * 待定位行号（搜索结果跳转时设置，编辑器加载后消费并清空）
+   * 用于 GlobalSearch 跳转后自动滚动到匹配行
+   */
+  pendingScrollLine: number | null;
 
   setActiveCategory: (category: SidebarCategory) => void;
   setSelectedFile: (file: FileNode | null) => void;
   setActiveFileWordCount: (count: number) => void;
   /** 一次性设置分类和文件，避免 setActiveCategory 重置 selectedFile 的竞态 */
   navigateToFile: (file: FileNode, category: SidebarCategory) => void;
+  /** 设置待定位行号（null 表示清除） */
+  setPendingScrollLine: (line: number | null) => void;
 }
 
 export const createCategorySlice: StateCreator<CategorySlice> = (set) => ({
   activeCategory: "manuscript",
   selectedFile: null,
   activeFileWordCount: 0,
+  pendingScrollLine: null,
 
   setActiveCategory: (category) =>
-    set({ activeCategory: category, selectedFile: null, activeFileWordCount: 0 }),
+    set({ activeCategory: category, selectedFile: null, activeFileWordCount: 0, pendingScrollLine: null }),
 
-  setSelectedFile: (file) => set({ selectedFile: file, activeFileWordCount: 0 }),
+  setSelectedFile: (file) => set({ selectedFile: file, activeFileWordCount: 0, pendingScrollLine: null }),
 
   setActiveFileWordCount: (count) => set({ activeFileWordCount: count }),
 
   navigateToFile: (file, category) =>
     set({ activeCategory: category, selectedFile: file, activeFileWordCount: 0 }),
+
+  setPendingScrollLine: (line) => set({ pendingScrollLine: line }),
 });

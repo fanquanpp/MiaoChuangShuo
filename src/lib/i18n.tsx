@@ -1057,6 +1057,23 @@ const zhCN: TranslationDict = {
   "settings.indentWidth3": "3 字",
   "settings.indentWidth4": "4 字",
 
+  // ── 编辑器功能开关 ──
+  "settings.featuresSection": "编辑器功能",
+  "settings.featureAutoIndent": "首行缩进",
+  "settings.featureAutoIndentHint": "段落在输入时自动缩进（全局开关，与首行缩进设置联动）",
+  "settings.featureCharMention": "角色名补全",
+  "settings.featureCharMentionHint": "空行按 Tab 键弹出角色名选择浮层",
+  "settings.featurePoetryFormat": "诗歌排版",
+  "settings.featurePoetryFormatHint": "支持诗歌专用排版格式",
+  "settings.featureSmartQuotes": "智能引号",
+  "settings.featureSmartQuotesHint": "自动配对中英文引号",
+  "settings.featureForeshadowMark": "伏笔标记",
+  "settings.featureForeshadowMarkHint": "伏笔文本区域添加波浪线标记（实验性）",
+  "settings.featureSceneBreak": "场景分隔辅助",
+  "settings.featureSceneBreakHint": "辅助插入场景分隔标记",
+  "settings.featureEntityHighlight": "实体高亮",
+  "settings.featureEntityHighlightHint": "正文中高亮角色与设定等实体名称（规划中）",
+
   // ── 文件列表 - 批量重编号 ──
   "filelist.batchRenumber": "重新编号",
   "filelist.renumbered": "章节已重新编号",
@@ -2205,6 +2222,23 @@ const enUS: TranslationDict = {
   "settings.indentWidth3": "3 chars",
   "settings.indentWidth4": "4 chars",
   "settings.indentCustom": "Custom",
+
+  // ── Editor Feature Switches ──
+  "settings.featuresSection": "Editor Features",
+  "settings.featureAutoIndent": "Auto Indent",
+  "settings.featureAutoIndentHint": "Auto-indent paragraphs on input (global switch, linked with indent settings)",
+  "settings.featureCharMention": "Character Mention",
+  "settings.featureCharMentionHint": "Press Tab on empty line to show character picker",
+  "settings.featurePoetryFormat": "Poetry Format",
+  "settings.featurePoetryFormatHint": "Support poetry-specific formatting",
+  "settings.featureSmartQuotes": "Smart Quotes",
+  "settings.featureSmartQuotesHint": "Auto-pair Chinese and English quotes",
+  "settings.featureForeshadowMark": "Foreshadow Mark",
+  "settings.featureForeshadowMarkHint": "Add wavy underline to foreshadow text (experimental)",
+  "settings.featureSceneBreak": "Scene Break Helper",
+  "settings.featureSceneBreakHint": "Assist inserting scene break markers",
+  "settings.featureEntityHighlight": "Entity Highlight",
+  "settings.featureEntityHighlightHint": "Highlight character/setting entity names in text (planned)",
 
   // ── File List - Batch Renumber ──
   "filelist.batchRenumber": "Renumber",

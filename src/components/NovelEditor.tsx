@@ -51,6 +51,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { readFile, writeFile, readProjectTree, createSnapshot } from "../lib/api";
 import { useAppStore } from "../lib/store";
 import { useSettingsStore } from "../lib/settingsStore";
+import { usePreferencesStore } from "../lib/preferencesSlice";
 import { CharacterMention } from "../lib/characterMention";
 import { IndentParagraph } from "../lib/indentParagraph";
 import { PoetryFormat } from "../lib/poetryFormat";
@@ -178,11 +179,10 @@ export default function NovelEditor({
   const hoverShownNameRef = useRef<string>("");
 
   const projectType = currentProject?.meta?.type || "standard";
+  // 文体标识保留用于 UI 层条件渲染（如横幅提示文案差异）
+  // 扩展注册不再依赖文体守卫，所有扩展全量注册，由全局开关控制行为
   const isScript = projectType === "script" || projectType === "screenplay";
   const isDialogue = projectType === "dialogue";
-  // 散文类文体：包含标准长篇、短篇、日记、分卷、同世界观、诗歌等
-  // 剧本式与对话体不启用首行缩进（它们有专属的格式化逻辑）
-  const isProse = !isScript && !isDialogue;
   // 兼容旧代码：日记体仍保留 isEssay 标识用于日期自动填充等场景
   const isEssay = projectType === "diary";
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
@@ -191,6 +191,10 @@ export default function NovelEditor({
   const indentWidth = useSettingsStore((s) => s.indentWidth);
   const snapshotEnabled = useSettingsStore((s) => s.snapshotEnabled);
   const snapshotMinInterval = useSettingsStore((s) => s.snapshotMinInterval);
+
+  // 编辑器功能开关（用户级偏好，跨项目共享）
+  // 所有扩展全量注册，行为由开关控制，消除文体守卫导致的功能孤岛
+  const editorPrefs = usePreferencesStore((s) => s.preferences);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   // 查找替换面板可见性（Ctrl+F / Ctrl+H 触发）
   const [showFindReplace, setShowFindReplace] = useState(false);
@@ -208,9 +212,11 @@ export default function NovelEditor({
   // 文件格式约定：第一行为角色名（纯文本，不含冒号、不以分隔符开头）
   // 过滤规则：跳过模板文件（文件名包含"模板"/"名册"/"template"/"roster"）
   // 回退方案：读取 角色名册.txt（手动维护的花名册）
+  // 目录兼容：同时扫描"角色"与"人物"目录，消除目录名硬编码导致的静默失败
+  // 全文体扫描：所有文体均加载角色列表，由全局开关控制 Tab 补全行为
   useEffect(() => {
     let cancelled = false;
-    if ((!isScript && !isDialogue) || !currentProject) {
+    if (!currentProject) {
       setCharacters([]);
       return;
     }
@@ -218,12 +224,13 @@ export default function NovelEditor({
     const extractNames = async () => {
       try {
         // 优先方案：扫描角色目录，从每个 .txt 文件首行提取角色名
-        const charDirPath = `${currentProject.path}/角色`;
+        // 兼容"角色"与"人物"两种目录名（codexApi 同样兼容这两种命名）
         const tree = await readProjectTree(currentProject.path);
         const charDir = tree.find(
-          (n) => n.is_dir && n.name === "角色"
+          (n) => n.is_dir && (n.name === "角色" || n.name === "人物")
         );
         if (charDir?.children) {
+          const charDirPath = `${currentProject.path}/${charDir.name}`;
           const names: string[] = [];
           for (const child of charDir.children) {
             if (child.is_dir || !child.name.endsWith(".txt")) continue;
@@ -258,23 +265,39 @@ export default function NovelEditor({
         // 目录扫描失败，回退到角色名册
       }
 
-      // 回退方案：读取 角色名册.txt
-      const rosterPath = `${currentProject.path}/角色/角色名册.txt`;
+      // 回退方案：读取 角色名册.txt（兼容角色与人物两种目录）
+      const rosterPaths = [
+        `${currentProject.path}/角色/角色名册.txt`,
+        `${currentProject.path}/人物/角色名册.txt`,
+      ];
       try {
-        const content = await readFile(rosterPath, currentProject.path);
-        const names = content
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(
-            (line) =>
-              line &&
-              !line.startsWith("#") &&
-              !line.startsWith(">") &&
-              !line.startsWith("-") &&
-              !/^[-=]{3,}$/.test(line)
-          )
-          .filter(isValidCharacterName);
-        if (!cancelled) setCharacters(names);
+        // 依次尝试候选路径，读取第一个存在的名册文件
+        let content: string | null = null;
+        for (const p of rosterPaths) {
+          try {
+            content = await readFile(p, currentProject.path);
+            break;
+          } catch {
+            // 当前路径不存在，尝试下一个
+          }
+        }
+        if (content) {
+          const names = content
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(
+              (line) =>
+                line &&
+                !line.startsWith("#") &&
+                !line.startsWith(">") &&
+                !line.startsWith("-") &&
+                !/^[-=]{3,}$/.test(line)
+            )
+            .filter(isValidCharacterName);
+          if (!cancelled) setCharacters(names);
+        } else {
+          if (!cancelled) setCharacters([]);
+        }
       } catch {
         if (!cancelled) setCharacters([]);
       }
@@ -282,7 +305,7 @@ export default function NovelEditor({
 
     extractNames();
     return () => { cancelled = true; };
-  }, [isScript, isDialogue, currentProject]);
+  }, [currentProject]);
 
   // 构建 TipTap 扩展列表（Office 级富文本模式）
   // 包含完整富文本能力：标题层级、列表、表格、链接、高亮、对齐、颜色等
@@ -348,31 +371,33 @@ export default function NovelEditor({
       FontSizeShortcut.configure({ enabled: true }),
     ];
 
-    // 散文类文体启用首行缩进（标准长篇/短篇/日记/分卷/同世界观/诗歌等）
-    // 剧本式与对话体不启用，它们有专属格式化逻辑
-    if (isProse) {
-      exts.push(IndentParagraph.configure({ enabled: indentEnabled, indentWidth }));
-    }
+    // 首行缩进扩展：所有文体全量注册，由全局开关控制行为
+    // 开关来源合并：settingsStore.indentEnabled（旧设置）与 preferences.enableAutoIndent（新开关）
+    // 两者均为 true 时启用，兼容历史设置迁移
+    const autoIndentEnabled = indentEnabled && editorPrefs.enableAutoIndent;
+    exts.push(IndentParagraph.configure({ enabled: autoIndentEnabled, indentWidth }));
 
-    if (isScript || isDialogue) {
-      exts.push(
-        CharacterMention.configure({
-          characters,
-          onSelect: () => {},
-          labels: {
-            pickerAriaLabel: t("editor.charRosterHint", { count: characters.length }),
-            listboxAriaLabel: t("editor.charRosterHint", { count: characters.length }),
-            customInputAriaLabel: t("characterMention.placeholder"),
-            customInputPlaceholder: t("characterMention.placeholder"),
-            hintText: "Tab ↵ | ↑↓ | Esc",
-          },
-        })
-      );
-    }
+    // 角色名补全扩展：所有文体全量注册，由全局开关控制行为
+    // 开关关闭时 onKeyDown 直接 return false，Tab 键交还默认缩进行为
+    exts.push(
+      CharacterMention.configure({
+        characters,
+        enabled: editorPrefs.enableCharacterMentionPicker,
+        onSelect: () => {},
+        labels: {
+          pickerAriaLabel: t("editor.charRosterHint", { count: characters.length }),
+          listboxAriaLabel: t("editor.charRosterHint", { count: characters.length }),
+          customInputAriaLabel: t("characterMention.placeholder"),
+          customInputPlaceholder: t("characterMention.placeholder"),
+          hintText: "Tab ↵ | ↑↓ | Esc",
+        },
+      })
+    );
 
-    exts.push(PoetryFormat.configure({ enabled: true }));
+    // 诗歌排版扩展：所有文体全量注册，由全局开关控制行为
+    exts.push(PoetryFormat.configure({ enabled: editorPrefs.enablePoetryFormat }));
     return exts;
-  }, [isProse, isScript, isDialogue, characters, t, indentEnabled, indentWidth]);
+  }, [characters, t, indentEnabled, indentWidth, editorPrefs]);
 
   // 创建编辑器实例（Office 级富文本模式）
   const editor = useEditor({
@@ -447,6 +472,35 @@ export default function NovelEditor({
         // 使用 setTimeout 确保 DOM 已渲染完成
         setTimeout(() => {
           if (!cancelled && editor && !editor.isDestroyed) {
+            // 搜索结果跳转定位：检查 store 中的待定位行号
+            // 通过 getState 读取避免将 pendingScrollLine 加入 useEffect 依赖项
+            const pendingLine = useAppStore.getState().pendingScrollLine;
+            if (pendingLine !== null && pendingLine > 0) {
+              // 查询第 N 个块级元素（p/h/li/blockquote/pre）模拟行定位
+              // line_number 基于纯文本行，HTML 存储后按块级元素近似映射
+              const blockEls = editor.view.dom.querySelectorAll(
+                "p, h1, h2, h3, h4, li, blockquote, pre, tr"
+              );
+              const targetEl = blockEls[pendingLine - 1] as HTMLElement | undefined;
+              if (targetEl) {
+                targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                // 高亮目标行 1.5 秒，提供视觉反馈（内联样式避免自定义 CSS）
+                const originalBg = targetEl.style.backgroundColor;
+                const originalTransition = targetEl.style.transition;
+                targetEl.style.transition = "background-color 0.3s ease";
+                targetEl.style.backgroundColor = "rgba(240, 144, 112, 0.2)";
+                setTimeout(() => {
+                  targetEl.style.backgroundColor = originalBg;
+                  setTimeout(() => {
+                    targetEl.style.transition = originalTransition;
+                  }, 300);
+                }, 1500);
+              }
+              // 消费后清空，避免下次加载重复定位
+              useAppStore.getState().setPendingScrollLine(null);
+              editor.commands.focus();
+              return;
+            }
             editor.commands.focus("end");
           }
         }, 0);

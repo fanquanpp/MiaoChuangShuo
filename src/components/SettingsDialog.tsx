@@ -12,6 +12,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { X, Type, BookOpen, FileText, Palette, Zap, Droplet, Info, RefreshCw, ExternalLink, CheckCircle, Layers } from "lucide-react";
 import { useSettingsStore, BACKGROUND_PRESETS, type ChapterFormat, type TextureMode } from "../lib/settingsStore";
+import { usePreferencesStore } from "../lib/preferencesSlice";
 import { useThemeStore } from "../lib/themeStore";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
@@ -24,6 +25,7 @@ export type SettingsSection =
   | "chapter"
   | "automation"
   | "indent"
+  | "features"
   | "appearance"
   | "about";
 
@@ -93,7 +95,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
 
   // ===== 版本更新检测状态 =====
   // 当前应用版本号（组件挂载时异步获取）
-  const [currentVersion, setCurrentVersion] = useState("26.7.19");
+  const [currentVersion, setCurrentVersion] = useState("26.7.20");
   // 检查中状态（控制按钮 loading 动画）
   const [checking, setChecking] = useState(false);
   // 检测到的新版本信息（null=未检测到或未检查）
@@ -179,9 +181,15 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
     chapter: useRef<HTMLElement>(null),
     automation: useRef<HTMLElement>(null),
     indent: useRef<HTMLElement>(null),
+    features: useRef<HTMLElement>(null),
     appearance: useRef<HTMLElement>(null),
     about: useRef<HTMLElement>(null),
   };
+
+  // 编辑器功能开关（用户级偏好，跨项目共享）
+  // 所有扩展全量注册，行为由这些开关控制，消除文体守卫导致的功能孤岛
+  const preferences = usePreferencesStore((s) => s.preferences);
+  const updatePreference = usePreferencesStore((s) => s.updatePreference);
 
   // 打开时若指定 initialSection,自动滚动到对应分区
   useEffect(() => {
@@ -512,6 +520,144 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
                   <span className="text-[10px] text-nf-text-tertiary">1-8</span>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* 编辑器功能开关设置 */}
+          <section ref={sectionRefs.features}>
+            <div className="flex items-center gap-2 mb-3">
+              <Zap className="w-4 h-4 text-fandex-tertiary" />
+              <h3 className="text-sm font-bold font-display text-nf-text">
+                {t("settings.featuresSection")}
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              {/* 首行缩进开关 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={preferences.enableAutoIndent}
+                  onChange={(e) => updatePreference("enableAutoIndent", e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("settings.featureAutoIndent")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("settings.featureAutoIndentHint")}
+                  </p>
+                </div>
+              </label>
+
+              {/* 角色名补全开关 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={preferences.enableCharacterMentionPicker}
+                  onChange={(e) => updatePreference("enableCharacterMentionPicker", e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("settings.featureCharMention")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("settings.featureCharMentionHint")}
+                  </p>
+                </div>
+              </label>
+
+              {/* 诗歌排版开关 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={preferences.enablePoetryFormat}
+                  onChange={(e) => updatePreference("enablePoetryFormat", e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("settings.featurePoetryFormat")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("settings.featurePoetryFormatHint")}
+                  </p>
+                </div>
+              </label>
+
+              {/* 智能引号配对开关 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={preferences.enableSmartQuotes}
+                  onChange={(e) => updatePreference("enableSmartQuotes", e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("settings.featureSmartQuotes")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("settings.featureSmartQuotesHint")}
+                  </p>
+                </div>
+              </label>
+
+              {/* 伏笔标记开关 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={preferences.enableForeshadowMark}
+                  onChange={(e) => updatePreference("enableForeshadowMark", e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("settings.featureForeshadowMark")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("settings.featureForeshadowMarkHint")}
+                  </p>
+                </div>
+              </label>
+
+              {/* 场景分隔辅助开关 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={preferences.enableSceneBreakHelper}
+                  onChange={(e) => updatePreference("enableSceneBreakHelper", e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("settings.featureSceneBreak")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("settings.featureSceneBreakHint")}
+                  </p>
+                </div>
+              </label>
+
+              {/* 实体高亮开关 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={preferences.enableEntityHighlight}
+                  onChange={(e) => updatePreference("enableEntityHighlight", e.target.checked)}
+                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
+                    {t("settings.featureEntityHighlight")}
+                  </span>
+                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
+                    {t("settings.featureEntityHighlightHint")}
+                  </p>
+                </div>
+              </label>
             </div>
           </section>
 

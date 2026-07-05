@@ -10,7 +10,7 @@
 // 3. 提供设定库目录扫描辅助函数
 
 import { invoke } from "@tauri-apps/api/core";
-import { readProjectTree, createFile, deletePath } from "./api";
+import { readProjectTree, createFile, deletePath, readFile } from "./api";
 import type { FileNode } from "./api";
 
 // ===== 类型定义 =====
@@ -122,6 +122,35 @@ export async function batchScanEntities(
 // ===== 设定库目录扫描辅助 =====
 
 /**
+ * 从设定文件内容解析别名列表
+ * 输入: content 文件内容字符串
+ * 输出: string[] 别名列表（去重去空）
+ * 流程:
+ *   1. 按行分割文件内容
+ *   2. 查找以"别名:"或"别名："开头的行（兼容中英文冒号与前后空白）
+ *   3. 提取冒号后的内容，按逗号/中文逗号/顿号分割
+ *   4. 清理每项空白并过滤空值
+ */
+function parseAliasesFromContent(content: string): string[] {
+  const lines = content.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // 匹配 "别名: A, B, C" 或 "别名：A、B、C" 格式（兼容中英文冒号）
+    const match = trimmed.match(/^别名\s*[:：]\s*(.+)$/);
+    if (match) {
+      const aliasesStr = match[1];
+      // 按英文逗号、中文逗号、顿号分割
+      const aliases = aliasesStr
+        .split(/[,，、]/)
+        .map((a) => a.trim())
+        .filter((a) => a.length > 0);
+      return aliases;
+    }
+  }
+  return [];
+}
+
+/**
  * 扫描项目下所有 Codex 实体文件
  * 输入: projectPath 项目根路径
  * 输出: Promise<CodexEntity[]> 实体列表（按类型分组后按名称排序）
@@ -129,7 +158,7 @@ export async function batchScanEntities(
  *   1. 读取项目目录树
  *   2. 遍历 4 种 Codex 类型对应的目录
  *   3. 收集每个目录下的 .txt 文件作为实体
- *   4. 解析文件内容提取别名（首行"别名: A, B, C"格式）
+ *   4. 读取文件内容，解析首行"别名: A, B, C"格式填充 aliases 数组
  */
 export async function scanCodexEntities(projectPath: string): Promise<CodexEntity[]> {
   const tree = await readProjectTree(projectPath);
@@ -144,11 +173,20 @@ export async function scanCodexEntities(projectPath: string): Promise<CodexEntit
         if (file.is_dir) continue;
         if (!file.name.endsWith(".txt")) continue;
         const id = file.name.replace(/\.txt$/i, "");
-        // 暂不读取文件内容，别名留空，由 CodexPanel 在选中时懒加载解析
+        // 读取文件内容解析别名（首行"别名: A, B, C"格式）
+        // 修复原"懒加载断链"问题：原代码注释标注懒加载但无实现，aliases 始终为空数组
+        let aliases: string[] = [];
+        try {
+          const filePath = `${projectPath}/${file.relative_path}`;
+          const content = await readFile(filePath, projectPath);
+          aliases = parseAliasesFromContent(content);
+        } catch {
+          // 文件读取失败，别名留空，不影响实体扫描流程
+        }
         entities.push({
           id,
           name: id,
-          aliases: [],
+          aliases,
           type,
           sourceFile: file.relative_path,
           mentions: null,

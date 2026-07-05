@@ -34,13 +34,25 @@ import { useToast } from "../lib/toast";
 /**
  * 从相对路径推断分类
  * 输入: relativePath 文件相对路径
- * 输出: SidebarCategory 分类
+ * 输出: SidebarCategory 分类字符串
+ * 流程: 提取路径首段目录名，查表映射到 SidebarCategory
+ *   补全覆盖：正文/大纲/卷宗/分卷/伏笔/草稿/设定类全部目录名
  */
 function detectCategoryFromPath(relativePath: string): string {
   const firstDir = relativePath.split(/[\\/]/)[0] || "";
   const categoryMap: Record<string, string> = {
+    // 正文类
     "正文": "manuscript",
+    "草稿": "manuscript",
+    "草稿箱": "manuscript",
+    // 大纲类（含伏笔，伏笔属于创作规划类内容）
     "大纲": "outline",
+    "伏笔": "outline",
+    "伏笔记录": "outline",
+    "系列伏笔": "outline",
+    // 分卷类
+    "卷宗": "volumes",
+    "分卷": "volumes",
     // 设定类统一收敛到 Codex
     "角色": "codex",
     "人物": "codex",
@@ -58,6 +70,7 @@ function detectCategoryFromPath(relativePath: string): string {
 export default function GlobalSearch() {
   const currentProject = useAppStore((s) => s.currentProject);
   const navigateToFile = useAppStore((s) => s.navigateToFile);
+  const setPendingScrollLine = useAppStore((s) => s.setPendingScrollLine);
   const refreshProjectTree = useAppStore((s) => s.refreshProjectTree);
   const { t } = useI18n();
   const { showToast } = useToast();
@@ -172,9 +185,12 @@ export default function GlobalSearch() {
   /**
    * 跳转到搜索结果对应文件
    * 输入: result 搜索结果项
+   * 流程: 设置待定位行号，导航到对应分类与文件，编辑器加载后自动滚动到匹配行
    */
   const handleJumpToResult = (result: SearchResult) => {
     const category = detectCategoryFromPath(result.relative_path);
+    // 设置待定位行号，NovelEditor 加载文件后消费并自动滚动
+    setPendingScrollLine(result.line_number);
     navigateToFile(
       {
         name: result.file_name,

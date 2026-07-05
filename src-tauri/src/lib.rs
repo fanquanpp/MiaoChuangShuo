@@ -19,6 +19,7 @@ mod codex_commands;
 mod timeline_commands;
 mod character_graph_commands;
 mod word_count;
+mod editor_preferences;
 
 /// 应用入口函数
 /// 输入: 无
@@ -93,6 +94,11 @@ pub fn run() {
             character_graph_commands::read_character_graph,
             character_graph_commands::save_character_graph,
             character_graph_commands::clear_character_graph,
+            // 编辑器偏好配置命令
+            editor_preferences::get_user_preferences,
+            editor_preferences::set_user_preferences,
+            editor_preferences::get_project_config,
+            editor_preferences::set_project_config,
         ])
         .setup(|_app| {
             Ok(())

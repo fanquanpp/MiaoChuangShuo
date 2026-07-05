@@ -24,6 +24,8 @@ import type { EditorState, Transaction } from "@tiptap/pm/state";
 export interface CharacterMentionOptions {
   characters: string[];
   onSelect: (name: string) => void;
+  /** 功能开关：false 时 Tab 键不拦截，交还默认缩进行为（默认 true） */
+  enabled: boolean;
   labels?: {
     pickerAriaLabel?: string;
     listboxAriaLabel?: string;
@@ -76,6 +78,7 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
     return {
       characters: [],
       onSelect: () => {},
+      enabled: true,
       labels: {},
     };
   },
@@ -104,6 +107,8 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
           _oldState: EditorState,
           newState: EditorState
         ): Transaction | null => {
+          // 全局开关检查：关闭时不执行换行轮换
+          if (!options.enabled) return null;
           if (!options.characters.length) return null;
 
           const docChanged = transactions.some((tr) => tr.docChanged);
@@ -150,6 +155,15 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
           handleKeyDown(view, event) {
             // Tab 键：在空行或行首弹出角色名选择浮层
             if (event.key === "Tab") {
+              // 全局开关检查：开关关闭时不拦截，Tab 交还默认缩进行为
+              // 此设计实现"功能全局开关化"——所有文体全量注册扩展，
+              // 由 enabled 开关控制行为，消除文体守卫导致的功能孤岛
+              if (!options.enabled) return false;
+
+              // 空列表防御：角色列表为空时不拦截 Tab，避免 picker 弹空层
+              // 且 preventDefault 导致 Tab 键被吞掉的卡死问题
+              if (!options.characters.length) return false;
+
               const { state } = view;
               const { selection } = state;
               const $pos = selection.$head;
