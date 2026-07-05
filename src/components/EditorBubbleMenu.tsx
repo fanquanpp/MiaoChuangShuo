@@ -25,13 +25,22 @@ import {
   Link as LinkIcon,
   Palette,
   Highlighter,
+  Sparkles,
+  Wand2,
+  Scissors,
+  UserCheck,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import ConfirmDialog from "./ConfirmDialog";
 
+// AI 预设指令类型 (AI-3.4 右键菜单触发)
+type AiPresetCommand = "polish" | "expand" | "condense" | "characterCheck";
+
 // BubbleMenu 属性接口
 interface EditorBubbleMenuProps {
   editor: Editor;
+  /** AI 指令回调 (AI-3.4: 选中文本后触发预设 AI 指令) */
+  onAiCommand?: (command: AiPresetCommand, selectedText: string) => void;
 }
 
 // 预设字体颜色（精简版，避免 BubbleMenu 过宽）
@@ -66,10 +75,30 @@ const HIGHLIGHT_COLORS = [
  *   3. 提供行内格式按钮，点击即应用格式
  *   4. 颜色按钮展开预设色板
  */
-export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
+export default function EditorBubbleMenu({ editor, onAiCommand }: EditorBubbleMenuProps) {
   const { t } = useI18n();
   // 链接输入对话框状态
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  // AI 子菜单展开状态 (AI-3.4)
+  const [aiMenuOpen, setAiMenuOpen] = useState(false);
+
+  /**
+   * 触发 AI 预设指令
+   * 输入: command 预设指令类型
+   * 输出: 无 (提取选中文本并调用 onAiCommand 回调)
+   * 流程:
+   *   1. 从编辑器选区提取纯文本
+   *   2. 调用父组件 onAiCommand 回调
+   *   3. 关闭 AI 子菜单
+   */
+  const handleAiPreset = (command: AiPresetCommand) => {
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, "\n");
+    if (selectedText.trim() && onAiCommand) {
+      onAiCommand(command, selectedText);
+    }
+    setAiMenuOpen(false);
+  };
 
   /**
    * 打开链接输入对话框
@@ -239,6 +268,72 @@ export default function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
         >
           <LinkIcon className="w-3.5 h-3.5" />
         </BubbleButton>
+
+        {/* AI 按钮组 (AI-3.4): 仅当 onAiCommand 回调存在时渲染 */}
+        {onAiCommand && (
+          <>
+            {/* 分隔线 */}
+            <div className="w-px h-4 bg-nf-border-light/60 mx-0.5" />
+
+            {/* AI 助手主按钮 + 悬浮子菜单 */}
+            <div className="relative group">
+              <button
+                type="button"
+                tabIndex={-1}
+                title={t("editor.aiAssistant")}
+                onClick={() => setAiMenuOpen((prev) => !prev)}
+                className="h-7 px-1.5 flex items-center gap-0.5 text-nf-text-secondary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+              </button>
+              {/* 悬浮 AI 子菜单 (group-hover 或 aiMenuOpen 时显示) */}
+              <div
+                className={`nf-glass-panel absolute top-full right-0 mt-1 bg-nf-bg-card border border-nf-border-light shadow-lg p-1 z-50 min-w-[140px] ${
+                  aiMenuOpen ? "flex" : "hidden group-hover:flex"
+                } flex-col`}
+                onMouseLeave={() => setAiMenuOpen(false)}
+              >
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => handleAiPreset("polish")}
+                  className="w-full flex items-center gap-2 px-2 py-1 text-xs text-nf-text-secondary hover:text-fandex-primary hover:bg-fandex-primary/5 transition-colors duration-fast"
+                >
+                  <Wand2 className="w-3 h-3" />
+                  {t("editor.aiPolish")}
+                </button>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => handleAiPreset("expand")}
+                  className="w-full flex items-center gap-2 px-2 py-1 text-xs text-nf-text-secondary hover:text-fandex-primary hover:bg-fandex-primary/5 transition-colors duration-fast"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {t("editor.aiExpand")}
+                </button>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => handleAiPreset("condense")}
+                  className="w-full flex items-center gap-2 px-2 py-1 text-xs text-nf-text-secondary hover:text-fandex-primary hover:bg-fandex-primary/5 transition-colors duration-fast"
+                >
+                  <Scissors className="w-3 h-3" />
+                  {t("editor.aiCondense")}
+                </button>
+                <div className="my-1 border-t border-nf-border-light" />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => handleAiPreset("characterCheck")}
+                  className="w-full flex items-center gap-2 px-2 py-1 text-xs text-nf-text-secondary hover:text-fandex-secondary hover:bg-fandex-secondary/5 transition-colors duration-fast"
+                >
+                  <UserCheck className="w-3 h-3" />
+                  {t("editor.aiCharacterCheck")}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </BubbleMenu>
 

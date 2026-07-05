@@ -10,7 +10,7 @@
 import type { Node as RFNode, Edge as RFEdge } from "@xyflow/react";
 
 /**
- * 角色关系类型枚举
+ * 内置角色关系类型枚举(8 种预设, 用于类型安全与默认值)
  * - Master: 师徒(师徒/师徒关系, 含师徒双向语义)
  * - Enemy:  敌对(对立/仇敌/竞争对手)
  * - Family: 亲属(血缘/家族关系)
@@ -19,6 +19,9 @@ import type { Node as RFNode, Edge as RFEdge } from "@xyflow/react";
  * - Subordinate: 上下级(主从/统属关系)
  * - Fellow: 同门(同门/同修/同袍)
  * - Other:  其他(无法归类的特殊关系)
+ *
+ * 注意: 实际存储字段 relationType 类型为 string, 允许用户自定义关系类型.
+ *       此联合仅用于内置类型的类型提示与默认值约束.
  */
 export type RelationType =
   | "master"
@@ -29,6 +32,30 @@ export type RelationType =
   | "subordinate"
   | "fellow"
   | "other";
+
+/**
+ * 用户自定义关系类型接口
+ * 持久化到 localStorage, 跨项目共享
+ * id: 唯一标识(用作 edge.data.relationType 的值, 不能与内置类型冲突)
+ * label: 中文显示名称
+ * color: 边 stroke 颜色(HEX)
+ */
+export interface CustomRelationType {
+  id: string;
+  label: string;
+  color: string;
+}
+
+/**
+ * 关系类型元信息(内置与自定义统一结构, 用于 UI 渲染)
+ */
+export interface RelationTypeMeta {
+  value: string;
+  label: string;
+  color: string;
+  /** 是否为内置类型( false 表示用户自定义) */
+  builtin: boolean;
+}
 
 /**
  * 角色节点业务数据载荷
@@ -74,7 +101,8 @@ type RFEdgeBase = Omit<RFEdge, "data" | "type">;
  * 注意: 自定义边数据必须包裹在 data 字段内, 与后端 PersistedEdge.data 对齐
  */
 export type CharacterGraphEdge = RFEdgeBase & {
-  data: { relationType: RelationType; description: string };
+  // relationType 类型为 string, 兼容内置 8 种预设与用户自定义关系类型
+  data: { relationType: string; description: string };
   type: "characterEdge";
 };
 
@@ -136,3 +164,137 @@ export const RELATION_TYPE_COLORS: Record<RelationType, string> = {
 
 /** 默认节点强调色(主色蓝, 用于新建节点未指定 accentColor 时) */
 export const DEFAULT_NODE_ACCENT = "#6EA8FE";
+
+// ===== 关系类型管理(内置 + 用户自定义) =====
+
+/**
+ * 内置关系类型元信息数组(8 种预设, 顺序固定, 用于下拉选择渲染)
+ * 与 RELATION_TYPE_LABELS / RELATION_TYPE_COLORS 保持一致
+ */
+export const BUILTIN_RELATION_TYPES: RelationTypeMeta[] = (
+  Object.keys(RELATION_TYPE_LABELS) as RelationType[]
+).map((key) => ({
+  value: key,
+  label: RELATION_TYPE_LABELS[key],
+  color: RELATION_TYPE_COLORS[key],
+  builtin: true,
+}));
+
+/** localStorage 键名(自定义关系类型持久化) */
+const CUSTOM_RELATION_TYPES_STORAGE_KEY = "mcs_custom_relation_types";
+
+/** 自定义关系类型默认颜色候选(用户未选色时轮询使用) */
+const CUSTOM_COLOR_PALETTE = [
+  "#6EA8FE",
+  "#55EFC4",
+  "#F09070",
+  "#A855F7",
+  "#EC4899",
+  "#FACC15",
+  "#22D3EE",
+  "#FB923C",
+];
+
+/**
+ * 从 localStorage 读取自定义关系类型列表
+ * 输出: CustomRelationType[] 自定义关系类型数组(无数据时返回空数组)
+ * 流程: 解析 localStorage JSON, 失败时返回空数组
+ */
+export function loadCustomRelationTypes(): CustomRelationType[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_RELATION_TYPES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as CustomRelationType[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 保存自定义关系类型列表到 localStorage
+ * 输入: types 自定义关系类型数组
+ * 输出: void
+ * 流程: JSON 序列化后写入 localStorage
+ */
+function persistCustomRelationTypes(types: CustomRelationType[]): void {
+  try {
+    localStorage.setItem(CUSTOM_RELATION_TYPES_STORAGE_KEY, JSON.stringify(types));
+  } catch {
+    // 静默处理写入失败(如 localStorage 满)
+  }
+}
+
+/**
+ * 新增自定义关系类型
+ * 输入:
+ *   label: 中文显示名称(必填, 非空)
+ *   color: 边颜色(可选, 缺省时按数量轮询色板)
+ * 输出: CustomRelationType 新增的关系类型(含生成的 id), 失败返回 null
+ * 流程:
+ *   1. 校验 label 非空
+ *   2. 生成 id(label 拼音化或随机串, 避免与内置类型冲突)
+ *   3. 追加到 localStorage 并返回
+ */
+export function addCustomRelationType(label: string, color?: string): CustomRelationType | null {
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+  const existing = loadCustomRelationTypes();
+  // 颜色: 优先用户传入, 否则按现有数量轮询色板
+  const finalColor = color || CUSTOM_COLOR_PALETTE[existing.length % CUSTOM_COLOR_PALETTE.length];
+  // id 生成: custom_ + 时间戳基 36, 避免与内置类型(master/enemy 等)冲突
+  const id = `custom_${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
+  const newType: CustomRelationType = { id, label: trimmed, color: finalColor };
+  persistCustomRelationTypes([...existing, newType]);
+  return newType;
+}
+
+/**
+ * 删除自定义关系类型
+ * 输入: id 关系类型 id
+ * 输出: void
+ * 流程: 从 localStorage 过滤掉目标 id 并保存
+ * 注意: 不会修改已使用该类型的边(边数据中保留旧 id, 显示时回退到"未知关系")
+ */
+export function deleteCustomRelationType(id: string): void {
+  const existing = loadCustomRelationTypes();
+  persistCustomRelationTypes(existing.filter((t) => t.id !== id));
+}
+
+/**
+ * 获取所有关系类型(内置 + 自定义), 用于下拉选择渲染
+ * 输出: RelationTypeMeta[] 合并后的关系类型列表
+ */
+export function getAllRelationTypes(): RelationTypeMeta[] {
+  const customs = loadCustomRelationTypes().map((c) => ({
+    value: c.id,
+    label: c.label,
+    color: c.color,
+    builtin: false,
+  }));
+  return [...BUILTIN_RELATION_TYPES, ...customs];
+}
+
+/**
+ * 根据关系类型 id 查询元信息(标签与颜色)
+ * 输入: type 关系类型 id(内置字面量或自定义 id)
+ * 输出: { label, color } 元信息, 未找到时回退到"其他"的值
+ * 流程: 先查内置映射, 再查自定义列表, 都未命中返回"其他"灰色
+ */
+export function getRelationMeta(type: string): { label: string; color: string } {
+  // 内置类型直接查映射
+  if (type in RELATION_TYPE_LABELS) {
+    return {
+      label: RELATION_TYPE_LABELS[type as RelationType],
+      color: RELATION_TYPE_COLORS[type as RelationType],
+    };
+  }
+  // 自定义类型查 localStorage
+  const customs = loadCustomRelationTypes();
+  const found = customs.find((c) => c.id === type);
+  if (found) return { label: found.label, color: found.color };
+  // 未找到: 回退到"其他"
+  return { label: "未知关系", color: RELATION_TYPE_COLORS.other };
+}
+

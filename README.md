@@ -43,7 +43,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-26.7.21-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/badge/version-26.7.22-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
@@ -68,6 +68,7 @@
 
 - **剧情时间线**: 基于 React Flow 受控模式, 支持手动拖拽 + dagre LR 自动布局, DFS 三色标记法校验 DAG 无环
 - **人物关系图**: 支持关系类型标签、关系描述编辑, 孤立节点按类型网格化分区布局, 消除遮挡
+- **右键上下文菜单**: 剧情图谱与人物关系图均支持画布空白与节点右键菜单, 含新建节点/编辑/删除/自动布局/重置视图, 屏幕边界检测防溢出, Esc 键与外部点击关闭
 - **节点详情抽屉**: 双向联动编辑, 边详情抽屉支持关系类型自定义
 
 ### 1.3 智能设定库 (Codex)
@@ -90,9 +91,35 @@
 - **.pmd 格式迁移**: 批量将 .txt/.html 转换为 .pmd (ProseMirror JSON), 支持断点续传与进度事件推送
 - **版本快照**: 增量快照归档, 支持项目级版本回溯, 写入前自动清理 .tmp 残留
 
-### 1.6 AI-Ready 基础设施
+### 1.6 AI 创作助手 (AI-1 ~ AI-3)
 
-本项目将全文索引、语义节点、设定库结构化视为"AI 就绪基础设施", 为未来 AI 功能 (大纲生成、剧情推演、角色一致性校验、智能续写) 提供底层支撑:
+本项目采用 BYOK (Bring Your Own Key) 模式, 用户自带 OpenAI 兼容 API Key, 所有 AI 调用流式直连 LLM 服务, 不经任何第三方中转。AI 功能建立在 4 层上下文组装架构之上, 已完成编辑器端到端打通:
+
+| 阶段 | 能力 | 实现 |
+|------|------|------|
+| AI-1 BYOK 配置 | API Key/Base URL/Model 安全存储, SSE 流式管道 | `aiService.ts` + `ai_config.rs`, Base64 编码持久化 |
+| AI-2 上下文组装 | 4 层上下文: 项目元信息 + 章节大纲 + 当前场景文本 + 未回收伏笔 | `ai_context.rs` + `promptBuilder.ts` + `sceneUtils.ts` |
+| AI-3.1 工具栏触发 | 编辑器工具栏 AI 助手按钮, Ctrl+Shift+A 快捷键 | `EditorToolbar.tsx` + `NovelEditor.tsx` |
+| AI-3.2 侧边栏对话 | 右侧滑出面板, 多轮对话历史, 流式输出, 插入到文档 | `AiAssistantPanel.tsx` |
+
+**4 层上下文组装链路**:
+
+```
+NovelEditor 光标位置
+  └─ getCurrentSceneLocation() 识别当前场景
+      └─ get_scene_context (Rust) 组装 4 层上下文
+          └─ PromptBuilder.buildContinuationPrompt 构建 System+User Prompt
+              └─ 用户指令追加到 System Prompt 末尾
+                  └─ streamChatCompletion 流式调用 LLM
+```
+
+**用户指令注入策略**: 不修改 `buildContinuationPrompt` 签名, 通过 `${system}\n\n用户额外指令: ${instruction}` 追加, 保持零侵入。
+
+**多轮对话 Token 控制**: 保留最近 8 条消息 (4 轮) 作为历史上下文, 避免 Token 爆炸。
+
+### 1.7 AI-Ready 基础设施
+
+本项目将全文索引、语义节点、设定库结构化视为"AI 就绪基础设施", 为 AI 创作助手提供底层支撑:
 
 | 模块 | AI 价值 |
 |------|---------|
@@ -148,6 +175,7 @@
 | `F11` | 进入/退出聚焦模式 |
 | `Ctrl + F` | 打开查找替换面板 |
 | `Ctrl + H` | 切换到替换模式 |
+| `Ctrl + Shift + A` | 打开/关闭 AI 助手面板 |
 
 ### 2.4 侧边栏导航
 
@@ -163,6 +191,9 @@
 ---
 
 ## 三、系统架构设计
+
+<details>
+<summary>点击展开架构图与设计要点</summary>
 
 本项目采用桌面端 C/S 变体架构: 前端 Webview 负责渲染与交互, Rust 原生后端承载文件系统操作、图谱计算、模板生成等重型计算。两层通过 Tauri IPC 桥接层进行异步序列化通信。
 
@@ -202,9 +233,14 @@ graph TD
 | 原子写入策略 | 临时文件写入 + rename 原子替换, 写入前清理 `.tmp` 残留 | 防止崩溃或断电导致 JSON 文件损坏 |
 | 受控图谱 | React Flow 受控模式 + zundo pause/resume 精细化历史记录 | 拖拽节点时不产生过量撤销历史条目 |
 
+</details>
+
 ---
 
 ## 四、技术栈选型
+
+<details>
+<summary>点击展开技术栈详情</summary>
 
 | 层级 | 技术选型 | 选型理由 |
 |------|---------|---------|
@@ -222,9 +258,14 @@ graph TD
 | 多模式匹配 | Aho-Corasick (Web Worker) | O(N+K) 实体名称匹配, 在 Web Worker 中运行避免阻塞主线程 |
 | 后端语言 | Rust (stable) + Tauri Command | 内存安全保证本地数据不损坏; 零成本抽象提供原生级文件 IO 性能 |
 
+</details>
+
 ---
 
 ## 五、核心模块与技术实现
+
+<details>
+<summary>点击展开核心模块技术实现细节</summary>
 
 ### 5.1 富文本编辑器引擎
 
@@ -275,9 +316,14 @@ graph TD
 - 前后端 IPC 类型通过 Rust serde 序列化特性与 TypeScript 接口手工对齐, 关键结构体标注 `#[serde(rename_all = "camelCase")]`
 - 全量启用 TypeScript strict 模式, ESLint 强制禁用 `any`/`unknown`, 所有函数参数与返回值显式标注
 
+</details>
+
 ---
 
 ## 六、代码结构
+
+<details>
+<summary>点击展开代码结构树</summary>
 
 项目遵循分层架构原则, 前后端代码严格解耦, 每个模块承担单一职责。
 
@@ -346,6 +392,7 @@ MiaoChuangShuo/
 │   │   ├── SettingsDialog.tsx          # 设置对话框
 │   │   ├── ShortcutPanel.tsx           # 快捷键面板
 │   │   ├── FocusTimer.tsx              # 聚焦计时器
+│   │   ├── AiAssistantPanel.tsx        # AI 助手侧边栏面板 (多轮对话 + 流式输出)
 │   │   ├── ErrorBoundary.tsx           # 渲染异常边界
 │   │   ├── ContextMenu.tsx             # 通用右键菜单
 │   │   ├── ConfirmDialog.tsx           # 统一确认/提示对话框
@@ -380,6 +427,7 @@ MiaoChuangShuo/
 │   │   ├── uiStore.ts                  # UI 布局状态 (FileList 视图/Sidebar 折叠)
 │   │   ├── eventBusSlice.ts            # Tauri 事件总线状态切片
 │   │   ├── promptBuilder.ts            # AI Prompt 统一构建器 (System+User+Constraints)
+│   │   ├── aiService.ts                # AI 服务层 (BYOK 配置 + SSE 流式调用)
 │   │   ├── foreshadowing.ts            # 伏笔追踪数据模型与解析
 │   │   ├── sceneBreak.ts              # 场景分割自定义节点 (pov/mood 元数据)
 │   │   ├── entityHighlightPlugin.ts    # 实体高亮 ProseMirror 插件 (Decoration.inline)
@@ -403,6 +451,8 @@ MiaoChuangShuo/
 ├── tsconfig.json
 └── README.md
 ```
+
+</details>
 
 ---
 
@@ -431,7 +481,7 @@ npm run tauri build
 
 ### 7.3 版本号同步机制
 
-版本号采用 `YY.MM.修改序号` 格式 (如 `26.7.21`), 以下 7 个位置必须保持同步:
+版本号采用 `YY.MM.修改序号` 格式 (如 `26.7.22`), 以下 7 个位置必须保持同步:
 
 | 文件 | 字段 |
 |------|------|
@@ -450,6 +500,9 @@ npm run tauri build
 ---
 
 ## 八、技术特色
+
+<details>
+<summary>点击展开技术特色细节</summary>
 
 ### 8.1 Windows HVCI 兼容性
 
@@ -517,6 +570,8 @@ Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
 - **备份策略**: 迁移前在 `.novelforge/migration_backup_{timestamp}/` 创建完整备份
 - **回滚机制**: 任一文件迁移失败时自动触发回滚, 遍历备份目录恢复原位置, 删除已迁移的新位置文件
 - **进度推送**: 通过 `migration:progress` Tauri Event 实时推送 done/total/currentFile 进度
+
+</details>
 
 ---
 

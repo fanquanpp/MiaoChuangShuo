@@ -6,8 +6,8 @@
 // 中点显示关系类型标签, 选中态加粗。
 
 import { type EdgeProps, getBezierPath, EdgeLabelRenderer } from "@xyflow/react";
-import { RELATION_TYPE_COLORS, RELATION_TYPE_LABELS } from "../lib/stores/characterGraphTypes";
-import type { CharacterGraphEdge, RelationType } from "../lib/stores/characterGraphTypes";
+import { getRelationMeta } from "../lib/stores/characterGraphTypes";
+import type { CharacterGraphEdge } from "../lib/stores/characterGraphTypes";
 import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
 
 /**
@@ -39,9 +39,9 @@ export default function CharacterGraphEdgeComponent(props: EdgeProps<CharacterGr
   const selectEdge = useCharacterGraphStore((s) => s.selectEdge);
 
   // 关系类型默认 other(data 可能未初始化时回退)
-  const relationType: RelationType = data?.relationType ?? "other";
-  const color = RELATION_TYPE_COLORS[relationType];
-  const label = RELATION_TYPE_LABELS[relationType];
+  // 使用 getRelationMeta 统一查询内置与自定义关系类型的标签/颜色
+  const relationType: string = data?.relationType ?? "other";
+  const { color, label } = getRelationMeta(relationType);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,

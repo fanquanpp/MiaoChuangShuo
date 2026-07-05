@@ -1,6 +1,6 @@
 [package]
 name = "miaochuangshuo"
-version = "26.7.21"
+version = "26.7.22"
 description = "喵创说 - 离线小说创作工作站"
 authors = ["MiaoChuangShuo"]
 edition = "2021"
@@ -20,7 +20,7 @@ tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = "0.4"
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros", "io-util", "time"] }
 trash = "5"
 dirs = "5"
 zip = { version = "2", default-features = false, features = ["deflate"] }
@@ -28,3 +28,6 @@ walkdir = "2"
 uuid = { version = "1", features = ["v4"] }
 tantivy = "0.22"
 tantivy-jieba = "0.11"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+futures-util = "0.3"
+base64 = "0.22"

@@ -237,6 +237,16 @@ export default function TimelinePanel() {
   }, [showToast, t]);
 
   /**
+   * 重置视图(居中并自适应缩放)
+   * 输入: 无
+   * 输出: void
+   * 流程: 调用 ReactFlowInstance.fitView 将所有节点居中显示并适配缩放比例
+   */
+  const handleResetView = useCallback(() => {
+    reactFlowInstance.current?.fitView({ padding: 0.2, duration: 300 });
+  }, []);
+
+  /**
    * 创建新节点并可选地连线到父节点
    * 输入: type 节点类型, screenPosition 屏幕坐标(右键位置), parentId 父节点 ID(可选)
    * 输出: void
@@ -616,6 +626,14 @@ export default function TimelinePanel() {
               deleteNode(contextMenu.nodeId);
               showToast("success", t("timeline.toast.deleted"));
             }
+            setContextMenu(null);
+          }}
+          onAutoLayout={() => {
+            handleAutoLayout();
+            setContextMenu(null);
+          }}
+          onResetView={() => {
+            handleResetView();
             setContextMenu(null);
           }}
           onClose={() => setContextMenu(null)}

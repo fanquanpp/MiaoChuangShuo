@@ -46,6 +46,7 @@ import {
   ChevronDown,
   ZoomIn,
   ZoomOut,
+  Sparkles,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { useSettingsStore } from "../lib/settingsStore";
@@ -603,6 +604,9 @@ interface EditorToolbarProps {
   // 查找替换面板
   showFindReplace?: boolean;
   onToggleFindReplace?: () => void;
+  // AI 助手面板 (AI-3.1)
+  showAiPanel?: boolean;
+  onToggleAiPanel?: () => void;
 }
 
 // 编辑器工具栏组件（Office 级富文本模式）
@@ -628,6 +632,8 @@ export default function EditorToolbar({
   onToggleSnapshotHistory,
   showFindReplace = false,
   onToggleFindReplace,
+  showAiPanel = false,
+  onToggleAiPanel,
 }: EditorToolbarProps) {
   const { t } = useI18n();
 
@@ -904,6 +910,24 @@ export default function EditorToolbar({
           <Divider />
           {/* 字号调整组：A- / 当前字号 / A+（实时调整编辑器字体显示大小） */}
           <FontSizeAdjuster />
+          <Divider />
+          {/* AI 助手组 (AI-3.1): 打开侧边栏 AI 创作助手面板 */}
+          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
+            <button
+              type="button"
+              onClick={() => onToggleAiPanel?.()}
+              title={t("ai.panel.toggleHint")}
+              tabIndex={-1}
+              className={`nf-tool-btn h-7 px-2 flex items-center gap-1 text-xs transition-all duration-fast ease-fandex border border-transparent ${
+                showAiPanel
+                  ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary/30"
+                  : "text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {t("ai.panel.toolbarButton")}
+            </button>
+          </div>
         </div>
       )}
     </div>

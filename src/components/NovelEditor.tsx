@@ -74,6 +74,7 @@ import EditorBubbleMenu from "./EditorBubbleMenu";
 import SnapshotHistory from "./SnapshotHistory";
 import CharacterHoverCard from "./CharacterHoverCard";
 import FindReplace from "./FindReplace";
+import AiAssistantPanel from "./AiAssistantPanel";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -243,6 +244,10 @@ export default function NovelEditor({
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   // 查找替换面板可见性（Ctrl+F / Ctrl+H 触发）
   const [showFindReplace, setShowFindReplace] = useState(false);
+  // AI 助手面板可见性（Ctrl+Shift+A 或工具栏按钮触发）
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  // AI 待发送指令 (AI-3.4 右键菜单触发: 存储预设指令, 由 AiAssistantPanel 消费后清空)
+  const [pendingAiInstruction, setPendingAiInstruction] = useState<string | null>(null);
   // 查找替换初始模式：'find' 仅查找 / 'replace' 查找并替换
   const [findReplaceMode, setFindReplaceMode] = useState<"find" | "replace">("find");
   // 文件重载触发器：恢复快照后递增以强制重新加载文件内容
@@ -730,6 +735,32 @@ export default function NovelEditor({
     }
   }, [editor, filePath, dirty, showToast, t, currentProject, snapshotEnabled, snapshotMinInterval]);
 
+  /**
+   * AI 预设指令处理 (AI-3.4 右键菜单触发)
+   * 输入: command 预设指令类型, selectedText 选中文本
+   * 输出: void (组装指令并打开 AI 助手面板)
+   * 流程:
+   *   1. 根据 command 类型选择预设指令模板
+   *   2. 将选中文本填入模板生成完整 instruction
+   *   3. 设置 pendingAiInstruction 并打开 AI 面板
+   *   4. AiAssistantPanel 消费 pendingInstruction 后自动发送
+   */
+  const handleAiCommand = useCallback(
+    (command: "polish" | "expand" | "condense" | "characterCheck", selectedText: string) => {
+      const templates: Record<string, string> = {
+        polish: "请润色以下文本，保持原意，提升文学性与节奏感：\n\n",
+        expand: "请基于以下文本进行扩写，增加细节描写、环境烘托与心理刻画：\n\n",
+        condense: "请精简以下文本，保留核心信息与关键情节，删除冗余表述：\n\n",
+        characterCheck:
+          "请检查以下文本中角色的行为与对话是否符合设定库中的角色设定，逐条分析是否存在 OOC（Out Of Character）情况，并给出修正建议：\n\n",
+      };
+      const instruction = (templates[command] || "") + selectedText;
+      setPendingAiInstruction(instruction);
+      setShowAiPanel(true);
+    },
+    []
+  );
+
   // 导出 TXT
   const handleExportTxt = useCallback(async () => {
     if (!editor) return;
@@ -792,6 +823,11 @@ export default function NovelEditor({
         e.preventDefault();
         setFindReplaceMode("replace");
         setShowFindReplace(true);
+      }
+      // Ctrl+Shift+A 打开 AI 助手面板 (AI-3.1)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        setShowAiPanel((prev) => !prev);
       }
       // Esc 关闭查找替换面板
       if (e.key === "Escape" && showFindReplace) {
@@ -1065,6 +1101,8 @@ export default function NovelEditor({
         onToggleSnapshotHistory={() => setShowSnapshotHistory((prev) => !prev)}
         showFindReplace={showFindReplace}
         onToggleFindReplace={() => setShowFindReplace((prev) => !prev)}
+        showAiPanel={showAiPanel}
+        onToggleAiPanel={() => setShowAiPanel((prev) => !prev)}
       />
 
       {isScript && characters.length > 0 && (
@@ -1103,7 +1141,7 @@ export default function NovelEditor({
         <div className="flex-1 overflow-y-auto relative">
           <EditorContent editor={editor} />
           {/* 选中文字时浮起的格式化工具栏：行内格式移到此处的 BubbleMenu，减少主工具栏按钮数量 */}
-          {editor && <EditorBubbleMenu editor={editor} />}
+          {editor && <EditorBubbleMenu editor={editor} onAiCommand={handleAiCommand} />}
           {/* 查找替换面板：浮于编辑区顶部，Ctrl+F / Ctrl+H 触发 */}
           {showFindReplace && editor && (
             <FindReplace
@@ -1133,6 +1171,17 @@ export default function NovelEditor({
         characterName={hoverCard.name}
         projectPath={currentProject?.path || ""}
         characterId={hoverCard.characterId}
+      />
+
+      {/* AI 助手侧边栏面板 (AI-3.1): 工具栏按钮或 Ctrl+Shift+A 触发 */}
+      <AiAssistantPanel
+        open={showAiPanel}
+        onClose={() => setShowAiPanel(false)}
+        editor={editor}
+        projectPath={currentProject?.path || ""}
+        filePath={filePath}
+        pendingInstruction={pendingAiInstruction}
+        onPendingInstructionConsumed={() => setPendingAiInstruction(null)}
       />
     </div>
   );

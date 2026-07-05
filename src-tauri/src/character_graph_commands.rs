@@ -11,39 +11,11 @@ use std::path::{Path, PathBuf};
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 
-/// 角色关系类型枚举(与前端 RelationType 一一对应)
-/// 注意: 关系类型枚举值序列化为小写字符串(如 "master"/"enemy"),
-///       与前端 TS 联合类型字面量完全匹配, 不使用 camelCase 转换。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum RelationType {
-    Master,
-    Enemy,
-    Family,
-    Friend,
-    Lover,
-    Subordinate,
-    Fellow,
-    Other,
-}
-
-impl RelationType {
-    /// 显式字符串映射(避免 format!("{:?}", variant).to_lowercase() 丢失下划线)
-    /// 输入: &self
-    /// 输出: &'static str
-    pub fn to_str(&self) -> &'static str {
-        match self {
-            Self::Master => "师徒",
-            Self::Enemy => "敌对",
-            Self::Family => "亲属",
-            Self::Friend => "朋友",
-            Self::Lover => "恋人",
-            Self::Subordinate => "上下级",
-            Self::Fellow => "同门",
-            Self::Other => "其他",
-        }
-    }
-}
+/// 关系类型说明:
+/// 后端不再使用枚举, relation_type 字段为 String, 支持用户自定义关系类型.
+/// 前端维护内置关系类型列表(BUILTIN_RELATION_TYPES)与自定义关系类型(localStorage 持久化),
+/// 序列化时存储关系类型的标识字符串(如 "master"/"enemy"/自定义 id).
+/// 此设计避免后端枚举无法反序列化自定义值的问题, 同时保留前端类型安全(内置类型仍为联合字面量).
 
 /// 角色节点业务数据载荷(与前端 CharacterGraphNodeData 字段一致)
 /// serde rename_all = "camelCase": 前端 TS 接口使用驼峰命名(accentColor/sourceFile/createdAt/updatedAt),
@@ -99,7 +71,7 @@ pub struct PersistedNode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedEdgeData {
-    pub relation_type: RelationType,
+    pub relation_type: String,
     #[serde(default)]
     pub description: String,
 }
@@ -329,7 +301,7 @@ fn generate_summary(graph: &CharacterGraph) -> String {
             "{} → {}  关系:{}{}\n",
             find_name(&e.source, graph),
             find_name(&e.target, graph),
-            e.data.relation_type.to_str(),
+            &e.data.relation_type,
             desc
         ));
     }

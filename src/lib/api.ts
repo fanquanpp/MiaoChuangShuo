@@ -1097,6 +1097,7 @@ export interface ForeshadowingBrief {
 
 // 场景上下文（AI 续写的核心数据）
 // AI 价值：这是 AI 理解"剧情结构"的锚点
+// AI-2 扩展: currentSceneText (层1) + globalUnresolvedForeshadowings (层3b)
 export interface SceneContext {
   // 场景 ID（关联 sceneBreak 节点 id）
   sceneId: string;
@@ -1118,6 +1119,10 @@ export interface SceneContext {
   relatedSettings: SettingBrief[];
   // 活跃伏笔列表（从伏笔追踪提取）
   activeForeshadowings: ForeshadowingBrief[];
+  // AI-2 层1: 当前场景正文文本（从 .pmd ProseMirror JSON 提取的纯文本）
+  currentSceneText: string;
+  // AI-2 层3b: 全局未回收伏笔（跨章节/跨场景的活跃伏笔）
+  globalUnresolvedForeshadowings: ForeshadowingBrief[];
 }
 
 // 角色出场记录
@@ -1196,16 +1201,26 @@ export interface ProjectContext {
   chapterCount: number;
 }
 
-// 获取场景上下文
-// 输入: projectPath 项目根路径, sceneId 场景 ID
-// 输出: Promise<SceneContext> 场景上下文
-// 用途: AI 续写时提供当前场景的角色/氛围/前文摘要
-// 当前状态: 后端返回 Mock 空数据，前端可 Mock 数据进行开发
+// 场景上下文请求参数（AI-2 前端调用入口）
+// 字段说明:
+//   - projectPath: 项目根路径
+//   - chapterId: 章节标识（文件相对路径，如 "正文/第一章.pmd"）
+//   - sceneIndex: 场景索引（0-based，由 getCurrentSceneLocation 计算）
+export interface SceneContextRequest {
+  projectPath: string;
+  chapterId: string;
+  sceneIndex: number;
+}
+
+// 获取场景上下文（AI-2 四层上下文组装）
+// 输入: req 场景上下文请求（项目路径 + 章节 ID + 场景索引）
+// 输出: Promise<SceneContext> 场景上下文（含 4 层数据）
+// 用途: AI 续写时提供当前场景正文/出场角色/伏笔/前文摘要
+// 实现状态: AI-2 已实现后端 4 层组装（读取 .pmd + 设定库 + 伏笔目录）
 export async function getSceneContext(
-  projectPath: string,
-  sceneId: string
+  req: SceneContextRequest
 ): Promise<SceneContext> {
-  return invoke<SceneContext>("get_scene_context", { projectPath, sceneId });
+  return invoke<SceneContext>("get_scene_context", { req });
 }
 
 // 获取角色上下文

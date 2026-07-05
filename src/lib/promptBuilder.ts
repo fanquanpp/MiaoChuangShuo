@@ -54,6 +54,10 @@ export interface ForeshadowingBrief {
 /**
  * 场景上下文（AI 续写的核心数据）
  * AI 价值：理解"第几幕/谁的视角/什么氛围"，生成符合上下文的内容
+ *
+ * AI-2 扩展字段:
+ *   - currentSceneText: 当前场景正文文本（层1），让 AI 知道"已写了什么"，自然衔接续写
+ *   - globalUnresolvedForeshadowings: 全局未回收伏笔（层3b），供 AI 全局视角参考
  */
 export interface SceneContext {
   sceneId: string;
@@ -68,6 +72,10 @@ export interface SceneContext {
   presentCharacters: CharacterBrief[];
   relatedSettings: SettingBrief[];
   activeForeshadowings: ForeshadowingBrief[];
+  /** AI-2 层1: 当前场景正文文本（从 .pmd ProseMirror JSON 提取的纯文本） */
+  currentSceneText: string;
+  /** AI-2 层3b: 全局未回收伏笔（跨章节/跨场景的活跃伏笔） */
+  globalUnresolvedForeshadowings: ForeshadowingBrief[];
 }
 
 /**
@@ -233,13 +241,23 @@ export class PromptBuilder {
   }
 
   /**
-   * 构建续写 Prompt
-   * 输入: sceneCtx 场景上下文
+   * 构建续写 Prompt（AI-2 升级：4 层上下文注入）
+   * 输入: sceneCtx 场景上下文（含 4 层数据：场景正文/出场角色/伏笔/前文摘要）
    * 输出: BuiltPrompt 完整提示词
    * 流程:
    *   1. System Prompt 定义角色与约束
-   *   2. User Prompt 注入场景信息（视角/氛围/前文摘要/出场角色/活跃伏笔）
+   *   2. User Prompt 注入 4 层上下文:
+   *      层1: 当前场景元数据 + 场景正文文本（让 AI 自然衔接）
+   *      层2: 出场角色设定（避免角色幻觉）
+   *      层3: 场景内伏笔 + 全局未回收伏笔（提醒 AI 回收时机）
+   *      层4: 前文摘要（保持剧情连贯）
    *   3. 明确续写任务指令（字数、风格、避免重复）
+   *
+   * Token 控制:
+   *   - currentSceneText 超 2000 字时截取最后 2000 字（保留近文上下文）
+   *   - precedingSummary 超 1000 字时截取最后 1000 字
+   *   - presentCharacters 最多取 5 个（避免 Token 爆炸）
+   *   - globalUnresolvedForeshadowings 最多取 5 个
    */
   buildContinuationPrompt(sceneCtx: SceneContext): BuiltPrompt {
     const system = this.buildSystemPrompt();
@@ -250,19 +268,29 @@ export class PromptBuilder {
       sceneCtx.povCharacterName ? `视角：${sceneCtx.povCharacterName}（${sceneCtx.povCharacterId ?? ""}）` : "",
       sceneCtx.mood ? `氛围：${sceneCtx.mood}` : "",
       "",
-      "前文摘要：",
-      sceneCtx.precedingSummary || "（无前文，此为开篇）",
-      "",
     ].filter(Boolean);
 
+    // 层4: 前文摘要（截取最后 1000 字，保留近期剧情）
+    if (sceneCtx.precedingSummary) {
+      lines.push("前文摘要：");
+      const prevText = sceneCtx.precedingSummary.length > 1000
+        ? sceneCtx.precedingSummary.slice(-1000) + "..."
+        : sceneCtx.precedingSummary;
+      lines.push(prevText);
+      lines.push("");
+    }
+
+    // 层2: 出场角色设定（最多 5 个，避免 Token 爆炸）
     if (sceneCtx.presentCharacters.length > 0) {
       lines.push("当前出场角色：");
-      for (const c of sceneCtx.presentCharacters) {
+      const charsToInclude = sceneCtx.presentCharacters.slice(0, 5);
+      for (const c of charsToInclude) {
         lines.push(`- ${c.name}（${c.id}）：${c.summary}`);
       }
       lines.push("");
     }
 
+    // 相关设定（地点/物品/组织）
     if (sceneCtx.relatedSettings.length > 0) {
       lines.push("相关设定：");
       for (const s of sceneCtx.relatedSettings) {
@@ -271,11 +299,34 @@ export class PromptBuilder {
       lines.push("");
     }
 
+    // 层3a: 场景内伏笔（当前场景已埋设的伏笔）
     if (sceneCtx.activeForeshadowings.length > 0) {
-      lines.push("活跃伏笔（需考虑回收时机）：");
+      lines.push("场景内活跃伏笔（需考虑回收时机）：");
       for (const f of sceneCtx.activeForeshadowings) {
         lines.push(`- [${f.importance}] ${f.description}（状态：${f.status}）`);
       }
+      lines.push("");
+    }
+
+    // 层3b: 全局未回收伏笔（最多 5 个，提醒 AI 全局伏笔状态）
+    if (sceneCtx.globalUnresolvedForeshadowings.length > 0) {
+      lines.push("全局未回收伏笔（供全局参考，非必须在此场景回收）：");
+      const globalToInclude = sceneCtx.globalUnresolvedForeshadowings.slice(0, 5);
+      for (const f of globalToInclude) {
+        lines.push(`- [${f.importance}] ${f.description}（状态：${f.status}）`);
+      }
+      lines.push("");
+    }
+
+    // 层1: 当前场景正文文本（截取最后 2000 字，让 AI 自然衔接）
+    if (sceneCtx.currentSceneText) {
+      lines.push("当前场景正文（请基于此自然衔接续写）：");
+      lines.push("```");
+      const sceneText = sceneCtx.currentSceneText.length > 2000
+        ? "..." + sceneCtx.currentSceneText.slice(-2000)
+        : sceneCtx.currentSceneText;
+      lines.push(sceneText);
+      lines.push("```");
       lines.push("");
     }
 
@@ -292,7 +343,9 @@ export class PromptBuilder {
           hasCharacterContext: false,
           hasProjectContext: false,
           presentCharacterCount: sceneCtx.presentCharacters.length,
-          activeForeshadowingCount: sceneCtx.activeForeshadowings.length,
+          activeForeshadowingCount:
+            sceneCtx.activeForeshadowings.length +
+            sceneCtx.globalUnresolvedForeshadowings.length,
         },
       },
     };

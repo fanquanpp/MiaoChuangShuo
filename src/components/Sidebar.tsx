@@ -31,7 +31,6 @@ import {
   PanelLeftClose,
   GitBranch,
   Trash2,
-  Check,
   X,
   Users,
 } from "lucide-react";
@@ -159,19 +158,38 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
     refreshExtraDirs();
   }, [refreshExtraDirs]);
 
-  // ===== 自定义分类新建功能 =====
+  // ===== 自定义分类新建功能(悬浮模态面板) =====
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const newCategoryInputRef = useRef<HTMLInputElement>(null);
+
+  // 打开新建分类模态: 重置状态并自动聚焦输入框
+  const openAddCategoryDialog = () => {
+    setNewCategoryName("");
+    setCategoryError(null);
+    setIsAddingCategory(true);
+    // 延迟聚焦, 等待模态渲染完成
+    setTimeout(() => newCategoryInputRef.current?.focus(), 50);
+  };
+
+  // 关闭新建分类模态
+  const closeAddCategoryDialog = () => {
+    setIsAddingCategory(false);
+    setNewCategoryName("");
+    setCategoryError(null);
+  };
 
   // 提交新建分类：在项目根目录创建对应目录（通过创建 .gitkeep 占位文件）
   const handleCreateCategory = async () => {
     const name = newCategoryName.trim();
-    if (!name || !currentProject) return;
+    if (!name || !currentProject) {
+      setCategoryError(t("sidebar.customCategoryNameRequired"));
+      return;
+    }
     // 校验名称合法性：禁止路径分隔符与特殊字符
     if (/[\\/:*?"<>|]/.test(name)) {
-      setIsAddingCategory(false);
-      setNewCategoryName("");
+      setCategoryError(t("sidebar.customCategoryNameInvalid"));
       return;
     }
     // 禁止与已知分类目录重名
@@ -181,19 +199,18 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
     }
     for (const d of typeSpecificDirs) knownDirs.add(d);
     if (knownDirs.has(name) || extraDirs.includes(name)) {
-      setIsAddingCategory(false);
-      setNewCategoryName("");
+      setCategoryError(t("sidebar.customCategoryNameExists"));
       return;
     }
     try {
       // 创建 .gitkeep 占位文件，后端会自动创建父目录
       await createFile(currentProject.path, `${name}/.gitkeep`, "");
       await refreshExtraDirs();
-    } catch {
-      // 静默处理创建失败
+      // 成功后关闭模态
+      closeAddCategoryDialog();
+    } catch (err) {
+      setCategoryError(`${t("sidebar.customCategoryCreateFailed")}: ${String(err)}`);
     }
-    setIsAddingCategory(false);
-    setNewCategoryName("");
   };
 
   // ===== 自定义分类右键删除功能 =====
@@ -450,46 +467,13 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
               )}
               {t("sidebar.customSection")}
             </button>
-            {/* 新建自定义分类按钮 */}
+            {/* 新建自定义分类按钮 - 打开悬浮模态面板 */}
             <button
-              onClick={() => {
-                setIsAddingCategory(true);
-                setTimeout(() => newCategoryInputRef.current?.focus(), 50);
-              }}
+              onClick={openAddCategoryDialog}
               title={t("sidebar.newCustomCategory")}
               className="w-5 h-5 mr-2 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-colors duration-fast"
             >
               <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-        {/* 新建分类输入框（inline 模式，回车确认，Esc/点击取消按钮取消） */}
-        {isAddingCategory && !collapsed && (
-          <div className="px-3 py-1 flex items-center gap-1">
-            <input
-              ref={newCategoryInputRef}
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreateCategory();
-                if (e.key === "Escape") { setIsAddingCategory(false); setNewCategoryName(""); }
-              }}
-              placeholder={t("sidebar.customCategoryName")}
-              className="flex-1 h-6 px-1.5 text-xs bg-nf-bg border border-fandex-primary/40 text-nf-text placeholder:text-nf-text-tertiary focus:outline-none focus:border-fandex-primary"
-            />
-            <button
-              onClick={handleCreateCategory}
-              title={t("app.confirm")}
-              className="w-5 h-5 flex items-center justify-center text-fandex-primary hover:bg-fandex-primary/10 transition-colors duration-fast"
-            >
-              <Check className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => { setIsAddingCategory(false); setNewCategoryName(""); }}
-              title={t("app.cancel")}
-              className="w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary hover:bg-nf-bg-hover transition-colors duration-fast"
-            >
-              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -619,6 +603,88 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
             <Trash2 className="w-3.5 h-3.5" />
             {t("sidebar.deleteCategory")}
           </button>
+        </div>
+      )}
+
+      {/* 新建自定义分类悬浮模态面板 - 类似 SettingsDialog 的居中模态 */}
+      {isAddingCategory && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeAddCategoryDialog();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") closeAddCategoryDialog();
+          }}
+        >
+          <div
+            className="nf-glass-panel w-full max-w-sm bg-nf-bg-card border border-nf-border-light shadow-lg flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 头部 */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-nf-border-light">
+              <h3 className="text-sm font-semibold font-display text-nf-text flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-fandex-primary" />
+                {t("sidebar.newCustomCategory")}
+              </h3>
+              <button
+                onClick={closeAddCategoryDialog}
+                className="p-1 hover:bg-nf-bg-hover text-nf-text-tertiary transition duration-fast"
+                aria-label="close dialog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 表单内容 */}
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs text-nf-text-secondary mb-1">
+                  {t("sidebar.customCategoryName")}
+                </label>
+                <input
+                  ref={newCategoryInputRef}
+                  value={newCategoryName}
+                  onChange={(e) => {
+                    setNewCategoryName(e.target.value);
+                    if (categoryError) setCategoryError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateCategory();
+                    if (e.key === "Escape") closeAddCategoryDialog();
+                  }}
+                  placeholder={t("sidebar.customCategoryName")}
+                  className="w-full h-8 px-2.5 text-sm bg-nf-bg border border-nf-border-light text-nf-text placeholder:text-nf-text-tertiary focus:outline-none focus:border-fandex-primary transition duration-fast"
+                />
+                {/* 错误提示 */}
+                {categoryError && (
+                  <p className="mt-1.5 text-[11px] text-fandex-tertiary flex items-center gap-1">
+                    <X className="w-3 h-3" />
+                    {categoryError}
+                  </p>
+                )}
+                <p className="mt-1.5 text-[10px] text-nf-text-tertiary">
+                  {t("sidebar.customCategoryHint")}
+                </p>
+              </div>
+            </div>
+
+            {/* 底部按钮 */}
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
+              <button
+                onClick={closeAddCategoryDialog}
+                className="px-3 py-1.5 text-xs text-nf-text-secondary hover:text-nf-text border border-nf-border-light hover:bg-nf-bg-hover transition-colors duration-fast"
+              >
+                {t("app.cancel")}
+              </button>
+              <button
+                onClick={handleCreateCategory}
+                className="px-3 py-1.5 text-xs text-nf-bg-card bg-fandex-primary hover:bg-fandex-primary/90 transition-colors duration-fast"
+              >
+                {t("app.confirm")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -26,6 +26,8 @@ mod tantivy_indexer;
 mod tantivy_search;
 mod ai_context;
 mod legacy_migration;
+mod ai_config;
+mod ai_commands;
 
 /// 应用入口函数
 /// 输入: 无
@@ -124,6 +126,13 @@ pub fn run() {
             ai_context::get_project_context,
             // 旧版项目目录结构迁移命令
             legacy_migration::migrate_legacy_project,
+            // AI 配置管理命令（BYOK 模式：API Key/Base URL/Model 持久化）
+            ai_config::get_ai_config,
+            ai_config::set_ai_config,
+            ai_config::test_ai_connection,
+            // AI 流式聊天命令（OpenAI 兼容协议，SSE 流式推送）
+            ai_commands::chat_completion_stream,
+            ai_commands::cancel_chat_completion,
         ])
         .setup(|_app| {
             Ok(())

@@ -11,7 +11,9 @@
 // NodeProps 仍使用默认 Node 类型(因 @xyflow/react v12 泛型约束与禁用 unknown 规则冲突),
 // 但 id 与 selected 字段由 React Flow 正确注入。
 
+import { useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { CharacterGraphNodeData } from "../lib/stores/characterGraphTypes";
 import { DEFAULT_NODE_ACCENT } from "../lib/stores/characterGraphTypes";
 import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
@@ -27,6 +29,10 @@ import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
  *   4. 渲染 Handle 锚点(左侧 target, 右侧 source)
  */
 export default function CharacterGraphNode({ id, selected }: NodeProps) {
+  // 折叠状态: 本地 useState 维护(临时视图操作, 不持久化)
+  // 折叠时仅显示角色名称与身份标识, 展开时显示全部字段(标签+简介)
+  const [collapsed, setCollapsed] = useState(false);
+
   // 直接从 Zustand store 按 ID 订阅节点数据
   // 修复记录: 原实现使用 useNodesData(id) 从 React Flow 内部 store 读取,
   //   但在受控模式下, store 中 nodes 变化后 useNodesData 可能无法及时感知 data 字段的更新,
@@ -50,7 +56,8 @@ export default function CharacterGraphNode({ id, selected }: NodeProps) {
         }
       `}
       style={{
-        width: 200,
+        // 折叠时宽度收窄为 160px, 展开时 200px
+        width: collapsed ? 160 : 200,
         // 磨砂玻璃 65% 透明度(与 TimelineNode 保持一致视觉风格)
         backgroundColor: "rgba(22, 24, 33, 0.65)",
         // 多层阴影提升质感: 外阴影(深度) + 内顶部高光(立体感)
@@ -88,7 +95,7 @@ export default function CharacterGraphNode({ id, selected }: NodeProps) {
       <div className="nf-card-sheen nf-card-dots relative overflow-hidden">
         {/* 内容区(统一内边距, 优化排版节奏, z 层级高于装饰) */}
         <div className="px-3.5 py-2.5 relative z-[1]">
-          {/* 姓名行: 角色姓名 + 关联文件标识(如有) */}
+          {/* 姓名行: 角色姓名 + 折叠/展开切换按钮 */}
           <div className="flex items-start justify-between gap-2 mb-1.5">
             <div
               className="text-sm font-bold font-display truncate flex-1 leading-tight"
@@ -97,9 +104,24 @@ export default function CharacterGraphNode({ id, selected }: NodeProps) {
             >
               {data.name || "未命名角色"}
             </div>
+            {/* 折叠/展开切换按钮: 点击切换 collapsed 状态
+                阻止 mousedown 冒泡避免触发 React Flow 的节点拖拽 */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCollapsed((v) => !v);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="text-nf-text-tertiary hover:text-fandex-primary transition-colors duration-fast flex-shrink-0 mt-0.5"
+              title={collapsed ? "展开" : "折叠"}
+              aria-label={collapsed ? "展开节点" : "折叠节点"}
+            >
+              {collapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            </button>
           </div>
 
-          {/* 身份标签(几何直角, 强调色填充提升识别度) */}
+          {/* 身份标签(几何直角, 强调色填充提升识别度) - 折叠/展开均显示 */}
           {data.identity && (
             <div className="mb-1.5">
               <span
@@ -111,30 +133,35 @@ export default function CharacterGraphNode({ id, selected }: NodeProps) {
             </div>
           )}
 
-          {/* 标签数组(限定 3 个, 多余显示 +N) */}
-          {data.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-1.5">
-              {data.tags.slice(0, 3).map((tag, idx) => (
-                <span
-                  key={`${tag}-${idx}`}
-                  className="text-[10px] px-1.5 py-0.5 border border-nf-border-light text-nf-text-tertiary"
-                >
-                  {tag}
-                </span>
-              ))}
-              {data.tags.length > 3 && (
-                <span className="text-[10px] px-1.5 py-0.5 text-nf-text-tertiary">
-                  +{data.tags.length - 3}
-                </span>
+          {/* 折叠态: 隐藏标签数组与简介预览, 仅保留姓名+身份标识 */}
+          {!collapsed && (
+            <>
+              {/* 标签数组(限定 3 个, 多余显示 +N) */}
+              {data.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {data.tags.slice(0, 3).map((tag, idx) => (
+                    <span
+                      key={`${tag}-${idx}`}
+                      className="text-[10px] px-1.5 py-0.5 border border-nf-border-light text-nf-text-tertiary"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {data.tags.length > 3 && (
+                    <span className="text-[10px] px-1.5 py-0.5 text-nf-text-tertiary">
+                      +{data.tags.length - 3}
+                    </span>
+                  )}
+                </div>
               )}
-            </div>
-          )}
 
-          {/* 简介预览(line-clamp-2 限制 2 行, 优化行高) */}
-          {data.brief && (
-            <div className="text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
-              {data.brief}
-            </div>
+              {/* 简介预览(line-clamp-2 限制 2 行, 优化行高) */}
+              {data.brief && (
+                <div className="text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
+                  {data.brief}
+                </div>
+              )}
+            </>
           )}
         </div>
 
