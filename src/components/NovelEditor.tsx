@@ -60,6 +60,10 @@ import { AutoPair } from "../lib/autoPair";
 import { LineHighlight } from "../lib/lineHighlight";
 import { SmartTab } from "../lib/smartTab";
 import { FontSizeShortcut } from "../lib/fontSizeShortcut";
+import { EntityHighlight } from "../lib/entityHighlightPlugin";
+import { getEntityHighlightClient } from "../lib/entityHighlightClient";
+import { listCodexEntities } from "../lib/codexApi";
+import { Foreshadowing } from "../lib/foreshadowing";
 import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
@@ -90,6 +94,40 @@ function isHtmlContent(content: string): boolean {
   if (!trimmed.startsWith("<")) return false;
   // 检测常见块级标签：p/h1-h6/ul/ol/div/blockquote/pre/table/section/article
   return /^<(p|h[1-6]|ul|ol|div|blockquote|pre|table|section|article|figure)\b/i.test(trimmed);
+}
+
+/**
+ * 检测内容是否为 ProseMirror JSON 文档（.pmd 格式）
+ * 输入: content 文件内容
+ * 输出: boolean 是否为 ProseMirror JSON
+ * 流程:
+ *   1. 去除首尾空白
+ *   2. 检测是否以 { 开头并包含 "type":"doc"
+ *   3. 用于加载时识别 .pmd 格式
+ */
+function isPmdContent(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("{")) return false;
+  // ProseMirror JSON 文档的根节点 type 为 "doc"
+  return /"type"\s*:\s*"doc"/.test(trimmed);
+}
+
+/**
+ * 将文件路径转换为 .pmd 扩展名
+ * 输入: filePath 原始文件路径
+ * 输出: string .pmd 扩展名的文件路径
+ * 流程:
+ *   1. 已是 .pmd 则原样返回
+ *   2. .txt/.html/.htm 替换为 .pmd
+ *   3. 无扩展名则追加 .pmd
+ */
+function toPmdPath(filePath: string): string {
+  if (filePath.toLowerCase().endsWith(".pmd")) return filePath;
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith(".txt") || lower.endsWith(".html") || lower.endsWith(".htm")) {
+    return filePath.replace(/\.(txt|html|htm)$/i, ".pmd");
+  }
+  return filePath + ".pmd";
 }
 
 /**
@@ -171,7 +209,14 @@ export default function NovelEditor({
   const [characters, setCharacters] = useState<string[]>([]);
   const { showToast } = useToast();
   // 角色悬停卡片状态：鼠标悬停在正文中的角色名上时显示摘要卡片
-  const [hoverCard, setHoverCard] = useState<{ open: boolean; x: number; y: number; name: string }>({
+  // characterId 字段（p5-26）：从实体高亮装饰的 data-entity-id 属性提取，供 AI 操作区使用
+  const [hoverCard, setHoverCard] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    name: string;
+    characterId?: string;
+  }>({
     open: false, x: 0, y: 0, name: "",
   });
   const hoverTimerRef = useRef<number | null>(null);
@@ -307,6 +352,45 @@ export default function NovelEditor({
     return () => { cancelled = true; };
   }, [currentProject]);
 
+  // 构建 Aho-Corasick 实体高亮自动机
+  // 依赖：阶段 1 设定库（listCodexEntities）提供结构化实体（含 UUID 与别名）
+  // 行为：项目切换时重置 Worker 自动机，注入新项目的全部实体模式串
+  // AI-Ready：自动机为 Web Worker 内的 Aho-Corasick 自动机，匹配触发 `entity:detected` 事件
+  // 容错：设定库读取失败时清空自动机，避免跨项目实体污染
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentProject) {
+      // 无项目上下文：清空自动机，避免上次项目残留匹配
+      getEntityHighlightClient().reset();
+      return;
+    }
+    const buildAutomaton = async () => {
+      try {
+        const entities = await listCodexEntities(currentProject.path);
+        if (cancelled) return;
+        // 将 StructuredCodexEntity 转为 Worker 接受的 EntityPattern
+        // 实体名与别名均作为模式串注入（O(N+K) 一次扫描全部匹配）
+        // 过滤空名与空别名的脏数据，避免 AC 自动机插入空串导致死循环
+        const patterns = entities
+          .map((e) => ({
+            entityId: e.meta.id,
+            entityName: e.meta.name,
+            entityType: e.meta.entity_type,
+            aliases: (e.meta.aliases ?? []).filter((a) => a.trim().length > 0),
+          }))
+          .filter((p) => p.entityId && p.entityName && p.entityName.trim().length > 0);
+        // 先重置再构建：防止旧项目实体残留造成跨项目误高亮
+        getEntityHighlightClient().reset();
+        await getEntityHighlightClient().buildAutomaton(patterns);
+      } catch {
+        // 设定库读取失败：清空自动机，编辑器仍可用（仅无高亮）
+        if (!cancelled) getEntityHighlightClient().reset();
+      }
+    };
+    buildAutomaton();
+    return () => { cancelled = true; };
+  }, [currentProject]);
+
   // 构建 TipTap 扩展列表（Office 级富文本模式）
   // 包含完整富文本能力：标题层级、列表、表格、链接、高亮、对齐、颜色等
   const extensions: Extensions = useMemo(() => {
@@ -379,6 +463,20 @@ export default function NovelEditor({
 
     // 角色名补全扩展：所有文体全量注册，由全局开关控制行为
     // 开关关闭时 onKeyDown 直接 return false，Tab 键交还默认缩进行为
+    //
+    // zundo 协调策略（遗漏 13 补充）：
+    // ProseMirror 编辑器内容由 ProseMirror History 扩展管理撤销/重做，
+    // zundo temporal 中间件仅管理全局状态（timelineStore/characterGraphStore）。
+    // 两者作用域分离，characterMention 插入产生的文档变更由 ProseMirror History 处理。
+    //
+    // 当 onSelect 回调需要更新全局状态（如最近使用角色列表）时：
+    //   1. 在回调内调用 useTimelineStore.temporal.getState().pause()
+    //   2. 执行全局状态更新
+    //   3. 立即调用 useTimelineStore.temporal.getState().resume()
+    //   4. 这样 zundo 不会记录此次全局状态变更，避免与 ProseMirror History 不同步
+    //
+    // 当前 onSelect 为空函数，无需 zundo pause/resume。
+    // 阶段 5 实时标记接入后，若 onSelect 触发全局状态更新，需按上述策略包裹。
     exts.push(
       CharacterMention.configure({
         characters,
@@ -394,10 +492,31 @@ export default function NovelEditor({
       })
     );
 
+    // 实体高亮扩展：所有文体全量注册，由全局开关控制行为
+    // 依赖：Codex 设定库（阶段 1）提供 EntityPattern 数据源
+    // 行为：Web Worker Aho-Corasick 自动机匹配实体名/别名，ProseMirror Decoration 渲染下划线
+    // AI-Ready：匹配结果触发 `entity:detected` Tauri 事件，供 AI 模块监听场景上下文
+    // 文件路径传空时仅高亮不触发事件（防止空路径污染 AI 数据流）
+    exts.push(
+      EntityHighlight.configure({
+        enabled: editorPrefs.enableEntityHighlight,
+        filePath: filePath || "",
+      })
+    );
+
     // 诗歌排版扩展：所有文体全量注册，由全局开关控制行为
     exts.push(PoetryFormat.configure({ enabled: editorPrefs.enablePoetryFormat }));
+
+    // 伏笔标记扩展：所有文体全量注册，由全局开关控制行为
+    // p5-27：底部波浪线 Decoration 由 CSS .nf-foreshadowing--{status} 提供
+    // 快捷键 Alt+Shift-F 已避开 Alt+7（人物图）与 Alt+8（伏笔面板）
+    // Mark 持久化 foreshadowingId + status，伏笔面板状态变更通过 updateForeshadowingStatus 同步
+    // 开关关闭时 Mark 仍可被 parseHTML 解析（保证旧文件加载不丢失标记），仅 toggle 命令受开关控制
+    if (editorPrefs.enableForeshadowMark) {
+      exts.push(Foreshadowing.configure({ HTMLAttributes: {} }));
+    }
     return exts;
-  }, [characters, t, indentEnabled, indentWidth, editorPrefs]);
+  }, [characters, t, indentEnabled, indentWidth, editorPrefs, filePath, editorPrefs.enableEntityHighlight, editorPrefs.enableForeshadowMark]);
 
   // 创建编辑器实例（Office 级富文本模式）
   const editor = useEditor({
@@ -420,7 +539,7 @@ export default function NovelEditor({
     },
   });
 
-  // 加载文件内容（智能识别 HTML 富文本 vs 纯文本，向后兼容旧 .txt）
+  // 加载文件内容（三层兼容读取：.pmd > .html > .txt）
   useEffect(() => {
     let cancelled = false;
     if (!editor || !filePath) {
@@ -431,7 +550,13 @@ export default function NovelEditor({
     }
 
     setLoadError("");
-    readFile(filePath, currentProject?.path || "")
+    const projectPath = currentProject?.path || "";
+    const pmdPath = toPmdPath(filePath);
+    // 三层兼容读取：优先 .pmd 版本，不存在则降级读取原文件
+    const loadPromise = pmdPath !== filePath
+      ? readFile(pmdPath, projectPath).catch(() => readFile(filePath, projectPath))
+      : readFile(filePath, projectPath);
+    loadPromise
       .then((content) => {
         if (cancelled) return;
         // 日记模式：新建空文件时自动添加当天日期
@@ -442,10 +567,21 @@ export default function NovelEditor({
           finalContent = `${dateStr}\n\n`;
         }
 
-        // 智能识别内容格式：
-        // - HTML 格式（新富文本存储）：直接 setContent(html)
+        // 智能识别内容格式（三层兼容读取）：
+        // - .pmd 格式（ProseMirror JSON）：JSON.parse 后 setContent(json)
+        // - HTML 格式（旧富文本存储）：直接 setContent(html)
         // - 纯文本（旧 .txt 兼容）：按行转 HTML 段落再 setContent
-        if (isHtmlContent(finalContent)) {
+        if (isPmdContent(finalContent)) {
+          // .pmd 格式：解析 ProseMirror JSON 并直接注入编辑器
+          try {
+            const json = JSON.parse(finalContent);
+            editor.commands.setContent(json);
+          } catch {
+            // JSON 解析失败，降级为纯文本处理
+            const html = plainTextToHtml(finalContent);
+            editor.commands.setContent(html);
+          }
+        } else if (isHtmlContent(finalContent)) {
           editor.commands.setContent(finalContent);
         } else {
           const html = plainTextToHtml(finalContent);
@@ -453,8 +589,8 @@ export default function NovelEditor({
         }
         if (cancelled) return;
         setDirty(false);
-        // 记录上次保存内容（用于冲突检测，使用 HTML 字符串）
-        lastSavedContentRef.current = editor.getHTML();
+        // 记录上次保存内容（用于冲突检测，使用 JSON 字符串）
+        lastSavedContentRef.current = JSON.stringify(editor.getJSON());
         setWordCount(countWords(editor.getText()));
         // 记录最近文件
         const relativePath = filePath.replace(
@@ -512,7 +648,7 @@ export default function NovelEditor({
     return () => { cancelled = true; };
   }, [filePath, editor, currentProject, t, projectType, diaryAutoDate, reloadKey]);
 
-  // 保存文件（HTML 持久化，保留富文本格式；含竞态保护）
+  // 保存文件（.pmd 持久化，ProseMirror JSON 格式；含竞态保护）
   const savingRef = useRef(false);
   const pendingSaveRef = useRef(false);
   const lastSavedContentRef = useRef("");
@@ -527,9 +663,14 @@ export default function NovelEditor({
     pendingSaveRef.current = false;
     setSaving(true);
     try {
+      const projectPath = currentProject?.path || "";
+      const pmdPath = toPmdPath(filePath);
       // 冲突检测：读取当前磁盘内容与上次保存内容比较
+      // 优先读取 .pmd 版本，不存在则读原文件
       try {
-        const currentContent = await readFile(filePath, currentProject?.path || "");
+        const currentContent = pmdPath !== filePath
+          ? await readFile(pmdPath, projectPath).catch(() => readFile(filePath, projectPath))
+          : await readFile(filePath, projectPath);
         if (
           lastSavedContentRef.current &&
           currentContent !== lastSavedContentRef.current
@@ -544,10 +685,15 @@ export default function NovelEditor({
         // 文件可能不存在，跳过冲突检测
       }
 
-      // 保存为 HTML 格式，持久化富文本格式（标题/列表/表格/链接/高亮等）
-      const html = editor.getHTML();
-      await writeFile(filePath, html, currentProject?.path || "");
-      lastSavedContentRef.current = html;
+      // 保存为 .pmd 格式（ProseMirror JSON），持久化完整文档结构
+      // .pmd 格式相比 .html 优势：
+      //   1. 保留 sceneBreak/characterMentionNode/foreshadowing 等自定义节点
+      //   2. 便于 Tantivy 索引与 AI 上下文提取
+      //   3. 避免 HTML 序列化/反序列化的信息丢失
+      const json = editor.getJSON();
+      const jsonStr = JSON.stringify(json);
+      await writeFile(pmdPath, jsonStr, projectPath);
+      lastSavedContentRef.current = jsonStr;
       setDirty(false);
       useAppStore.getState().setEditorDirty(false);
       showToast("success", t("editor.saved"));
@@ -561,7 +707,8 @@ export default function NovelEditor({
         if (elapsed >= snapshotMinInterval * 1000) {
           lastSnapshotTimeRef.current = now;
           // 异步创建快照，不阻塞保存流程，失败静默处理（不打扰作者）
-          createSnapshot(filePath, currentProject.path, html, "auto").catch(() => {
+          // 保存 .pmd JSON 字符串作为快照内容（保留自定义节点结构）
+          createSnapshot(filePath, currentProject.path, jsonStr, "auto").catch(() => {
             // 快照创建失败不影响保存成功状态，仅回退时间戳以便下次重试
             lastSnapshotTimeRef.current = 0;
           });
@@ -726,14 +873,15 @@ export default function NovelEditor({
     return () => window.clearTimeout(id);
   }, [editor]);
 
-  // 角色悬停卡片：监听编辑器内光标移动，悬停在角色名上时延迟显示摘要卡片
-  // 仅在剧本/对话体（已加载角色名列表）时启用
+  // 角色悬停卡片：所有文体全量启用（p5-26 移除文体限制）
+  // 依赖：p5-25 实体高亮装饰提供 data-entity-id 属性（characterId 用于 AI 操作区）
   // 交互逻辑：
   //   1. 首次悬停在某角色名上：延迟 500ms 后显示（避免误触）
   //   2. 在同一角色名内移动：仅更新卡片坐标，不重置计时器（避免闪烁）
   //   3. 从一个角色名切换到另一个：立即切换（已激活悬停态，无需再次延迟）
   //   4. 移动到非角色名文本：立即隐藏卡片
   //   5. 离开编辑器区域：立即隐藏卡片
+  //  AI-Ready：优先从 data-entity-id 提取 characterId（UUID），无装饰时回退为 undefined
   useEffect(() => {
     if (!editor || characters.length === 0) {
       setHoverCard((prev) => (prev.open ? { ...prev, open: false } : prev));
@@ -783,6 +931,18 @@ export default function NovelEditor({
         if (matchedName) break;
       }
 
+      // AI-Ready：从实体高亮装饰提取 characterId（UUID）
+      // 优先查询最近的 .nf-entity-character 祖先元素的 data-entity-id 属性
+      // 无装饰时返回 undefined（旧版未启用实体高亮的兼容路径）
+      const extractCharacterId = (): string | undefined => {
+        const target = e.target as HTMLElement | null;
+        if (!target) return undefined;
+        const entitySpan = target.closest('[data-entity-type="character"]') as HTMLElement | null;
+        if (!entitySpan) return undefined;
+        const id = entitySpan.getAttribute("data-entity-id");
+        return id || undefined;
+      };
+
       if (matchedName) {
         const name = matchedName;
         if (hoverShownNameRef.current === name) {
@@ -797,7 +957,7 @@ export default function NovelEditor({
             hoverTimerRef.current = null;
           }
           hoverShownNameRef.current = name;
-          setHoverCard({ open: true, x: e.clientX, y: e.clientY, name });
+          setHoverCard({ open: true, x: e.clientX, y: e.clientY, name, characterId: extractCharacterId() });
         } else {
           // 首次悬停：延迟 500ms 显示，避免快速划过时误触
           if (hoverTimerRef.current) {
@@ -805,7 +965,7 @@ export default function NovelEditor({
           }
           hoverTimerRef.current = window.setTimeout(() => {
             hoverShownNameRef.current = name;
-            setHoverCard({ open: true, x: e.clientX, y: e.clientY, name });
+            setHoverCard({ open: true, x: e.clientX, y: e.clientY, name, characterId: extractCharacterId() });
           }, 500);
         }
       } else {
@@ -958,7 +1118,7 @@ export default function NovelEditor({
           <SnapshotHistory
             filePath={filePath}
             projectPath={currentProject.path}
-            currentContent={editor?.getHTML() || ""}
+            currentContent={editor ? JSON.stringify(editor.getJSON()) : ""}
             onClose={() => setShowSnapshotHistory(false)}
             onRestored={() => setReloadKey((n) => n + 1)}
           />
@@ -972,6 +1132,7 @@ export default function NovelEditor({
         y={hoverCard.y}
         characterName={hoverCard.name}
         projectPath={currentProject?.path || ""}
+        characterId={hoverCard.characterId}
       />
     </div>
   );

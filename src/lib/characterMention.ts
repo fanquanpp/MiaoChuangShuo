@@ -1,22 +1,28 @@
-// 剧本角色名自动选择 TipTap 扩展
+// 角色名提及 TipTap 扩展（双形态）
 //
 // 功能概述：
-// 为舞台剧本/对话体类型项目提供台词前的角色名自动选择与填充功能。
-// 功能1: 在空行按 Tab 键弹出角色名选择浮层
-// 功能2: 换行自动轮换 —— 当上一行以"角色名: "开头时，新行自动填充下一个角色名前缀
-// 功能3: 选中文本后按 Ctrl+Shift+N，在选中段落最前端弹出角色名选择器
+// 本模块提供两种角色名相关扩展，按文体场景独立注册：
+//
+// 1. CharacterMention（Extension，段落级前缀补全）
+//    用于舞台剧本/对话体，在台词行前自动填充"角色名: "前缀。
+//    - Tab 键弹出角色名选择浮层
+//    - 换行自动轮换（A→B→A→B）
+//    - Ctrl+Shift+N 在选中段落前插入角色名
+//
+// 2. CharacterMentionNode（Node，行内 Inline Node）
+//    用于小说/散文中的角色提及，将角色名渲染为可点击的 inline node。
+//    - attrs.characterId 关联设定库 CodexMeta.id（UUID v4）
+//    - attrs.name 显示名（与设定库 CodexMeta.name 同步）
+//    - 渲染为 span.nf-character-mention，支持点击跳转设定库
+//    - 用于阶段 5 实体高亮、悬停卡片、伏笔追踪的统一锚点
 //
 // 模块职责：
-// 1. 监听编辑器输入，检测台词行起始位置
-// 2. Tab 键弹出角色名选择浮层
-// 3. 选中后自动插入角色名前缀
-// 4. Enter 键自动轮换到下一个角色名（基于角色列表顺序循环）
-// 5. 支持自定义角色名输入
-// 6. 键盘导航（ArrowUp/ArrowDown/Enter/Escape）
-// 7. ARIA 无障碍标注
-// 8. Ctrl+Shift+N 快捷键在选中文本前插入角色名
+// 1. CharacterMention: 段落级前缀补全（剧本模式）
+// 2. CharacterMentionNode: 行内 inline node（小说模式）
+// 3. 两者共享 picker UI，但触发方式与数据形态不同
+// 4. CharacterMentionNode 的 characterId 是阶段 1 设定库 UUID 的下游消费者
 
-import { Extension } from "@tiptap/core";
+import { Extension, Node, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 
@@ -437,7 +443,8 @@ function showCharacterPicker(
   // 点击外部关闭
   setTimeout(() => {
     const handler = (e: MouseEvent) => {
-      if (!picker.contains(e.target as Node)) {
+      // 使用 globalThis.Node 避免与 ProseMirror Node 类冲突
+      if (!picker.contains(e.target as globalThis.Node)) {
         picker.remove();
         document.removeEventListener("mousedown", handler);
       }
@@ -445,3 +452,206 @@ function showCharacterPicker(
     document.addEventListener("mousedown", handler);
   }, 100);
 }
+
+// ===== CharacterMentionNode: 行内 Inline Node（小说模式） =====
+//
+// 设计说明：
+// 阶段 3 重构新增，用于在小说/散文正文中插入可点击的角色名 inline node。
+// 与 CharacterMention Extension（段落级前缀补全）互不冲突，两者按文体独立注册：
+//   - 剧本/对话体: 注册 CharacterMention Extension
+//   - 小说/散文: 注册 CharacterMentionNode Node
+//   - 混合文体: 两者同时注册（CharacterMentionNode 处理 @ 触发，CharacterMention 处理 Tab）
+//
+// characterId 关联设定库 CodexMeta.id（UUID v4），由阶段 1 list_codex_entities 提供。
+// 当设定库实体被重命名时，可通过 characterId 反向查找并更新 inline node 的 name attrs。
+
+/**
+ * CharacterMentionNode 配置
+ */
+export interface CharacterMentionNodeOptions {
+  /**
+   * HTMLAttributes 合并到渲染节点
+   */
+  HTMLAttributes: Record<string, string>;
+  /**
+   * 是否允许编辑角色名（双击进入编辑模式）
+   * 默认 false：双击跳转设定库而非编辑
+   */
+  editable: boolean;
+}
+
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    characterMentionNode: {
+      /**
+       * 插入角色提及 inline node
+       * 输入:
+       *   characterId - 设定库实体 UUID
+       *   name - 显示名（与设定库 CodexMeta.name 同步）
+       * 流程:
+       *   1. 校验 characterId 非空
+       *   2. 在当前选区插入 characterMentionNode
+       *   3. 插入后光标移至节点后
+       */
+      insertCharacterMention: (characterId: string, name: string) => ReturnType;
+      /**
+       * 更新已有角色提及节点的显示名（设定库重命名时批量调用）
+       * 输入:
+       *   characterId - 目标实体 UUID
+       *   newName - 新显示名
+       * 流程: 遍历文档所有 characterMentionNode，匹配 characterId 并更新 name
+       */
+      updateCharacterMentionName: (characterId: string, newName: string) => ReturnType;
+    };
+  }
+}
+
+/**
+ * CharacterMentionNode 行内 inline node
+ *
+ * 渲染为 span.nf-character-mention[data-character-id][data-character-name]
+ * 点击时由 NovelEditor 的 ReactNodeView 或事件委托捕获，触发跳转设定库
+ */
+export const CharacterMentionNode = Node.create<CharacterMentionNodeOptions>({
+  name: "characterMentionNode",
+
+  group: "inline",
+
+  inline: true,
+
+  atom: true,
+
+  selectable: true,
+
+  draggable: false,
+
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+      editable: false,
+    };
+  },
+
+  addAttributes() {
+    return {
+      /**
+       * 角色实体 UUID，关联设定库 CodexMeta.id
+       * 设定库重命名/删除时，通过此 ID 反向定位文档中的提及节点
+       */
+      characterId: {
+        default: "",
+        parseHTML: (el): string => (el as HTMLElement).getAttribute("data-character-id") || "",
+        renderHTML: (attrs): Record<string, string> => ({
+          "data-character-id": String(attrs.characterId || ""),
+        }),
+      },
+      /**
+       * 显示名，与设定库 CodexMeta.name 同步
+       * 设定库重命名时通过 updateCharacterMentionName 命令批量更新
+       */
+      name: {
+        default: "",
+        parseHTML: (el): string => (el as HTMLElement).getAttribute("data-character-name") || "",
+        renderHTML: (attrs): Record<string, string> => ({
+          "data-character-name": String(attrs.name || ""),
+        }),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: "span[data-character-id]",
+      },
+      // 兼容旧版 .html 中的 <a class="character-mention"> 格式
+      {
+        tag: "a.character-mention",
+        getAttrs: (node): Record<string, string> => {
+          const el = node as HTMLElement;
+          return {
+            characterId: el.getAttribute("data-character-id") || "",
+            name: el.textContent || "",
+          };
+        },
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    // 合并外部 HTMLAttributes 与内部 class
+    // class 包含 nf-character-mention 基类，由 Tailwind/FANDEX 主题提供视觉
+    const merged = mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+      class: "nf-character-mention",
+      // role="button" 提示可点击，tabindex 由主题控制
+      role: "button",
+      tabindex: "0",
+    });
+    // 渲染为带 name 文本的 span（atom 节点，内容来自 attrs.name 而非子节点）
+    return ["span", merged, HTMLAttributes.name || ""];
+  },
+
+  renderText({ node }) {
+    // 纯文本导出时仅保留 name，不带 characterId（避免污染 .txt 导出）
+    return node.attrs.name || "";
+  },
+
+  addCommands() {
+    return {
+      insertCharacterMention:
+        (characterId: string, name: string) =>
+        ({ commands }) => {
+          // 校验 characterId 非空（空 ID 的提及节点无设定库关联，无意义）
+          if (!characterId) {
+            return false;
+          }
+          return commands.insertContent({
+            type: this.name,
+            attrs: { characterId, name },
+          });
+        },
+      updateCharacterMentionName:
+        (characterId: string, newName: string) =>
+        ({ tr, state }) => {
+          // 遍历文档，查找所有匹配 characterId 的 characterMentionNode
+          let modified = false;
+          state.doc.descendants((node, pos) => {
+            if (node.type.name !== this.name) {
+              return true;
+            }
+            if (node.attrs.characterId === characterId && node.attrs.name !== newName) {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                name: newName,
+              });
+              modified = true;
+            }
+            return false;
+          });
+          return modified;
+        },
+    };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      // Backspace 在节点前删除整个节点（而非进入内部）
+      Backspace: () => {
+        const { state } = this.editor;
+        const { selection } = state;
+        // 选区正好选中一个 characterMentionNode 时删除
+        if (
+          selection.empty &&
+          selection.$from.nodeBefore?.type.name === this.name
+        ) {
+          // TipTap v2 deleteRange 接受 Range 对象 {from, to}，非两个数字参数
+          return this.editor.commands.deleteRange({
+            from: selection.from - 1,
+            to: selection.from,
+          });
+        }
+        return false;
+      },
+    };
+  },
+});

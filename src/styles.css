@@ -537,6 +537,113 @@ select:focus-visible {
   color: var(--fandex-text);
 }
 
+/* ========== 实体名高亮：类型化下划线（AI-Ready 视觉反馈） ==========
+ * 设计原则：
+ *   - 纯文本风格，仅底部 1px 装饰线，无背景色、无边框、无圆角
+ *   - 按实体类型着色：角色(主蓝)/世界观(次绿)/术语(三橙)/素材(灰)/默认(主蓝浅)
+ *   - 装饰线使用 box-shadow 模拟下划线，避免与文本下划线冲突
+ *   - data-entity-id 与 data-entity-type 属性供 HoverCard 查询与 AI DOM 可观测
+ *   - 鼠标悬停时颜色加深，提示可交互（点击/悬停查询实体详情）
+ */
+.ProseMirror .nf-entity-character,
+.ProseMirror .nf-entity-worldview,
+.ProseMirror .nf-entity-glossary,
+.ProseMirror .nf-entity-material,
+.ProseMirror .nf-entity-default {
+  border-radius: 0;
+  /* box-shadow 模拟下划线，离文本 2px 间距避免与文字粘连 */
+  box-shadow: inset 0 -2px 0 0 currentColor;
+  transition: box-shadow 0.15s ease-out, color 0.15s ease-out;
+  /* 颜色透明度 0.5：与正文文字色区分但不抢眼 */
+  opacity: 0.92;
+}
+
+/* 角色实体：FANDEX 主色（蓝） */
+.ProseMirror .nf-entity-character {
+  color: var(--fandex-primary);
+}
+
+/* 世界观实体：FANDEX 次色（绿） */
+.ProseMirror .nf-entity-worldview {
+  color: var(--fandex-secondary);
+}
+
+/* 术语实体：FANDEX 三色（橙） */
+.ProseMirror .nf-entity-glossary {
+  color: var(--fandex-tertiary);
+}
+
+/* 素材实体：中性灰，弱化视觉权重 */
+.ProseMirror .nf-entity-material {
+  color: var(--fandex-text-tertiary);
+}
+
+/* 默认实体：主色淡蓝（未识别类型回退） */
+.ProseMirror .nf-entity-default {
+  color: var(--fandex-primary);
+  opacity: 0.7;
+}
+
+/* 悬停态：颜色加深（opacity 提升至 1）提示可交互 */
+.ProseMirror .nf-entity-character:hover,
+.ProseMirror .nf-entity-worldview:hover,
+.ProseMirror .nf-entity-glossary:hover,
+.ProseMirror .nf-entity-material:hover,
+.ProseMirror .nf-entity-default:hover {
+  opacity: 1;
+  box-shadow: inset 0 -3px 0 0 currentColor;
+  cursor: pointer;
+}
+
+/* ========== 伏笔标记：状态化下划线（p5-27 波浪线 Decoration） ==========
+ * 设计原则：
+ *   - 纯文本风格，仅底部装饰线，无背景色、无边框、无圆角
+ *   - 按状态着色：pending(主蓝虚线)/resolved(次绿实线)/abandoned(灰删除线)
+ *   - 使用 text-decoration 替代 box-shadow，因波浪线需 text-decoration-style: wavy
+ *   - data-foreshadowing-id 属性供伏笔面板反向定位与 AI 场景分析
+ *   - 悬停态加深颜色，提示可交互（点击跳转伏笔条目）
+ * 注意：快捷键 Alt+Shift-F 已避开 Alt+7（人物图）与 Alt+8（伏笔面板）冲突
+ */
+.ProseMirror .nf-foreshadowing {
+  border-radius: 0;
+  transition: text-decoration-color 0.15s ease-out, color 0.15s ease-out;
+  cursor: pointer;
+}
+
+/* pending（埋设）：主蓝波浪线，提示此处埋有伏笔 */
+.ProseMirror .nf-foreshadowing--pending {
+  text-decoration: underline wavy var(--fandex-primary);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  color: inherit;
+}
+
+/* resolved（回收）：次绿实线下划线，提示伏笔已回收 */
+.ProseMirror .nf-foreshadowing--resolved {
+  text-decoration: underline solid var(--fandex-secondary);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  color: inherit;
+}
+
+/* abandoned（废弃）：灰删除线，提示伏笔废弃 */
+.ProseMirror .nf-foreshadowing--abandoned {
+  text-decoration: line-through var(--fandex-text-tertiary);
+  text-decoration-thickness: 1px;
+  opacity: 0.65;
+  color: inherit;
+}
+
+/* 悬停态：颜色加深（pending/resolved）或透明度提升（abandoned） */
+.ProseMirror .nf-foreshadowing--pending:hover,
+.ProseMirror .nf-foreshadowing--resolved:hover {
+  filter: brightness(1.2);
+}
+
+.ProseMirror .nf-foreshadowing--abandoned:hover {
+  opacity: 0.85;
+}
+
 /* ========== 诗歌/歌词行内排版样式 ==========
  * 设计原则：纯文本视觉表现，仅改变文字本身属性
  * 不包含任何块级装饰（无边框、无背景色、无圆角、无 padding/margin）

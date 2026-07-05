@@ -225,6 +225,7 @@ export default function Workspace() {
           // 判定是否为小说类文体：standard/multi_volume/short_story/shared_world 均视为小说类
           // diary/dialogue/screenplay/poetry 等非小说类型不生成章节号
           const isNovelType =
+            projectType === "novel" ||
             projectType === "standard" ||
             projectType === "multi_volume" ||
             projectType === "short_story" ||
@@ -263,6 +264,7 @@ export default function Workspace() {
     const projectType = currentProject.meta.type;
     // 判定是否为小说类文体（与 getFileTemplate 保持一致）
     const isNovelType =
+      projectType === "novel" ||
       projectType === "standard" ||
       projectType === "multi_volume" ||
       projectType === "short_story" ||

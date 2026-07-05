@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Loader2, ArrowRight, Lock } from "lucide-react";
-import { updateProjectMeta, NOVEL_GENRES, type ProjectInfo, type ProjectType } from "../lib/api";
+import { updateProjectMeta, NOVEL_GENRES, type ProjectInfo } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
 // 组件属性接口
@@ -50,8 +50,8 @@ export default function EditProjectDialog({ project, onClose, onSuccess }: EditP
 
   const handleSaveRef = useRef<() => void>(() => {});
 
-  // 当前项目文体类型（只读展示，从元数据推断）
-  const currentType: ProjectType = (project.meta.type as ProjectType) || "standard";
+  // 当前项目文体类型（只读展示，兼容旧版字符串与新版 3 标准文体）
+  const currentType: string = project.meta.type || "novel";
 
   // Esc 关闭, Enter 提交（编辑中禁用 Esc 防止误触丢失修改）
   const handleKeyDown = useCallback(

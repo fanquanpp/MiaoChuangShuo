@@ -20,6 +20,12 @@ mod timeline_commands;
 mod character_graph_commands;
 mod word_count;
 mod editor_preferences;
+mod text_extractor;
+mod pmd_migration;
+mod tantivy_indexer;
+mod tantivy_search;
+mod ai_context;
+mod legacy_migration;
 
 /// 应用入口函数
 /// 输入: 无
@@ -46,6 +52,7 @@ pub fn run() {
             fs_commands::update_project_meta,
             // 文件操作命令
             fs_commands::read_project_tree,
+            fs_commands::is_legacy_project,
             fs_commands::read_file,
             fs_commands::write_file,
             fs_commands::create_file,
@@ -86,6 +93,8 @@ pub fn run() {
             // 智能设定库（Codex）命令
             codex_commands::scan_entity_mentions,
             codex_commands::batch_scan_entities,
+            codex_commands::list_codex_entities,
+            codex_commands::inject_codex_front_matter,
             // 剧情时间线编辑器命令
             timeline_commands::read_timeline,
             timeline_commands::save_timeline,
@@ -99,6 +108,22 @@ pub fn run() {
             editor_preferences::set_user_preferences,
             editor_preferences::get_project_config,
             editor_preferences::set_project_config,
+            // .pmd 格式迁移命令
+            pmd_migration::migrate_project_to_pmd,
+            pmd_migration::get_migration_state,
+            pmd_migration::clear_migration_state,
+            // 全文索引与搜索命令（Tantivy + jieba 中文分词）
+            tantivy_search::search_project,
+            tantivy_search::build_project_index,
+            tantivy_search::get_project_index_stats,
+            tantivy_search::update_file_index,
+            tantivy_search::remove_file_index,
+            // AI 上下文提取命令（AI-Ready: 接口定义阶段，返回 Mock 空数据）
+            ai_context::get_scene_context,
+            ai_context::get_character_context,
+            ai_context::get_project_context,
+            // 旧版项目目录结构迁移命令
+            legacy_migration::migrate_legacy_project,
         ])
         .setup(|_app| {
             Ok(())

@@ -48,3 +48,15 @@ _commitmsg.tmp
 _releasenotes.md
 _*.tmp
 
+# Novelforge 运行时产物（.novelforge/config.json 需纳入版本控制，其余忽略）
+.novelforge/index/
+.novelforge/migration_state.json
+.novelforge/migration_backup_*/
+.novelforge/.writable_test
+.novelforge/snapshots/
+.novelforge/*.tmp
+
+# 备份文件（.pmd 迁移与旧版迁移产生）
+*.bak
+*.txt.bak
+

@@ -172,6 +172,42 @@ pub fn common_directories() -> Vec<&'static str> {
     ]
 }
 
+/// 旧版目录列表（兼容扫描用）
+///
+/// 说明：
+///   旧版项目使用 8 种目录名（角色/世界观/术语/剧情图谱/正文/大纲/素材/.novelforge）。
+///   新版项目使用 6 种统一目录（正文/设定/大纲/伏笔/草稿箱/.novelforge）。
+///   此函数返回旧版独有目录名（5 个），用于：
+///   1. is_legacy_project 命令检测旧版项目结构
+///   2. migrate_legacy_project 命令的迁移源目录识别
+///   3. read_project_tree 的兼容扫描标记
+///
+/// 输入: 无
+/// 输出: Vec<&'static str> 旧版独有目录名列表
+pub fn legacy_directories() -> Vec<&'static str> {
+    vec![
+        "角色",     // 旧版角色设计目录（新版合并至"设定"）
+        "世界观",   // 旧版世界观设定目录（新版合并至"设定"）
+        "术语",     // 旧版术语目录（新版合并至"设定"）
+        "剧情图谱", // 旧版剧情图谱目录（新版保留但不在统一目录中）
+        "素材",     // 旧版素材目录（新版合并至"草稿箱"或保留为自定义目录）
+    ]
+}
+
+/// 判断项目是否为旧版目录结构
+///
+/// 输入: project_root 项目根目录路径
+/// 输出: bool 是否为旧版项目（存在旧版独有目录即判定为旧版）
+/// 流程:
+///   1. 遍历旧版独有目录列表
+///   2. 检查项目根下是否存在任一旧版独有目录
+///   3. 命中任一即返回 true（用于触发迁移提示）
+pub fn is_legacy_project(project_root: &std::path::Path) -> bool {
+    legacy_directories()
+        .iter()
+        .any(|dir| project_root.join(dir).is_dir())
+}
+
 /// 通用预设文件
 pub fn common_files() -> Vec<(&'static str, &'static str)> {
     vec![
@@ -1052,4 +1088,277 @@ pub fn create_project_meta(
 fn chrono_now_iso() -> String {
     use chrono::Local;
     Local::now().to_rfc3339()
+}
+
+// ===== 架构重构：3 标准文体 + 统一目录（阶段 2） =====
+//
+// 设计说明：
+// 原有 8 种文体枚举（ShortStory/Diary/Dialogue/MultiVolume/SharedWorld/Screenplay/Poetry/Standard）
+// 保留用于兼容旧项目。新建项目使用 3 种标准文体（Novel/Script/Essay），
+// 配合统一 5 一级目录结构，通过功能开关区分文体差异。
+//
+// 兼容策略：
+// - parse_standard_project_type 将旧字符串映射到 3 种新文体
+// - 旧项目的 ProjectMeta.type 字段保持原值，不强制迁移
+// - 新建项目使用 StandardProjectType 的 to_str 值
+
+/// 标准文体类型枚举（架构重构后新建项目使用）
+///
+/// 3 种文体覆盖所有创作场景：
+/// - Novel：长短篇小说（含日记体、多卷本、武侠、科幻等）
+/// - Script：剧本与脚本（含影视脚本、对话体、舞台剧本等）
+/// - Essay：散文与文章（含散文、随笔、诗歌、杂文等）
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum StandardProjectType {
+    /// 长短篇小说
+    Novel,
+    /// 剧本与脚本
+    Script,
+    /// 散文与文章
+    Essay,
+}
+
+impl StandardProjectType {
+    /// 从字符串解析标准文体类型（兼容旧版 8 种文体字符串）
+    ///
+    /// 输入: s 文体字符串（旧版或新版）
+    /// 输出: StandardProjectType 标准文体枚举
+    /// 流程:
+    ///   1. 转小写后匹配新版 3 种文体
+    ///   2. 匹配旧版 8 种文体，映射到对应的新文体
+    ///   3. 未知字符串默认归入 Novel
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            // 新版 3 种标准文体
+            "novel" => StandardProjectType::Novel,
+            "script" => StandardProjectType::Script,
+            "essay" => StandardProjectType::Essay,
+            // 旧版 8 种文体兼容映射
+            "short_story" | "diary" | "multi_volume" | "shared_world" | "standard" => {
+                StandardProjectType::Novel
+            }
+            "dialogue" | "screenplay" => StandardProjectType::Script,
+            "poetry" => StandardProjectType::Essay,
+            // 题材字符串（旧版 genre 误传为 type）归入 Novel
+            "epic" | "wuxia" | "scifi" | "mystery" | "romance" => StandardProjectType::Novel,
+            _ => StandardProjectType::Novel,
+        }
+    }
+
+    /// 将枚举转换为 snake_case 字符串
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            StandardProjectType::Novel => "novel",
+            StandardProjectType::Script => "script",
+            StandardProjectType::Essay => "essay",
+        }
+    }
+
+    /// 获取文体的中文显示名
+    pub fn label(&self) -> &'static str {
+        match self {
+            StandardProjectType::Novel => "长短篇小说",
+            StandardProjectType::Script => "剧本与脚本",
+            StandardProjectType::Essay => "散文与文章",
+        }
+    }
+}
+
+/// 统一一级目录列表（架构重构后所有文体共享）
+///
+/// 5 个标准目录 + 1 个隐藏元数据目录：
+/// - 正文：所有正文内容（含分卷子目录）
+/// - 设定：所有设定文件（角色/世界观/术语/素材统一存放，通过 front matter 区分类型）
+/// - 大纲：大纲与构思
+/// - 伏笔：伏笔追踪
+/// - 草稿箱：废弃章节与草稿
+/// - .novelforge：应用元数据目录（config.json、index/ 等）
+pub fn universal_directories() -> Vec<&'static str> {
+    vec![
+        "正文",
+        "设定",
+        "大纲",
+        "伏笔",
+        "草稿箱",
+        ".novelforge",
+    ]
+}
+
+/// 获取标准文体的预设引导文件
+///
+/// 输入: project_type 标准文体类型
+/// 输出: Vec<(相对路径, 文件内容)> 预设文件列表
+/// 流程: 按文体类型返回对应的预设引导文件
+pub fn standard_template_files(project_type: &StandardProjectType) -> Vec<(&'static str, String)> {
+    match project_type {
+        StandardProjectType::Novel => vec![
+            (
+                "设定/主角设定.txt",
+                r#"---
+{"id":"","name":"主角设定","aliases":[],"entity_type":"character","created":""}
+---
+【基础信息】
+姓名：
+年龄：
+性别：
+身份/职业：
+
+【性格】
+核心特质：
+优点：
+缺点：
+
+【背景】
+出身来历：
+关键经历：
+
+【动机与目标】
+内在动机：
+外在目标：
+核心冲突：
+"#.to_string(),
+            ),
+            (
+                "设定/世界观设定.txt",
+                r#"---
+{"id":"","name":"世界观设定","aliases":[],"entity_type":"worldview","created":""}
+---
+【地理环境】
+主要地域：
+气候特征：
+
+【历史背景】
+时代划分：
+关键历史事件：
+
+【社会结构】
+政治体制：
+经济形态：
+
+【力量体系】
+力量来源：
+等级划分：
+"#.to_string(),
+            ),
+            (
+                "大纲/总体大纲.txt",
+                r#"{{项目名}} 总体大纲
+
+【一句话梗概】
+[用一句话概括故事核心]
+
+【主题立意】
+[故事想表达什么]
+
+【主要冲突】
+核心矛盾：
+主角 vs 对立面：
+
+【情节结构】
+起（开端）：
+承（发展）：
+转（高潮）：
+合（结局）：
+"#.to_string(),
+            ),
+            (
+                "伏笔/_伏笔模板.txt",
+                "伏笔追踪模板\n\n\
+                 伏笔名称 | 状态 | 埋设章节 | 回收章节 | 重要度 | 备注\n\
+                 --- | --- | --- | --- | --- | ---\n\
+                 | | | | | \n".to_string(),
+            ),
+        ],
+        StandardProjectType::Script => vec![
+            (
+                "设定/角色名册.txt",
+                r#"---
+{"id":"","name":"角色名册","aliases":[],"entity_type":"character","created":""}
+---
+此文件用于剧本台词人名预设，每行一个角色名
+
+主角
+配角A
+配角B
+"#.to_string(),
+            ),
+            (
+                "设定/角色声线设定.txt",
+                r#"---
+{"id":"","name":"角色声线设定","aliases":[],"entity_type":"character","created":""}
+---
+角色名:
+语言风格:
+常用词汇:
+语气特征:
+口头禅:
+
+对话示例:
+"#.to_string(),
+            ),
+            (
+                "大纲/分幕大纲.txt",
+                "{{项目名}} 分幕大纲\n\n\
+                 第一幕\n场景:\n出场人物:\n核心冲突:\n结尾悬念:\n\n\
+                 第二幕\n场景:\n出场人物:\n核心冲突:\n结尾悬念:\n\n\
+                 第三幕\n场景:\n出场人物:\n核心冲突:\n结尾悬念:\n".to_string(),
+            ),
+            (
+                "伏笔/_伏笔模板.txt",
+                "伏笔追踪模板\n\n\
+                 伏笔名称 | 状态 | 埋设章节 | 回收章节 | 重要度 | 备注\n\
+                 --- | --- | --- | --- | --- | ---\n\
+                 | | | | | \n".to_string(),
+            ),
+        ],
+        StandardProjectType::Essay => vec![
+            (
+                "大纲/主题构思.txt",
+                "{{项目名}} 主题构思\n\n\
+                 【主题】\n[核心思想]\n\n\
+                 【切入点】\n[文章的切入角度]\n\n\
+                 【结构】\n起:\n承:\n转:\n合:\n".to_string(),
+            ),
+            (
+                "素材/意象集.txt",
+                "意象集\n\n\
+                 核心意象:\n反复出现的意象 / 象征意义 / 出现位置\n\n\
+                 [意象1] / / \n\
+                 [意象2] / / \n".to_string(),
+            ),
+        ],
+    }
+}
+
+/// 生成项目元数据（标准文体版本，架构重构后新建项目使用）
+///
+/// 输入:
+///   name - 项目名称
+///   standard_type - 标准文体类型（Novel/Script/Essay）
+///   genre - 题材
+///   author - 作者
+///   description - 描述
+/// 输出: ProjectMeta 项目元数据
+/// 流程: 用 StandardProjectType::to_str() 写入 project_type 字段
+/// 说明: 旧版 create_project_meta 保留用于向后兼容，新建项目应使用本函数
+pub fn create_project_meta_v2(
+    name: &str,
+    standard_type: &StandardProjectType,
+    genre: &str,
+    author: &str,
+    description: &str,
+) -> ProjectMeta {
+    let now = chrono_now_iso();
+    ProjectMeta {
+        name: name.to_string(),
+        project_type: standard_type.to_str().to_string(),
+        genre: genre.to_string(),
+        created_at: now.clone(),
+        updated_at: now,
+        version: "1.0.0".to_string(),
+        author: author.to_string(),
+        description: description.to_string(),
+        word_count: 0,
+    }
 }

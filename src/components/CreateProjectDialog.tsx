@@ -30,7 +30,7 @@ interface CreateProjectDialogProps {
 
 // 创建项目对话框组件
 export default function CreateProjectDialog({
-  defaultType = "standard",
+  defaultType = "novel",
   customTemplate = null,
   defaultPath = "",
   onClose,

@@ -122,7 +122,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
   // 是否为分卷类型（决定是否显示分卷入口）
   const showVolumeEntry = useMemo(() => {
     const type = currentProject?.meta?.type;
-    return type === "multi_volume" || type === "standard" || type === "shared_world";
+    return type === "novel" || type === "multi_volume" || type === "standard" || type === "shared_world";
   }, [currentProject]);
 
   // 根据项目类型获取专属目录列表

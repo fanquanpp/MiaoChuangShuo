@@ -35,36 +35,41 @@ import { useToast } from "../lib/toast";
  * 从相对路径推断分类
  * 输入: relativePath 文件相对路径
  * 输出: SidebarCategory 分类字符串
- * 流程: 提取路径首段目录名，查表映射到 SidebarCategory
- *   补全覆盖：正文/大纲/卷宗/分卷/伏笔/草稿/设定类全部目录名
+ * 流程:
+ *   1. 提取路径首段目录名
+ *   2. 优先匹配 5 个标准目录（正文/设定/大纲/伏笔/草稿箱）
+ *   3. 降级匹配旧版兼容目录名（旧项目迁移前仍需识别）
+ *   4. 默认归入正文类
+ * 设计说明：标准目录映射为主表，兼容层为降级表，
+ *   迁移专项完成后旧目录名将不再出现，兼容层可安全移除。
  */
 function detectCategoryFromPath(relativePath: string): string {
   const firstDir = relativePath.split(/[\\/]/)[0] || "";
-  const categoryMap: Record<string, string> = {
-    // 正文类
+  // 5 个标准一级目录映射（架构重构后的统一目录结构）
+  const standardMap: Record<string, string> = {
     "正文": "manuscript",
-    "草稿": "manuscript",
-    "草稿箱": "manuscript",
-    // 大纲类（含伏笔，伏笔属于创作规划类内容）
+    "设定": "codex",
     "大纲": "outline",
     "伏笔": "outline",
+    "草稿箱": "manuscript",
+  };
+  // 旧版兼容目录映射（旧项目迁移前的降级识别，迁移后可移除）
+  const legacyMap: Record<string, string> = {
+    "草稿": "manuscript",
     "伏笔记录": "outline",
     "系列伏笔": "outline",
-    // 分卷类
     "卷宗": "volumes",
     "分卷": "volumes",
-    // 设定类统一收敛到 Codex
     "角色": "codex",
     "人物": "codex",
     "世界观": "codex",
-    "设定": "codex",
     "术语": "codex",
     "名词": "codex",
     "素材": "codex",
     "资料": "codex",
     "时间线": "codex",
   };
-  return categoryMap[firstDir] || "manuscript";
+  return standardMap[firstDir] || legacyMap[firstDir] || "manuscript";
 }
 
 export default function GlobalSearch() {

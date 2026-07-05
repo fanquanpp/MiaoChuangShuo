@@ -97,10 +97,11 @@ const zhCN: TranslationDict = {
   "launcher.lastOpened": "上次打开",
 
   // 启动器 - 项目类型名称
+  "launcher.typeNovel": "长短篇小说",
   "launcher.typeEpic": "西幻史诗",
   "launcher.typeStandard": "标准长篇",
-  "launcher.typeEssay": "散文随笔",
-  "launcher.typeScript": "舞台剧本",
+  "launcher.typeEssay": "散文与文章",
+  "launcher.typeScript": "剧本与脚本",
   "launcher.typeWuxia": "武侠江湖",
   "launcher.typeScifi": "科幻未来",
   "launcher.typeMystery": "悬疑推理",
@@ -1173,6 +1174,34 @@ const zhCN: TranslationDict = {
   "characterHover.identity": "身份",
   "characterHover.personality": "性格",
   "characterHover.brief": "简介",
+  // AI 操作区（p5-26 预留，p6 阶段实现具体逻辑）
+  "characterHover.aiSectionTitle": "AI 助手",
+  "characterHover.aiSummarizeState": "总结该角色当前状态",
+  "characterHover.aiGenerateDialogue": "生成该角色对话",
+  "characterHover.aiComingSoon": "敬请期待",
+
+  // ── 旧版项目迁移对话框（m-31）──
+  "legacyMigration.title": "检测到旧版项目结构",
+  "legacyMigration.description": "该项目使用旧版目录结构，迁移至新版后可启用设定库、伏笔追踪等新功能。",
+  "legacyMigration.legacyDirs": "旧版目录",
+  "legacyMigration.newDirs": "新版目录",
+  "legacyMigration.mapping": "目录映射",
+  "legacyMigration.mappingRole": "角色 → 设定/",
+  "legacyMigration.mappingWorldview": "世界观 → 设定/",
+  "legacyMigration.mappingTerms": "术语 → 设定/",
+  "legacyMigration.mappingGraph": "剧情图谱 → 保留为自定义目录",
+  "legacyMigration.mappingMaterial": "素材 → 草稿箱/",
+  "legacyMigration.warning": "迁移前将自动创建 .bak 备份，迁移失败时自动回滚。建议关闭其他编辑器后继续。",
+  "legacyMigration.migrate": "立即迁移",
+  "legacyMigration.later": "暂不迁移",
+  "legacyMigration.migrating": "迁移中...",
+  "legacyMigration.progress": "已处理 {done}/{total} 个文件",
+  "legacyMigration.success": "迁移成功",
+  "legacyMigration.successDesc": "共迁移 {count} 个文件，备份已保存至 .bak 目录",
+  "legacyMigration.failed": "迁移失败",
+  "legacyMigration.rollback": "已自动回滚至迁移前状态",
+  "legacyMigration.close": "关闭",
+  "legacyMigration.viewReport": "查看迁移报告",
 };
 
 // 英文翻译
@@ -1254,10 +1283,11 @@ const enUS: TranslationDict = {
   "launcher.lastOpened": "Last opened",
 
   // Launcher - Project type names
+  "launcher.typeNovel": "Novel",
   "launcher.typeEpic": "Epic Fantasy",
   "launcher.typeStandard": "Standard Novel",
-  "launcher.typeEssay": "Essay / Prose",
-  "launcher.typeScript": "Stage Script",
+  "launcher.typeEssay": "Essay / Article",
+  "launcher.typeScript": "Script",
   "launcher.typeWuxia": "Martial Arts",
   "launcher.typeScifi": "Sci-Fi",
   "launcher.typeMystery": "Mystery",
@@ -1981,6 +2011,34 @@ const enUS: TranslationDict = {
   "characterHover.identity": "Identity",
   "characterHover.personality": "Personality",
   "characterHover.brief": "Brief",
+  // AI 操作区（p5-26 预留，p6 阶段实现具体逻辑）
+  "characterHover.aiSectionTitle": "AI Assistant",
+  "characterHover.aiSummarizeState": "Summarize character's current state",
+  "characterHover.aiGenerateDialogue": "Generate dialogue for this character",
+  "characterHover.aiComingSoon": "Coming soon",
+
+  // ── Legacy project migration dialog (m-31) ──
+  "legacyMigration.title": "Legacy project structure detected",
+  "legacyMigration.description": "This project uses legacy directory structure. Migrate to enable codex library, foreshadowing tracking, and other new features.",
+  "legacyMigration.legacyDirs": "Legacy directories",
+  "legacyMigration.newDirs": "New directories",
+  "legacyMigration.mapping": "Directory mapping",
+  "legacyMigration.mappingRole": "角色 (Characters) → 设定/ (Codex)",
+  "legacyMigration.mappingWorldview": "世界观 (Worldview) → 设定/ (Codex)",
+  "legacyMigration.mappingTerms": "术语 (Terms) → 设定/ (Codex)",
+  "legacyMigration.mappingGraph": "剧情图谱 (Plot graph) → kept as custom directory",
+  "legacyMigration.mappingMaterial": "素材 (Materials) → 草稿箱/ (Drafts)",
+  "legacyMigration.warning": "A .bak backup will be created before migration. Automatic rollback on failure. Close other editors before proceeding.",
+  "legacyMigration.migrate": "Migrate now",
+  "legacyMigration.later": "Migrate later",
+  "legacyMigration.migrating": "Migrating...",
+  "legacyMigration.progress": "Processed {done}/{total} files",
+  "legacyMigration.success": "Migration succeeded",
+  "legacyMigration.successDesc": "Migrated {count} files. Backup saved to .bak directory.",
+  "legacyMigration.failed": "Migration failed",
+  "legacyMigration.rollback": "Automatically rolled back to pre-migration state",
+  "legacyMigration.close": "Close",
+  "legacyMigration.viewReport": "View migration report",
 
   // ── Character Linkage (appearance stats / global rename) ──
   "characterLinkage.appearanceBtn": "Appearance Stats",

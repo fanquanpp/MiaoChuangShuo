@@ -271,3 +271,68 @@ export async function deleteCodexEntity(
   const absPath = `${projectPath}${sep}${entity.sourceFile.replace(/[\\/]/g, sep)}`;
   return deletePath(absPath, projectPath);
 }
+
+// ===== 结构化设定实体（阶段 1：JSON front matter） =====
+
+/**
+ * 设定文件元数据（与后端 CodexMeta 结构对应）
+ * 存储于设定文件首部 JSON front matter 中
+ */
+export interface CodexMeta {
+  /** 实体唯一标识（UUID v4） */
+  id: string;
+  /** 实体显示名 */
+  name: string;
+  /** 别名列表 */
+  aliases: string[];
+  /** 实体类型：character / worldview / glossary / material */
+  entity_type: string;
+  /** 创建时间（ISO 8601） */
+  created: string;
+}
+
+/**
+ * 结构化设定实体（与后端 CodexEntity 结构对应）
+ * 包含完整元数据 + 正文内容 + 来源路径
+ */
+export interface StructuredCodexEntity {
+  /** 元数据（front matter 解析结果） */
+  meta: CodexMeta;
+  /** 来源文件相对路径 */
+  source_file: string;
+  /** 正文内容（已剥离 front matter） */
+  content: string;
+}
+
+/**
+ * 扫描设定目录，返回结构化设定实体列表
+ * 输入: projectPath 项目根路径
+ * 输出: Promise<StructuredCodexEntity[]> 实体列表（按类型分组后按名称排序）
+ * 流程: 调用后端 list_codex_entities 命令，统一扫描设定目录 + 兼容旧版目录
+ * 设计说明:
+ *   - 标准目录为"设定"，兼容旧版的 角色/人物/世界观/术语/名词/素材/资料
+ *   - 每个文件解析 JSON front matter，无 front matter 的旧文件自动生成默认元数据
+ *   - 返回的实体可直接用于 CodexPanel 展示与跨面板联动
+ */
+export async function listCodexEntities(
+  projectPath: string
+): Promise<StructuredCodexEntity[]> {
+  return invoke<StructuredCodexEntity[]>("list_codex_entities", { projectPath });
+}
+
+/**
+ * 为旧版设定文件注入 JSON front matter（迁移工具）
+ * 输入: projectPath 项目根路径
+ * 输出: Promise<number> 迁移的文件数量
+ * 流程: 调用后端 inject_codex_front_matter 命令
+ * 设计说明:
+ *   - 扫描所有兼容目录下的 .txt 文件
+ *   - 对无 front matter 的文件，解析旧格式并注入 front matter
+ *   - 原子写入保证文件完整性
+ *   - 已有 front matter 的文件跳过，避免重复注入
+ */
+export async function injectCodexFrontMatter(
+  projectPath: string
+): Promise<number> {
+  return invoke<number>("inject_codex_front_matter", { projectPath });
+}

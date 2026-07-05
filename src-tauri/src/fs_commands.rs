@@ -19,9 +19,8 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::project_template::{
-    common_directories, common_files, create_project_meta, initial_manuscript_file,
-    project_type_label, render_template, type_specific_directories, type_specific_files,
-    ProjectMeta, ProjectType, TemplateVars,
+    create_project_meta_v2, is_legacy_project as detect_legacy, render_template,
+    standard_template_files, universal_directories, ProjectMeta, StandardProjectType, TemplateVars,
 };
 
 /// 自定义模板结构
@@ -162,14 +161,16 @@ fn validate_project_path(project_path: &str) -> Result<PathBuf, String> {
 }
 
 /// 创建小说项目命令
-/// 输入: name 项目名称, type_str 文体类型, genre 题材(可选), author 作者, description 描述, parent_path 父目录
+/// 输入: name 项目名称, type_str 文体类型(兼容旧版 8 种字符串), genre 题材(可选),
+///       author 作者, description 描述, parent_path 父目录
 /// 输出: Result<String, String> 项目根目录路径或错误
 /// 流程:
 ///   1. 校验项目名称合法性
-///   2. 构建项目根目录路径
-///   3. 创建通用目录与专属目录
-///   4. 写入通用预设文件与专属预设文件
+///   2. 解析标准文体类型(旧版字符串自动映射到 Novel/Script/Essay)
+///   3. 创建统一一级目录(正文/设定/大纲/伏笔/草稿箱/.novelforge)
+///   4. 写入文体对应的预设引导文件
 ///   5. 写入项目元数据文件
+///   6. 创建自定义模板目录(如果有)
 #[tauri::command]
 pub fn create_project(
     name: String,
@@ -190,7 +191,8 @@ pub fn create_project(
         return Err("项目名称包含非法字符".to_string());
     }
 
-    let project_type = ProjectType::from_str(&type_str);
+    // 解析为标准文体类型(Novel/Script/Essay),旧版 8 种字符串自动映射
+    let project_type = StandardProjectType::from_str(&type_str);
     let project_root = PathBuf::from(&parent_path).join(&name);
 
     // 检查目录是否已存在
@@ -201,22 +203,16 @@ pub fn create_project(
     // 创建项目根目录
     fs::create_dir_all(&project_root).map_err(|e| format!("创建项目目录失败: {}", e))?;
 
-    // 创建通用目录
-    for dir in common_directories() {
+    // 创建统一一级目录(所有文体共享 5 个标准目录 + .novelforge 元数据目录)
+    for dir in universal_directories() {
         let dir_path = project_root.join(dir);
         fs::create_dir_all(&dir_path).map_err(|e| format!("创建目录失败 {}: {}", dir, e))?;
     }
 
-    // 创建类型专属目录
-    for dir in type_specific_directories(&project_type) {
-        let dir_path = project_root.join(dir);
-        fs::create_dir_all(&dir_path).map_err(|e| format!("创建专属目录失败 {}: {}", dir, e))?;
-    }
-
-    // 创建自定义模板目录（如果有）
+    // 创建自定义模板目录（如果有，用于自定义模板补充的目录）
     if let Some(ref dirs_list) = custom_dirs {
         for dir in dirs_list {
-            // 跳过与通用目录或专属目录重名的目录
+            // 跳过与统一目录重名的目录
             let dir_path = project_root.join(dir);
             if !dir_path.exists() {
                 fs::create_dir_all(&dir_path)
@@ -234,50 +230,29 @@ pub fn create_project(
         time: now.format("%H:%M").to_string(),
         year: now.format("%Y").to_string(),
         month: now.format("%m").to_string(),
-        project_type_label: project_type_label(&project_type).to_string(),
+        project_type_label: project_type.label().to_string(),
         genre: genre.clone(),
         description: description.clone(),
     };
 
-    // 写入通用预设文件（应用模板变量替换）
-    for (rel_path, content) in common_files() {
-        let file_path = project_root.join(rel_path);
-        if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {}", e))?;
-        }
-        let rendered = render_template(content, &template_vars);
-        fs::write(&file_path, rendered)
-            .map_err(|e| format!("写入文件失败 {}: {}", rel_path, e))?;
-    }
-
-    // 写入类型专属预设文件（应用模板变量替换）
-    for (rel_path, content) in type_specific_files(&project_type) {
+    // 写入文体对应的预设引导文件(应用模板变量替换)
+    for (rel_path, content) in standard_template_files(&project_type) {
         let file_path = project_root.join(rel_path);
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {}", e))?;
         }
         let rendered = render_template(&content, &template_vars);
         fs::write(&file_path, rendered)
-            .map_err(|e| format!("写入专属文件失败 {}: {}", rel_path, e))?;
+            .map_err(|e| format!("写入预设文件失败 {}: {}", rel_path, e))?;
     }
 
-    // 写入项目元数据
-    let meta = create_project_meta(&name, &project_type, &genre, &author, &description);
+    // 写入项目元数据(使用标准文体枚举,project_type 字段存储 to_str 值)
+    let meta = create_project_meta_v2(&name, &project_type, &genre, &author, &description);
     let meta_path = project_root.join(".novelforge").join("project.json");
     let meta_json = serde_json::to_string_pretty(&meta)
         .map_err(|e| format!("序列化元数据失败: {}", e))?;
     fs::write(&meta_path, meta_json)
         .map_err(|e| format!("写入元数据失败: {}", e))?;
-
-    // 创建正文初始文件（当前所有类型均不自动创建，由用户自行创建）
-    if let Some((manuscript_name, manuscript_content)) = initial_manuscript_file(&project_type) {
-        let manuscript_path = project_root.join("正文").join(manuscript_name);
-        if let Some(parent) = manuscript_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("创建正文子目录失败: {}", e))?;
-        }
-        fs::write(&manuscript_path, manuscript_content)
-            .map_err(|e| format!("创建正文文件失败: {}", e))?;
-    }
 
     Ok(project_root.to_string_lossy().to_string())
 }
@@ -478,6 +453,25 @@ pub fn import_project(project_path: String) -> Result<ProjectInfo, String> {
 pub fn read_project_tree(project_path: String) -> Result<Vec<FileNode>, String> {
     let path = validate_project_path(&project_path)?;
     read_dir_recursive(&path, &path)
+}
+
+/// 检测项目是否为旧版目录结构
+///
+/// 输入: project_path 项目根目录路径
+/// 输出: Result<bool, String> 是否为旧版项目
+/// 流程:
+///   1. 校验项目路径
+///   2. 调用 project_template::is_legacy_project 检测旧版独有目录
+///   3. 返回检测结果（true 时前端弹出迁移提示对话框）
+///
+/// 兼容说明：
+///   旧版 8 种目录名（角色/世界观/术语/剧情图谱/正文/大纲/素材/.novelforge）
+///   新版 6 种目录名（正文/设定/大纲/伏笔/草稿箱/.novelforge）
+///   存在旧版独有目录即判定为旧版项目，触发 LegacyProjectMigrationDialog
+#[tauri::command]
+pub fn is_legacy_project(project_path: String) -> Result<bool, String> {
+    let path = validate_project_path(&project_path)?;
+    Ok(detect_legacy(&path))
 }
 
 /// 文件节点结构

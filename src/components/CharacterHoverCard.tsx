@@ -10,12 +10,18 @@
 // 2. 调用后端 API 获取角色摘要
 // 3. 渲染浮动卡片，自动调整位置防止溢出屏幕
 // 4. 加载中/未找到/正常 三种状态展示
+// 5. 预留 AI 操作区（p5-26 占位，p6 阶段接入实际 AI 命令）
 //
 // 设计理念：
 // 减少作者在正文与角色设定之间的切换操作，保持写作沉浸感
+//
+// AI-Ready 设计说明：
+// characterId 字段来自 p5-25 实体高亮装饰的 data-entity-id 属性（UUID v4），
+// 未来 AI 模块可通过此 ID 精确查询角色结构化数据（避免按名称模糊匹配）。
+// AI 操作区按钮当前为占位 disabled 状态，p6 阶段接入 PromptBuilder 后启用。
 
 import { useEffect, useState, useRef } from "react";
-import { Loader2, UserCircle, AlertCircle, FileText } from "lucide-react";
+import { Loader2, UserCircle, AlertCircle, FileText, Sparkles, MessageSquare } from "lucide-react";
 import { readCharacterSummary, type CharacterSummary } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
@@ -30,6 +36,9 @@ interface CharacterHoverCardProps {
   characterName: string;
   /** 项目根路径 */
   projectPath: string;
+  /** 角色实体 UUID（来自 p5-25 实体高亮装饰的 data-entity-id）
+   * AI-Ready：未来 AI 操作通过此 ID 精确查询结构化设定数据 */
+  characterId?: string;
 }
 
 /**
@@ -39,13 +48,15 @@ interface CharacterHoverCardProps {
  *   - x, y: 锚点坐标
  *   - characterName: 角色名
  *   - projectPath: 项目路径
+ *   - characterId: 角色实体 UUID（可选，用于 AI 操作）
  * 输出: JSX 浮动卡片（open=false 时返回 null）
  * 流程:
  *   1. open 切换为 true 时调用后端读取角色摘要
  *   2. 加载中显示 spinner
  *   3. 未找到设定文件显示提示
  *   4. 正常显示身份、性格、简介
- *   5. 自动调整位置防止溢出屏幕
+ *   5. 渲染 AI 操作区占位按钮（p6 阶段启用）
+ *   6. 自动调整位置防止溢出屏幕
  */
 export default function CharacterHoverCard({
   open,
@@ -53,6 +64,7 @@ export default function CharacterHoverCard({
   y,
   characterName,
   projectPath,
+  characterId,
 }: CharacterHoverCardProps) {
   const { t } = useI18n();
   const [summary, setSummary] = useState<CharacterSummary | null>(null);
@@ -189,6 +201,47 @@ export default function CharacterHoverCard({
           </div>
         )}
       </div>
+
+      {/* AI 操作区（p5-26 预留占位，p6 阶段接入 PromptBuilder 后启用）
+       * 设计说明：
+       *   - 按钮当前为 disabled 占位，仅展示未来能力
+       *   - characterId 用于 p6 阶段 AI 命令精确查询结构化设定
+       *   - 悬停态显示"敬请期待"提示，避免用户误以为按钮可点击
+       *   - 仅在成功加载角色摘要后显示（无角色档案时不显示 AI 入口） */}
+      {summary && summary.found && (
+        <div className="px-3 py-2 border-t border-nf-border-light bg-nf-bg/40">
+          <div className="flex items-center gap-1 mb-1.5">
+            <Sparkles className="w-2.5 h-2.5 text-fandex-tertiary" />
+            <span className="text-[10px] font-medium text-nf-text-tertiary uppercase tracking-wider">
+              {t("characterHover.aiSectionTitle")}
+            </span>
+          </div>
+          <div className="space-y-1">
+            <button
+              type="button"
+              disabled
+              title={t("characterHover.aiComingSoon")}
+              className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-[11px] text-nf-text-tertiary cursor-not-allowed opacity-60 rounded-sm hover:bg-nf-bg-hover transition-colors"
+              data-character-id={characterId}
+              data-ai-action="summarize-state"
+            >
+              <Sparkles className="w-2.5 h-2.5 flex-shrink-0" />
+              <span className="truncate">{t("characterHover.aiSummarizeState")}</span>
+            </button>
+            <button
+              type="button"
+              disabled
+              title={t("characterHover.aiComingSoon")}
+              className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-[11px] text-nf-text-tertiary cursor-not-allowed opacity-60 rounded-sm hover:bg-nf-bg-hover transition-colors"
+              data-character-id={characterId}
+              data-ai-action="generate-dialogue"
+            >
+              <MessageSquare className="w-2.5 h-2.5 flex-shrink-0" />
+              <span className="truncate">{t("characterHover.aiGenerateDialogue")}</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

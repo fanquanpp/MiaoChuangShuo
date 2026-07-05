@@ -74,7 +74,13 @@ import { checkForUpdates, type ReleaseInfo } from "../lib/updateChecker";
 const SCAN_DIR_KEY = "novelforge:scanDir:v1";
 
 // 项目类型图标映射
+// 新版 3 标准文体 + 旧版 8 种文体兼容(用于显示旧项目卡片图标)
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  // 新版 3 标准文体
+  novel: BookMarked,
+  script: Clapperboard,
+  essay: Feather,
+  // 旧版 8 种文体兼容(旧项目 meta.type 仍为旧字符串)
   standard: BookMarked,
   short_story: FileText,
   diary: ScrollText,
@@ -105,10 +111,10 @@ export default function Launcher() {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [selectedType, setSelectedType] = useState<ProjectType>("standard");
+  const [selectedType, setSelectedType] = useState<ProjectType>("novel");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("26.7.20");
+  const [appVersion, setAppVersion] = useState("26.7.21");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
   // 编辑项目对话框目标：非 null 时渲染 EditProjectDialog
   const [editTarget, setEditTarget] = useState<ProjectInfo | null>(null);
@@ -448,10 +454,13 @@ export default function Launcher() {
 
   const toProjectData = useCallback((p: ProjectInfo): ProjectData => {
     const typeI18nMap: Record<string, string> = {
+      // 新版 3 标准文体
+      novel: t("launcher.typeNovel"),
+      script: t("launcher.typeScript"),
+      essay: t("launcher.typeEssay"),
+      // 旧版 8 种文体兼容(旧项目 meta.type 仍为旧字符串)
       epic: t("launcher.typeEpic"),
       standard: t("launcher.typeStandard"),
-      essay: t("launcher.typeEssay"),
-      script: t("launcher.typeScript"),
       wuxia: t("launcher.typeWuxia"),
       scifi: t("launcher.typeScifi"),
       mystery: t("launcher.typeMystery"),
@@ -469,10 +478,13 @@ export default function Launcher() {
       sharedworld: t("launcher.typeSharedWorld"),
     };
     const typeColors: Record<string, string> = {
+      // 新版 3 标准文体
+      novel: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
+      script: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
+      essay: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
+      // 旧版 8 种文体兼容
       epic: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
       standard: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
-      essay: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
-      script: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
       wuxia: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
       scifi: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
       mystery: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
@@ -490,10 +502,13 @@ export default function Launcher() {
       sharedworld: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
     };
     const gradients: Record<string, string> = {
+      // 新版 3 标准文体
+      novel: "from-fandex-primary to-fandex-primary/40",
+      script: "from-fandex-primary to-fandex-primary/40",
+      essay: "from-fandex-secondary to-fandex-secondary/40",
+      // 旧版 8 种文体兼容
       epic: "from-fandex-tertiary to-fandex-tertiary/40",
       standard: "from-fandex-primary to-fandex-primary/40",
-      essay: "from-fandex-secondary to-fandex-secondary/40",
-      script: "from-fandex-primary to-fandex-primary/40",
       wuxia: "from-fandex-tertiary to-fandex-tertiary/40",
       scifi: "from-fandex-secondary to-fandex-secondary/40",
       mystery: "from-fandex-primary to-fandex-primary/40",
@@ -566,7 +581,7 @@ export default function Launcher() {
   // 选择自定义模板后打开创建对话框
   const handleCustomTemplateSelect = useCallback((template: CustomTemplate) => {
     setSelectedCustomTemplate(template);
-    setSelectedType("standard"); // 自定义模板基于 standard 类型
+    setSelectedType("novel"); // 自定义模板基于 novel 类型(架构重构后标准文体)
     setShowCreateDialog(true);
   }, []);
 

@@ -10,6 +10,7 @@
 // 3. 封装 Tauri invoke 调用
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 
 /**
@@ -24,16 +25,9 @@ function validatePathInProject(filePath: string, projectPath: string): void {
   }
 }
 
-// 项目文体类型（按文体体裁分类）
-export type ProjectType =
-  | "short_story"
-  | "diary"
-  | "dialogue"
-  | "multi_volume"
-  | "shared_world"
-  | "screenplay"
-  | "poetry"
-  | "standard";
+// 项目文体类型（架构重构后 3 种标准文体）
+// 旧版 8 种文体字符串透传到后端，由 StandardProjectType::from_str 自动映射
+export type ProjectType = "novel" | "script" | "essay";
 
 // 项目元数据接口
 export interface ProjectMeta {
@@ -83,16 +77,11 @@ export interface TemplateInfo {
   desc: string;
 }
 
-// 可用的项目文体模板列表（按文体体裁分类）
+// 可用的项目文体模板列表（3 种标准文体，对应 Rust StandardProjectType）
 export const PROJECT_TEMPLATES: TemplateInfo[] = [
-  { id: "standard", name: "标准长篇", desc: "通用长篇小说架构，分卷管理、人物关系图" },
-  { id: "short_story", name: "短篇小说", desc: "单篇精炼结构，灵感笔记与人物速写模板" },
-  { id: "diary", name: "日记体", desc: "日期驱动叙事，心理轨迹追踪、日记模板" },
-  { id: "dialogue", name: "对话体", desc: "对话推动叙事，角色声线设定、场景模板" },
-  { id: "multi_volume", name: "长篇分卷", desc: "多卷深度架构，分卷大纲、卷间关联、人物关系图" },
-  { id: "shared_world", name: "同世界观系列", desc: "多作品共享世界观，系列规划、跨作品人物档案库" },
-  { id: "screenplay", name: "剧本式", desc: "幕次结构叙事，场景设定、道具清单、分幕大纲" },
-  { id: "poetry", name: "诗歌体", desc: "诗意叙事，诗稿模板、韵律笔记、意象集" },
+  { id: "novel", name: "长短篇小说", desc: "通用小说架构，统一目录结构、伏笔追踪、设定库" },
+  { id: "script", name: "剧本与脚本", desc: "影视剧本、舞台剧本、对话体，角色名册与分幕大纲" },
+  { id: "essay", name: "散文与文章", desc: "散文、随笔、诗歌、杂文，主题构思与意象集" },
 ];
 
 // 小说题材列表（次级可选分类）
@@ -199,6 +188,15 @@ export async function pickDirectory(): Promise<string | null> {
 // 流程: 调用 Rust 后端 read_project_tree 命令
 export async function readProjectTree(projectPath: string): Promise<FileNode[]> {
   return invoke<FileNode[]>("read_project_tree", { projectPath });
+}
+
+// 检测项目是否为旧版目录结构
+// 输入: projectPath 项目路径
+// 输出: Promise<boolean> 是否为旧版项目（true 时前端弹出迁移对话框）
+// 流程: 调用 Rust 后端 is_legacy_project 命令，检测旧版 8 种目录名
+// 兼容说明: 旧版目录（角色/世界观/术语/剧情图谱/素材）任一存在即判定为旧版
+export async function isLegacyProject(projectPath: string): Promise<boolean> {
+  return invoke<boolean>("is_legacy_project", { projectPath });
 }
 
 // 读取文件内容（含项目路径校验）
@@ -802,4 +800,433 @@ export async function pickOpenArchive(): Promise<string | null> {
   });
   // open 返回 string | string[] | null，单选模式下为 string | null
   return typeof result === "string" ? result : null;
+}
+
+// ===== .pmd 格式迁移 API =====
+
+// 迁移进度事件 payload（与后端 MigrationProgress 对应）
+export interface MigrationProgress {
+  // 当前已处理文件数
+  processed: number;
+  // 待迁移文件总数
+  total: number;
+  // 当前处理的文件相对路径
+  current_file: string;
+  // 已完成百分比（0-100）
+  percent: number;
+  // 迁移阶段（scan / migrate / done / error）
+  stage: string;
+}
+
+// 单个文件迁移结果
+export interface FileMigrationResult {
+  // 原文件相对路径
+  relative_path: string;
+  // 是否成功
+  success: boolean;
+  // 失败原因（success=false 时有值）
+  error: string | null;
+  // 是否跳过（已是 .pmd 或为设定文件）
+  skipped: boolean;
+  // 跳过原因
+  skip_reason: string | null;
+}
+
+// 迁移统计结果
+export interface MigrationStats {
+  // 待迁移文件总数
+  total_targets: number;
+  // 成功迁移数
+  migrated: number;
+  // 跳过数
+  skipped: number;
+  // 失败数
+  failed: number;
+  // 备份文件总数
+  backups_created: number;
+  // 各文件详情
+  details: FileMigrationResult[];
+  // 是否为断点续传（true 表示从上次中断处继续）
+  resumed: boolean;
+}
+
+// 迁移状态（持久化到 .novelforge/migration_state.json）
+export interface MigrationState {
+  // 已完成迁移的文件相对路径列表
+  completed: string[];
+  // 迁移开始时间（ISO 8601）
+  started_at: string;
+  // 最后更新时间（ISO 8601）
+  updated_at: string;
+  // 是否全部完成
+  finished: boolean;
+}
+
+// 迁移进度事件名（与后端 PROGRESS_EVENT 常量一致）
+const MIGRATION_PROGRESS_EVENT = "pmd-migration-progress";
+
+// 批量迁移项目文件为 .pmd 格式
+// 输入: projectPath 项目根路径
+// 输出: Promise<MigrationStats> 迁移统计
+// 流程: 调用 Rust 后端 migrate_project_to_pmd 命令，后端推送 pmd-migration-progress 事件
+// 注意: 调用前应通过 onMigrationProgress 注册进度回调，事件可能在本函数返回前触发
+export async function migrateProjectToPmd(projectPath: string): Promise<MigrationStats> {
+  return invoke<MigrationStats>("migrate_project_to_pmd", { projectPath });
+}
+
+// 读取迁移状态（用于判断是否支持断点续传）
+// 输入: projectPath 项目根路径
+// 输出: Promise<MigrationState | null> 迁移状态（null 表示无状态文件）
+export async function getMigrationState(projectPath: string): Promise<MigrationState | null> {
+  return invoke<MigrationState | null>("get_migration_state", { projectPath });
+}
+
+// 清除迁移状态（迁移成功后重置断点）
+// 输入: projectPath 项目根路径
+// 输出: Promise<void>
+export async function clearMigrationState(projectPath: string): Promise<void> {
+  return invoke<void>("clear_migration_state", { projectPath });
+}
+
+// 注册迁移进度事件监听器
+// 输入: callback 进度回调函数
+// 输出: Promise<UnlistenFn> 取消监听函数（组件卸载时调用以避免内存泄漏）
+// 流程: 调用 Tauri event API 的 listen 函数订阅 pmd-migration-progress 事件
+// 用途: 在迁移对话框中实时显示进度条与当前处理文件名
+export async function onMigrationProgress(
+  callback: (progress: MigrationProgress) => void
+): Promise<UnlistenFn> {
+  return listen<MigrationProgress>(MIGRATION_PROGRESS_EVENT, (event) => {
+    callback(event.payload);
+  });
+}
+
+// ===== 全文索引与搜索（Tantivy + jieba 中文分词）=====
+//
+// 功能概述：
+// 基于 Tantivy 全文索引引擎，提供项目级全文搜索能力。
+// 支持中文分词（jieba）、异步索引构建、增量更新、按场景/类型过滤（AI-Ready）。
+// 索引存储于 .novelforge/index/ 目录，与项目元数据隔离。
+//
+// 设计说明：
+// - 所有索引操作通过 Tauri 命令调用 Rust 后端
+// - 索引构建进度通过 "index-progress" 事件推送到前端
+// - AI-Ready: 支持 chunk_type（manuscript/setting/outline）和 scene_id 过滤
+
+// 索引构建进度事件 payload（与后端 IndexProgress 对应）
+export interface IndexProgress {
+  // 已处理文件数
+  processed: number;
+  // 总文件数
+  total: number;
+  // 当前处理文件名
+  current_file: string;
+  // 进度百分比（0-100）
+  percent: number;
+  // 阶段：scan / index / commit / done / error
+  stage: string;
+}
+
+// 索引统计信息（与后端 IndexStats 对应）
+export interface IndexStats {
+  // 索引文档总数（Chunk 粒度）
+  doc_count: number;
+  // 已索引文件数
+  file_count: number;
+  // 索引大小（字节）
+  index_size: number;
+  // 最后构建时间（ISO 8601）
+  last_built_at: string;
+}
+
+// 搜索结果（单个 Chunk，与后端 SearchResult 对应）
+export interface TantivySearchResult {
+  // 文件相对路径（相对于项目根，含"正文/"前缀）
+  file_path: string;
+  // 文件名
+  file_name: string;
+  // Chunk 序号
+  chunk_index: number;
+  // 匹配的文本片段
+  text: string;
+  // 文件更新时间
+  updated_at: string;
+}
+
+// 搜索请求参数（与后端 SearchRequest 对应）
+// 注意：字段名使用 snake_case，与后端 Rust 结构体一致
+export interface TantivySearchRequest {
+  // 项目根路径（绝对路径）
+  project_path: string;
+  // 搜索关键词
+  query: string;
+  // 返回结果上限（默认 50）
+  limit?: number;
+  // AI-Ready: 按类型过滤（manuscript/setting/outline）
+  chunk_type?: string;
+  // AI-Ready: 按场景 ID 过滤
+  scene_id?: string;
+}
+
+// 搜索响应（与后端 SearchResponse 对应）
+export interface TantivySearchResponse {
+  // 查询关键词
+  query: string;
+  // 匹配结果总数
+  total: number;
+  // 匹配结果列表
+  results: TantivySearchResult[];
+  // 索引统计信息（便于前端判断是否需要重建索引）
+  index_stats: IndexStats | null;
+}
+
+// 索引构建进度事件名（与后端 INDEX_PROGRESS_EVENT 常量一致）
+const INDEX_PROGRESS_EVENT = "index-progress";
+
+// 全文搜索项目内容
+// 输入: request 搜索请求参数（项目路径、关键词、可选过滤条件）
+// 输出: Promise<TantivySearchResponse> 搜索响应
+// 流程: 调用 Rust 后端 search_project 命令执行 Tantivy 全文搜索
+// 用途: 全局搜索面板、AI 上下文检索（RAG）
+export async function searchProject(
+  request: TantivySearchRequest
+): Promise<TantivySearchResponse> {
+  return invoke<TantivySearchResponse>("search_project", { request });
+}
+
+// 异步构建项目全文索引（全量重建）
+// 输入: projectPath 项目根路径
+// 输出: Promise<IndexStats> 索引统计信息
+// 流程: 调用 Rust 后端 build_project_index 命令，后端推送 index-progress 事件
+// 注意: 调用前应通过 onIndexProgress 注册进度回调，事件可能在本函数返回前触发
+export async function buildProjectIndex(projectPath: string): Promise<IndexStats> {
+  return invoke<IndexStats>("build_project_index", { projectPath });
+}
+
+// 获取项目索引统计信息
+// 输入: projectPath 项目根路径
+// 输出: Promise<IndexStats> 索引统计
+// 用途: 判断索引是否存在、是否需要重建
+export async function getProjectIndexStats(projectPath: string): Promise<IndexStats> {
+  return invoke<IndexStats>("get_project_index_stats", { projectPath });
+}
+
+// 增量更新单文件索引
+// 输入: projectPath 项目根路径, relativePath 文件相对路径
+// 输出: Promise<number> 写入的 Chunk 数量
+// 流程: 调用 Rust 后端 update_file_index 命令，采用"先删后建"策略
+// 用途: 文件保存后自动更新索引，避免全量重建
+export async function updateFileIndex(
+  projectPath: string,
+  relativePath: string
+): Promise<number> {
+  return invoke<number>("update_file_index", { projectPath, relativePath });
+}
+
+// 删除单文件索引
+// 输入: projectPath 项目根路径, relativePath 文件相对路径
+// 输出: Promise<void>
+// 用途: 文件删除后清理索引文档
+export async function removeFileIndex(
+  projectPath: string,
+  relativePath: string
+): Promise<void> {
+  return invoke<void>("remove_file_index", { projectPath, relativePath });
+}
+
+// 注册索引构建进度事件监听器
+// 输入: callback 进度回调函数
+// 输出: Promise<UnlistenFn> 取消监听函数（组件卸载时调用以避免内存泄漏）
+// 流程: 调用 Tauri event API 的 listen 函数订阅 index-progress 事件
+// 用途: 在索引构建对话框中实时显示进度条与当前处理文件名
+export async function onIndexProgress(
+  callback: (progress: IndexProgress) => void
+): Promise<UnlistenFn> {
+  return listen<IndexProgress>(INDEX_PROGRESS_EVENT, (event) => {
+    callback(event.payload);
+  });
+}
+
+// ===== AI 上下文提取（AI-Ready 基础设施）=====
+//
+// 功能概述：
+// 为 AI 功能（续写、推演、一致性校验）提供结构化上下文数据。
+// 当前为接口定义阶段，后端返回 Mock 空数据，前端可 Mock 数据进行开发。
+// 后续阶段 6 实现 RAG 检索与上下文组装。
+//
+// 设计说明：
+// - 所有结构使用 camelCase 字段名（后端使用 #[serde(rename_all = "camelCase")]）
+// - AI-Ready: SceneContext 的 povCharacterId 和 mood 为强类型化字段
+// - 接口提前定义，确保 AI 功能上线时前端无需重构
+
+// 角色简要信息（用于场景上下文中的出场角色列表）
+export interface CharacterBrief {
+  // 角色 ID（设定库 UUID）
+  id: string;
+  // 角色名称
+  name: string;
+  // 角色别名列表（AI-Ready: 用于实体识别匹配）
+  aliases: string[];
+  // 角色简介（一句话描述）
+  summary: string;
+}
+
+// 设定简要信息（用于场景上下文中的相关设定引用）
+export interface SettingBrief {
+  // 设定 ID
+  id: string;
+  // 设定名称
+  name: string;
+  // 设定类型（角色/地点/物品/组织/概念）
+  category: string;
+  // 设定摘要
+  summary: string;
+}
+
+// 伏笔简要信息（用于场景上下文中的活跃伏笔提醒）
+export interface ForeshadowingBrief {
+  // 伏笔 ID
+  id: string;
+  // 伏笔描述
+  description: string;
+  // 状态（已埋设/已回收/待回收）
+  status: string;
+  // 重要度（高/中/低）
+  importance: string;
+}
+
+// 场景上下文（AI 续写的核心数据）
+// AI 价值：这是 AI 理解"剧情结构"的锚点
+export interface SceneContext {
+  // 场景 ID（关联 sceneBreak 节点 id）
+  sceneId: string;
+  // 场景标题
+  sceneTitle: string;
+  // AI-Ready: 视角角色 ID（强类型化，关联设定库 UUID）
+  povCharacterId: string | null;
+  // 视角角色名称（从设定库解析）
+  povCharacterName: string | null;
+  // AI-Ready: 氛围（强类型化，如"紧张"/"温馨"/"悲伤"）
+  mood: string | null;
+  // 场景所在章节
+  chapter: string | null;
+  // 前文摘要（最近 N 个 Chunk 的拼接，从 Tantivy 索引检索）
+  precedingSummary: string;
+  // 场景内出场角色列表（从设定库提取）
+  presentCharacters: CharacterBrief[];
+  // 相关设定引用（从设定库提取，如地点/物品/组织）
+  relatedSettings: SettingBrief[];
+  // 活跃伏笔列表（从伏笔追踪提取）
+  activeForeshadowings: ForeshadowingBrief[];
+}
+
+// 角色出场记录
+export interface AppearanceRecord {
+  // 文件路径
+  filePath: string;
+  // 文件名
+  fileName: string;
+  // 出场文本片段（匹配的 Chunk 文本）
+  excerpt: string;
+  // AI-Ready: 场景 ID（关联 sceneBreak 节点）
+  sceneId: string | null;
+}
+
+// 角色关系简要
+export interface RelationshipBrief {
+  // 目标角色 ID
+  targetId: string;
+  // 目标角色名称
+  targetName: string;
+  // 关系类型（朋友/敌人/师徒/恋人等）
+  relationType: string;
+  // 关系描述
+  description: string;
+}
+
+// 角色上下文（AI 角色一致性校验的核心数据）
+// AI 价值：避免"角色幻觉"（如把 A 的性格安在 B 身上）
+export interface CharacterContext {
+  // 角色 ID（设定库 UUID）
+  characterId: string;
+  // 角色名称
+  name: string;
+  // 角色别名列表
+  aliases: string[];
+  // 角色设定全文（从设定库读取）
+  fullProfile: string;
+  // 角色出场记录（从 Tantivy 索引检索，按时间倒序）
+  appearanceRecords: AppearanceRecord[];
+  // 角色关系列表（从人物关系图读取）
+  relationships: RelationshipBrief[];
+}
+
+// 章节摘要
+export interface ChapterSummary {
+  // 章节名
+  chapterName: string;
+  // 文件路径
+  filePath: string;
+  // 摘要文本（前 200 字）
+  summary: string;
+  // 字数
+  wordCount: number;
+}
+
+// 项目全局上下文（AI 大纲生成、剧情推演的核心数据）
+// AI 价值：提供全局视角的项目信息
+export interface ProjectContext {
+  // 项目名称
+  projectName: string;
+  // 项目类型（novel/script/essay）
+  projectType: string;
+  // 项目描述
+  description: string;
+  // 主要角色列表（从设定库提取，按重要度排序）
+  mainCharacters: CharacterBrief[];
+  // 主要设定列表（从设定库提取，如世界观/地点/组织）
+  keySettings: SettingBrief[];
+  // 已完成章节摘要（从 Tantivy 索引检索，前 200 字）
+  chapterSummaries: ChapterSummary[];
+  // 活跃伏笔列表（状态为"已埋设"或"待回收"）
+  activeForeshadowings: ForeshadowingBrief[];
+  // 总字数
+  totalWords: number;
+  // 章节数
+  chapterCount: number;
+}
+
+// 获取场景上下文
+// 输入: projectPath 项目根路径, sceneId 场景 ID
+// 输出: Promise<SceneContext> 场景上下文
+// 用途: AI 续写时提供当前场景的角色/氛围/前文摘要
+// 当前状态: 后端返回 Mock 空数据，前端可 Mock 数据进行开发
+export async function getSceneContext(
+  projectPath: string,
+  sceneId: string
+): Promise<SceneContext> {
+  return invoke<SceneContext>("get_scene_context", { projectPath, sceneId });
+}
+
+// 获取角色上下文
+// 输入: projectPath 项目根路径, characterId 角色 ID
+// 输出: Promise<CharacterContext> 角色上下文
+// 用途: AI 角色一致性校验，提供角色设定全文与出场记录
+// 当前状态: 后端返回 Mock 空数据，前端可 Mock 数据进行开发
+export async function getCharacterContext(
+  projectPath: string,
+  characterId: string
+): Promise<CharacterContext> {
+  return invoke<CharacterContext>("get_character_context", { projectPath, characterId });
+}
+
+// 获取项目全局上下文
+// 输入: projectPath 项目根路径
+// 输出: Promise<ProjectContext> 项目上下文
+// 用途: AI 大纲生成、剧情推演，提供全局视角的项目信息
+// 当前状态: 后端返回 Mock 空数据，前端可 Mock 数据进行开发
+export async function getProjectContext(
+  projectPath: string
+): Promise<ProjectContext> {
+  return invoke<ProjectContext>("get_project_context", { projectPath });
 }
