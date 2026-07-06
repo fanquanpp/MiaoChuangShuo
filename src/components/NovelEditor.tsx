@@ -261,6 +261,15 @@ export default function NovelEditor({
   const [showAiPanel, setShowAiPanel] = useState(false);
   // AI 待发送指令 (AI-3.4 右键菜单触发: 存储预设指令, 由 AiAssistantPanel 消费后清空)
   const [pendingAiInstruction, setPendingAiInstruction] = useState<string | null>(null);
+  // Sprint 6: AI 任务上下文 (与 pendingAiInstruction 同步设置, 由 AiAssistantPanel 消费后清空)
+  // pendingAiCharacterId - 角色 UUID (dialogue / consistencyCheck 任务需要)
+  // pendingAiSelectedText - 选中文本 (consistencyCheck 任务需要)
+  // pendingAiTaskType - 任务类型 (默认 continuation, 外部触发特定任务时切换)
+  const [pendingAiCharacterId, setPendingAiCharacterId] = useState<string | null>(null);
+  const [pendingAiSelectedText, setPendingAiSelectedText] = useState<string | null>(null);
+  const [pendingAiTaskType, setPendingAiTaskType] = useState<
+    "continuation" | "dialogue" | "consistencyCheck" | "plotReview" | "outlineGeneration" | null
+  >(null);
   // 查找替换初始模式：'find' 仅查找 / 'replace' 查找并替换
   const [findReplaceMode, setFindReplaceMode] = useState<"find" | "replace">("find");
   // 文件重载触发器：恢复快照后递增以强制重新加载文件内容
@@ -994,14 +1003,16 @@ export default function NovelEditor({
   }, [editor, filePath, dirty, showToast, t, currentProject, snapshotEnabled, snapshotMinInterval]);
 
   /**
-   * AI 预设指令处理 (AI-3.4 右键菜单触发)
+   * AI 预设指令处理 (AI-3.4 右键菜单触发 / Sprint 6 任务类型联动)
    * 输入: command 预设指令类型, selectedText 选中文本
    * 输出: void (组装指令并打开 AI 助手面板)
    * 流程:
    *   1. 根据 command 类型选择预设指令模板
    *   2. 将选中文本填入模板生成完整 instruction
-   *   3. 设置 pendingAiInstruction 并打开 AI 面板
-   *   4. AiAssistantPanel 消费 pendingInstruction 后自动发送
+   *   3. Sprint 6: characterCheck 命令切换为 consistencyCheck 任务类型,
+   *      并从选区遍历 characterMentionNode 提取 characterId
+   *   4. 设置 pendingAiInstruction 与任务上下文, 打开 AI 面板
+   *   5. AiAssistantPanel 消费 pendingInstruction 后自动发送
    */
   const handleAiCommand = useCallback(
     (command: "polish" | "expand" | "condense" | "characterCheck", selectedText: string) => {
@@ -1014,13 +1025,42 @@ export default function NovelEditor({
       };
       const instruction = (templates[command] || "") + selectedText;
       setPendingAiInstruction(instruction);
+
+      // Sprint 6: characterCheck 切换为 consistencyCheck 任务, 尝试从选区提取 characterId
+      if (command === "characterCheck") {
+        setPendingAiTaskType("consistencyCheck");
+        setPendingAiSelectedText(selectedText);
+        // 遍历选区内的 characterMentionNode, 提取首个 characterId
+        let extractedCharacterId: string | null = null;
+        if (editor && !editor.isDestroyed) {
+          const { state } = editor;
+          const { from, to } = state.selection;
+          state.doc.nodesBetween(from, to, (node) => {
+            if (extractedCharacterId) return false;
+            if (node.type.name === "characterMentionNode") {
+              const cid = node.attrs.characterId as string | undefined;
+              if (cid) {
+                extractedCharacterId = cid;
+                return false;
+              }
+            }
+            return true;
+          });
+        }
+        setPendingAiCharacterId(extractedCharacterId);
+      } else {
+        // polish/expand/condense 保持 continuation 任务
+        setPendingAiTaskType("continuation");
+        setPendingAiSelectedText(null);
+        setPendingAiCharacterId(null);
+      }
       setShowAiPanel(true);
     },
-    []
+    [editor]
   );
 
   /**
-   * 角色悬停卡片 AI 操作处理（Sprint 3 任务 3.2）
+   * 角色悬停卡片 AI 操作处理（Sprint 3 任务 3.2 / Sprint 6 任务类型联动）
    * 输入:
    *   action - 操作类型（"summarize-state" | "generate-dialogue"）
    *   characterId - 角色实体 UUID（可能为 undefined）
@@ -1029,8 +1069,9 @@ export default function NovelEditor({
    * 流程:
    *   1. 根据 action 类型选择预设指令模板
    *   2. 将角色名填入模板，附加 characterId 供 AI 上下文检索
-   *   3. 设置 pendingAiInstruction 并打开 AI 面板
-   *   4. AiAssistantPanel 消费 pendingInstruction 后自动发送
+   *   3. Sprint 6: generate-dialogue 切换为 dialogue 任务类型并设置 characterId
+   *   4. 设置 pendingAiInstruction 与任务上下文, 打开 AI 面板
+   *   5. AiAssistantPanel 消费 pendingInstruction 后自动发送
    * 容错: characterId 为 undefined 时仅按名称匹配，不阻塞 AI 调用
    */
   const handleCharacterAiAction = useCallback(
@@ -1048,6 +1089,17 @@ export default function NovelEditor({
       const instruction = templates[action] || "";
       if (!instruction) return;
       setPendingAiInstruction(instruction);
+
+      // Sprint 6: generate-dialogue 切换为 dialogue 任务, 注入 characterId
+      if (action === "generate-dialogue") {
+        setPendingAiTaskType("dialogue");
+        setPendingAiCharacterId(characterId || null);
+      } else {
+        // summarize-state 保持 continuation 任务
+        setPendingAiTaskType("continuation");
+        setPendingAiCharacterId(null);
+      }
+      setPendingAiSelectedText(null);
       setShowAiPanel(true);
     },
     []
@@ -1528,6 +1580,14 @@ export default function NovelEditor({
         filePath={filePath}
         pendingInstruction={pendingAiInstruction}
         onPendingInstructionConsumed={() => setPendingAiInstruction(null)}
+        pendingCharacterId={pendingAiCharacterId}
+        pendingSelectedText={pendingAiSelectedText}
+        pendingTaskType={pendingAiTaskType}
+        onPendingTaskConsumed={() => {
+          setPendingAiCharacterId(null);
+          setPendingAiSelectedText(null);
+          setPendingAiTaskType(null);
+        }}
       />
     </div>
   );

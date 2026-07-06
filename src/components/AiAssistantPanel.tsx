@@ -20,7 +20,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Sparkles, X, Send, Square, Copy, Check, ClipboardPaste, Trash2, AlertCircle } from "lucide-react";
+import { Sparkles, X, Send, Square, Copy, Check, ClipboardPaste, Trash2, AlertCircle, ChevronDown } from "lucide-react";
 import type { Editor } from "@tiptap/react";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
@@ -32,9 +32,19 @@ import {
   type ChatMessage,
   type AiConfig,
 } from "../lib/aiService";
-import { PromptBuilder, type SceneContext } from "../lib/promptBuilder";
+import {
+  PromptBuilder,
+  type SceneContext,
+  type ProjectContext,
+  type AiTaskType,
+} from "../lib/promptBuilder";
 import { getCurrentSceneLocation } from "../lib/tiptap/sceneUtils";
-import { getSceneContext, type SceneContextRequest } from "../lib/api";
+import {
+  getSceneContext,
+  getCharacterContext,
+  getProjectContext,
+  type SceneContextRequest,
+} from "../lib/api";
 
 // 对话消息角色
 type MessageRole = "user" | "assistant";
@@ -74,6 +84,17 @@ interface AiAssistantPanelProps {
   pendingInstruction?: string | null;
   // 待发送指令已被消费回调 (通知父组件清空 pendingInstruction)
   onPendingInstructionConsumed?: () => void;
+  // Sprint 6: 外部注入的角色 UUID (用于 dialogue / consistencyCheck 任务)
+  // 由 CharacterHoverCard / 右键菜单触发, 与 pendingInstruction 同步设置
+  pendingCharacterId?: string | null;
+  // Sprint 6: 外部注入的选中文本 (用于 consistencyCheck 任务)
+  // 由 EditorBubbleMenu 的 characterCheck 按钮触发
+  pendingSelectedText?: string | null;
+  // Sprint 6: 外部注入的任务类型 (默认 continuation)
+  // 当外部触发特定任务时, 自动切换面板任务类型
+  pendingTaskType?: AiTaskType | null;
+  // Sprint 6: 外部任务已被消费回调 (通知父组件清空 pendingCharacterId/SelectedText/TaskType)
+  onPendingTaskConsumed?: () => void;
 }
 
 /**
@@ -194,6 +215,10 @@ export default function AiAssistantPanel({
   filePath,
   pendingInstruction,
   onPendingInstructionConsumed,
+  pendingCharacterId,
+  pendingSelectedText,
+  pendingTaskType,
+  onPendingTaskConsumed,
 }: AiAssistantPanelProps) {
   const { t } = useI18n();
   const { showToast } = useToast();
@@ -215,6 +240,18 @@ export default function AiAssistantPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // 输入框 ref (打开面板时自动聚焦)
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sprint 6: 当前 AI 任务类型 (默认续写)
+  const [taskType, setTaskType] = useState<AiTaskType>("continuation");
+  // Sprint 6: 当前绑定的角色 UUID (dialogue / consistencyCheck 任务使用)
+  // 由外部 pendingCharacterId 注入, 或手动切换任务类型时清空
+  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
+  // Sprint 6: 当前绑定的选中文本 (consistencyCheck 任务使用)
+  const [activeSelectedText, setActiveSelectedText] = useState<string | null>(null);
+  // Sprint 6: 任务类型下拉展开状态
+  const [taskMenuOpen, setTaskMenuOpen] = useState(false);
+  // 任务类型下拉菜单 ref (用于点击外部关闭)
+  const taskMenuRef = useRef<HTMLDivElement>(null);
 
   // 自动滚动到最新消息
   useEffect(() => {
@@ -253,6 +290,11 @@ export default function AiAssistantPanel({
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && open) {
+        // 任务菜单展开时优先关闭菜单
+        if (taskMenuOpen) {
+          setTaskMenuOpen(false);
+          return;
+        }
         // 流式生成中 Esc 中断请求
         if (isStreaming) {
           cancelStreamCompletion().catch(() => {});
@@ -263,22 +305,47 @@ export default function AiAssistantPanel({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, isStreaming, onClose]);
+  }, [open, isStreaming, onClose, taskMenuOpen]);
 
-  // 外部注入指令自动发送 (AI-3.4 右键菜单触发)
-  // 当 pendingInstruction 变化且非空时, 填入输入框并触发 handleSend
+  // Sprint 6: 任务菜单外部点击关闭
+  useEffect(() => {
+    if (!taskMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (taskMenuRef.current && !taskMenuRef.current.contains(e.target as Node)) {
+        setTaskMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [taskMenuOpen]);
+
+  // 外部注入指令自动发送 (AI-3.4 右键菜单触发 / Sprint 6 任务触发)
+  // 当 pendingInstruction 变化且非空时:
+  //   1. 同步外部注入的任务类型 / 角色ID / 选中文本到本地状态
+  //   2. 填入输入框并触发 handleSend
   useEffect(() => {
     if (!open || !pendingInstruction) return;
+    // Sprint 6: 同步外部任务上下文
+    if (pendingTaskType) {
+      setTaskType(pendingTaskType);
+    }
+    if (pendingCharacterId !== undefined) {
+      setActiveCharacterId(pendingCharacterId);
+    }
+    if (pendingSelectedText !== undefined) {
+      setActiveSelectedText(pendingSelectedText);
+    }
     setInput(pendingInstruction);
     onPendingInstructionConsumed?.();
-    // 延迟调用 handleSend 以确保 input 状态已更新
+    onPendingTaskConsumed?.();
+    // 延迟调用 handleSend 以确保 input 与任务状态已更新
     // 使用 ref 避免 handleSend 闭包过期
     const timer = window.setTimeout(() => {
       handleSendRef.current?.(pendingInstruction);
     }, 50);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, pendingInstruction]);
+  }, [open, pendingInstruction, pendingTaskType, pendingCharacterId, pendingSelectedText]);
 
   /**
    * 计算章节 ID (相对项目根的路径)
@@ -300,27 +367,180 @@ export default function AiAssistantPanel({
   }, [filePath, projectPath]);
 
   /**
+   * Sprint 6: 根据任务类型构建 Prompt
+   * 输入:
+   *   currentTask - 当前任务类型
+   *   instruction - 用户指令
+   *   sceneLoc - 当前场景位置 (continuation / dialogue 需要)
+   * 输出: Promise<BuiltPrompt | null> 构建完成的 Prompt, null 表示前置校验失败
+   * 流程:
+   *   1. continuation: getSceneContext + buildContinuationPrompt
+   *   2. dialogue: getCharacterContext + getSceneContext + buildDialoguePrompt
+   *   3. consistencyCheck: getCharacterContext + activeSelectedText + buildConsistencyCheckPrompt
+   *   4. plotReview: getProjectContext + buildPlotReviewPrompt
+   *   5. outlineGeneration: getProjectContext + buildOutlineGenerationPrompt
+   * 容错: 各类前置校验失败时弹出 toast 并返回 null
+   */
+  const buildPromptByTask = useCallback(
+    async (
+      currentTask: AiTaskType,
+      instruction: string,
+      sceneLoc: { sceneIndex: number } | null
+    ): Promise<{ system: string; user: string } | null> => {
+      const builder = new PromptBuilder(editorPrefs);
+
+      // continuation: 续写任务, 需要场景上下文
+      if (currentTask === "continuation") {
+        if (!sceneLoc) {
+          showToast("error", t("ai.panel.noSceneFound"));
+          return null;
+        }
+        const chapterId = computeChapterId();
+        if (!chapterId) {
+          showToast("error", t("ai.panel.invalidChapter"));
+          return null;
+        }
+        try {
+          const req: SceneContextRequest = {
+            projectPath,
+            chapterId,
+            sceneIndex: sceneLoc.sceneIndex,
+          };
+          const sceneContext: SceneContext = await getSceneContext(req);
+          const built = builder.buildContinuationPrompt(sceneContext);
+          return {
+            system: `${built.system}\n\n用户额外指令: ${instruction}`,
+            user: built.user,
+          };
+        } catch (err) {
+          showToast("error", `${t("ai.panel.generationFailed")}: ${String(err)}`);
+          return null;
+        }
+      }
+
+      // dialogue: 对话生成, 需要角色上下文 + 场景上下文
+      if (currentTask === "dialogue") {
+        if (!activeCharacterId) {
+          showToast("error", t("ai.panel.noCharacterSelected"));
+          return null;
+        }
+        if (!sceneLoc) {
+          showToast("error", t("ai.panel.noSceneFound"));
+          return null;
+        }
+        const chapterId = computeChapterId();
+        if (!chapterId) {
+          showToast("error", t("ai.panel.invalidChapter"));
+          return null;
+        }
+        try {
+          const [characterCtx, sceneCtx] = await Promise.all([
+            getCharacterContext(projectPath, activeCharacterId),
+            getSceneContext({
+              projectPath,
+              chapterId,
+              sceneIndex: sceneLoc.sceneIndex,
+            }),
+          ]);
+          showToast("success", t("ai.panel.characterContextLoaded"));
+          const built = builder.buildDialoguePrompt(characterCtx, sceneCtx);
+          return {
+            system: `${built.system}\n\n用户额外指令: ${instruction}`,
+            user: built.user,
+          };
+        } catch (err) {
+          showToast("error", `${t("ai.panel.characterContextLoadFailed")}: ${String(err)}`);
+          return null;
+        }
+      }
+
+      // consistencyCheck: 一致性校验, 需要角色上下文 + 选中文本
+      if (currentTask === "consistencyCheck") {
+        if (!activeCharacterId) {
+          showToast("error", t("ai.panel.noCharacterSelected"));
+          return null;
+        }
+        if (!activeSelectedText || !activeSelectedText.trim()) {
+          showToast("error", t("ai.panel.noSelectedText"));
+          return null;
+        }
+        try {
+          const characterCtx = await getCharacterContext(projectPath, activeCharacterId);
+          showToast("success", t("ai.panel.characterContextLoaded"));
+          const built = builder.buildConsistencyCheckPrompt(
+            characterCtx,
+            activeSelectedText
+          );
+          return {
+            system: `${built.system}\n\n用户额外指令: ${instruction}`,
+            user: built.user,
+          };
+        } catch (err) {
+          showToast("error", `${t("ai.panel.characterContextLoadFailed")}: ${String(err)}`);
+          return null;
+        }
+      }
+
+      // plotReview: 剧情推演, 需要项目上下文
+      if (currentTask === "plotReview") {
+        try {
+          const projectCtx: ProjectContext = await getProjectContext(projectPath);
+          showToast("success", t("ai.panel.projectContextLoaded"));
+          const built = builder.buildPlotReviewPrompt(projectCtx);
+          return {
+            system: `${built.system}\n\n用户额外指令: ${instruction}`,
+            user: built.user,
+          };
+        } catch (err) {
+          showToast("error", `${t("ai.panel.projectContextLoadFailed")}: ${String(err)}`);
+          return null;
+        }
+      }
+
+      // outlineGeneration: 大纲生成, 需要项目上下文
+      if (currentTask === "outlineGeneration") {
+        try {
+          const projectCtx: ProjectContext = await getProjectContext(projectPath);
+          showToast("success", t("ai.panel.projectContextLoaded"));
+          const built = builder.buildOutlineGenerationPrompt(projectCtx);
+          return {
+            system: `${built.system}\n\n用户额外指令: ${instruction}`,
+            user: built.user,
+          };
+        } catch (err) {
+          showToast("error", `${t("ai.panel.projectContextLoadFailed")}: ${String(err)}`);
+          return null;
+        }
+      }
+
+      return null;
+    },
+    [
+      editorPrefs,
+      activeCharacterId,
+      activeSelectedText,
+      projectPath,
+      computeChapterId,
+      t,
+      showToast,
+    ]
+  );
+
+  /**
    * 发送用户指令
    * 输入: overrideInstruction 外部注入指令 (AI-3.4 右键菜单触发, 不传则读取 input 状态)
    * 输出: Promise<void>
    * 流程:
    *   1. 校验输入与配置
-   *   2. 获取当前场景位置 (getCurrentSceneLocation)
-   *   3. 调用后端 getSceneContext 获取 4 层上下文
-   *   4. 构建 Prompt (buildContinuationPrompt + 用户指令追加)
-   *   5. 调用 streamChatCompletion 流式生成
-   *   6. 累加 chunk 到 assistant 消息
-   *   7. 完成或失败时更新消息状态
+   *   2. 续写/对话类任务需要编辑器与场景位置; 校验/推演/大纲类不需要
+   *   3. 根据 taskType 调用 buildPromptByTask 构建提示词
+   *   4. 调用 streamChatCompletion 流式生成
+   *   5. 累加 chunk 到 assistant 消息
+   *   6. 完成或失败时更新消息状态
    */
   const handleSend = useCallback(async (overrideInstruction?: string) => {
     const instruction = (overrideInstruction ?? input).trim();
     if (!instruction || isStreaming) return;
-
-    // 校验编辑器与场景
-    if (!editor || editor.isDestroyed) {
-      showToast("error", t("ai.panel.editorNotReady"));
-      return;
-    }
 
     // 校验 AI 配置
     const config = aiConfigRef.current;
@@ -333,18 +553,19 @@ export default function AiAssistantPanel({
       return;
     }
 
-    // 获取当前场景位置
-    const sceneLoc = getCurrentSceneLocation(editor);
-    if (!sceneLoc) {
-      showToast("error", t("ai.panel.noSceneFound"));
-      return;
-    }
-
-    // 计算 chapterId
-    const chapterId = computeChapterId();
-    if (!chapterId) {
-      showToast("error", t("ai.panel.invalidChapter"));
-      return;
+    // 续写/对话类任务需要编辑器与场景位置; 校验/推演/大纲类不需要
+    const needsScene = taskType === "continuation" || taskType === "dialogue";
+    let sceneLoc: { sceneIndex: number } | null = null;
+    if (needsScene) {
+      if (!editor || editor.isDestroyed) {
+        showToast("error", t("ai.panel.editorNotReady"));
+        return;
+      }
+      sceneLoc = getCurrentSceneLocation(editor);
+      if (!sceneLoc) {
+        showToast("error", t("ai.panel.noSceneFound"));
+        return;
+      }
     }
 
     // 创建用户消息
@@ -354,10 +575,12 @@ export default function AiAssistantPanel({
       id: userMsgId,
       role: "user",
       content: instruction,
-      sceneSnapshot: {
-        sceneIndex: sceneLoc.sceneIndex,
-        sceneTitle: `场景 ${sceneLoc.sceneIndex + 1}`,
-      },
+      sceneSnapshot: sceneLoc
+        ? {
+            sceneIndex: sceneLoc.sceneIndex,
+            sceneTitle: `场景 ${sceneLoc.sceneIndex + 1}`,
+          }
+        : undefined,
     };
     const assistantPlaceholder: ChatMessageItem = {
       id: assistantMsgId,
@@ -372,25 +595,20 @@ export default function AiAssistantPanel({
     setPanelError(null);
 
     try {
-      // 调用后端获取 4 层上下文
-      const req: SceneContextRequest = {
-        projectPath,
-        chapterId,
-        sceneIndex: sceneLoc.sceneIndex,
-      };
-      const sceneContext: SceneContext = await getSceneContext(req);
-
-      // 构建 Prompt (PromptBuilder 已内置续写任务指令)
-      const builder = new PromptBuilder(editorPrefs);
-      const builtPrompt = builder.buildContinuationPrompt(sceneContext);
-
-      // 在 system prompt 末尾追加用户自定义指令
-      // 设计说明: 不修改 buildContinuationPrompt 签名, 通过追加方式注入用户指令
-      const systemWithInstruction = `${builtPrompt.system}\n\n用户额外指令: ${instruction}`;
+      // Sprint 6: 根据任务类型构建 Prompt
+      const builtPrompt = await buildPromptByTask(taskType, instruction, sceneLoc);
+      if (!builtPrompt) {
+        // 前置校验失败, 移除占位消息
+        setMessages((prev) =>
+          prev.filter((m) => m.id !== userMsgId && m.id !== assistantMsgId)
+        );
+        setIsStreaming(false);
+        return;
+      }
 
       // 组装聊天消息 (含历史消息, 保持多轮对话上下文)
       const chatMessages: ChatMessage[] = [
-        { role: "system", content: systemWithInstruction },
+        { role: "system", content: builtPrompt.system },
       ];
       // 追加历史对话 (最多保留最近 4 轮, 避免 Token 爆炸)
       const recentHistory = messages.slice(-8);
@@ -399,7 +617,7 @@ export default function AiAssistantPanel({
           chatMessages.push({ role: msg.role, content: msg.content });
         }
       }
-      // 追加当前 user prompt (buildContinuationPrompt 的 user 字段)
+      // 追加当前 user prompt
       chatMessages.push({ role: "user", content: builtPrompt.user });
 
       // 流式累加 chunk
@@ -461,6 +679,8 @@ export default function AiAssistantPanel({
     computeChapterId,
     t,
     showToast,
+    taskType,
+    buildPromptByTask,
   ]);
 
   // handleSend 的 ref 引用 (供 pendingInstruction useEffect 调用, 避免闭包过期)
@@ -589,6 +809,74 @@ export default function AiAssistantPanel({
             </button>
           </div>
         </header>
+
+        {/* Sprint 6: 任务类型切换栏 */}
+        <div className="px-4 py-2 border-b border-nf-border-light bg-nf-bg-hover/30">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-nf-text-tertiary">
+                {t("ai.panel.taskType")}:
+              </span>
+              <div className="relative" ref={taskMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setTaskMenuOpen((v) => !v)}
+                  disabled={isStreaming}
+                  tabIndex={-1}
+                  className="flex items-center gap-1 h-6 px-2 text-[11px] text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/40 bg-nf-bg transition-colors duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="font-medium">
+                    {t(`ai.panel.task.${taskType}`)}
+                  </span>
+                  <ChevronDown
+                    className={`w-3 h-3 transition-transform duration-fast ${
+                      taskMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {taskMenuOpen && (
+                  <div className="absolute top-full left-0 mt-1 z-[102] min-w-[140px] bg-nf-bg-card border border-nf-border-light shadow-xl py-1">
+                    {(
+                      [
+                        "continuation",
+                        "dialogue",
+                        "consistencyCheck",
+                        "plotReview",
+                        "outlineGeneration",
+                      ] as AiTaskType[]
+                    ).map((tt) => (
+                      <button
+                        key={tt}
+                        type="button"
+                        onClick={() => {
+                          setTaskType(tt);
+                          // 切换任务类型时清空外部注入的上下文, 避免误用
+                          if (tt !== "dialogue" && tt !== "consistencyCheck") {
+                            setActiveCharacterId(null);
+                          }
+                          if (tt !== "consistencyCheck") {
+                            setActiveSelectedText(null);
+                          }
+                          setTaskMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors duration-fast ${
+                          tt === taskType
+                            ? "text-fandex-primary bg-fandex-primary/10"
+                            : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                        }`}
+                      >
+                        {t(`ai.panel.task.${tt}`)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <span className="text-[10px] text-nf-text-tertiary italic">
+              {t("ai.panel.taskHint")}
+            </span>
+          </div>
+        </div>
 
         {/* 错误提示区 */}
         {panelError && (

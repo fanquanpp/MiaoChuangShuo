@@ -43,7 +43,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-26.7.24-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/badge/version-26.7.25-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
@@ -94,9 +94,9 @@
 - **.pmd 格式迁移**: 批量将 .txt/.html 转换为 .pmd (ProseMirror JSON), 支持断点续传与进度事件推送
 - **版本快照**: 增量快照归档, 支持项目级版本回溯, 写入前自动清理 .tmp 残留
 
-### 1.6 AI 创作助手 (AI-1 ~ AI-3)
+### 1.6 AI 创作助手 (AI-1 ~ AI-4)
 
-本项目采用 BYOK (Bring Your Own Key) 模式, 用户自带 OpenAI 兼容 API Key, 所有 AI 调用流式直连 LLM 服务, 不经任何第三方中转。AI 功能建立在 4 层上下文组装架构之上, 已完成编辑器端到端打通:
+本项目采用 BYOK (Bring Your Own Key) 模式, 用户自带 OpenAI 兼容 API Key, 所有 AI 调用流式直连 LLM 服务, 不经任何第三方中转。AI 功能建立在 4 层上下文组装架构之上, 已完成编辑器端到端打通, 并支持 5 种任务类型切换:
 
 | 阶段 | 能力 | 实现 |
 |------|------|------|
@@ -104,6 +104,18 @@
 | AI-2 上下文组装 | 4 层上下文: 项目元信息 + 章节大纲 + 当前场景文本 + 未回收伏笔 | `ai_context.rs` + `promptBuilder.ts` + `sceneUtils.ts` |
 | AI-3.1 工具栏触发 | 编辑器工具栏 AI 助手按钮, Ctrl+Shift+A 快捷键 | `EditorToolbar.tsx` + `NovelEditor.tsx` |
 | AI-3.2 侧边栏对话 | 右侧滑出面板, 多轮对话历史, 流式输出, 插入到文档 | `AiAssistantPanel.tsx` |
+| AI-3.4 选区右键菜单 | 润色/扩写/缩写/角色一致性检查, 角色悬停卡片 AI 操作 | `EditorBubbleMenu.tsx` + `CharacterHoverCard.tsx` |
+| AI-4 多任务集成 | 5 种任务类型切换, 打通全部 PromptBuilder 构建方法 | `AiAssistantPanel.tsx` 任务类型切换栏 |
+
+**Sprint 6 多任务类型 (AI-4)**:
+
+| 任务类型 | 触发方式 | 上下文加载 | PromptBuilder 方法 |
+|----------|----------|------------|-------------------|
+| 续写 (continuation) | 默认 / 工具栏 / summarize-state | 场景上下文 (4 层) | `buildContinuationPrompt` |
+| 对话生成 (dialogue) | 角色悬停卡片 generate-dialogue | 角色 + 场景上下文 | `buildDialoguePrompt` |
+| 一致性校验 (consistencyCheck) | 选区 characterCheck / 手动切换 | 角色 + 选中文本 | `buildConsistencyCheckPrompt` |
+| 剧情推演 (plotReview) | 面板手动切换 | 项目全局上下文 | `buildPlotReviewPrompt` |
+| 大纲生成 (outlineGeneration) | 面板手动切换 | 项目全局上下文 | `buildOutlineGenerationPrompt` |
 
 **4 层上下文组装链路**:
 
@@ -116,7 +128,12 @@ NovelEditor 光标位置
                   └─ streamChatCompletion 流式调用 LLM
 ```
 
-**用户指令注入策略**: 不修改 `buildContinuationPrompt` 签名, 通过 `${system}\n\n用户额外指令: ${instruction}` 追加, 保持零侵入。
+**Sprint 6 真实上下文数据**:
+
+- `get_character_context`: 从设定库读取角色完整设定 + Tantivy 检索出场记录 + 人物关系图读取关系列表
+- `get_project_context`: 读取项目元数据 + 提取主要角色/关键设定 + 扫描章节摘要 + 加载活跃伏笔 + 统计字数/章节数
+
+**用户指令注入策略**: 不修改 `buildContinuationPrompt` 等签名, 通过 `${system}\n\n用户额外指令: ${instruction}` 追加, 保持零侵入。
 
 **多轮对话 Token 控制**: 保留最近 8 条消息 (4 轮) 作为历史上下文, 避免 Token 爆炸。
 
@@ -130,8 +147,8 @@ NovelEditor 光标位置
 | SceneBreak 场景元数据 | AI 理解"剧情结构"的锚点 (povCharacterId/mood 强类型) |
 | Tantivy 全文索引 | AI 的"海马体", 按场景 Chunk 快速召回相关上下文 |
 | 实体高亮 + `entity:detected` 事件 | 为 AI 提供"当前场景有哪些角色在场"的实时数据流 |
-| `ai_context.rs` 接口 | 统一 AI 上下文提取入口 (场景/角色/项目级 Mock 接口) |
-| `promptBuilder.ts` | 统一 Prompt 构建器, 将 UserPreferences 开关注入 System Prompt |
+| `ai_context.rs` 接口 | 统一 AI 上下文提取入口 (场景/角色/项目级真实数据实现) |
+| `promptBuilder.ts` | 统一 Prompt 构建器, 5 种任务类型, 将 UserPreferences 开关注入 System Prompt |
 
 ---
 

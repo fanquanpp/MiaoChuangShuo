@@ -27,6 +27,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::codex_commands::list_codex_entities;
+use crate::character_graph_commands::read_character_graph;
+use crate::tantivy_indexer::search as tantivy_search;
 
 /// 场景上下文（AI 续写的核心数据）
 ///
@@ -694,68 +696,485 @@ fn build_preceding_summary(scene_slices: &[SceneSlice], current_index: usize) ->
     summary.trim().to_string()
 }
 
-/// 获取角色上下文命令
+/// 获取角色上下文命令（Sprint 6 已实现真实数据组装）
 ///
 /// 输入:
 ///   project_path - 项目根路径
 ///   character_id - 角色 ID（设定库 UUID）
 /// 输出: Result<CharacterContext, String> 角色上下文
 /// 流程:
-///   1. 从设定库读取角色完整设定（full_profile）
-///   2. 从 Tantivy 索引检索角色出场记录（按文件修改时间倒序）
-///   3. 从人物关系图读取角色关系列表
+///   1. 从设定库读取角色完整设定（full_profile + aliases + name）
+///   2. 从 Tantivy 索引检索角色出场记录（按名称 + 别名查询，合并去重，取前 5 条）
+///   3. 从人物关系图读取角色关系列表（匹配 source 或 target 为该角色的边）
 ///   4. 组装角色上下文返回
-/// 当前状态: 接口定义阶段（AI-Ready 战略提前执行），返回 Mock 空数据
-/// 后续实现: 阶段 6 完成设定库读取 + 索引检索 + 关系图读取
+/// 容错策略:
+///   - 角色未在设定库中找到: 返回空字段 CharacterContext（不阻塞 AI 调用）
+///   - Tantivy 索引未建立或查询失败: appearance_records 返回空数组
+///   - 人物关系图文件不存在: relationships 返回空数组
 #[tauri::command]
 pub async fn get_character_context(
     project_path: String,
     character_id: String,
 ) -> Result<CharacterContext, String> {
-    // 接口定义阶段：返回 Mock 空数据
-    // 前端可通过 TypeScript 接口 Mock 数据进行开发
-    // 后续阶段 6 实现：设定库读取 + Tantivy 检索 + 关系图读取
-    let _ = project_path; // 暂未使用，保留参数以匹配接口定义
+    let project_root = Path::new(&project_path);
+
+    // 步骤1: 从设定库读取角色完整设定
+    let entities = list_codex_entities(project_path.clone()).unwrap_or_default();
+    let character_entity = entities
+        .iter()
+        .find(|e| e.meta.id == character_id && e.meta.entity_type == "character");
+
+    // 角色未找到时返回空上下文（保持向后兼容，不阻塞 AI 调用）
+    let (name, aliases, full_profile) = match character_entity {
+        Some(entity) => (
+            entity.meta.name.clone(),
+            entity.meta.aliases.clone(),
+            entity.content.clone(),
+        ),
+        None => {
+            return Ok(CharacterContext {
+                character_id,
+                name: String::new(),
+                aliases: vec![],
+                full_profile: String::new(),
+                appearance_records: vec![],
+                relationships: vec![],
+            });
+        }
+    };
+
+    // 步骤2: 从 Tantivy 索引检索角色出场记录
+    // 用角色名 + 别名作为查询词，合并结果并去重（按 file_path + chunk_index）
+    let appearance_records = collect_appearance_records(project_root, &name, &aliases);
+
+    // 步骤3: 从人物关系图读取角色关系列表
+    let relationships = collect_character_relationships(&project_path, &character_id);
+
     Ok(CharacterContext {
         character_id,
-        name: String::new(),
-        aliases: vec![],
-        full_profile: String::new(),
-        appearance_records: vec![],
-        relationships: vec![],
+        name,
+        aliases,
+        full_profile,
+        appearance_records,
+        relationships,
     })
 }
 
-/// 获取项目全局上下文命令
+/// 收集角色出场记录（从 Tantivy 索引按名称 + 别名检索，合并去重）
+/// 输入:
+///   project_root - 项目根路径
+///   character_name - 角色主名称
+///   aliases - 角色别名列表
+/// 输出: Vec<AppearanceRecord> 出场记录列表（最多 5 条，按文件名排序）
+/// 流程:
+///   1. 用主名称调用 tantivy_search 检索
+///   2. 对每个别名也调用 tantivy_search 检索
+///   3. 合并结果并按 (file_path, chunk_index) 去重
+///   4. 截取前 5 条返回
+/// 容错: 索引未建立或查询失败时返回空数组（不阻塞 AI 调用）
+fn collect_appearance_records(
+    project_root: &Path,
+    character_name: &str,
+    aliases: &[String],
+) -> Vec<AppearanceRecord> {
+    let mut results: Vec<AppearanceRecord> = Vec::new();
+    let mut seen: std::collections::HashSet<(String, u32)> = std::collections::HashSet::new();
+
+    // 构造查询词列表（主名称 + 别名，过滤空字符串）
+    let mut query_terms = vec![character_name.to_string()];
+    query_terms.extend(aliases.iter().cloned());
+    query_terms.retain(|s| !s.is_empty());
+
+    for term in &query_terms {
+        let search_results = match tantivy_search(project_root, term, 10) {
+            Ok(rs) => rs,
+            Err(_) => continue, // 索引未建立或查询失败，跳过该词
+        };
+        for sr in search_results {
+            let key = (sr.file_path.clone(), sr.chunk_index);
+            if seen.insert(key) {
+                // 截取匹配文本片段的前 200 字作为摘录
+                let excerpt = if sr.text.chars().count() > 200 {
+                    sr.text.chars().take(200).collect::<String>() + "..."
+                } else {
+                    sr.text.clone()
+                };
+                results.push(AppearanceRecord {
+                    file_path: sr.file_path,
+                    file_name: sr.file_name,
+                    excerpt,
+                    scene_id: None, // Tantivy schema 中 scene_id 当前为空，待后续填充
+                });
+            }
+        }
+    }
+
+    // 截取前 5 条（避免 Token 爆炸）
+    results.truncate(5);
+    results
+}
+
+/// 收集角色关系列表（从人物关系图读取）
+/// 输入:
+///   project_path - 项目根路径
+///   character_id - 目标角色 UUID
+/// 输出: Vec<RelationshipBrief> 关系列表
+/// 流程:
+///   1. 调用 read_character_graph 读取关系图数据
+///   2. 构建 node_id -> node_name 的映射
+///   3. 遍历 edges，找到 source 或 target 为 character_id 的边
+///   4. 对每条边，识别另一端节点并组装 RelationshipBrief
+/// 容错: 关系图文件不存在或解析失败时返回空数组
+fn collect_character_relationships(
+    project_path: &str,
+    character_id: &str,
+) -> Vec<RelationshipBrief> {
+    let graph = match read_character_graph(project_path.to_string()) {
+        Ok(g) => g,
+        Err(_) => return vec![],
+    };
+
+    // 构建 node_id -> node_name 映射
+    let node_map: std::collections::HashMap<String, String> = graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.clone(), n.data.name.clone()))
+        .collect();
+
+    let mut relationships = Vec::new();
+    for edge in &graph.edges {
+        // source 端为当前角色：target 为关系对象
+        if edge.source == character_id {
+            if let Some(target_name) = node_map.get(&edge.target) {
+                relationships.push(RelationshipBrief {
+                    target_id: edge.target.clone(),
+                    target_name: target_name.clone(),
+                    relation_type: edge.data.relation_type.clone(),
+                    description: edge.data.description.clone(),
+                });
+            }
+        }
+        // target 端为当前角色：source 为关系对象（反向关系）
+        else if edge.target == character_id {
+            if let Some(target_name) = node_map.get(&edge.source) {
+                relationships.push(RelationshipBrief {
+                    target_id: edge.source.clone(),
+                    target_name: target_name.clone(),
+                    relation_type: edge.data.relation_type.clone(),
+                    description: edge.data.description.clone(),
+                });
+            }
+        }
+    }
+
+    relationships
+}
+
+/// 获取项目全局上下文命令（Sprint 6 已实现真实数据组装）
 ///
 /// 输入: project_path 项目根路径
 /// 输出: Result<ProjectContext, String> 项目上下文
 /// 流程:
-///   1. 读取项目元数据（名称/类型/描述）
-///   2. 从设定库提取主要角色与核心设定
-///   3. 从 Tantivy 索引生成已完成章节的摘要
-///   4. 从伏笔追踪提取活跃伏笔
-///   5. 统计总字数与章节数
-///   6. 组装项目上下文返回
-/// 当前状态: 接口定义阶段（AI-Ready 战略提前执行），返回 Mock 空数据
-/// 后续实现: 阶段 6 完成元数据读取 + 设定库提取 + 索引摘要 + 伏笔追踪
+///   1. 读取项目元数据（.novelforge/project.json: 名称/类型/描述）
+///   2. 从设定库提取主要角色（entity_type == "character"，按 sort_order 排序，取前 10 个）
+///   3. 从设定库提取关键设定（entity_type != "character"，取前 10 个）
+///   4. 扫描正文目录生成章节摘要（每个 .pmd/.txt 文件提取前 200 字）
+///   5. 从伏笔目录提取活跃伏笔（复用 load_global_unresolved_foreshadowings）
+///   6. 统计总字数与章节数（支持 .pmd 与 .txt 文件）
+///   7. 组装项目上下文返回
+/// 容错策略:
+///   - project.json 不存在或解析失败: project_name 使用目录名，project_type 默认 "novel"
+///   - 设定库为空: main_characters 与 key_settings 返回空数组
+///   - 正文目录不存在: chapter_summaries 返回空数组，total_words 与 chapter_count 为 0
 #[tauri::command]
 pub async fn get_project_context(
     project_path: String,
 ) -> Result<ProjectContext, String> {
-    // 接口定义阶段：返回 Mock 空数据
-    // 前端可通过 TypeScript 接口 Mock 数据进行开发
-    // 后续阶段 6 实现：元数据读取 + 设定库提取 + 索引摘要 + 伏笔追踪
-    let _ = project_path; // 暂未使用，保留参数以匹配接口定义
+    let project_root = Path::new(&project_path);
+
+    // 步骤1: 读取项目元数据
+    let (project_name, project_type, description) = read_project_meta_for_ai(project_root);
+
+    // 步骤2: 从设定库提取主要角色与关键设定
+    let entities = list_codex_entities(project_path.clone()).unwrap_or_default();
+    let main_characters: Vec<CharacterBrief> = entities
+        .iter()
+        .filter(|e| e.meta.entity_type == "character")
+        .take(10)
+        .map(|e| CharacterBrief {
+            id: e.meta.id.clone(),
+            name: e.meta.name.clone(),
+            aliases: e.meta.aliases.clone(),
+            summary: if e.meta.summary.is_empty() {
+                e.content.chars().take(100).collect::<String>()
+            } else {
+                e.meta.summary.clone()
+            },
+        })
+        .collect();
+    let key_settings: Vec<SettingBrief> = entities
+        .iter()
+        .filter(|e| e.meta.entity_type != "character")
+        .take(10)
+        .map(|e| SettingBrief {
+            id: e.meta.id.clone(),
+            name: e.meta.name.clone(),
+            category: e.meta.entity_type.clone(),
+            summary: if e.meta.summary.is_empty() {
+                e.content.chars().take(100).collect::<String>()
+            } else {
+                e.meta.summary.clone()
+            },
+        })
+        .collect();
+
+    // 步骤3: 扫描正文目录生成章节摘要
+    let chapter_summaries = collect_chapter_summaries(project_root);
+
+    // 步骤4: 提取活跃伏笔
+    let active_foreshadowings = load_global_unresolved_foreshadowings(&project_path);
+
+    // 步骤5: 统计总字数与章节数
+    let (total_words, chapter_count) = count_project_words_and_chapters(project_root);
+
     Ok(ProjectContext {
-        project_name: String::new(),
-        project_type: String::new(),
-        description: String::new(),
-        main_characters: vec![],
-        key_settings: vec![],
-        chapter_summaries: vec![],
-        active_foreshadowings: vec![],
-        total_words: 0,
-        chapter_count: 0,
+        project_name,
+        project_type,
+        description,
+        main_characters,
+        key_settings,
+        chapter_summaries,
+        active_foreshadowings,
+        total_words,
+        chapter_count,
     })
+}
+
+/// 读取项目元数据（.novelforge/project.json）供 AI 上下文使用
+/// 输入: project_root 项目根路径
+/// 输出: (project_name, project_type, description) 三元组
+/// 流程:
+///   1. 拼接 .novelforge/project.json 路径
+///   2. 文件存在时解析 JSON 提取字段
+///   3. 文件不存在或解析失败时回退：project_name = 目录名，project_type = "novel"
+fn read_project_meta_for_ai(project_root: &Path) -> (String, String, String) {
+    let meta_path = project_root.join(".novelforge").join("project.json");
+    if let Ok(content) = fs::read_to_string(&meta_path) {
+        if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content) {
+            let name = meta
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| {
+                    project_root
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("未命名项目")
+                        .to_string()
+                });
+            let project_type = meta
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("novel")
+                .to_string();
+            let description = meta
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            return (name, project_type, description);
+        }
+    }
+    // 回退：使用目录名作为项目名
+    let fallback_name = project_root
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("未命名项目")
+        .to_string();
+    (fallback_name, "novel".to_string(), String::new())
+}
+
+/// 收集正文目录下所有章节的摘要（前 200 字）
+/// 输入: project_root 项目根路径
+/// 输出: Vec<ChapterSummary> 章节摘要列表（按文件名排序）
+/// 流程:
+///   1. 遍历 正文/ 目录下所有 .pmd 与 .txt 文件
+///   2. 对每个文件提取纯文本（.pmd 需剥离 front matter 并解析 ProseMirror JSON）
+///   3. 截取前 200 字作为摘要
+///   4. 统计该文件字数
+/// 容错: 正文目录不存在时返回空数组；单文件解析失败跳过
+fn collect_chapter_summaries(project_root: &Path) -> Vec<ChapterSummary> {
+    let manuscript_dir = project_root.join("正文");
+    if !manuscript_dir.exists() {
+        return vec![];
+    }
+
+    let mut summaries = Vec::new();
+    let mut files: Vec<PathBuf> = Vec::new();
+    collect_manuscript_files(&manuscript_dir, &mut files);
+    // 按文件名排序，保证章节顺序稳定
+    files.sort_by(|a, b| {
+        a.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .cmp(b.file_name().and_then(|n| n.to_str()).unwrap_or(""))
+    });
+
+    for file_path in files {
+        let content = match fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let plain_text = extract_plain_text_from_manuscript(&content, &file_path);
+        if plain_text.is_empty() {
+            continue;
+        }
+
+        let chapter_name = file_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        let rel_path = file_path
+            .strip_prefix(project_root)
+            .unwrap_or(&file_path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        // 摘要取前 200 字
+        let summary: String = plain_text.chars().take(200).collect();
+        let word_count = count_chinese_and_words(&plain_text) as u64;
+
+        summaries.push(ChapterSummary {
+            chapter_name,
+            file_path: rel_path,
+            summary,
+            word_count,
+        });
+    }
+
+    summaries
+}
+
+/// 递归收集正文目录下所有 .pmd 与 .txt 文件
+/// 输入:
+///   dir - 当前扫描目录
+///   result - 累加的文件路径列表
+/// 流程: 递归遍历目录，收集 .pmd 与 .txt 文件
+fn collect_manuscript_files(dir: &Path, result: &mut Vec<PathBuf>) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_manuscript_files(&path, result);
+            } else {
+                let is_target = path
+                    .extension()
+                    .map(|e| e == "pmd" || e == "txt")
+                    .unwrap_or(false);
+                if is_target {
+                    result.push(path);
+                }
+            }
+        }
+    }
+}
+
+/// 从正文中提取纯文本（支持 .pmd 与 .txt 格式）
+/// 输入:
+///   content - 文件完整内容
+///   file_path - 文件路径（用于判断格式）
+/// 输出: String 纯文本
+/// 流程:
+///   1. .pmd 文件：剥离 front matter 后解析 ProseMirror JSON，调用 extract_text_from_nodes
+///   2. .txt 文件：直接返回内容
+///   3. 解析失败时返回空字符串
+fn extract_plain_text_from_manuscript(content: &str, file_path: &Path) -> String {
+    let extension = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if extension == "pmd" {
+        // 剥离 front matter
+        let lines: Vec<&str> = content.lines().collect();
+        let json_str = if lines.len() >= 3 && lines[0].trim() == "---" {
+            if let Some(end) = lines[1..]
+                .iter()
+                .position(|l| l.trim() == "---")
+                .map(|i| i + 1)
+            {
+                lines[end + 1..].join("\n").trim_start().to_string()
+            } else {
+                content.to_string()
+            }
+        } else {
+            content.to_string()
+        };
+        // 解析 ProseMirror JSON 并提取文本
+        match serde_json::from_str::<Value>(&json_str) {
+            Ok(doc) => extract_text_from_nodes(
+                doc.get("content")
+                    .and_then(|c| c.as_array())
+                    .map(|v| v.as_slice())
+                    .unwrap_or(&[]),
+            ),
+            Err(_) => String::new(),
+        }
+    } else {
+        content.to_string()
+    }
+}
+
+/// 统计项目总字数与章节数（支持 .pmd 与 .txt 文件）
+/// 输入: project_root 项目根路径
+/// 输出: (total_words, chapter_count) 总字数与章节数
+/// 流程:
+///   1. 遍历 正文/ 目录下所有 .pmd 与 .txt 文件
+///   2. 对每个文件提取纯文本并统计字数
+///   3. 累加总字数与文件数
+fn count_project_words_and_chapters(project_root: &Path) -> (u64, u64) {
+    let manuscript_dir = project_root.join("正文");
+    if !manuscript_dir.exists() {
+        return (0, 0);
+    }
+
+    let mut files: Vec<PathBuf> = Vec::new();
+    collect_manuscript_files(&manuscript_dir, &mut files);
+
+    let mut total_words: u64 = 0;
+    let mut chapter_count: u64 = 0;
+    for file_path in &files {
+        if let Ok(content) = fs::read_to_string(file_path) {
+            let plain_text = extract_plain_text_from_manuscript(&content, file_path);
+            total_words += count_chinese_and_words(&plain_text) as u64;
+            chapter_count += 1;
+        }
+    }
+
+    (total_words, chapter_count)
+}
+
+/// 中英文混合字数统计
+/// 输入: text 纯文本
+/// 输出: u32 字数（中文字符按 1 字，英文单词按 1 字）
+/// 流程:
+///   1. 统计中文字符数（Unicode 范围 \u4e00-\u9fff）
+///   2. 统计英文单词数（连续字母序列）
+///   3. 返回两者之和
+fn count_chinese_and_words(text: &str) -> u32 {
+    let mut chinese_count: u32 = 0;
+    let mut english_word_count: u32 = 0;
+    let mut in_word = false;
+
+    for ch in text.chars() {
+        if ('\u{4e00}'..='\u{9fff}').contains(&ch) {
+            chinese_count += 1;
+            in_word = false;
+        } else if ch.is_ascii_alphabetic() {
+            if !in_word {
+                english_word_count += 1;
+                in_word = true;
+            }
+        } else {
+            in_word = false;
+        }
+    }
+
+    chinese_count + english_word_count
 }
