@@ -595,6 +595,39 @@ select:focus-visible {
   cursor: pointer;
 }
 
+/* ========== 角色提及 inline node：结构化样式（Sprint 3 任务 3.1） ==========
+ * 设计原则：
+ *   - 与裸文本下划线装饰（nf-entity-*）视觉区分：采用背景色 + 圆角 + 边框
+ *   - 表示该角色名已结构化关联到设定库 UUID，可点击跳转
+ *   - 裸文本下划线仅提示"此处出现了某实体"，无结构化关联
+ *   - 鼠标悬停时背景色加深，提示可交互（点击跳转设定库）
+ *   - 焦点态（Tab 键聚焦）显示外边框，提升可访问性
+ */
+.ProseMirror .nf-character-mention {
+  display: inline-block;
+  padding: 0 4px;
+  margin: 0 1px;
+  border-radius: 4px;
+  border: 1px solid var(--fandex-primary);
+  background: rgba(110, 168, 254, 0.12);
+  color: var(--fandex-primary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease-out, border-color 0.15s ease-out;
+  vertical-align: baseline;
+  user-select: none;
+}
+
+.ProseMirror .nf-character-mention:hover {
+  background: rgba(110, 168, 254, 0.22);
+  border-color: var(--fandex-primary);
+}
+
+.ProseMirror .nf-character-mention:focus-visible {
+  outline: 2px solid var(--fandex-primary);
+  outline-offset: 1px;
+}
+
 /* ========== 伏笔标记：状态化下划线（p5-27 波浪线 Decoration） ==========
  * 设计原则：
  *   - 纯文本风格，仅底部装饰线，无背景色、无边框、无圆角

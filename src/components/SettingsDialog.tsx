@@ -19,6 +19,7 @@ import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 import { checkForUpdates, getCurrentVersion, openExternalUrl, RELEASES_PAGE_URL, type ReleaseInfo } from "../lib/updateChecker";
 import UpdateNoticeDialog from "./UpdateNoticeDialog";
+import IndexManagerPanel from "./IndexManagerPanel";
 
 // 设置分区类型：用于 initialSection 属性指定打开时定位的分区
 export type SettingsSection =
@@ -29,6 +30,7 @@ export type SettingsSection =
   | "features"
   | "appearance"
   | "ai"
+  | "index"
   | "about";
 
 /**
@@ -116,7 +118,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
 
   // ===== 版本更新检测状态 =====
   // 当前应用版本号（组件挂载时异步获取）
-  const [currentVersion, setCurrentVersion] = useState("26.7.23");
+  const [currentVersion, setCurrentVersion] = useState("26.7.24");
   // 检查中状态（控制按钮 loading 动画）
   const [checking, setChecking] = useState(false);
   // 检测到的新版本信息（null=未检测到或未检查）
@@ -205,6 +207,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
     features: useRef<HTMLElement>(null),
     appearance: useRef<HTMLElement>(null),
     ai: useRef<HTMLElement>(null),
+    index: useRef<HTMLElement>(null),
     about: useRef<HTMLElement>(null),
   };
 
@@ -1147,6 +1150,11 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
                 </button>
               </div>
             </div>
+          </section>
+
+          {/* 全文索引管理设置（Sprint 4 任务 4.2） */}
+          <section ref={sectionRefs.index}>
+            <IndexManagerPanel />
           </section>
 
           {/* 关于与更新设置 */}

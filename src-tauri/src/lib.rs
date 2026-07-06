@@ -97,6 +97,8 @@ pub fn run() {
             codex_commands::batch_scan_entities,
             codex_commands::list_codex_entities,
             codex_commands::inject_codex_front_matter,
+            codex_commands::update_codex_entity,
+            codex_commands::scan_invalid_mentions,
             // 剧情时间线编辑器命令
             timeline_commands::read_timeline,
             timeline_commands::save_timeline,

@@ -31,21 +31,25 @@ import {
   X,
   ChevronDown,
   Sparkles,
+  Edit3,
+  ArrowRight,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
+import { useCodexStore } from "../lib/stores/useCodexStore";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import {
-  scanCodexEntities,
   scanEntityMentions,
   createCodexEntity,
   deleteCodexEntity,
+  scanInvalidMentions,
   CODEX_TYPE_LABELS,
-  type CodexEntity,
+  type CodexCard,
   type CodexEntityType,
   type EntityMention,
 } from "../lib/codexApi";
 import ConfirmDialog from "./ConfirmDialog";
+import CodexCardEditor from "./CodexCardEditor";
 
 // Codex 实体类型图标映射
 const TYPE_ICONS: Record<CodexEntityType, React.ComponentType<{ className?: string }>> = {
@@ -73,7 +77,20 @@ export default function CodexPanel() {
   const { showToast } = useToast();
   const { t } = useI18n();
 
-  const [entities, setEntities] = useState<CodexEntity[]>([]);
+  // Sprint 1 任务 1.3b：从 useCodexStore 读取设定库数据（SSOT）
+  // cards 为 Map<string, CodexCard>，订阅后状态变更自动触发重渲染
+  const cards = useCodexStore((s) => s.cards);
+  const loadAll = useCodexStore((s) => s.loadAll);
+  const deleteCardFromStore = useCodexStore((s) => s.deleteCard);
+  const resetStore = useCodexStore((s) => s.reset);
+  // Sprint 3 任务 3.3：订阅 pendingSelectCardId 实现跨组件跳转
+  // NovelEditor 双击 characterMentionNode 时设置此值，CodexPanel 消费后选中对应卡片
+  const pendingSelectCardId = useCodexStore((s) => s.pendingSelectCardId);
+  const setPendingSelectCardId = useCodexStore((s) => s.setPendingSelectCardId);
+  // Sprint 3 任务 3.5：订阅 pendingEditMode 实现右键菜单"编辑设定"自动进入编辑模式
+  const pendingEditMode = useCodexStore((s) => s.pendingEditMode);
+  const setPendingEditMode = useCodexStore((s) => s.setPendingEditMode);
+
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -90,33 +107,45 @@ export default function CodexPanel() {
   const [creating, setCreating] = useState(false);
 
   // 删除确认对话框状态
-  const [deleteTarget, setDeleteTarget] = useState<CodexEntity | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CodexCard | null>(null);
+  // Sprint 2 任务 2.5：删除失效检测结果（正文中引用该卡片的 characterMentionNode 总数）
+  // 大于 0 时删除确认对话框追加失效警告提示
+  const [deleteInvalidCount, setDeleteInvalidCount] = useState(0);
 
-  // 扫描设定库实体
+  // Sprint 2 任务 2.3：查看/编辑模式切换状态
+  // editing 为 true 时渲染 CodexCardEditor，false 时渲染只读详情视图
+  const [editing, setEditing] = useState(false);
+
+  // 加载设定库卡片：项目切换时调用 useCodexStore.loadAll
+  // loadAll 内部调用后端 list_codex_entities 并填充 Map，组件订阅 cards 自动重渲染
   const loadEntities = useCallback(async () => {
     if (!currentProject) return;
     setLoading(true);
     try {
-      const list = await scanCodexEntities(currentProject.path);
-      setEntities(list);
+      await loadAll(currentProject.path);
     } catch (e) {
       showToast("error", t("codex.loadFailed", { error: String(e) }));
     } finally {
       setLoading(false);
     }
-  }, [currentProject, showToast, t]);
+  }, [currentProject, loadAll, showToast, t]);
 
   useEffect(() => {
+    // 项目切换时先重置 Store，避免上一个项目的卡片残留
+    resetStore();
     loadEntities();
-  }, [loadEntities]);
+  }, [loadEntities, resetStore]);
+
+  // cards Map 转为数组（便于过滤与分组）
+  const cardsList = useMemo(() => Array.from(cards.values()), [cards]);
 
   // 选中实体后懒加载出现追踪
   const selectedEntity = useMemo(
-    () => entities.find((e) => e.id === selectedId) || null,
-    [entities, selectedId]
+    () => (selectedId ? cards.get(selectedId) || null : null),
+    [cards, selectedId]
   );
 
-  const loadMentions = useCallback(async (entity: CodexEntity) => {
+  const loadMentions = useCallback(async (entity: CodexCard) => {
     if (!currentProject) return;
     setMentionLoading(true);
     setMentions(null);
@@ -143,23 +172,50 @@ export default function CodexPanel() {
     }
   }, [selectedEntity, loadMentions]);
 
-  // 搜索过滤
+  // Sprint 2 任务 2.3：选中实体变化时退出编辑模式，避免上一个卡片的未保存改动残留
+  useEffect(() => {
+    setEditing(false);
+  }, [selectedId]);
+
+  // Sprint 3 任务 3.3：订阅 pendingSelectCardId 实现跨组件跳转
+  // 当 NovelEditor 双击 characterMentionNode 时设置此值，CodexPanel 消费后选中对应卡片
+  // 一次性信号量：消费后立即清空，避免重复触发
+  // Sprint 3 任务 3.5：若 pendingEditMode 为 true，选中后自动进入编辑模式
+  useEffect(() => {
+    if (!pendingSelectCardId) return;
+    // 校验卡片是否存在（可能因未加载完成或 UUID 失效而缺失）
+    if (cards.has(pendingSelectCardId)) {
+      setSelectedId(pendingSelectCardId);
+      // 右键菜单"编辑设定"触发：选中后自动进入编辑模式
+      if (pendingEditMode) {
+        setEditing(true);
+        setPendingEditMode(false);
+      }
+    } else {
+      showToast("warning", t("codex.cardNotFound"));
+    }
+    setPendingSelectCardId(null);
+  }, [pendingSelectCardId, cards, setPendingSelectCardId, pendingEditMode, setPendingEditMode, showToast, t]);
+
+  // 搜索过滤（基于 CodexCard 字段：name / aliases / tags / summary）
   const filteredEntities = useMemo(() => {
-    if (!searchQuery.trim()) return entities;
+    if (!searchQuery.trim()) return cardsList;
     const q = searchQuery.toLowerCase();
-    return entities.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.aliases.some((a) => a.toLowerCase().includes(q))
+    return cardsList.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.aliases.some((a) => a.toLowerCase().includes(q)) ||
+        c.tags.some((tag) => tag.toLowerCase().includes(q)) ||
+        c.summary.toLowerCase().includes(q)
     );
-  }, [entities, searchQuery]);
+  }, [cardsList, searchQuery]);
 
   // 按类型分组
   const groupedEntities = useMemo(() => {
-    const groups: Partial<Record<CodexEntityType, CodexEntity[]>> = {};
-    for (const entity of filteredEntities) {
-      if (!groups[entity.type]) groups[entity.type] = [];
-      groups[entity.type]!.push(entity);
+    const groups: Partial<Record<CodexEntityType, CodexCard[]>> = {};
+    for (const card of filteredEntities) {
+      if (!groups[card.cardType]) groups[card.cardType] = [];
+      groups[card.cardType]!.push(card);
     }
     return groups;
   }, [filteredEntities]);
@@ -180,6 +236,22 @@ export default function CodexPanel() {
     [setSelectedFile, setActiveCategory]
   );
 
+  // Sprint 3 任务 3.4：在正文中查找按钮处理
+  // 点击行为：
+  //   - mentions 已加载且非空：跳转到第一个匹配文件
+  //   - mentions 未加载或为空：触发扫描（扫描完成后由 useEffect 自动填充）
+  // 设计说明: 提供主动触发入口，避免用户需滚动到列表底部才能跳转
+  const handleFindInManuscript = useCallback(() => {
+    if (!selectedEntity) return;
+    if (mentions && mentions.length > 0) {
+      // 已有匹配结果：直接跳转到第一个文件
+      handleJumpToFile(mentions[0]);
+    } else {
+      // 无结果：触发扫描（扫描完成后 mentions 更新，用户可再点击跳转）
+      loadMentions(selectedEntity);
+    }
+  }, [selectedEntity, mentions, handleJumpToFile, loadMentions]);
+
   // 打开新增实体对话框：指定类型预填
   const handleOpenAddDialog = useCallback((type: CodexEntityType) => {
     setNewEntityType(type);
@@ -190,7 +262,8 @@ export default function CodexPanel() {
     setAddMenuOpen(false);
   }, []);
 
-  // 提交新增实体：调用后端创建文件后刷新列表
+  // 提交新增实体：调用后端创建 .pmd 文件后刷新 Store
+  // 创建成功后通过名称查找新卡片并自动选中（ID 为 UUID，前端创建时不可知）
   const handleCreateEntity = useCallback(async () => {
     if (!currentProject) return;
     const name = newEntityName.trim();
@@ -198,9 +271,9 @@ export default function CodexPanel() {
       showToast("warning", t("codex.nameRequired"));
       return;
     }
-    // 检查重名：同类型下不允许重名
-    const exists = entities.some(
-      (e) => e.type === newEntityType && e.name === name
+    // 检查重名：同类型下不允许重名（基于 Store 中的 cardsList）
+    const exists = cardsList.some(
+      (c) => c.cardType === newEntityType && c.name === name
     );
     if (exists) {
       showToast("warning", t("codex.nameExists", { name }));
@@ -222,40 +295,72 @@ export default function CodexPanel() {
       );
       showToast("success", t("codex.createSuccess", { name }));
       setAddDialogOpen(false);
-      // 刷新实体列表
+      // 刷新 Store 以加载新创建的卡片（后端生成 UUID，前端需重新拉取）
       await loadEntities();
-      // 自动选中新创建的实体
-      const newId = `${newEntityType}-${name}`;
-      setSelectedId(newId);
+      // 通过名称查找新卡片并自动选中
+      const newCard = useCodexStore.getState().getByName(name);
+      if (newCard) setSelectedId(newCard.id);
     } catch (e) {
       showToast("error", t("codex.createFailed", { error: String(e) }));
     } finally {
       setCreating(false);
     }
-  }, [currentProject, newEntityName, newEntityAliases, newEntityContent, newEntityType, entities, showToast, t, loadEntities]);
+  }, [currentProject, newEntityName, newEntityAliases, newEntityContent, newEntityType, cardsList, showToast, t, loadEntities]);
 
-  // 删除实体：打开确认对话框
-  const handleDeleteEntity = useCallback((entity: CodexEntity) => {
-    setDeleteTarget(entity);
-  }, []);
+  // 删除实体：先扫描正文中引用该卡片的 characterMentionNode，再打开确认对话框
+  // Sprint 2 任务 2.5：若检测到失效引用，确认对话框追加警告提示
+  const handleDeleteEntity = useCallback(
+    async (card: CodexCard) => {
+      setDeleteTarget(card);
+      setDeleteInvalidCount(0);
+      // 当前项目不可用时直接打开对话框（不进行失效检测）
+      if (!currentProject) {
+        return;
+      }
+      try {
+        // 扫描正文中引用该卡片 UUID 的 characterMentionNode
+        const invalidMentions = await scanInvalidMentions(
+          currentProject.path,
+          card.id
+        );
+        // 汇总各文件的引用数量
+        const totalCount = invalidMentions.reduce(
+          (sum, m) => sum + m.count,
+          0
+        );
+        setDeleteInvalidCount(totalCount);
+      } catch {
+        // 扫描失败时不阻塞删除流程，按无失效提及处理
+        setDeleteInvalidCount(0);
+      }
+    },
+    [currentProject]
+  );
 
-  // 确认删除实体：调用后端删除文件后刷新列表
+  // 确认删除实体：调用后端删除文件后同步移除 Store 中的卡片
   const handleConfirmDelete = useCallback(async () => {
     if (!currentProject || !deleteTarget) return;
     try {
-      await deleteCodexEntity(currentProject.path, deleteTarget);
+      await deleteCodexEntity(currentProject.path, deleteTarget.sourceFile);
       showToast("success", t("codex.deleteSuccess", { name: deleteTarget.name }));
+      // 从 Store 中移除该卡片（SSOT：Store 删除即 UI 更新）
+      deleteCardFromStore(deleteTarget.id);
       // 若删除的是当前选中项，清空选中
-      if (selectedId === `${deleteTarget.type}-${deleteTarget.id}`) {
+      if (selectedId === deleteTarget.id) {
         setSelectedId(null);
       }
       setDeleteTarget(null);
-      // 刷新实体列表
-      await loadEntities();
+      setDeleteInvalidCount(0);
     } catch (e) {
       showToast("error", t("codex.deleteFailed", { error: String(e) }));
     }
-  }, [currentProject, deleteTarget, selectedId, showToast, t, loadEntities]);
+  }, [currentProject, deleteTarget, selectedId, showToast, t, deleteCardFromStore]);
+
+  // 取消删除：重置删除目标与失效计数
+  const handleCancelDelete = useCallback(() => {
+    setDeleteTarget(null);
+    setDeleteInvalidCount(0);
+  }, []);
 
   // 总出现次数统计
   const totalMentions = useMemo(() => {
@@ -361,11 +466,11 @@ export default function CodexPanel() {
                     <span className="text-nf-text-tertiary/60">({list!.length})</span>
                   </div>
                   {/* 实体项 */}
-                  {list!.map((entity) => {
-                    const isSelected = entity.id === selectedId;
+                  {list!.map((card) => {
+                    const isSelected = card.id === selectedId;
                     return (
                       <div
-                        key={`${entity.type}-${entity.id}`}
+                        key={card.id}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-150 relative group ${
                           isSelected
                             ? "bg-fandex-primary/10 text-fandex-primary"
@@ -380,14 +485,14 @@ export default function CodexPanel() {
                           style={{ transformOrigin: "center" }}
                         />
                         <button
-                          onClick={() => setSelectedId(entity.id)}
+                          onClick={() => setSelectedId(card.id)}
                           className="flex items-center gap-2 flex-1 min-w-0 text-left"
                         >
                           <FileText className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
-                          <span className="truncate flex-1">{entity.name}</span>
-                          {entity.aliases.length > 0 && (
+                          <span className="truncate flex-1">{card.name}</span>
+                          {card.aliases.length > 0 && (
                             <span className="text-[10px] text-nf-text-tertiary">
-                              +{entity.aliases.length}
+                              +{card.aliases.length}
                             </span>
                           )}
                         </button>
@@ -395,7 +500,7 @@ export default function CodexPanel() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteEntity(entity);
+                            handleDeleteEntity(card);
                           }}
                           title={t("codex.deleteEntity")}
                           className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-nf-text-tertiary hover:text-red-500 transition duration-fast p-0.5"
@@ -415,80 +520,128 @@ export default function CodexPanel() {
       {/* 主区域：实体详情与出现追踪（占据中间最大空间） */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {selectedEntity ? (
-          <>
-            {/* 详情头部（固定项，禁止压缩，仅下方列表滚动） */}
-            <div className="flex-shrink-0 px-6 py-4 border-b border-nf-border-light">
-              <div className="flex items-center gap-3 mb-2">
-                {(() => {
-                  const Icon = TYPE_ICONS[selectedEntity.type];
-                  return <Icon className="w-5 h-5 text-fandex-primary" />;
-                })()}
-                <h2 className="text-lg font-semibold text-nf-text">{selectedEntity.name}</h2>
-                <span className="text-[10px] px-1.5 py-0.5 bg-fandex-primary/10 text-fandex-primary font-medium">
-                  {CODEX_TYPE_LABELS[selectedEntity.type]}
-                </span>
-              </div>
-              {selectedEntity.aliases.length > 0 && (
-                <div className="flex items-center gap-2 text-xs text-nf-text-tertiary">
-                  <span>{t("codex.aliasesLabel")}:</span>
-                  {selectedEntity.aliases.map((alias, i) => (
-                    <span key={i} className="px-1.5 py-0.5 bg-nf-bg-hover text-nf-text-secondary">
-                      {alias}
-                    </span>
-                  ))}
+          // Sprint 2 任务 2.3：查看/编辑模式切换
+          // editing 为 true 且项目路径可用时渲染 CodexCardEditor，否则渲染只读详情视图
+          editing && currentProject ? (
+            <CodexCardEditor
+              card={selectedEntity}
+              projectPath={currentProject.path}
+              onCancel={() => setEditing(false)}
+              onSaved={() => setEditing(false)}
+            />
+          ) : (
+            <>
+              {/* 详情头部（固定项，禁止压缩，仅下方列表滚动） */}
+              <div className="flex-shrink-0 px-6 py-4 border-b border-nf-border-light">
+                <div className="flex items-center gap-3 mb-2">
+                  {(() => {
+                    const Icon = TYPE_ICONS[selectedEntity.cardType];
+                    return <Icon className="w-5 h-5 text-fandex-primary" />;
+                  })()}
+                  <h2 className="text-lg font-semibold text-nf-text">{selectedEntity.name}</h2>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-fandex-primary/10 text-fandex-primary font-medium">
+                    {CODEX_TYPE_LABELS[selectedEntity.cardType]}
+                  </span>
+                  {/* Sprint 2 任务 2.3：编辑卡片按钮，点击进入编辑模式 */}
+                  <button
+                    onClick={() => setEditing(true)}
+                    title={t("codex.editCard")}
+                    className="ml-auto flex items-center gap-1.5 px-3 py-1 text-xs border border-nf-border-light text-nf-text-secondary hover:text-fandex-primary hover:border-fandex-primary/60 hover:bg-fandex-primary/5 transition duration-fast"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    {t("codex.editCard")}
+                  </button>
+                  {/* Sprint 3 任务 3.4：在正文中查找按钮，跳转到第一个匹配文件或触发扫描 */}
+                  <button
+                    onClick={handleFindInManuscript}
+                    title={t("codex.findInManuscript")}
+                    className="flex items-center gap-1.5 px-3 py-1 text-xs border border-nf-border-light text-nf-text-secondary hover:text-fandex-secondary hover:border-fandex-secondary/60 hover:bg-fandex-secondary/5 transition duration-fast"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    {t("codex.findInManuscript")}
+                  </button>
                 </div>
-              )}
-              <div className="mt-2 text-xs text-nf-text-tertiary">
-                {t("codex.totalMentions", { count: totalMentions })}
+                {selectedEntity.aliases.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-nf-text-tertiary">
+                    <span>{t("codex.aliasesLabel")}:</span>
+                    {selectedEntity.aliases.map((alias, i) => (
+                      <span key={i} className="px-1.5 py-0.5 bg-nf-bg-hover text-nf-text-secondary">
+                        {alias}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {/* 简介展示（Sprint 2 新增字段，非空时显示） */}
+                {selectedEntity.summary && (
+                  <div className="mt-2 text-xs text-nf-text-secondary leading-relaxed">
+                    {selectedEntity.summary}
+                  </div>
+                )}
+                {/* 标签展示（Sprint 2 新增字段，非空时显示） */}
+                {selectedEntity.tags.length > 0 && (
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    {selectedEntity.tags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="text-[10px] px-1.5 py-0.5 bg-fandex-secondary/10 text-fandex-secondary border border-fandex-secondary/20"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 text-xs text-nf-text-tertiary">
+                  {t("codex.totalMentions", { count: totalMentions })}
+                </div>
               </div>
-            </div>
 
-            {/* 出现追踪列表 */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {mentionLoading ? (
-                <div className="flex items-center justify-center py-12 text-nf-text-tertiary">
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  <span className="text-xs">{t("codex.scanning")}</span>
-                </div>
-              ) : !mentions || mentions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-nf-text-tertiary">
-                  <Inbox className="w-8 h-8 mb-2 opacity-50" />
-                  <span className="text-xs">{t("codex.noMentions")}</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {mentions.map((mention, idx) => (
-                    <button
-                      key={`${mention.file_path}-${idx}`}
-                      onClick={() => handleJumpToFile(mention)}
-                      className="w-full text-left p-3 border border-nf-border-light bg-nf-bg-panel hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition-all duration-150 group"
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <FileText className="w-3.5 h-3.5 flex-shrink-0 text-fandex-secondary" />
-                          <span className="text-sm font-medium text-nf-text truncate">
-                            {mention.file_name}
-                          </span>
+              {/* 出现追踪列表 */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                {mentionLoading ? (
+                  <div className="flex items-center justify-center py-12 text-nf-text-tertiary">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <span className="text-xs">{t("codex.scanning")}</span>
+                  </div>
+                ) : !mentions || mentions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-nf-text-tertiary">
+                    <Inbox className="w-8 h-8 mb-2 opacity-50" />
+                    <span className="text-xs">{t("codex.noMentions")}</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {mentions.map((mention, idx) => (
+                      <button
+                        key={`${mention.file_path}-${idx}`}
+                        onClick={() => handleJumpToFile(mention)}
+                        className="w-full text-left p-3 border border-nf-border-light bg-nf-bg-panel hover:border-fandex-primary/40 hover:bg-nf-bg-hover transition-all duration-150 group"
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-3.5 h-3.5 flex-shrink-0 text-fandex-secondary" />
+                            <span className="text-sm font-medium text-nf-text truncate">
+                              {mention.file_name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-[10px] px-1.5 py-0.5 bg-fandex-secondary/10 text-fandex-secondary font-medium">
+                              {t("codex.mentionCount", { count: mention.count })}
+                            </span>
+                            <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary group-hover:text-fandex-primary transition-colors" />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-[10px] px-1.5 py-0.5 bg-fandex-secondary/10 text-fandex-secondary font-medium">
-                            {t("codex.mentionCount", { count: mention.count })}
-                          </span>
-                          <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary group-hover:text-fandex-primary transition-colors" />
+                        <div className="text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
+                          {mention.preview}
                         </div>
-                      </div>
-                      <div className="text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
-                        {mention.preview}
-                      </div>
-                      <div className="text-[10px] text-nf-text-tertiary/60 mt-1 truncate">
-                        {mention.file_path}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
+                        <div className="text-[10px] text-nf-text-tertiary/60 mt-1 truncate">
+                          {mention.file_path}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-nf-text-tertiary">
             <Library className="w-12 h-12 mb-3 opacity-30" />
@@ -618,16 +771,27 @@ export default function CodexPanel() {
         </div>
       )}
 
-      {/* 删除实体确认对话框 */}
+      {/* 删除实体确认对话框（Sprint 2 任务 2.5：含失效提及警告） */}
       <ConfirmDialog
         open={deleteTarget !== null}
         title={t("codex.deleteEntity")}
-        message={deleteTarget ? `${t("codex.deleteConfirm", { name: deleteTarget.name })}\n${t("codex.deleteConfirmDesc")}` : ""}
+        message={
+          deleteTarget
+            ? deleteInvalidCount > 0
+              ? `${t("codex.deleteConfirm", { name: deleteTarget.name })}\n${t(
+                  "codex.deleteWithInvalidWarning",
+                  { count: deleteInvalidCount }
+                )}\n${t("codex.deleteConfirmDesc")}`
+              : `${t("codex.deleteConfirm", { name: deleteTarget.name })}\n${t(
+                  "codex.deleteConfirmDesc"
+                )}`
+            : ""
+        }
         type="danger"
         confirmLabel={t("app.delete")}
         cancelLabel={t("app.cancel")}
         onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={handleCancelDelete}
       />
     </div>
   );

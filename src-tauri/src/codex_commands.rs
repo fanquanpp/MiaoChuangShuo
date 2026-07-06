@@ -223,9 +223,25 @@ pub struct CodexMeta {
     #[serde(default)]
     pub aliases: Vec<String>,
     /// 实体类型：character / worldview / glossary / material
+    /// 注：对应方案中的 card_type，保留 entity_type 以向后兼容旧 front matter
     pub entity_type: String,
     /// 创建时间（ISO 8601 格式）
     pub created: String,
+    /// 一句话简介（用于 Hover 预览和 AI 快速读取）
+    #[serde(default)]
+    pub summary: String,
+    /// 标签数组（如 ["主角","骑士"]）
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// 头像/图标 URL（可选）
+    #[serde(default)]
+    pub avatar: Option<String>,
+    /// 排序权重（数字越小越靠前，默认 0）
+    #[serde(default)]
+    pub sort_order: i32,
+    /// 更新时间（ISO 8601 格式，首次创建时与 created 相同）
+    #[serde(default)]
+    pub updated_at: String,
 }
 
 /// 设定实体（前端展示用结构化数据）
@@ -326,27 +342,132 @@ pub fn parse_codex_file(
         content.to_string()
     };
 
-    // 生成默认元数据
+    // 生成默认元数据（新字段使用默认值，向后兼容旧文件）
+    let now = chrono::Utc::now().to_rfc3339();
     let meta = CodexMeta {
         id: Uuid::new_v4().to_string(),
         name: fallback_name.to_string(),
         aliases,
         entity_type: fallback_type.to_string(),
-        created: chrono::Utc::now().to_rfc3339(),
+        created: now.clone(),
+        summary: String::new(),
+        tags: Vec::new(),
+        avatar: None,
+        sort_order: 0,
+        updated_at: now,
     };
 
     (meta, body)
 }
 
-/// 扫描设定目录，返回所有结构化设定实体
+// ===== 设定文件 .pmd 迁移辅助函数 =====
+
+/// 将纯文本正文转换为 ProseMirror JSON 文档字符串
+/// 输入: text 纯文本内容
+/// 输出: String ProseMirror JSON 字符串（每行一个 paragraph）
+/// 流程:
+///   1. 按换行符分割文本（兼容 Windows CRLF 与 Unix LF）
+///   2. 非空行转为含 text 节点的 paragraph
+///   3. 空行转为空 paragraph
+///   4. 包装为 doc 根节点并序列化为 JSON 字符串
+fn convert_codex_text_to_pmd(text: &str) -> String {
+    let mut content = Vec::new();
+    for line in text.split('\n').map(|l| l.trim_end_matches('\r')) {
+        if line.is_empty() {
+            content.push(serde_json::json!({"type": "paragraph"}));
+        } else {
+            content.push(serde_json::json!({
+                "type": "paragraph",
+                "content": [{"type": "text", "text": line}]
+            }));
+        }
+    }
+    // 空文档至少保留一个空段落，避免 ProseMirror 解析失败
+    if content.is_empty() {
+        content.push(serde_json::json!({"type": "paragraph"}));
+    }
+    let doc = serde_json::json!({"type": "doc", "content": content});
+    serde_json::to_string(&doc).unwrap_or_else(|_| "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\"}]}".to_string())
+}
+
+/// 原子写入文件（临时文件 + 重命名，保证写入原子性）
+/// 输入: path 目标文件路径, content 文件内容
+/// 输出: Result<(), String> 写入结果
+/// 流程:
+///   1. 写入 .tmp 临时文件（同目录，保证同一文件系统以支持原子重命名）
+///   2. 重命名为目标文件
+///   3. 失败时清理临时文件
+fn atomic_write_codex(path: &Path, content: &str) -> Result<(), String> {
+    let tmp_path = PathBuf::from(format!("{}.tmp", path.to_string_lossy()));
+    fs::write(&tmp_path, content).map_err(|e| format!("写入临时文件失败: {}", e))?;
+    match fs::rename(&tmp_path, path) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            let _ = fs::remove_file(&tmp_path);
+            Err(format!("重命名文件失败: {}", e))
+        }
+    }
+}
+
+/// 将旧版 .txt 设定文件迁移为 .pmd 格式
+/// 输入:
+///   txt_path - 旧版 .txt 文件路径
+///   fallback_type - 回退实体类型（用于无 front matter 的旧文件）
+/// 输出: Result<PathBuf, String> 迁移后的 .pmd 文件路径
+/// 流程:
+///   1. 读取 .txt 文件内容
+///   2. 解析 front matter + 纯文本正文
+///   3. 将正文转换为 ProseMirror JSON
+///   4. 构造 .pmd 文件内容（front matter + ProseMirror JSON）
+///   5. 原子写入 .pmd 文件
+///   6. 删除旧 .txt 文件（迁移成功后）
+/// 设计说明:
+///   - .pmd 格式 = front matter（JSON 元数据）+ ProseMirror JSON（富文本正文）
+///   - 迁移是一次性的、透明的，用户无感
+///   - 原子写入保证迁移过程中断不会损坏文件
+fn migrate_codex_txt_to_pmd(txt_path: &Path, fallback_type: &str) -> Result<PathBuf, String> {
+    let content = fs::read_to_string(txt_path)
+        .map_err(|e| format!("读取设定文件失败: {}", e))?;
+
+    let file_name = txt_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    let (meta, body) = parse_codex_file(&content, &file_name, fallback_type);
+
+    // 将纯文本正文转换为 ProseMirror JSON
+    let pmd_content = convert_codex_text_to_pmd(&body);
+
+    // 构造 .pmd 文件内容：front matter + ProseMirror JSON
+    let meta_json = serde_json::to_string(&meta)
+        .map_err(|e| format!("序列化设定元数据失败: {}", e))?;
+    let pmd_file_content = format!("---\n{}\n---\n{}", meta_json, pmd_content);
+
+    // 原子写入 .pmd 文件（与原 .txt 同目录）
+    let pmd_path = txt_path.with_extension("pmd");
+    atomic_write_codex(&pmd_path, &pmd_file_content)?;
+
+    // 迁移成功后删除旧 .txt 文件
+    // 失败不阻断流程（.pmd 已写入），仅记录警告
+    if let Err(e) = fs::remove_file(txt_path) {
+        eprintln!("[codex] 警告: 删除旧 .txt 文件失败: {}", e);
+    }
+
+    Ok(pmd_path)
+}
+
+/// 扫描设定目录，返回所有结构化设定实体（支持 .pmd 与 .txt 自动迁移）
 ///
 /// 输入: project_path 项目根目录绝对路径
 /// 输出: Result<Vec<CodexEntity>, String> 实体列表（按类型分组后按名称排序）
 /// 流程:
 ///   1. 遍历 CODEX_DIRS 中定义的标准目录与兼容目录
-///   2. 对每个存在的目录，扫描其下 .txt 文件
-///   3. 解析每个文件的 front matter + 正文
-///   4. 返回结构化实体列表
+///   2. 对每个存在的目录，扫描其下 .pmd 与 .txt 文件
+///   3. .txt 文件自动迁移为 .pmd（一次性、透明、用户无感）
+///   4. 解析每个 .pmd 文件的 front matter + ProseMirror JSON 正文
+///   5. 返回结构化实体列表
 #[tauri::command]
 pub fn list_codex_entities(project_path: String) -> Result<Vec<CodexEntity>, String> {
     let root = PathBuf::from(&project_path);
@@ -368,21 +489,60 @@ pub fn list_codex_entities(project_path: String) -> Result<Vec<CodexEntity>, Str
             if path.is_dir() {
                 continue;
             }
-            // 仅处理 .txt 文件（设定文件统一为 .txt，正文才用 .pmd/.html）
-            let is_txt = path
-                .extension()
-                .map(|e| e == "txt")
-                .unwrap_or(false);
-            if !is_txt {
-                continue;
-            }
 
-            let file_name = path
+            // 获取文件扩展名，决定处理方式
+            let extension = path
+                .extension()
+                .map(|e| e.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            // 根据扩展名决定处理路径：.txt 迁移为 .pmd，.pmd 直接处理，其他跳过
+            let pmd_path = if extension == "txt" {
+                // 旧版 .txt 文件：先过滤模板/名册文件，再迁移为 .pmd
+                let file_name = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                let lower = file_name.to_lowercase();
+                if lower.contains("模板")
+                    || lower.contains("名册")
+                    || lower.contains("template")
+                    || lower.contains("roster")
+                    || lower.contains("readme")
+                {
+                    continue;
+                }
+
+                // 迁移 .txt 为 .pmd（失败时跳过该文件，不阻断整体扫描）
+                match migrate_codex_txt_to_pmd(&path, fallback_type) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("[codex] 警告: 迁移设定文件失败 {}: {}", path.display(), e);
+                        continue;
+                    }
+                }
+            } else if extension == "pmd" {
+                // 新版 .pmd 文件：直接处理
+                path.clone()
+            } else {
+                // 其他扩展名跳过
+                continue;
+            };
+
+            // 读取 .pmd 文件内容
+            let content = match fs::read_to_string(&pmd_path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let file_name = pmd_path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_string();
-            // 过滤模板文件和名册文件
+
+            // 过滤模板文件和名册文件（.pmd 也需检查）
             let lower = file_name.to_lowercase();
             if lower.contains("模板")
                 || lower.contains("名册")
@@ -393,17 +553,11 @@ pub fn list_codex_entities(project_path: String) -> Result<Vec<CodexEntity>, Str
                 continue;
             }
 
-            let content = match fs::read_to_string(&path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
+            let (meta, body) = parse_codex_file(&content, &file_name, fallback_type);
 
-            let (meta, body) =
-                parse_codex_file(&content, &file_name, fallback_type);
-
-            let rel_path = path
+            let rel_path = pmd_path
                 .strip_prefix(&root)
-                .unwrap_or(&path)
+                .unwrap_or(&pmd_path)
                 .to_string_lossy()
                 .replace('\\', "/");
 
@@ -510,3 +664,318 @@ pub fn inject_codex_front_matter(project_path: String) -> Result<u32, String> {
 
     Ok(count)
 }
+
+// ===== Sprint 2 任务 2.1：单卡片更新命令 =====
+
+/// 待合并的元数据补丁（与 CodexMeta 字段对应，所有字段可选）
+///
+/// 前端传入 JSON 对象，仅包含需要更新的字段。
+/// 未传入的字段保持原值不变，实现部分更新语义。
+#[derive(Debug, Clone, Deserialize)]
+pub struct CodexMetaPatch {
+    pub name: Option<String>,
+    pub aliases: Option<Vec<String>>,
+    pub entity_type: Option<String>,
+    pub summary: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub avatar: Option<Option<String>>,
+    pub sort_order: Option<i32>,
+}
+
+/// 更新单个设定卡片的元数据与正文（.pmd 文件）
+///
+/// 输入:
+///   project_path - 项目根目录绝对路径
+///   source_file - 卡片来源文件相对路径（如 "角色/亚瑟.pmd"）
+///   meta_patch - 元数据补丁（JSON 字符串，仅含待更新字段）
+///   content - 正文内容（ProseMirror JSON 字符串，空字符串表示不更新正文）
+/// 输出: Result<CodexMeta, String> 更新后的完整元数据
+/// 流程:
+///   1. 拼接目标文件绝对路径并校验存在性
+///   2. 读取并解析 .pmd 文件，得到原 meta 与 body
+///   3. 反序列化 meta_patch 为 CodexMetaPatch
+///   4. 将 patch 字段合并到原 meta，更新 updated_at 时间戳
+///   5. 若 content 非空，替换正文；否则保留原 body
+///   6. 若 name 发生变更，同步重命名文件（atomic rename）
+///   7. 原子写入新内容到目标文件
+/// 设计说明:
+///   - name 变更时文件重命名由后端统一处理，前端无需关心文件路径变化
+///   - 重命名后返回的 meta 包含新 name，前端据以更新 Store 中的 sourceFile
+///   - 原子写入保证更新过程中断不会损坏文件
+#[tauri::command]
+pub fn update_codex_entity(
+    project_path: String,
+    source_file: String,
+    meta_patch: String,
+    content: String,
+) -> Result<CodexMeta, String> {
+    let root = PathBuf::from(&project_path);
+    // 安全校验：source_file 必须为相对路径，禁止路径穿越
+    if source_file.contains("..") || source_file.starts_with('/') || source_file.contains(':') {
+        return Err("非法的来源文件路径".to_string());
+    }
+    let file_path = root.join(&source_file);
+    if !file_path.exists() {
+        return Err(format!("设定文件不存在: {}", source_file));
+    }
+
+    // 读取并解析现有 .pmd 文件
+    let raw = fs::read_to_string(&file_path)
+        .map_err(|e| format!("读取设定文件失败: {}", e))?;
+    let file_name = file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+    let (mut meta, original_body) = parse_codex_file(&raw, &file_name, "unknown");
+
+    // 反序列化并合并 meta_patch
+    let patch: CodexMetaPatch = if meta_patch.is_empty() {
+        // 空补丁：仅更新正文（若提供）
+        CodexMetaPatch {
+            name: None,
+            aliases: None,
+            entity_type: None,
+            summary: None,
+            tags: None,
+            avatar: None,
+            sort_order: None,
+        }
+    } else {
+        serde_json::from_str(&meta_patch)
+            .map_err(|e| format!("解析元数据补丁失败: {}", e))?
+    };
+
+    // 逐字段合并（Option<T>：Some 表示更新，None 表示保留原值）
+    if let Some(name) = patch.name {
+        meta.name = name;
+    }
+    if let Some(aliases) = patch.aliases {
+        meta.aliases = aliases;
+    }
+    if let Some(entity_type) = patch.entity_type {
+        meta.entity_type = entity_type;
+    }
+    if let Some(summary) = patch.summary {
+        meta.summary = summary;
+    }
+    if let Some(tags) = patch.tags {
+        meta.tags = tags;
+    }
+    // avatar 使用 Option<Option<String>>：外层 Some 表示需要更新，内层 None 表示清空
+    if let Some(avatar) = patch.avatar {
+        meta.avatar = avatar;
+    }
+    if let Some(sort_order) = patch.sort_order {
+        meta.sort_order = sort_order;
+    }
+    // 更新时间戳
+    meta.updated_at = chrono::Utc::now().to_rfc3339();
+
+    // 确定正文内容：content 非空则替换，空则保留原 body
+    let final_body = if content.is_empty() { original_body } else { content };
+
+    // 序列化并原子写入
+    let meta_json = serde_json::to_string(&meta)
+        .map_err(|e| format!("序列化元数据失败: {}", e))?;
+    let new_file_content = format!("---\n{}\n---\n{}", meta_json, final_body);
+
+    // 若 name 变更，需要重命名文件（同步文件名与显示名）
+    let final_path = if meta.name != file_name {
+        let parent = file_path.parent().ok_or("无法获取父目录")?;
+        let new_name = format!("{}.pmd", meta.name);
+        let new_path = parent.join(&new_name);
+        // 若目标文件已存在（同目录下有重名卡片），拒绝覆盖
+        if new_path.exists() && new_path != file_path {
+            return Err(format!("目标文件已存在: {}", new_name));
+        }
+        new_path
+    } else {
+        file_path.clone()
+    };
+
+    // 原子写入到最终路径
+    atomic_write_codex(&final_path, &new_file_content)?;
+
+    // 若文件重命名了，删除旧文件
+    if final_path != file_path {
+        if let Err(e) = fs::remove_file(&file_path) {
+            eprintln!("[codex] 警告: 删除旧文件失败 {}: {}", file_path.display(), e);
+        }
+    }
+
+    Ok(meta)
+}
+
+// ===== Sprint 2 任务 2.5：删除失效检测 =====
+
+/// 失效提及位置（单文件维度）
+/// 用于删除卡片前检测正文中引用该卡片的 characterMentionNode 数量
+#[derive(Debug, Clone, Serialize)]
+pub struct InvalidMention {
+    /// 文件相对路径（相对于项目根，含"正文/"前缀）
+    pub file_path: String,
+    /// 文件名（含扩展名）
+    pub file_name: String,
+    /// 该文件中引用该卡片的 characterMentionNode 数量
+    pub count: u32,
+}
+
+/// 扫描正文中引用指定卡片的 characterMentionNode 数量
+/// 输入:
+///   project_path - 项目根目录绝对路径
+///   card_id - 待检测的卡片 UUID（characterMentionNode.attrs.characterId）
+/// 输出: Result<Vec<InvalidMention>, String> 引用该卡片的文件列表（按数量降序）
+/// 流程:
+///   1. 遍历正文目录下所有 .pmd 文件
+///   2. 剥离 front matter 后解析 ProseMirror JSON
+///   3. 递归查找 type == "characterMentionNode" 且 attrs.characterId == card_id 的节点
+///   4. 按文件汇总数量返回
+/// 设计说明:
+///   - 仅扫描 .pmd 文件（characterMentionNode 仅存在于 ProseMirror JSON 格式中）
+///   - .txt/.html 旧文件不含 characterMentionNode，跳过
+///   - 删除卡片前调用，返回值用于前端弹出失效提示
+#[tauri::command]
+pub fn scan_invalid_mentions(
+    project_path: String,
+    card_id: String,
+) -> Result<Vec<InvalidMention>, String> {
+    let root = PathBuf::from(&project_path);
+    let manuscript_dir = root.join("正文");
+    if !manuscript_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut results = Vec::new();
+    scan_dir_for_invalid_mentions(&manuscript_dir, &card_id, &root, &mut results)?;
+
+    // 按数量降序排序
+    results.sort_by_key(|b| std::cmp::Reverse(b.count));
+    Ok(results)
+}
+
+/// 递归扫描目录下 .pmd 文件中的失效提及
+/// 输入:
+///   dir - 当前扫描目录
+///   card_id - 待检测的卡片 UUID
+///   project_root - 项目根目录（用于计算相对路径）
+///   results - 结果列表（可变引用，累加结果）
+/// 输出: Result<(), String> 扫描成功或错误
+fn scan_dir_for_invalid_mentions(
+    dir: &Path,
+    card_id: &str,
+    project_root: &Path,
+    results: &mut Vec<InvalidMention>,
+) -> Result<(), String> {
+    let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {}", e))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            // 递归扫描子目录
+            scan_dir_for_invalid_mentions(&path, card_id, project_root, results)?;
+        } else {
+            // 仅处理 .pmd 文件（characterMentionNode 仅存在于 ProseMirror JSON 格式中）
+            let is_pmd = path
+                .extension()
+                .map(|e| e == "pmd")
+                .unwrap_or(false);
+            if !is_pmd {
+                continue;
+            }
+
+            let content = match fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            // 剥离 .pmd front matter 后解析 ProseMirror JSON
+            let json_str = strip_pmd_front_matter(&content);
+            let doc = match serde_json::from_str::<serde_json::Value>(&json_str) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            // 递归查找 characterMentionNode 节点并统计匹配数量
+            let count = count_character_mentions(&doc, card_id);
+            if count > 0 {
+                let rel_path = path
+                    .strip_prefix(project_root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                let file_name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                results.push(InvalidMention {
+                    file_path: rel_path,
+                    file_name,
+                    count,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 剥离 .pmd 文件的 JSON front matter，返回 ProseMirror JSON 字符串
+/// 输入: content .pmd 文件完整内容
+/// 输出: String ProseMirror JSON 字符串（已剥离 front matter）
+/// 流程:
+///   1. 检测首行是否为 "---"（front matter 起始标记）
+///   2. 若是，查找下一个 "---" 结束标记，返回其后内容
+///   3. 若否，返回原内容（可能是纯 ProseMirror JSON 或旧格式）
+fn strip_pmd_front_matter(content: &str) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.len() >= 3 && lines[0].trim() == "---" {
+        // 查找结束标记 ---
+        if let Some(end) = lines[1..]
+            .iter()
+            .position(|l| l.trim() == "---")
+            .map(|i| i + 1)
+        {
+            return lines[end + 1..].join("\n").trim_start().to_string();
+        }
+    }
+    content.to_string()
+}
+
+/// 递归统计 ProseMirror JSON 文档中引用指定 characterId 的 characterMentionNode 数量
+/// 输入:
+///   node - ProseMirror JSON 节点（serde_json::Value）
+///   card_id - 待匹配的卡片 UUID
+/// 输出: u32 匹配的节点数量
+/// 流程:
+///   1. 检查当前节点 type 是否为 "characterMentionNode"
+///   2. 若是，检查 attrs.characterId 是否等于 card_id，匹配则计数 +1
+///   3. 递归检查 content 数组中的子节点
+fn count_character_mentions(node: &serde_json::Value, card_id: &str) -> u32 {
+    let mut count = 0;
+
+    // 检查当前节点是否为 characterMentionNode
+    if let Some(node_type) = node.get("type").and_then(|v| v.as_str()) {
+        if node_type == "characterMentionNode" {
+            // 检查 attrs.characterId 是否匹配
+            if let Some(attrs) = node.get("attrs") {
+                if let Some(id) = attrs.get("characterId").and_then(|v| v.as_str()) {
+                    if id == card_id {
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    // 递归检查子节点（content 数组）
+    if let Some(content) = node.get("content").and_then(|v| v.as_array()) {
+        for child in content {
+            count += count_character_mentions(child, card_id);
+        }
+    }
+
+    count
+}
+

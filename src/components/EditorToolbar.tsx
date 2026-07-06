@@ -62,9 +62,11 @@ interface ToolbarButtonProps {
 
 // 工具栏按钮 - 统一直角几何风格
 // 关键设计：tabIndex={-1} 防止 Tab 键焦点跳到工具栏按钮，保证写作时焦点常驻编辑器
-// 视觉风格：FANDEX 直角按钮，统一 28x28 正方形容器，激活态文字变色 + 淡色背景块
-// 悬停效果：仅文字颜色变化，无背景色放大效果 (用户要求移除悬停放大背景)
-// 尺寸规范: h-7 w-7 (28x28px) 固定容器 + w-4 h-4 图标, 确保所有工具按钮视觉一致
+// 视觉规范 (v26.7.24 统一重构):
+//   - 尺寸: h-8 w-8 (32x32px) 固定容器 + w-4 h-4 图标
+//   - 色彩: 默认 text-nf-text-tertiary / 悬停 text-nf-text / 激活 text-fandex-primary + bg-fandex-primary/10
+//   - 过渡: transition-colors duration-fast (仅色彩, 无背景放大)
+//   - 装饰: border border-transparent (保持盒模型一致, 避免激活态布局抖动)
 export function ToolbarButton({
   onClick,
   active,
@@ -77,7 +79,7 @@ export function ToolbarButton({
       onClick={onClick}
       title={title}
       tabIndex={-1}
-      className={`nf-tool-btn relative h-7 w-7 flex items-center justify-center ease-fandex border border-transparent group transition-colors duration-fast ${
+      className={`nf-tool-btn relative h-8 w-8 flex items-center justify-center ease-fandex border border-transparent transition-colors duration-fast ${
         active
           ? "text-fandex-primary bg-fandex-primary/10"
           : "text-nf-text-tertiary hover:text-nf-text"
@@ -142,14 +144,14 @@ function Dropdown({ trigger, children, panelWidth = "w-56", active = false, titl
         onClick={() => setOpen((prev) => !prev)}
         title={title}
         tabIndex={-1}
-        className={`nf-tool-btn relative h-7 px-1.5 transition-colors duration-fast ease-fandex border border-transparent flex items-center gap-0.5 group ${
+        className={`nf-tool-btn relative h-8 px-2 transition-colors duration-fast ease-fandex border border-transparent flex items-center gap-1 ${
           active || open
             ? "text-fandex-primary bg-fandex-primary/10"
             : "text-nf-text-tertiary hover:text-nf-text"
         }`}
       >
         {trigger}
-        <ChevronDown className="w-3 h-3 opacity-60 transition-transform duration-fast group-hover:opacity-100" />
+        <ChevronDown className="w-3 h-3 opacity-60" />
       </button>
       {open && (
         <div
@@ -268,7 +270,7 @@ function FontSizeAdjuster() {
   const DEFAULT_SIZE = 17;
 
   return (
-    <div className="flex items-center h-7 border border-nf-border-light/40 bg-nf-bg-card/50">
+    <div className="flex items-center h-8 border border-nf-border-light/30 bg-nf-bg-card/40">
       {/* 缩小字号 */}
       <button
         type="button"
@@ -276,7 +278,7 @@ function FontSizeAdjuster() {
         disabled={fontSize <= 12}
         title={t("shortcuts.fontSizeDecrease")}
         tabIndex={-1}
-        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
+        className="nf-tool-btn h-8 w-8 flex items-center justify-center text-nf-text-tertiary hover:text-nf-text transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ZoomOut className="w-4 h-4" />
       </button>
@@ -286,7 +288,7 @@ function FontSizeAdjuster() {
         onClick={() => setFontSize(DEFAULT_SIZE)}
         title={t("shortcuts.fontSizeReset")}
         tabIndex={-1}
-        className="nf-tool-btn h-7 px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-colors duration-fast min-w-[32px] text-center flex items-center justify-center"
+        className="nf-tool-btn h-8 px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-colors duration-fast min-w-[32px] text-center flex items-center justify-center border-x border-nf-border-light/30"
       >
         {fontSize}
       </button>
@@ -297,7 +299,7 @@ function FontSizeAdjuster() {
         disabled={fontSize >= 28}
         title={t("shortcuts.fontSizeIncrease")}
         tabIndex={-1}
-        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
+        className="nf-tool-btn h-8 w-8 flex items-center justify-center text-nf-text-tertiary hover:text-nf-text transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ZoomIn className="w-4 h-4" />
       </button>
@@ -404,13 +406,13 @@ function SessionStats({
         onClick={onTogglePause}
         title={paused ? t("editor.sessionResume") : t("editor.sessionPause")}
         tabIndex={-1}
-        className={`nf-tool-btn h-7 w-7 flex items-center justify-center transition-colors duration-fast ease-fandex border ${
+        className={`nf-tool-btn h-8 w-8 flex items-center justify-center transition-colors duration-fast ease-fandex border ${
           paused
             ? "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/40"
             : "text-nf-text-tertiary hover:text-nf-text border-transparent"
         }`}
       >
-        {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+        {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
       </button>
       {/* 会话字数 */}
       <span className={`tabular-nums font-medium ${wordsColor}`}>
@@ -432,13 +434,13 @@ function SessionStats({
         onClick={handleOpenDialog}
         title={t("editor.setTarget")}
         tabIndex={-1}
-        className={`nf-tool-btn flex items-center gap-1.5 h-7 px-1.5 transition-colors duration-fast ease-fandex border ${
+        className={`nf-tool-btn flex items-center gap-1.5 h-8 px-2 transition-colors duration-fast ease-fandex border ${
           wordTarget > 0
             ? "bg-fandex-primary/10 border-fandex-primary/30"
-            : "border-transparent"
+            : "border-transparent hover:bg-nf-bg-card/40"
         }`}
       >
-        <Target className={`w-3.5 h-3.5 ${wordTarget > 0 ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
+        <Target className={`w-4 h-4 ${wordTarget > 0 ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
         {wordTarget > 0 ? (
           <>
             <div className="w-16 h-1.5 bg-nf-bg-hover border border-nf-border-light/40 overflow-hidden">
@@ -462,9 +464,9 @@ function SessionStats({
           onClick={() => setResetConfirmOpen(true)}
           title={t("editor.sessionReset")}
           tabIndex={-1}
-          className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary transition-all duration-fast"
+          className="nf-tool-btn h-8 w-8 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary transition-colors duration-fast"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <RotateCcw className="w-4 h-4" />
         </button>
       )}
 
@@ -741,14 +743,14 @@ export default function EditorToolbar({
           onSetTarget={onSetSessionTarget}
           onResetSession={onResetSession}
         />
-        <div className="ml-auto flex items-center gap-3 text-xs text-nf-text-tertiary flex-shrink-0">
-          {/* 字数统计:增加微胶囊背景 */}
-          <span className="tabular-nums px-2 py-0.5 bg-nf-bg-card/60 border border-nf-border-light/40 text-nf-text-secondary">
+        <div className="ml-auto flex items-center gap-2 text-xs text-nf-text-tertiary flex-shrink-0">
+          {/* 字数统计:微胶囊背景, 与其他按钮高度对齐 */}
+          <span className="tabular-nums h-8 px-2 flex items-center bg-nf-bg-card/40 border border-nf-border-light/30 text-nf-text-secondary">
             {t("editor.wordCount", { count: wordCount })}
           </span>
           {/* 保存状态指示器 */}
           {dirty && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-fandex-tertiary/10 text-fandex-tertiary border border-fandex-tertiary/20">
+            <span className="flex items-center gap-1 h-8 px-2 bg-fandex-tertiary/10 text-fandex-tertiary border border-fandex-tertiary/20">
               <span className="w-1.5 h-1.5 bg-fandex-tertiary animate-pulse" />
               {t("editor.unsaved")}
             </span>
@@ -759,9 +761,9 @@ export default function EditorToolbar({
               onClick={onExportTxt}
               title={t("editor.exportTxt")}
               tabIndex={-1}
-              className="nf-tool-btn flex items-center gap-1 h-7 px-2 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 transition-all duration-fast ease-fandex"
+              className="nf-tool-btn flex items-center gap-1 h-8 px-2 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 transition-colors duration-fast ease-fandex"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-4 h-4" />
               TXT
             </button>
           )}
@@ -771,9 +773,9 @@ export default function EditorToolbar({
             disabled={!dirty || saving}
             title={t("app.save")}
             tabIndex={-1}
-            className={`nf-tool-btn flex items-center gap-1 h-7 px-2.5 text-xs ease-fandex transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed ${
+            className={`nf-tool-btn flex items-center gap-1.5 h-8 px-3 text-xs ease-fandex transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed ${
               dirty
-                ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse shadow-sm'
+                ? 'bg-fandex-primary hover:bg-fandex-primary-hover text-nf-text-inverse'
                 : 'bg-fandex-primary/40 text-nf-text-inverse/60'
             }`}
           >
@@ -789,11 +791,12 @@ export default function EditorToolbar({
 
       {/* 格式栏：分组容器 + flex-wrap 自动换行（无滚动条）
           行内格式（粗体/斜体/下划线/删除线/代码/颜色/链接）已移至 EditorBubbleMenu，
-          此处仅保留段落级操作，大幅减少按钮数量，解决工具栏溢出问题。 */}
+          此处仅保留段落级操作，大幅减少按钮数量，解决工具栏溢出问题。
+          视觉规范 (v26.7.24): 所有分组容器统一 h-8 + bg-nf-bg-card/40 + border-nf-border-light/30 */}
       {!focusMode && (
         <div className="flex flex-wrap items-center gap-1.5 px-4 py-1.5 border-t border-nf-border-light/50">
           {/* 标题段落组 */}
-          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
+          <div className="flex items-center gap-0.5 h-8 px-1 bg-nf-bg-card/40 border border-nf-border-light/30">
             <HeadingDropdown editor={editor} />
             <ToolbarButton
               onClick={() => editor?.chain().focus().setHorizontalRule().run()}
@@ -828,7 +831,7 @@ export default function EditorToolbar({
           </div>
           <Divider />
           {/* 对齐组 */}
-          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
+          <div className="flex items-center gap-0.5 h-8 px-1 bg-nf-bg-card/40 border border-nf-border-light/30">
             <ToolbarButton
               onClick={() => editor?.chain().focus().setTextAlign("left").run()}
               active={editor?.isActive({ textAlign: "left" }) || false}
@@ -860,7 +863,7 @@ export default function EditorToolbar({
           </div>
           <Divider />
           {/* 插入组：诗歌 / 歌词（表格已移除，链接和颜色已移至 BubbleMenu） */}
-          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
+          <div className="flex items-center gap-0.5 h-8 px-1 bg-nf-bg-card/40 border border-nf-border-light/30">
             <ToolbarButton
               onClick={handlePoetryToggle}
               active={isPoetryActive()}
@@ -878,7 +881,7 @@ export default function EditorToolbar({
           </div>
           <Divider />
           {/* 操作历史组 + 快照 + 查找替换 */}
-          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
+          <div className="flex items-center gap-0.5 h-8 px-1 bg-nf-bg-card/40 border border-nf-border-light/30">
             <ToolbarButton
               onClick={() => editor?.chain().focus().undo().run()}
               active={false}
@@ -913,23 +916,22 @@ export default function EditorToolbar({
           <FontSizeAdjuster />
           <Divider />
           {/* AI 助手组 (AI-3.1): 打开侧边栏 AI 创作助手面板
-              按钮尺寸增大 (h-9 px-3), 使用渐变色彩提升视觉强调度, 悬停仅色彩变化无背景放大 */}
-          <div className="flex items-center gap-0.5 h-9 px-1 bg-nf-bg-card/50 border border-fandex-primary/20">
-            <button
-              type="button"
-              onClick={() => onToggleAiPanel?.()}
-              title={t("ai.panel.toggleHint")}
-              tabIndex={-1}
-              className={`nf-tool-btn h-9 px-3 flex items-center gap-1.5 text-sm font-medium transition-colors duration-fast ease-fandex border ${
-                showAiPanel
-                  ? "text-nf-text-inverse bg-gradient-to-r from-fandex-primary to-fandex-secondary border-fandex-primary shadow-sm"
-                  : "text-fandex-primary bg-fandex-primary/5 border-fandex-primary/30 hover:text-fandex-secondary hover:border-fandex-secondary/50"
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              {t("ai.panel.toolbarButton")}
-            </button>
-          </div>
+              视觉规范: 高度对齐 h-8 (与其他分组一致), 保留渐变色彩作为视觉强调
+              悬停仅色彩变化, 无背景放大; 激活态使用 from-fandex-primary to-fandex-secondary 渐变 */}
+          <button
+            type="button"
+            onClick={() => onToggleAiPanel?.()}
+            title={t("ai.panel.toggleHint")}
+            tabIndex={-1}
+            className={`nf-tool-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium transition-colors duration-fast ease-fandex border ${
+              showAiPanel
+                ? "text-nf-text-inverse bg-gradient-to-r from-fandex-primary to-fandex-secondary border-fandex-primary"
+                : "text-fandex-primary bg-fandex-primary/5 border-fandex-primary/30 hover:text-fandex-secondary hover:border-fandex-secondary/50"
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            {t("ai.panel.toolbarButton")}
+          </button>
         </div>
       )}
     </div>

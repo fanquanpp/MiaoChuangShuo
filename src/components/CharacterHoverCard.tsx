@@ -39,6 +39,15 @@ interface CharacterHoverCardProps {
   /** 角色实体 UUID（来自 p5-25 实体高亮装饰的 data-entity-id）
    * AI-Ready：未来 AI 操作通过此 ID 精确查询结构化设定数据 */
   characterId?: string;
+  /**
+   * AI 操作回调（Sprint 3 任务 3.2 启用）
+   * 输入:
+   *   action - 操作类型（"summarize-state" | "generate-dialogue"）
+   *   characterId - 角色实体 UUID（可能为 undefined，调用方需容错）
+   *   characterName - 角色显示名
+   * 流程: 由 NovelEditor 接收并组装指令，打开 AiAssistantPanel 自动发送
+   */
+  onAiAction?: (action: string, characterId: string | undefined, characterName: string) => void;
 }
 
 /**
@@ -65,6 +74,7 @@ export default function CharacterHoverCard({
   characterName,
   projectPath,
   characterId,
+  onAiAction,
 }: CharacterHoverCardProps) {
   const { t } = useI18n();
   const [summary, setSummary] = useState<CharacterSummary | null>(null);
@@ -202,11 +212,11 @@ export default function CharacterHoverCard({
         )}
       </div>
 
-      {/* AI 操作区（p5-26 预留占位，p6 阶段接入 PromptBuilder 后启用）
+      {/* AI 操作区（Sprint 3 任务 3.2 启用）
        * 设计说明：
-       *   - 按钮当前为 disabled 占位，仅展示未来能力
-       *   - characterId 用于 p6 阶段 AI 命令精确查询结构化设定
-       *   - 悬停态显示"敬请期待"提示，避免用户误以为按钮可点击
+       *   - 按钮已接入 PromptBuilder + AiAssistantPanel（通过 onAiAction 回调）
+       *   - 点击后由 NovelEditor 组装角色上下文指令并打开 AI 助手面板
+       *   - characterId 用于精确查询结构化设定（undefined 时回退到按名称匹配）
        *   - 仅在成功加载角色摘要后显示（无角色档案时不显示 AI 入口） */}
       {summary && summary.found && (
         <div className="px-3 py-2 border-t border-nf-border-light bg-nf-bg/40">
@@ -219,9 +229,9 @@ export default function CharacterHoverCard({
           <div className="space-y-1">
             <button
               type="button"
-              disabled
-              title={t("characterHover.aiComingSoon")}
-              className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-[11px] text-nf-text-tertiary cursor-not-allowed opacity-60 rounded-sm hover:bg-nf-bg-hover transition-colors"
+              onClick={() => onAiAction?.("summarize-state", characterId, characterName)}
+              title={t("characterHover.aiSummarizeState")}
+              className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-[11px] text-nf-text-secondary hover:text-fandex-primary hover:bg-nf-bg-hover rounded-sm transition-colors"
               data-character-id={characterId}
               data-ai-action="summarize-state"
             >
@@ -230,9 +240,9 @@ export default function CharacterHoverCard({
             </button>
             <button
               type="button"
-              disabled
-              title={t("characterHover.aiComingSoon")}
-              className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-[11px] text-nf-text-tertiary cursor-not-allowed opacity-60 rounded-sm hover:bg-nf-bg-hover transition-colors"
+              onClick={() => onAiAction?.("generate-dialogue", characterId, characterName)}
+              title={t("characterHover.aiGenerateDialogue")}
+              className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-[11px] text-nf-text-secondary hover:text-fandex-primary hover:bg-nf-bg-hover rounded-sm transition-colors"
               data-character-id={characterId}
               data-ai-action="generate-dialogue"
             >

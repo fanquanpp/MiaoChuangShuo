@@ -48,11 +48,13 @@ import TaskItem from "@tiptap/extension-task-item";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { readFile, writeFile, readProjectTree, createSnapshot } from "../lib/api";
+import { createPortal } from "react-dom";
+import { readFile, writeFile, readProjectTree, createSnapshot, updateFileIndex } from "../lib/api";
 import { useAppStore } from "../lib/store";
+import { useCodexStore } from "../lib/stores/useCodexStore";
 import { useSettingsStore } from "../lib/settingsStore";
 import { usePreferencesStore } from "../lib/preferencesSlice";
-import { CharacterMention } from "../lib/characterMention";
+import { CharacterMention, CharacterMentionNode } from "../lib/characterMention";
 import { IndentParagraph } from "../lib/indentParagraph";
 import { PoetryFormat } from "../lib/poetryFormat";
 import { VSShortcuts } from "../lib/vscodeShortcuts";
@@ -75,6 +77,7 @@ import SnapshotHistory from "./SnapshotHistory";
 import CharacterHoverCard from "./CharacterHoverCard";
 import FindReplace from "./FindReplace";
 import AiAssistantPanel from "./AiAssistantPanel";
+import { BookOpen, Edit3, Copy } from "lucide-react";
 
 interface NovelEditorProps {
   filePath: string | null;
@@ -223,6 +226,16 @@ export default function NovelEditor({
   const hoverTimerRef = useRef<number | null>(null);
   // 当前已显示的角色名引用：用于避免同一角色名上移动时反复触发计时器造成卡片闪烁
   const hoverShownNameRef = useRef<string>("");
+  // Sprint 3 任务 3.5：characterMention 右键菜单状态
+  // 在正文中的角色提及节点上右键时弹出浮动菜单（查看设定/编辑设定/复制名称）
+  // characterId 为 null 表示旧版无 UUID 的提及节点（仅可复制名称）
+  const [mentionContextMenu, setMentionContextMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    characterId: string | null;
+    characterName: string;
+  }>({ open: false, x: 0, y: 0, characterId: null, characterName: "" });
 
   const projectType = currentProject?.meta?.type || "standard";
   // 文体标识保留用于 UI 层条件渲染（如横幅提示文案差异）
@@ -497,6 +510,18 @@ export default function NovelEditor({
       })
     );
 
+    // 角色提及 inline Node（Sprint 1 任务 1.5）
+    // 注册 CharacterMentionNode 后，编辑器才能插入 characterMentionNode 节点
+    // 节点存储 characterId（UUID）+ name，与设定库 CodexMeta.id 关联
+    // 设定库重命名时通过 updateCharacterMentionName 命令批量更新正文中的节点
+    // HTMLAttributes 添加 nf-character-mention 类名供样式与事件委托使用
+    exts.push(
+      CharacterMentionNode.configure({
+        HTMLAttributes: { class: "nf-character-mention" },
+        editable: false,
+      })
+    );
+
     // 实体高亮扩展：所有文体全量注册，由全局开关控制行为
     // 依赖：Codex 设定库（阶段 1）提供 EntityPattern 数据源
     // 行为：Web Worker Aho-Corasick 自动机匹配实体名/别名，ProseMirror Decoration 渲染下划线
@@ -653,10 +678,238 @@ export default function NovelEditor({
     return () => { cancelled = true; };
   }, [filePath, editor, currentProject, t, projectType, diaryAutoDate, reloadKey]);
 
+  // Sprint 2 任务 2.4：订阅 useCodexStore.renameQueue，设定库改名时联动更新正文中的 characterMentionNode
+  // 当 CodexCardEditor 保存改名后，renameQueue 推入条目，此 effect 遍历调用 updateCharacterMentionName
+  // 同步正文内所有提及节点的 name 属性，处理完成后清空队列并标记为脏内容触发自动保存
+  const renameQueue = useCodexStore((s) => s.renameQueue);
+  const consumeRenameQueue = useCodexStore((s) => s.consumeRenameQueue);
+  useEffect(() => {
+    // 编辑器未就绪、已销毁或队列为空时跳过
+    if (!editor || editor.isDestroyed || renameQueue.length === 0) return;
+    // 遍历队列，对每个改名条目调用 updateCharacterMentionName 同步正文提及节点
+    for (const entry of renameQueue) {
+      editor.commands.updateCharacterMentionName(entry.cardId, entry.newName);
+    }
+    // 处理完成后清空队列，避免重复处理
+    consumeRenameQueue();
+    // 标记为脏内容，触发自动保存以持久化改名后的正文
+    setDirty(true);
+    useAppStore.getState().setEditorDirty(true);
+  }, [renameQueue, editor, consumeRenameQueue]);
+
+  // Sprint 3 任务 3.3：characterMentionNode 双击跳转到 CodexPanel 对应卡片
+  // 交互设计：
+  //   - 单击：选中节点（ProseMirror 默认行为，atom 节点单击即选中）
+  //   - 双击：提取 characterId，切换到设定库分类并设置 pendingSelectCardId
+  //   - CodexPanel 订阅 pendingSelectCardId 后自动选中对应卡片并清空信号量
+  // 容错：characterId 为空时（旧版无 UUID 的提及节点）仅提示用户，不跳转
+  const setPendingSelectCardId = useCodexStore((s) => s.setPendingSelectCardId);
+  useEffect(() => {
+    if (!editor) return;
+    const editorDom = editor.view.dom;
+    /**
+     * 双击事件处理：检测是否落在 characterMentionNode 上
+     * 输入: e 鼠标双击事件
+     * 流程:
+     *   1. 通过 closest 查找最近的 .nf-character-mention 祖先元素
+     *   2. 提取 data-character-id 属性
+     *   3. 切换到 codex 分类并设置 pendingSelectCardId
+     */
+    const handleDoubleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const mentionEl = target.closest<HTMLElement>(".nf-character-mention");
+      if (!mentionEl) return;
+      const characterId = mentionEl.getAttribute("data-character-id");
+      if (!characterId) {
+        // 旧版无 UUID 的提及节点：提示用户该节点未关联设定库
+        showToast("warning", t("characterMention.noLinkedEntity"));
+        return;
+      }
+      // 切换到设定库分类并设置待选中卡片 ID
+      useAppStore.getState().setActiveCategory("codex");
+      setPendingSelectCardId(characterId);
+    };
+    editorDom.addEventListener("dblclick", handleDoubleClick);
+    return () => {
+      editorDom.removeEventListener("dblclick", handleDoubleClick);
+    };
+  }, [editor, setPendingSelectCardId, showToast, t]);
+
+  // Sprint 3 任务 3.5：characterMentionNode 右键菜单
+  // 交互设计：
+  //   - 在 .nf-character-mention 元素上右键时阻止浏览器默认菜单，弹出应用菜单
+  //   - 菜单选项：查看设定 / 编辑设定 / 复制名称
+  //   - 查看与编辑跳转：切换到设定库分类 + 设置 pendingSelectCardId（编辑额外设置 pendingEditMode）
+  //   - 复制名称：写入剪贴板并提示
+  //   - 旧版无 UUID 节点：仅可复制名称，查看/编辑按钮禁用并提示
+  const setPendingEditMode = useCodexStore((s) => s.setPendingEditMode);
+  useEffect(() => {
+    if (!editor) return;
+    const editorDom = editor.view.dom;
+    /**
+     * 上下文菜单事件处理：检测是否落在 characterMentionNode 上
+     * 输入: e 鼠标右键事件
+     * 流程:
+     *   1. 通过 closest 查找最近的 .nf-character-mention 祖先元素
+     *   2. 阻止浏览器默认菜单并弹出应用菜单
+     *   3. 提取 characterId（可能为 null）与角色名文本
+     */
+    const handleContextMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const mentionEl = target.closest<HTMLElement>(".nf-character-mention");
+      if (!mentionEl) return;
+      e.preventDefault();
+      const characterId = mentionEl.getAttribute("data-character-id");
+      const characterName = mentionEl.textContent || "";
+      setMentionContextMenu({
+        open: true,
+        x: e.clientX,
+        y: e.clientY,
+        characterId: characterId || null,
+        characterName,
+      });
+    };
+    editorDom.addEventListener("contextmenu", handleContextMenu);
+    return () => {
+      editorDom.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, [editor]);
+
+  // 右键菜单关闭逻辑：点击外部 / Esc 键 / 滚动 / 窗口失焦时关闭
+  useEffect(() => {
+    if (!mentionContextMenu.open) return;
+    const closeMenu = () =>
+      setMentionContextMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+    // 延迟绑定 click 事件，避免触发右键的同一交互周期立即关闭菜单
+    const clickTimer = window.setTimeout(() => {
+      window.addEventListener("click", closeMenu);
+    }, 0);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    const handleContext = (e: MouseEvent) => {
+      // 在菜单外右键：关闭当前菜单，让浏览器默认菜单生效
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest(".nf-mention-context-menu")) {
+        closeMenu();
+      } else {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("contextmenu", handleContext, true);
+    window.addEventListener("blur", closeMenu);
+    return () => {
+      window.clearTimeout(clickTimer);
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("contextmenu", handleContext, true);
+      window.removeEventListener("blur", closeMenu);
+    };
+  }, [mentionContextMenu.open]);
+
+  /**
+   * 右键菜单动作：查看设定
+   * 输入: characterId 角色 UUID
+   * 流程: 切换到设定库分类 + 设置 pendingSelectCardId（CodexPanel 订阅后选中卡片）
+   * 容错: characterId 为空时提示未关联实体
+   */
+  const handleMentionViewInCodex = useCallback(
+    (characterId: string | null) => {
+      if (!characterId) {
+        showToast("warning", t("characterMention.noLinkedEntity"));
+        return;
+      }
+      useAppStore.getState().setActiveCategory("codex");
+      setPendingSelectCardId(characterId);
+      setMentionContextMenu((prev) => ({ ...prev, open: false }));
+    },
+    [setPendingSelectCardId, showToast, t]
+  );
+
+  /**
+   * 右键菜单动作：编辑设定
+   * 输入: characterId 角色 UUID
+   * 流程: 查看流程 + 设置 pendingEditMode=true（CodexPanel 订阅后自动进入编辑模式）
+   */
+  const handleMentionEditInCodex = useCallback(
+    (characterId: string | null) => {
+      if (!characterId) {
+        showToast("warning", t("characterMention.noLinkedEntity"));
+        return;
+      }
+      useAppStore.getState().setActiveCategory("codex");
+      setPendingSelectCardId(characterId);
+      setPendingEditMode(true);
+      setMentionContextMenu((prev) => ({ ...prev, open: false }));
+    },
+    [setPendingSelectCardId, setPendingEditMode, showToast, t]
+  );
+
+  /**
+   * 右键菜单动作：复制角色名到剪贴板
+   * 输入: characterName 角色名文本
+   * 流程: 写入剪贴板 + 提示成功/失败
+   */
+  const handleMentionCopyName = useCallback(
+    async (characterName: string) => {
+      try {
+        await navigator.clipboard.writeText(characterName);
+        showToast("success", t("characterMention.nameCopied"));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast("error", t("characterMention.copyFailed", { error: msg }));
+      }
+      setMentionContextMenu((prev) => ({ ...prev, open: false }));
+    },
+    [showToast, t]
+  );
+
   // 保存文件（.pmd 持久化，ProseMirror JSON 格式；含竞态保护）
   const savingRef = useRef(false);
   const pendingSaveRef = useRef(false);
   const lastSavedContentRef = useRef("");
+  // Sprint 4 任务 4.3：增量索引更新防抖定时器引用
+  // 设计依据：自动保存间隔可能很短，防抖 500ms 避免频繁索引更新
+  const indexUpdateTimerRef = useRef<number | null>(null);
+  /**
+   * 调度增量索引更新（防抖 500ms，静默执行）
+   * 输入:
+   *   projectPath 项目根路径（绝对路径）
+   *   absFilePath 文件绝对路径（.txt 或 .pmd）
+   * 流程:
+   *   1. 清除已有定时器，重置防抖计时
+   *   2. 500ms 后计算相对路径（去除项目根前缀，兼容 / 与 \ 分隔符）
+   *   3. 转换为 .pmd 相对路径（与持久化格式一致，text_extractor 支持 .pmd 提取）
+   *   4. 调用 updateFileIndex 增量更新索引，失败仅 console.error 不干扰用户
+   */
+  const scheduleIndexUpdate = useCallback(
+    (projectPath: string, absFilePath: string) => {
+      if (indexUpdateTimerRef.current !== null) {
+        window.clearTimeout(indexUpdateTimerRef.current);
+      }
+      indexUpdateTimerRef.current = window.setTimeout(() => {
+        indexUpdateTimerRef.current = null;
+        // 计算相对路径（兼容 / 与 \ 分隔符）
+        const prefix = projectPath.endsWith("/") || projectPath.endsWith("\\")
+          ? projectPath
+          : projectPath + "/";
+        const relPath = absFilePath.startsWith(prefix)
+          ? absFilePath.slice(prefix.length)
+          : absFilePath;
+        // 索引 .pmd 版本（与持久化格式一致）
+        const pmdRelPath = toPmdPath(relPath);
+        updateFileIndex(projectPath, pmdRelPath).catch((err) => {
+          console.error("增量更新索引失败:", err);
+        });
+      }, 500);
+    },
+    []
+  );
   const handleSave = useCallback(async (): Promise<boolean> => {
     if (!editor || !filePath || !dirty) return false;
     // 竞态保护：如果正在保存，标记待保存但不阻塞
@@ -719,6 +972,11 @@ export default function NovelEditor({
           });
         }
       }
+      // Sprint 4 任务 4.3：保存成功后增量更新 Tantivy 索引（防抖静默执行）
+      // 设计依据：索引与正文同步，保证全局搜索与 AI RAG 检索结果时效性
+      if (currentProject?.path && filePath) {
+        scheduleIndexUpdate(currentProject.path, filePath);
+      }
       return true;
     } catch (e) {
       showToast("error", t("editor.saveFailed", { error: String(e) }));
@@ -755,6 +1013,40 @@ export default function NovelEditor({
           "请检查以下文本中角色的行为与对话是否符合设定库中的角色设定，逐条分析是否存在 OOC（Out Of Character）情况，并给出修正建议：\n\n",
       };
       const instruction = (templates[command] || "") + selectedText;
+      setPendingAiInstruction(instruction);
+      setShowAiPanel(true);
+    },
+    []
+  );
+
+  /**
+   * 角色悬停卡片 AI 操作处理（Sprint 3 任务 3.2）
+   * 输入:
+   *   action - 操作类型（"summarize-state" | "generate-dialogue"）
+   *   characterId - 角色实体 UUID（可能为 undefined）
+   *   characterName - 角色显示名
+   * 输出: void（组装指令并打开 AI 助手面板）
+   * 流程:
+   *   1. 根据 action 类型选择预设指令模板
+   *   2. 将角色名填入模板，附加 characterId 供 AI 上下文检索
+   *   3. 设置 pendingAiInstruction 并打开 AI 面板
+   *   4. AiAssistantPanel 消费 pendingInstruction 后自动发送
+   * 容错: characterId 为 undefined 时仅按名称匹配，不阻塞 AI 调用
+   */
+  const handleCharacterAiAction = useCallback(
+    (action: string, characterId: string | undefined, characterName: string) => {
+      const templates: Record<string, string> = {
+        "summarize-state":
+          `请基于设定库中角色「${characterName}` +
+          (characterId ? `（UUID: ${characterId}）` : "") +
+          `」的档案，结合当前正文场景，总结该角色在故事中此刻的心理状态、动机与潜在行为倾向，输出一段 150-300 字的状态描摹供后续创作参考：\n\n`,
+        "generate-dialogue":
+          `请基于设定库中角色「${characterName}` +
+          (characterId ? `（UUID: ${characterId}）` : "") +
+          `」的档案与说话风格，结合当前正文场景，生成 3-5 句符合该角色性格的对白，保持语气与措辞一致：\n\n`,
+      };
+      const instruction = templates[action] || "";
+      if (!instruction) return;
       setPendingAiInstruction(instruction);
       setShowAiPanel(true);
     },
@@ -1171,7 +1463,61 @@ export default function NovelEditor({
         characterName={hoverCard.name}
         projectPath={currentProject?.path || ""}
         characterId={hoverCard.characterId}
+        onAiAction={handleCharacterAiAction}
       />
+
+      {/* Sprint 3 任务 3.5：characterMention 右键菜单（Portal 至 body 避免 overflow 裁切） */}
+      {mentionContextMenu.open &&
+        createPortal(
+          <div
+            role="menu"
+            className="nf-mention-context-menu fixed z-[300] min-w-[140px] py-1 bg-nf-bg-secondary border border-nf-border-light shadow-lg rounded-md text-xs"
+            style={{
+              left: Math.min(mentionContextMenu.x, window.innerWidth - 160),
+              top: Math.min(mentionContextMenu.y, window.innerHeight - 120),
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!mentionContextMenu.characterId}
+              onClick={() =>
+                handleMentionViewInCodex(mentionContextMenu.characterId)
+              }
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-nf-text-primary hover:bg-nf-bg-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-fandex-primary" />
+              {t("characterMention.viewInCodex")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!mentionContextMenu.characterId}
+              onClick={() =>
+                handleMentionEditInCodex(mentionContextMenu.characterId)
+              }
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-nf-text-primary hover:bg-nf-bg-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-fandex-secondary" />
+              {t("characterMention.editInCodex")}
+            </button>
+            <div className="my-1 border-t border-nf-border-light" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() =>
+                handleMentionCopyName(mentionContextMenu.characterName)
+              }
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-nf-text-primary hover:bg-nf-bg-hover transition-colors"
+            >
+              <Copy className="w-3.5 h-3.5 text-fandex-tertiary" />
+              {t("characterMention.copyName")}
+            </button>
+          </div>,
+          document.body
+        )}
 
       {/* AI 助手侧边栏面板 (AI-3.1): 工具栏按钮或 Ctrl+Shift+A 触发 */}
       <AiAssistantPanel

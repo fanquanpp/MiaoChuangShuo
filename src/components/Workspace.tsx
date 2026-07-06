@@ -27,7 +27,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import { FocusTimer } from "./FocusTimer";
 import { useAppStore, getCategoryDir, type SidebarCategory } from "../lib/store";
 import { getEditorSaveFn } from "../lib/stores/viewSlice";
-import { readProjectTree, createFile } from "../lib/api";
+import { readProjectTree, createFile, getProjectIndexStats, buildProjectIndex } from "../lib/api";
 import type { FileNode } from "../lib/api";
 import { getCategoryConfig } from "../lib/categoryRegistry";
 import { useSettingsStore, formatChapterHeading, getNextChapterNum } from "../lib/settingsStore";
@@ -138,6 +138,35 @@ export default function Workspace() {
       });
     return () => { cancelled = true; };
   }, [currentProject, setProjectTree, setLoading, showToast, t]);
+
+  // Sprint 4 任务 4.5：项目打开时检查 Tantivy 索引状态，首次打开自动后台构建
+  // 设计依据：
+  //   - 索引不存在（doc_count=0 且 last_built_at 为空）时静默触发全量构建
+  //   - 构建过程通过 index-progress 事件推送进度，不在主界面显示（不干扰用户）
+  //   - 构建失败仅 console.error，不弹 toast（避免首次打开项目时干扰）
+  //   - 已有索引的项目不触发重建，避免重复开销
+  useEffect(() => {
+    if (!currentProject) return;
+    let cancelled = false;
+    const checkAndBuildIndex = async () => {
+      try {
+        const stats = await getProjectIndexStats(currentProject.path);
+        if (cancelled) return;
+        // 索引不存在或为空时触发后台构建
+        if (stats.doc_count === 0 && !stats.last_built_at) {
+          // 静默构建，不等待完成（后台执行）
+          buildProjectIndex(currentProject.path).catch((err) => {
+            console.error("后台构建索引失败:", err);
+          });
+        }
+      } catch (err) {
+        // 索引检查失败不影响项目打开，仅记录日志
+        console.error("检查索引状态失败:", err);
+      }
+    };
+    checkAndBuildIndex();
+    return () => { cancelled = true; };
+  }, [currentProject]);
 
   // 全局快捷键监听
   const handleGlobalKeyDown = useCallback(

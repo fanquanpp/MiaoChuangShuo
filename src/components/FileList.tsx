@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { useAppStore, getCategoryDir } from "../lib/store";
 import type { FileNode } from "../lib/api";
-import { deletePath, readProjectTree, renamePath, copyFile } from "../lib/api";
+import { deletePath, readProjectTree, renamePath, copyFile, removeFileIndex, updateFileIndex } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
@@ -679,6 +679,22 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
       if (useAppStore.getState().selectedFile?.relative_path === node.relative_path) {
         useAppStore.getState().setSelectedFile(null);
       }
+      // Sprint 4 任务 4.4：文件删除后清理 Tantivy 索引（静默执行）
+      // 仅对文件操作（目录不索引），同时清理 .txt 与 .pmd 两种路径避免残留
+      if (!node.is_dir) {
+        removeFileIndex(currentProject.path, node.relative_path).catch((err) => {
+          console.error("清理索引失败:", err);
+        });
+        // 若为 .txt 文件，同时清理可能存在的 .pmd 路径索引
+        if (node.relative_path.toLowerCase().endsWith(".txt")) {
+          const pmdRelPath = node.relative_path.replace(/\.txt$/i, ".pmd");
+          if (pmdRelPath !== node.relative_path) {
+            removeFileIndex(currentProject.path, pmdRelPath).catch((err) => {
+              console.error("清理 .pmd 索引失败:", err);
+            });
+          }
+        }
+      }
     } catch (e) {
       showToast("error", t("filelist.deleteFailed", { error: String(e) }));
     }
@@ -713,6 +729,27 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
       showToast("success", t("filelist.renamed", { name: ensuredName }));
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
+      // Sprint 4 任务 4.4：文件重命名后更新 Tantivy 索引（静默执行）
+      // 策略：先清理旧路径索引（.txt 与 .pmd），再异步触发新路径索引构建
+      if (!node.is_dir) {
+        // 清理旧路径索引
+        removeFileIndex(currentProject.path, node.relative_path).catch((err) => {
+          console.error("清理旧路径索引失败:", err);
+        });
+        if (node.relative_path.toLowerCase().endsWith(".txt")) {
+          const oldPmdPath = node.relative_path.replace(/\.txt$/i, ".pmd");
+          if (oldPmdPath !== node.relative_path) {
+            removeFileIndex(currentProject.path, oldPmdPath).catch((err) => {
+              console.error("清理旧 .pmd 索引失败:", err);
+            });
+          }
+        }
+        // 异步触发新路径索引构建（文件可能为 .pmd 格式）
+        const newPmdPath = newRelPath.replace(/\.txt$/i, ".pmd");
+        updateFileIndex(currentProject.path, newPmdPath).catch((err) => {
+          console.error("更新新路径索引失败:", err);
+        });
+      }
     } catch (e) {
       showToast("error", t("filelist.renameFailed", { error: String(e) }));
     }

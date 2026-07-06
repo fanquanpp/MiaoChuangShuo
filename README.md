@@ -43,7 +43,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-26.7.22-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/badge/version-26.7.24-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
@@ -80,8 +80,11 @@
 
 ### 1.4 全文搜索与索引
 
+- **双后端搜索切换**: 全局搜索面板支持精确匹配 (按行扫描, 支持大小写与替换) 与语义搜索 (Tantivy 索引, 中文分词) 一键切换
 - **Tantivy 全文索引**: Rust 原生搜索引擎 + tantivy-jieba 中文分词, 支持百万字级项目秒级检索
 - **场景级 Chunk 切分**: Schema 包含 `scene_id`/`chunk_type` 字段, 按"场景"而非"段落"切分, 为 AI 上下文召回优化
+- **增量索引更新**: 文件保存后 500ms 防抖触发 `update_file_index`, 文件删除/重命名自动清理索引文档, 项目首次打开自动后台全量构建
+- **索引管理面板**: 设置面板内嵌索引统计 (文档数/文件数/索引大小/最后构建时间) + 构建/重建按钮 + 实时进度条
 - **全局搜索与替换**: 支持区分大小写、跨文件批量替换, 替换前自动创建快照
 
 ### 1.5 项目管理与迁移
@@ -393,6 +396,7 @@ MiaoChuangShuo/
 │   │   ├── ShortcutPanel.tsx           # 快捷键面板
 │   │   ├── FocusTimer.tsx              # 聚焦计时器
 │   │   ├── AiAssistantPanel.tsx        # AI 助手侧边栏面板 (多轮对话 + 流式输出)
+│   │   ├── IndexManagerPanel.tsx       # 索引管理面板 (统计 + 构建 + 进度条)
 │   │   ├── ErrorBoundary.tsx           # 渲染异常边界
 │   │   ├── ContextMenu.tsx             # 通用右键菜单
 │   │   ├── ConfirmDialog.tsx           # 统一确认/提示对话框
@@ -481,7 +485,7 @@ npm run tauri build
 
 ### 7.3 版本号同步机制
 
-版本号采用 `YY.MM.修改序号` 格式 (如 `26.7.22`), 以下 7 个位置必须保持同步:
+版本号采用 `YY.MM.修改序号` 格式 (如 `26.7.24`), 以下 7 个位置必须保持同步:
 
 | 文件 | 字段 |
 |------|------|
@@ -561,6 +565,9 @@ Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
 - **Schema 设计**: 包含 `content`(文本)、`file_path`(路径)、`scene_id`(场景标识)、`chunk_type`(正文/设定/大纲) 字段, 支持按场景而非段落切分 Chunk
 - **索引位置**: 索引数据存储于 `.novelforge/index/` 目录 (已加入 .gitignore), 索引损坏时可通过 `build_project_index` 命令重建
 - **HVCI 兼容**: 全程使用 `std::fs` 同步 I/O, 不使用 `Command::output()`, 保证 Windows 11 内存完整性开启时正常运行
+- **双后端搜索切换**: 全局搜索面板 (GlobalSearch.tsx) 支持"精确匹配"(searchInProject 按行扫描) 与"语义搜索"(searchProject 走 Tantivy) 一键切换, 精确匹配支持大小写与替换, 语义搜索支持中文分词与场景级 Chunk 召回
+- **增量索引更新**: 编辑器保存后 500ms 防抖触发 `update_file_index` (先删后建策略); 文件删除/重命名时 FileList 自动清理对应索引文档 (.txt + .pmd 双路径); 项目首次打开时 Workspace 检测空索引并后台全量构建
+- **索引管理面板**: IndexManagerPanel 嵌入设置对话框, 展示统计 (文档数/文件数/索引大小/最后构建时间) + 构建/重建按钮 + index-progress 事件实时进度条
 
 ### 8.8 旧版项目目录迁移
 

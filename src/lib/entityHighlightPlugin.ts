@@ -64,14 +64,22 @@ interface TextMapping {
  *   1. 用 nodesBetween 遍历所有节点
  *   2. 文本节点：逐字符记录 ProseMirror 位置
  *   3. 块级节点（pos > 0）：插入换行符与 -1 哨兵
+ *   4. characterMentionNode：跳过其内部文本（结构化节点由独立样式处理，避免重复高亮）
  * 设计说明:
  *   换行符用于分隔段落/标题等块级节点，防止实体名跨段落匹配。
  *   -1 哨兵在 matchesToDecorations 中被跳过。
+ *   Sprint 3 任务 3.1：characterMentionNode 作为结构化 inline node，已携带 characterId
+ *   与样式（背景色），不再参与 Aho-Corasick 文本匹配，避免同一角色名出现双重装饰。
  */
 function buildTextMapping(doc: PmNode): TextMapping {
   let text = "";
   const posMap: number[] = [];
   doc.nodesBetween(0, doc.content.size, (node, pos) => {
+    // Sprint 3 任务 3.1：跳过 characterMentionNode 内部文本
+    // 返回 false 阻止递归进入其子节点（atom 节点本无子节点，此处显式声明意图）
+    if (node.type.name === "characterMentionNode") {
+      return false;
+    }
     if (node.isText) {
       const str = node.text ?? "";
       for (let i = 0; i < str.length; i++) {

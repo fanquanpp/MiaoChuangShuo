@@ -221,19 +221,21 @@ export function getCodexDirName(type: CodexEntityType): string {
 }
 
 /**
- * 创建新的 Codex 实体文件
+ * 创建新的 Codex 实体文件（.pmd 格式）
  * 输入:
  *   projectPath 项目根路径
  *   type 实体类型（决定写入哪个设定目录）
- *   name 实体名称（作为文件名与标题）
- *   aliases 别名列表（可选，写入文件首行"别名: A, B, C"格式）
- *   content 正文内容（可选，默认为空模板）
- * 输出: Promise<string> 新建文件的绝对路径
+ *   name 实体名称（作为文件名与显示名）
+ *   aliases 别名列表（可选，写入 front matter）
+ *   content 正文内容（可选，纯文本，自动转换为 ProseMirror JSON）
+ * 输出: Promise<string> 新建文件的相对路径
  * 流程:
  *   1. 根据 type 解析目标目录名
- *   2. 拼接相对路径 {目录名}/{name}.txt
- *   3. 生成文件内容（别名行 + 标题行 + 空模板）
- *   4. 调用 createFile 创建文件
+ *   2. 生成 UUID 作为实体唯一标识
+ *   3. 构造 CodexMeta front matter（含新字段 summary/tags/avatar/sort_order/updated_at）
+ *   4. 将纯文本正文转换为 ProseMirror JSON
+ *   5. 组合为 .pmd 文件内容（front matter + ProseMirror JSON）
+ *   6. 调用 createFile 创建 .pmd 文件
  */
 export async function createCodexEntity(
   projectPath: string,
@@ -246,11 +248,28 @@ export async function createCodexEntity(
   // 清理文件名：去除非法字符
   const safeName = name.replace(/[\\/:*?"<>|]/g, "").trim();
   if (!safeName) throw new Error("实体名称不能为空");
-  const relativePath = `${dirName}/${safeName}.txt`;
-  // 生成文件内容：别名行 + 标题 + 正文
-  const aliasLine = aliases.length > 0 ? `别名: ${aliases.join(", ")}\n` : "";
-  const titleLine = `# ${safeName}\n\n`;
-  const fileContent = `${aliasLine}${titleLine}${content}`;
+  // 生成 .pmd 文件（设定文件统一格式：front matter + ProseMirror JSON）
+  const relativePath = `${dirName}/${safeName}.pmd`;
+  // 构造 CodexMeta 元数据（含 Sprint 1 新增字段）
+  const now = new Date().toISOString();
+  const meta: CodexMeta = {
+    id: generateCodexUuid(),
+    name: safeName,
+    aliases,
+    entity_type: type,
+    created: now,
+    summary: "",
+    tags: [],
+    avatar: null,
+    sort_order: 0,
+    updated_at: now,
+  };
+  // 构造 ProseMirror JSON 正文（空文档或含初始内容）
+  const pmdContent = content
+    ? convertTextToPmd(content)
+    : '{"type":"doc","content":[{"type":"paragraph"}]}';
+  // 组合 .pmd 文件内容：front matter + ProseMirror JSON
+  const fileContent = `---\n${JSON.stringify(meta)}\n---\n${pmdContent}`;
   return createFile(projectPath, relativePath, fileContent);
 }
 
@@ -258,17 +277,17 @@ export async function createCodexEntity(
  * 删除 Codex 实体文件
  * 输入:
  *   projectPath 项目根路径
- *   entity 待删除的实体对象
+ *   sourceFile 待删除实体的来源文件相对路径（CodexCard.sourceFile 或 CodexEntity.sourceFile）
  * 输出: Promise<void>
  * 流程: 调用 deletePath 删除源文件（后端会移至回收站）
  */
 export async function deleteCodexEntity(
   projectPath: string,
-  entity: CodexEntity
+  sourceFile: string
 ): Promise<void> {
   // 源文件为相对路径，需拼接为绝对路径
   const sep = navigator.platform.toLowerCase().includes("win") ? "\\" : "/";
-  const absPath = `${projectPath}${sep}${entity.sourceFile.replace(/[\\/]/g, sep)}`;
+  const absPath = `${projectPath}${sep}${sourceFile.replace(/[\\/]/g, sep)}`;
   return deletePath(absPath, projectPath);
 }
 
@@ -285,10 +304,21 @@ export interface CodexMeta {
   name: string;
   /** 别名列表 */
   aliases: string[];
-  /** 实体类型：character / worldview / glossary / material */
+  /** 实体类型：character / worldview / glossary / material
+   *  注：对应方案中的 card_type，保留 entity_type 以向后兼容旧 front matter */
   entity_type: string;
   /** 创建时间（ISO 8601） */
   created: string;
+  /** 一句话简介（用于 Hover 预览和 AI 快速读取） */
+  summary?: string;
+  /** 标签数组（如 ["主角","骑士"]） */
+  tags?: string[];
+  /** 头像/图标 URL（可选） */
+  avatar?: string | null;
+  /** 排序权重（数字越小越靠前，默认 0） */
+  sort_order?: number;
+  /** 更新时间（ISO 8601 格式） */
+  updated_at?: string;
 }
 
 /**
@@ -336,3 +366,207 @@ export async function injectCodexFrontMatter(
 ): Promise<number> {
   return invoke<number>("inject_codex_front_matter", { projectPath });
 }
+
+// ===== Sprint 1 新增：CodexCard 类型与辅助函数 =====
+
+/**
+ * Codex 卡片（前端全局 Store 使用的扁平结构）
+ * 由 StructuredCodexEntity 转换而来，供 useCodexStore 统一管理
+ */
+export interface CodexCard {
+  /** 实体唯一标识（UUID v4，来自 CodexMeta.id） */
+  id: string;
+  /** 卡片名称（来自 CodexMeta.name） */
+  name: string;
+  /** 卡片类型（来自 CodexMeta.entity_type） */
+  cardType: CodexEntityType;
+  /** 别名列表 */
+  aliases: string[];
+  /** 一句话简介（用于 Hover 预览和 AI 上下文） */
+  summary: string;
+  /** 标签数组 */
+  tags: string[];
+  /** 头像/图标 URL */
+  avatar: string | null;
+  /** 排序权重 */
+  sortOrder: number;
+  /** 创建时间（ISO 8601） */
+  createdAt: string;
+  /** 更新时间（ISO 8601） */
+  updatedAt: string;
+  /** 来源文件相对路径（.pmd 文件路径） */
+  sourceFile: string;
+  /** 正文内容（ProseMirror JSON 字符串，供 TipTap 编辑器加载） */
+  content: string;
+}
+
+/**
+ * 生成 UUID v4（优先使用浏览器原生 crypto.randomUUID，不可用时降级为手动生成）
+ * 输入: 无
+ * 输出: string UUID v4 格式字符串
+ * 流程:
+ *   1. 检测 crypto.randomUUID 是否可用
+ *   2. 可用则直接调用
+ *   3. 不可用则手动生成（Math.random 降级方案）
+ */
+function generateCodexUuid(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // 降级方案：手动生成 UUID v4
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * 将纯文本转换为 ProseMirror JSON 文档字符串
+ * 输入: text 纯文本内容
+ * 输出: string ProseMirror JSON 字符串（每行一个 paragraph）
+ * 流程:
+ *   1. 按换行符分割文本（兼容 CRLF 与 LF）
+ *   2. 非空行转为含 text 节点的 paragraph
+ *   3. 空行转为空 paragraph
+ *   4. 包装为 doc 根节点并序列化
+ * 设计说明: 与后端 convert_codex_text_to_pmd 函数逻辑一致，保证前后端转换结果相同
+ */
+export function convertTextToPmd(text: string): string {
+  const content: object[] = [];
+  for (const line of text.split("\n").map((l) => l.replace(/\r$/, ""))) {
+    if (line === "") {
+      content.push({ type: "paragraph" });
+    } else {
+      content.push({
+        type: "paragraph",
+        content: [{ type: "text", text: line }],
+      });
+    }
+  }
+  if (content.length === 0) {
+    content.push({ type: "paragraph" });
+  }
+  const doc = { type: "doc", content };
+  return JSON.stringify(doc);
+}
+
+/**
+ * 将 StructuredCodexEntity 转换为 CodexCard
+ * 输入: entity 后端返回的结构化实体
+ * 输出: CodexCard 前端 Store 使用的扁平结构
+ * 流程:
+ *   1. 从 meta 提取字段，应用默认值（兼容旧文件缺失新字段的情况）
+ *   2. 映射 entity_type 为 CodexEntityType 枚举
+ *   3. 返回扁平化的 CodexCard 对象
+ */
+export function toCodexCard(entity: StructuredCodexEntity): CodexCard {
+  const meta = entity.meta;
+  // 类型映射：未知类型降级为 material（素材）以避免前端渲染崩溃
+  const cardType = (
+    ["character", "worldview", "glossary", "material"].includes(meta.entity_type)
+      ? meta.entity_type
+      : "material"
+  ) as CodexEntityType;
+
+  return {
+    id: meta.id,
+    name: meta.name,
+    cardType,
+    aliases: meta.aliases ?? [],
+    summary: meta.summary ?? "",
+    tags: meta.tags ?? [],
+    avatar: meta.avatar ?? null,
+    sortOrder: meta.sort_order ?? 0,
+    createdAt: meta.created,
+    updatedAt: meta.updated_at ?? meta.created,
+    sourceFile: entity.source_file,
+    content: entity.content,
+  };
+}
+
+// ===== Sprint 2 任务 2.2：单卡片更新 API =====
+
+/**
+ * 元数据补丁类型（与后端 CodexMetaPatch 对应）
+ * 所有字段可选：undefined 表示不更新，null（仅 avatar）表示清空
+ */
+export interface CodexMetaPatch {
+  name?: string;
+  aliases?: string[];
+  entity_type?: string;
+  summary?: string;
+  tags?: string[];
+  avatar?: string | null;
+  sort_order?: number;
+}
+
+/**
+ * 更新单个设定卡片（调用后端 update_codex_entity 命令）
+ * 输入:
+ *   projectPath 项目根路径
+ *   sourceFile 卡片来源文件相对路径（如 "角色/亚瑟.pmd"）
+ *   metaPatch 元数据补丁（仅含待更新字段）
+ *   content 正文内容（ProseMirror JSON 字符串，空字符串表示不更新正文）
+ * 输出: Promise<CodexMeta> 更新后的完整元数据
+ * 流程:
+ *   1. 序列化 metaPatch 为 JSON 字符串
+ *   2. 调用后端 update_codex_entity 命令
+ *   3. 后端处理：合并补丁、更新时间戳、必要时重命名文件、原子写入
+ *   4. 返回更新后的完整 CodexMeta
+ * 设计说明:
+ *   - name 变更时后端会重命名文件，返回的 meta.name 为新名称
+ *   - 前端据返回的 meta 更新 Store 中的卡片信息
+ */
+export async function updateCodexEntity(
+  projectPath: string,
+  sourceFile: string,
+  metaPatch: CodexMetaPatch,
+  content: string = ""
+): Promise<CodexMeta> {
+  const metaPatchJson = JSON.stringify(metaPatch);
+  return invoke<CodexMeta>("update_codex_entity", {
+    projectPath,
+    sourceFile,
+    metaPatch: metaPatchJson,
+    content,
+  });
+}
+
+// ===== Sprint 2 任务 2.5：删除失效检测 API =====
+
+/**
+ * 失效提及位置（单文件维度）
+ * 对应后端 InvalidMention 结构体
+ */
+export interface InvalidMention {
+  /** 文件相对路径（相对于项目根，含"正文/"前缀） */
+  file_path: string;
+  /** 文件名（含扩展名） */
+  file_name: string;
+  /** 该文件中引用该卡片的 characterMentionNode 数量 */
+  count: number;
+}
+
+/**
+ * 扫描正文中引用指定卡片的 characterMentionNode 数量
+ * 输入:
+ *   projectPath 项目根路径
+ *   cardId 待检测的卡片 UUID
+ * 输出: Promise<InvalidMention[]> 引用该卡片的文件列表（按数量降序）
+ * 流程: 调用后端 scan_invalid_mentions 命令，递归扫描正文 .pmd 文件
+ * 设计说明:
+ *   - 删除卡片前调用，返回值用于前端弹出失效提示
+ *   - 仅扫描 .pmd 文件（characterMentionNode 仅存在于 ProseMirror JSON 中）
+ *   - 返回空数组表示无引用，可安全删除
+ */
+export async function scanInvalidMentions(
+  projectPath: string,
+  cardId: string
+): Promise<InvalidMention[]> {
+  return invoke<InvalidMention[]>("scan_invalid_mentions", {
+    projectPath,
+    cardId,
+  });
+}
+

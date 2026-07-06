@@ -25,9 +25,19 @@ import {
   ArrowRight,
   AlertTriangle,
   CheckCircle2,
+  Database,
+  Zap,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
-import { searchInProject, replaceInProject, type SearchResult, type ReplaceResult } from "../lib/api";
+import {
+  searchInProject,
+  replaceInProject,
+  searchProject,
+  buildProjectIndex,
+  type SearchResult,
+  type ReplaceResult,
+  type TantivySearchResult,
+} from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 
@@ -82,10 +92,20 @@ export default function GlobalSearch() {
 
   // 模式：search=仅搜索, replace=搜索+替换
   const [mode, setMode] = useState<"search" | "replace">("search");
+  // 搜索后端模式：exact=精确匹配（按行扫描）, semantic=语义搜索（Tantivy 索引）
+  // 语义搜索模式仅支持 search 模式，replace 模式强制使用 exact
+  const [searchBackend, setSearchBackend] = useState<"exact" | "semantic">("exact");
   const [query, setQuery] = useState("");
   const [replacement, setReplacement] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
+  // 精确匹配结果（旧 API）
   const [results, setResults] = useState<SearchResult[]>([]);
+  // 语义搜索结果（Tantivy API）
+  const [semanticResults, setSemanticResults] = useState<TantivySearchResult[]>([]);
+  // 语义搜索时索引是否未构建（用于显示"构建索引"按钮）
+  const [semanticIndexEmpty, setSemanticIndexEmpty] = useState(false);
+  // 索引构建中状态（用于"构建索引"按钮 loading）
+  const [buildingIndex, setBuildingIndex] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   // 替换相关状态
@@ -96,27 +116,54 @@ export default function GlobalSearch() {
 
   /**
    * 执行搜索
-   * 流程: 校验项目与查询词，调用后端 searchInProject
+   * 流程:
+   *   - exact 模式: 调用 searchInProject 按行扫描，支持大小写区分
+   *   - semantic 模式: 调用 searchProject 走 Tantivy 索引，返回 Chunk 列表
+   *   - 语义搜索返回 0 结果且 index_stats.doc_count === 0 时，标记索引未构建
    */
   const doSearch = useCallback(async () => {
     if (!currentProject || !query.trim()) {
       setResults([]);
+      setSemanticResults([]);
+      setSemanticIndexEmpty(false);
       setSearched(false);
       return;
     }
     setLoading(true);
     setSearched(true);
     try {
-      const data = await searchInProject(currentProject.path, query.trim(), caseSensitive);
-      setResults(data);
+      if (searchBackend === "semantic") {
+        // 语义搜索：调用 Tantivy 后端
+        const resp = await searchProject({
+          project_path: currentProject.path,
+          query: query.trim(),
+          limit: 100,
+        });
+        setSemanticResults(resp.results);
+        setResults([]);
+        // 判断索引是否未构建（doc_count 为 0 视为未构建）
+        setSemanticIndexEmpty(
+          resp.results.length === 0 &&
+          !!resp.index_stats &&
+          resp.index_stats.doc_count === 0
+        );
+      } else {
+        // 精确匹配：调用旧后端按行扫描
+        const data = await searchInProject(currentProject.path, query.trim(), caseSensitive);
+        setResults(data);
+        setSemanticResults([]);
+        setSemanticIndexEmpty(false);
+      }
     } catch (e) {
       console.error("搜索失败:", e);
       showToast("error", t("search.failed"));
       setResults([]);
+      setSemanticResults([]);
+      setSemanticIndexEmpty(false);
     } finally {
       setLoading(false);
     }
-  }, [currentProject, query, caseSensitive, showToast, t]);
+  }, [currentProject, query, caseSensitive, searchBackend, showToast, t]);
 
   // 输入防抖：400ms 后自动搜索
   useEffect(() => {
@@ -125,11 +172,13 @@ export default function GlobalSearch() {
         doSearch();
       } else {
         setResults([]);
+        setSemanticResults([]);
+        setSemanticIndexEmpty(false);
         setSearched(false);
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [query, caseSensitive, doSearch]);
+  }, [query, caseSensitive, searchBackend, doSearch]);
 
   // 挂载时自动聚焦输入框
   useEffect(() => {
@@ -209,6 +258,48 @@ export default function GlobalSearch() {
   };
 
   /**
+   * 跳转到语义搜索结果对应文件
+   * 输入: result Tantivy 搜索结果项（含 file_path/file_name/text）
+   * 流程: 语义搜索无行号信息，仅导航到文件，不设置滚动行号
+   */
+  const handleJumpToSemanticResult = (result: TantivySearchResult) => {
+    const category = detectCategoryFromPath(result.file_path);
+    navigateToFile(
+      {
+        name: result.file_name,
+        relative_path: result.file_path,
+        is_dir: false,
+        children: [],
+        size: 0,
+      },
+      category as never
+    );
+  };
+
+  /**
+   * 构建全文索引（语义搜索空索引时触发）
+   * 流程:
+   *   1. 调用 buildProjectIndex 全量构建索引
+   *   2. 构建完成后重新执行搜索
+   *   3. 失败时 toast 提示
+   */
+  const handleBuildIndex = useCallback(async () => {
+    if (!currentProject || buildingIndex) return;
+    setBuildingIndex(true);
+    try {
+      await buildProjectIndex(currentProject.path);
+      showToast("success", t("index.buildSuccess", { docs: 0, files: 0 }));
+      // 构建完成后重新搜索
+      await doSearch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast("error", `${t("search.failed")}: ${msg}`);
+    } finally {
+      setBuildingIndex(false);
+    }
+  }, [currentProject, buildingIndex, showToast, t, doSearch]);
+
+  /**
    * 关键词高亮（安全：React JSX 自动转义，高亮所有匹配项）
    * 输入: text 原文, keyword 关键词
    * 输出: ReactNode 带高亮标记的节点
@@ -272,7 +363,11 @@ export default function GlobalSearch() {
               {t("search.searchMode")}
             </button>
             <button
-              onClick={() => setMode("replace")}
+              onClick={() => {
+                // 替换模式仅支持精确匹配后端，切换时强制回退
+                setMode("replace");
+                setSearchBackend("exact");
+              }}
               title={t("search.replaceMode")}
               className={`flex items-center gap-1 px-2 py-1 text-xs transition duration-fast ${
                 mode === "replace"
@@ -311,6 +406,42 @@ export default function GlobalSearch() {
             <CaseSensitive className="w-4 h-4" />
           </button>
         </div>
+
+        {/* 搜索后端切换：精确匹配 / 语义搜索
+            仅 search 模式显示，replace 模式强制精确匹配（替换需行级定位） */}
+        {mode === "search" && (
+          <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-0.5 bg-nf-bg-card border border-nf-border-light p-0.5">
+              <button
+                onClick={() => setSearchBackend("exact")}
+                title={t("index.modeExactHint")}
+                className={`flex items-center gap-1 px-2 py-1 text-xs transition duration-fast ${
+                  searchBackend === "exact"
+                    ? "bg-fandex-primary/15 text-fandex-primary"
+                    : "text-nf-text-tertiary hover:text-nf-text"
+                }`}
+              >
+                <Search className="w-3 h-3" />
+                {t("index.modeExact")}
+              </button>
+              <button
+                onClick={() => setSearchBackend("semantic")}
+                title={t("index.modeSemanticHint")}
+                className={`flex items-center gap-1 px-2 py-1 text-xs transition duration-fast ${
+                  searchBackend === "semantic"
+                    ? "bg-fandex-secondary/15 text-fandex-secondary"
+                    : "text-nf-text-tertiary hover:text-nf-text"
+                }`}
+              >
+                <Zap className="w-3 h-3" />
+                {t("index.modeSemantic")}
+              </button>
+            </div>
+            <span className="text-[10px] text-nf-text-tertiary">
+              {searchBackend === "exact" ? t("index.modeExactHint") : t("index.modeSemanticHint")}
+            </span>
+          </div>
+        )}
 
         {/* 替换输入行（仅替换模式显示） */}
         {mode === "replace" && (
@@ -357,9 +488,13 @@ export default function GlobalSearch() {
       {/* 搜索结果统计条 */}
       {searched && !loading && mode === "search" && (
         <div className="px-6 py-2 border-b border-nf-border-light bg-nf-bg-sidebar text-xs text-nf-text-tertiary">
-          {results.length > 0
-            ? `${t("search.results", { count: results.length })}${results.length >= 200 ? ` ${t("search.resultsMaxHint")}` : ""}`
-            : t("search.noResults")}
+          {searchBackend === "semantic"
+            ? semanticResults.length > 0
+              ? t("search.results", { count: semanticResults.length })
+              : t("index.semanticEmpty")
+            : results.length > 0
+              ? `${t("search.results", { count: results.length })}${results.length >= 200 ? ` ${t("search.resultsMaxHint")}` : ""}`
+              : t("search.noResults")}
         </div>
       )}
 
@@ -369,6 +504,62 @@ export default function GlobalSearch() {
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-6 h-6 animate-spin text-fandex-primary" />
           </div>
+        ) : searchBackend === "semantic" && mode === "search" ? (
+          // 语义搜索结果渲染
+          semanticIndexEmpty ? (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Database className="w-16 h-16 text-nf-border mb-4" />
+              <p className="text-sm text-nf-text-tertiary mb-4">
+                {t("index.indexRequired")}
+              </p>
+              <button
+                onClick={handleBuildIndex}
+                disabled={buildingIndex}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-nf-text-inverse bg-fandex-secondary hover:bg-fandex-secondary/90 disabled:opacity-40 disabled:cursor-not-allowed transition duration-fast"
+              >
+                {buildingIndex ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Database className="w-4 h-4" />
+                )}
+                {buildingIndex ? t("index.building") : t("index.buildFirst")}
+              </button>
+            </div>
+          ) : semanticResults.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Search className="w-16 h-16 text-nf-border mb-4" />
+              <p className="text-sm text-nf-text-tertiary">
+                {searched ? t("index.semanticEmpty") : t("search.hint")}
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto space-y-1">
+              {semanticResults.map((result, idx) => (
+                <div
+                  key={`${result.file_path}-${result.chunk_index}-${idx}`}
+                  onClick={() => handleJumpToSemanticResult(result)}
+                  className="fandex-bar-left bg-nf-bg-card border border-nf-border-light hover:border-fandex-secondary/40 p-3 transition duration-fast cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <FileText className="w-3.5 h-3.5 text-fandex-secondary flex-shrink-0" />
+                    <span className="text-xs font-medium font-display text-nf-text group-hover:text-fandex-secondary transition duration-fast truncate">
+                      {result.file_name}
+                    </span>
+                    <span className="text-[10px] text-nf-text-tertiary truncate">
+                      {result.file_path}
+                    </span>
+                    <span className="text-[10px] text-nf-text-tertiary flex-shrink-0">
+                      #{result.chunk_index + 1}
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary ml-auto group-hover:text-fandex-secondary transition duration-fast flex-shrink-0" />
+                  </div>
+                  <div className="text-xs text-nf-text-secondary leading-relaxed pl-5 line-clamp-3">
+                    {highlightKeyword(result.text.trim(), query.trim())}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         ) : results.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <Search className="w-16 h-16 text-nf-border mb-4" />
