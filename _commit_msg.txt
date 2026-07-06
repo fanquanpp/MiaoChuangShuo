@@ -1,0 +1,20 @@
+fix(ui,template): 修复 AI 面板遮挡/工具栏悬停/折叠逻辑/自定义分类模态/预设 txt 清空, 升级至 26.7.23
+
+修改目的:
+  修复前序版本用户反馈的 10 项 UI/UX 缺陷, 移除新建项目预设 txt 模板, 提升自定义分类可用性.
+
+修改范围:
+  - AiAssistantPanel: 使用 createPortal 渲染到 document.body, 修复被右侧 FileList 遮挡问题
+  - EditorToolbar: 移除所有按钮 hover 背景放大效果 (transition-all -> transition-colors), AI 按钮尺寸 h-9 px-3 + 渐变色彩
+  - i18n: 补充字号调节按钮中文翻译 (shortcuts.fontSizeIncrease/Decrease/Reset)
+  - TimelineNode: 全部节点显示 ChevronDown/Up 折叠按钮, 对齐 CharacterGraphNode 按钮配置, 移除未使用的 useTimelineStore
+  - CharacterGraphNode: 折叠逻辑由左右收窄 (200->160) 改为向下展开 (固定 200px + 隐藏内容区)
+  - project_template.rs: standard_template_files 函数返回空 Vec, 新建项目不再写入任何预设 txt
+  - Sidebar: 自定义分类模态与右键菜单使用 createPortal 渲染到 body (z-index 200), 修复父容器 relative z-10 层叠上下文限制; 自定义分类项新增悬停可见的删除按钮
+
+影响说明:
+  - 新建项目变为空目录结构 (仅创建 正文/设定/大纲/伏笔/草稿箱/.novelforge 6 个目录, 不含预设 txt)
+  - AI 面板不再被右侧边栏遮挡, 工具栏按钮悬停反馈更克制, AI 按钮视觉强调度提升
+  - 剧情图谱与角色关系图谱节点折叠逻辑统一 (向下展开长卡片), 按钮配置一致
+  - 自定义分类新增/删除流程可用, 模态正常显示
+  - 版本号同步至 26.7.23 (package.json/Cargo.toml/Cargo.lock/tauri.conf.json/updateChecker.ts/Launcher.tsx/SettingsDialog.tsx)

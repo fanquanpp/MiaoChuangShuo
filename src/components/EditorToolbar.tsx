@@ -62,7 +62,8 @@ interface ToolbarButtonProps {
 
 // 工具栏按钮 - 统一直角几何风格
 // 关键设计：tabIndex={-1} 防止 Tab 键焦点跳到工具栏按钮，保证写作时焦点常驻编辑器
-// 视觉风格：FANDEX 直角按钮，统一 28x28 正方形容器，激活态文字变色 + 淡色背景块，悬停微抬升
+// 视觉风格：FANDEX 直角按钮，统一 28x28 正方形容器，激活态文字变色 + 淡色背景块
+// 悬停效果：仅文字颜色变化，无背景色放大效果 (用户要求移除悬停放大背景)
 // 尺寸规范: h-7 w-7 (28x28px) 固定容器 + w-4 h-4 图标, 确保所有工具按钮视觉一致
 export function ToolbarButton({
   onClick,
@@ -76,10 +77,10 @@ export function ToolbarButton({
       onClick={onClick}
       title={title}
       tabIndex={-1}
-      className={`nf-tool-btn relative h-7 w-7 flex items-center justify-center ease-fandex border border-transparent group transition-all duration-fast ${
+      className={`nf-tool-btn relative h-7 w-7 flex items-center justify-center ease-fandex border border-transparent group transition-colors duration-fast ${
         active
           ? "text-fandex-primary bg-fandex-primary/10"
-          : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
+          : "text-nf-text-tertiary hover:text-nf-text"
       }`}
     >
       <span className="flex items-center justify-center">
@@ -141,10 +142,10 @@ function Dropdown({ trigger, children, panelWidth = "w-56", active = false, titl
         onClick={() => setOpen((prev) => !prev)}
         title={title}
         tabIndex={-1}
-        className={`nf-tool-btn relative h-7 px-1.5 transition-all duration-fast ease-fandex border border-transparent flex items-center gap-0.5 group ${
+        className={`nf-tool-btn relative h-7 px-1.5 transition-colors duration-fast ease-fandex border border-transparent flex items-center gap-0.5 group ${
           active || open
             ? "text-fandex-primary bg-fandex-primary/10"
-            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover"
+            : "text-nf-text-tertiary hover:text-nf-text"
         }`}
       >
         {trigger}
@@ -275,7 +276,7 @@ function FontSizeAdjuster() {
         disabled={fontSize <= 12}
         title={t("shortcuts.fontSizeDecrease")}
         tabIndex={-1}
-        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
+        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ZoomOut className="w-4 h-4" />
       </button>
@@ -285,7 +286,7 @@ function FontSizeAdjuster() {
         onClick={() => setFontSize(DEFAULT_SIZE)}
         title={t("shortcuts.fontSizeReset")}
         tabIndex={-1}
-        className="nf-tool-btn h-7 px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-all duration-fast min-w-[32px] text-center flex items-center justify-center"
+        className="nf-tool-btn h-7 px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-colors duration-fast min-w-[32px] text-center flex items-center justify-center"
       >
         {fontSize}
       </button>
@@ -296,7 +297,7 @@ function FontSizeAdjuster() {
         disabled={fontSize >= 28}
         title={t("shortcuts.fontSizeIncrease")}
         tabIndex={-1}
-        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover transition-all duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
+        className="nf-tool-btn h-7 w-7 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ZoomIn className="w-4 h-4" />
       </button>
@@ -403,10 +404,10 @@ function SessionStats({
         onClick={onTogglePause}
         title={paused ? t("editor.sessionResume") : t("editor.sessionPause")}
         tabIndex={-1}
-        className={`nf-tool-btn h-7 w-7 flex items-center justify-center transition-all duration-fast ease-fandex border ${
+        className={`nf-tool-btn h-7 w-7 flex items-center justify-center transition-colors duration-fast ease-fandex border ${
           paused
             ? "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/40"
-            : "text-nf-text-tertiary hover:text-nf-text hover:bg-nf-bg-hover border-transparent hover:border-nf-border-light"
+            : "text-nf-text-tertiary hover:text-nf-text border-transparent"
         }`}
       >
         {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
@@ -431,10 +432,10 @@ function SessionStats({
         onClick={handleOpenDialog}
         title={t("editor.setTarget")}
         tabIndex={-1}
-        className={`nf-tool-btn flex items-center gap-1.5 h-7 px-1.5 transition-all duration-fast ease-fandex border ${
+        className={`nf-tool-btn flex items-center gap-1.5 h-7 px-1.5 transition-colors duration-fast ease-fandex border ${
           wordTarget > 0
-            ? "bg-fandex-primary/10 border-fandex-primary/30 hover:bg-fandex-primary/15"
-            : "border-transparent hover:bg-nf-bg-hover border-transparent"
+            ? "bg-fandex-primary/10 border-fandex-primary/30"
+            : "border-transparent"
         }`}
       >
         <Target className={`w-3.5 h-3.5 ${wordTarget > 0 ? "text-fandex-primary" : "text-nf-text-tertiary"}`} />
@@ -911,20 +912,21 @@ export default function EditorToolbar({
           {/* 字号调整组：A- / 当前字号 / A+（实时调整编辑器字体显示大小） */}
           <FontSizeAdjuster />
           <Divider />
-          {/* AI 助手组 (AI-3.1): 打开侧边栏 AI 创作助手面板 */}
-          <div className="flex items-center gap-0.5 h-7 px-1 bg-nf-bg-card/50 border border-nf-border-light/40">
+          {/* AI 助手组 (AI-3.1): 打开侧边栏 AI 创作助手面板
+              按钮尺寸增大 (h-9 px-3), 使用渐变色彩提升视觉强调度, 悬停仅色彩变化无背景放大 */}
+          <div className="flex items-center gap-0.5 h-9 px-1 bg-nf-bg-card/50 border border-fandex-primary/20">
             <button
               type="button"
               onClick={() => onToggleAiPanel?.()}
               title={t("ai.panel.toggleHint")}
               tabIndex={-1}
-              className={`nf-tool-btn h-7 px-2 flex items-center gap-1 text-xs transition-all duration-fast ease-fandex border border-transparent ${
+              className={`nf-tool-btn h-9 px-3 flex items-center gap-1.5 text-sm font-medium transition-colors duration-fast ease-fandex border ${
                 showAiPanel
-                  ? "text-fandex-primary bg-fandex-primary/10 border-fandex-primary/30"
-                  : "text-nf-text-tertiary hover:text-fandex-primary hover:bg-nf-bg-hover"
+                  ? "text-nf-text-inverse bg-gradient-to-r from-fandex-primary to-fandex-secondary border-fandex-primary shadow-sm"
+                  : "text-fandex-primary bg-fandex-primary/5 border-fandex-primary/30 hover:text-fandex-secondary hover:border-fandex-secondary/50"
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5" />
+              <Sparkles className="w-4 h-4" />
               {t("ai.panel.toolbarButton")}
             </button>
           </div>

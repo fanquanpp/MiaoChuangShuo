@@ -19,6 +19,7 @@
 //   - 用户指令通过 system prompt 末尾追加, 不修改 buildContinuationPrompt 签名
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Sparkles, X, Send, Square, Copy, Check, ClipboardPaste, Trash2, AlertCircle } from "lucide-react";
 import type { Editor } from "@tiptap/react";
 import { useI18n } from "../lib/i18n";
@@ -540,17 +541,18 @@ export default function AiAssistantPanel({
 
   if (!open) return null;
 
-  return (
+  // 使用 Portal 渲染到 body, 避免父元素层叠上下文 (relative z-10) 限制导致面板被右侧 FileList 遮挡
+  return createPortal(
     <>
       {/* 遮罩层 (点击关闭) */}
       <div
-        className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px]"
+        className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-[1px]"
         onClick={onClose}
         aria-hidden="true"
       />
       {/* 侧边栏面板 (右侧滑出) */}
       <aside
-        className="fixed top-0 right-0 z-50 h-full w-full max-w-[440px] bg-nf-bg-card border-l border-nf-border-light shadow-2xl flex flex-col"
+        className="fixed top-0 right-0 z-[101] h-full w-full max-w-[440px] bg-nf-bg-card border-l border-nf-border-light shadow-2xl flex flex-col"
         role="dialog"
         aria-label={t("ai.panel.title")}
       >
@@ -740,6 +742,7 @@ export default function AiAssistantPanel({
           </div>
         </footer>
       </aside>
-    </>
+    </>,
+    document.body
   );
 }

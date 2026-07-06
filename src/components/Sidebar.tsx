@@ -12,6 +12,7 @@
 // 5. 触发分类切换
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   FileText,
   ListTree,
@@ -483,25 +484,51 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
           {extraDirs.map((dirName) => {
             const isActive = activeCategory === dirName;
             return (
-              <button
+              <div
                 key={dirName}
+                className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
+                  isActive
+                    ? `nf-active bg-fandex-primary/10 text-fandex-primary`
+                    : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                }`}
                 onClick={() => switchTo(dirName as SidebarCategory)}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   setContextMenu({ dirName, x: e.clientX, y: e.clientY });
                 }}
                 title={dirName}
-                className={`nf-sidebar-item w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
-                  isActive
-                    ? `nf-active bg-fandex-primary/10 text-fandex-primary`
-                    : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
-                }`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    switchTo(dirName as SidebarCategory);
+                  }
+                }}
               >
                 <Folder className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
                   isActive ? 'scale-110' : ''
                 }`} />
-                {!collapsed && <span className="truncate">{dirName}</span>}
-              </button>
+                {!collapsed && <span className="truncate flex-1">{dirName}</span>}
+                {/* 悬停显示删除按钮: 自定义分类可删除, 提升可发现性
+                    折叠态隐藏避免图标拥挤; 点击阻止冒泡防止触发分类切换 */}
+                {!collapsed && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(t("sidebar.confirmDeleteCategory").replace("{name}", dirName))) {
+                        handleDeleteCategory(dirName);
+                      }
+                    }}
+                    title={t("sidebar.deleteCategory")}
+                    aria-label={t("sidebar.deleteCategory")}
+                    className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary hover:bg-nf-bg-hover transition-all duration-fast"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>
@@ -582,10 +609,11 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         </button>
       </div>
 
-      {/* 自定义分类右键删除菜单（浮动定位到鼠标位置） */}
-      {contextMenu && (
+      {/* 自定义分类右键删除菜单（浮动定位到鼠标位置）
+          使用 createPortal 渲染到 body, 避免父容器 relative z-10 层叠上下文限制 */}
+      {contextMenu && createPortal(
         <div
-          className="fixed z-50 min-w-[120px] bg-nf-bg-card border border-nf-border-light shadow-xl py-0.5"
+          className="fixed z-[200] min-w-[120px] bg-nf-bg-card border border-nf-border-light shadow-xl py-0.5"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.preventDefault()}
@@ -603,13 +631,15 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
             <Trash2 className="w-3.5 h-3.5" />
             {t("sidebar.deleteCategory")}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* 新建自定义分类悬浮模态面板 - 类似 SettingsDialog 的居中模态 */}
-      {isAddingCategory && (
+      {/* 新建自定义分类悬浮模态面板 - 类似 SettingsDialog 的居中模态
+          使用 createPortal 渲染到 body, 避免父容器 relative z-10 层叠上下文限制导致面板被遮挡 */}
+      {isAddingCategory && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeAddCategoryDialog();
           }}
@@ -685,7 +715,8 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

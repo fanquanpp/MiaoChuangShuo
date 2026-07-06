@@ -233,6 +233,10 @@ const zhCN: TranslationDict = {
   "editor.redoHint": "重做已撤销的操作（Ctrl+Shift+Z）",
   "editor.findReplaceHint": "打开查找替换面板（Ctrl+F 查找 / Ctrl+H 替换）",
   "snapshot.toggleHistoryHint": "打开或关闭版本历史快照面板",
+  // 字号调节按钮悬浮提示
+  "shortcuts.fontSizeIncrease": "增大字号",
+  "shortcuts.fontSizeDecrease": "减小字号",
+  "shortcuts.fontSizeReset": "重置字号",
   "editor.conflictDetected": "文件已被外部修改，是否覆盖保存？",
   "editor.conflictCancelled": "已取消保存（文件被外部修改）",
   "editor.saved": "已保存",

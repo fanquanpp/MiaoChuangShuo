@@ -56,8 +56,8 @@ export default function CharacterGraphNode({ id, selected }: NodeProps) {
         }
       `}
       style={{
-        // 折叠时宽度收窄为 160px, 展开时 200px
-        width: collapsed ? 160 : 200,
+        // 宽度固定 200px, 折叠时通过隐藏内容区实现"向下展开"效果 (非左右收窄)
+        width: 200,
         // 磨砂玻璃 65% 透明度(与 TimelineNode 保持一致视觉风格)
         backgroundColor: "rgba(22, 24, 33, 0.65)",
         // 多层阴影提升质感: 外阴影(深度) + 内顶部高光(立体感)

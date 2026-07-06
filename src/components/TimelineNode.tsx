@@ -22,10 +22,11 @@
 //    Index signature for type 'string' is missing in type 'TimelineNodeData'."
 // 结论: 保留无泛型方案(useNodesData(id) + 双重断言), 微调建议 1 不采纳。
 
+import { useState } from "react";
 import { Handle, Position, useNodesData, type NodeProps } from "@xyflow/react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { NODE_TYPE_COLORS, NODE_STATUS_MAP, EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
 import type { TimelineNodeData } from "../lib/stores/timelineTypes";
-import { useTimelineStore } from "../lib/stores/timelineStore";
 
 /**
  * 自定义节点组件(性能优化版)
@@ -44,13 +45,14 @@ import { useTimelineStore } from "../lib/stores/timelineStore";
  *       (Node.data: Record<string, unknown> -> TimelineNodeData)
  */
 export default function TimelineNode({ id, selected }: NodeProps) {
+  // 本地折叠状态 (视图级操作, 与 CharacterGraphNode 保持一致, 不持久化)
+  // 折叠时仅显示标题行, 展开时显示类型标签/状态徽章/摘要 (向下展开为长卡片)
+  const [collapsed, setCollapsed] = useState(false);
+
   // 仅订阅当前节点的 data 字段变化(避免其他节点变化触发重渲染)
   // 不带泛型时返回 Node | undefined, data 为 Record<string, unknown>
   const nodeData = useNodesData(id);
   if (!nodeData) return null;
-
-  // 获取折叠/展开方法(仅订阅 toggleCollapse, 避免全量订阅)
-  const toggleCollapse = useTimelineStore((s) => s.toggleCollapse);
 
   // 双重断言: 将 Record<string, unknown> 还原为 TimelineNodeData(类型安全由数据源保证)
   const data = nodeData.data as unknown as TimelineNodeData;
@@ -111,47 +113,55 @@ export default function TimelineNode({ id, selected }: NodeProps) {
       <div className="nf-card-sheen nf-card-dots relative overflow-hidden">
         {/* 内容区(统一内边距, 优化排版节奏, z 层级高于装饰) */}
         <div className="px-3.5 py-2.5 relative z-[1]">
-          {/* 标题行: 标题 + 折叠按钮(仅 main 节点) */}
+          {/* 标题行: 标题 + 折叠/展开按钮 (所有节点均显示, 与 CharacterGraphNode 对齐) */}
           <div className="flex items-start justify-between gap-2 mb-1.5">
             <div className={`text-sm font-bold font-display ${colors.text} truncate flex-1 leading-tight`}>
               {data.title}
             </div>
-            {/* 折叠/展开按钮(仅 main 节点显示, 点击切换 collapsed 字段) */}
-            {data.nodeType === "main" && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleCollapse(id);
-                }}
-                className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-primary hover:bg-fandex-primary/10 transition-colors duration-fast"
-                title={data.collapsed ? "展开" : "折叠"}
-              >
-                {data.collapsed ? "+" : "−"}
-              </button>
-            )}
-          </div>
-
-          {/* 节点类型标签 + 状态徽章(几何直角, 强调色填充提升识别度) */}
-          <div className="flex items-center gap-1.5">
-            <span
-              className="text-[10px] px-1.5 py-0.5 font-medium tracking-wide text-white"
-              style={{ backgroundColor: accent }}
+            {/* 折叠/展开按钮: 点击切换本地 collapsed 状态
+                使用 ChevronDown/Up 图标 (与 CharacterGraphNode 一致)
+                阻止冒泡避免触发 React Flow 节点拖拽 */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCollapsed((v) => !v);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="text-nf-text-tertiary hover:text-fandex-primary transition-colors duration-fast flex-shrink-0 mt-0.5"
+              title={collapsed ? "展开" : "折叠"}
+              aria-label={collapsed ? "展开节点" : "折叠节点"}
             >
-              {data.nodeType === "main" && "主线"}
-              {data.nodeType === "branch" && "分支"}
-              {data.nodeType === "event" && "事件"}
-              {data.nodeType === "ending" && "结局"}
-            </span>
-            <span className={`text-[10px] px-1.5 py-0.5 font-medium ${statusInfo.color} text-white`}>
-              {statusInfo.label}
-            </span>
+              {collapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            </button>
           </div>
 
-          {/* 摘要预览(仅显示前 50 字, line-clamp-2 限制 2 行, 优化行高) */}
-          {data.summary && (
-            <div className="mt-1.5 text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
-              {data.summary}
-            </div>
+          {/* 折叠态: 隐藏类型标签/状态徽章/摘要, 仅保留标题行 (向下展开为长卡片) */}
+          {!collapsed && (
+            <>
+              {/* 节点类型标签 + 状态徽章(几何直角, 强调色填充提升识别度) */}
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="text-[10px] px-1.5 py-0.5 font-medium tracking-wide text-white"
+                  style={{ backgroundColor: accent }}
+                >
+                  {data.nodeType === "main" && "主线"}
+                  {data.nodeType === "branch" && "分支"}
+                  {data.nodeType === "event" && "事件"}
+                  {data.nodeType === "ending" && "结局"}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 font-medium ${statusInfo.color} text-white`}>
+                  {statusInfo.label}
+                </span>
+              </div>
+
+              {/* 摘要预览(仅显示前 50 字, line-clamp-2 限制 2 行, 优化行高) */}
+              {data.summary && (
+                <div className="mt-1.5 text-xs text-nf-text-tertiary line-clamp-2 leading-relaxed">
+                  {data.summary}
+                </div>
+              )}
+            </>
           )}
         </div>
 

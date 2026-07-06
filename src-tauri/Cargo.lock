@@ -2172,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "miaochuangshuo"
-version = "26.7.22"
+version = "26.7.23"
 dependencies = [
  "base64 0.22.1",
  "chrono",

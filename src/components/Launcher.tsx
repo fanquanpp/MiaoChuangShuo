@@ -114,7 +114,7 @@ export default function Launcher() {
   const [selectedType, setSelectedType] = useState<ProjectType>("novel");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("26.7.22");
+  const [appVersion, setAppVersion] = useState("26.7.23");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
   // 编辑项目对话框目标：非 null 时渲染 EditProjectDialog
   const [editTarget, setEditTarget] = useState<ProjectInfo | null>(null);
