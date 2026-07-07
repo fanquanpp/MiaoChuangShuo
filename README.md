@@ -33,7 +33,7 @@
 
 ### 项目主页
 
-- **在线体验版 (Web 版, 无需下载)**: [https://fanquanpp.github.io/MiaoChuangShuo/web/](https://fanquanpp.github.io/MiaoChuangShuo/web/)
+- **在线体验版 (Web 版, 无需下载)**: [https://fanquanpp.github.io/MiaoChuangShuo/](https://fanquanpp.github.io/MiaoChuangShuo/)
 - **在线展示 (报名网页)**: [https://fanquanpp.github.io/MiaoChuangShuo/docs/](https://fanquanpp.github.io/MiaoChuangShuo/docs/)
 - **源码仓库**: [https://github.com/fanquanpp/MiaoChuangShuo](https://github.com/fanquanpp/MiaoChuangShuo)
 - **发布下载**: [https://github.com/fanquanpp/MiaoChuangShuo/releases](https://github.com/fanquanpp/MiaoChuangShuo/releases)
