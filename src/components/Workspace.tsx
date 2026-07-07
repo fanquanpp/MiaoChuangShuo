@@ -17,7 +17,6 @@ import FileList from "./FileList";
 import NovelEditor from "./NovelEditor";
 import WritingStats from "./WritingStats";
 import GlobalSearch from "./GlobalSearch";
-import VolumeManager from "./VolumeManager";
 import SettingsDialog, { type SettingsSection } from "./SettingsDialog";
 import CreateFileDialog from "./CreateFileDialog";
 import CreateFileWizard from "./CreateFileWizard";
@@ -39,7 +38,6 @@ import { isNovelType } from "../lib/projectType";
 import CodexPanel from "./CodexPanel";
 import TimelinePanel from "./TimelinePanel";
 import CharacterGraphPanel from "./CharacterGraphPanel";
-import ForeshadowingPanel from "./ForeshadowingPanel";
 
 /** Alt+数字键 → 侧边栏分类映射 */
 const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
@@ -48,10 +46,8 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "3": "codex",
   "4": "stats",
   "5": "search",
-  "6": "volumes",
-  "7": "characterGraph",
-  "8": "foreshadowing",
-  "9": "timeline",
+  "6": "characterGraph",
+  "7": "timeline",
 };
 
 /**
@@ -62,7 +58,7 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
  *   1. 从全局 store 读取当前项目与选中文件
  *   2. 加载项目目录树（含失败重试与空状态处理）
  *   3. 渲染三栏布局：左侧 Sidebar + 中间内容区 + 右侧 FileList
- *   4. 根据 activeCategory 切换中间内容（编辑器/卡片管理器/统计/搜索/卷宗）
+ *   4. 根据 activeCategory 切换中间内容（编辑器/设定库/统计/搜索/图谱）
  *   5. 管理对话框层：新建文件、命令面板、设置、聚焦模式、专注计时器
  *   6. 注册全局快捷键：Alt+数字切换分类、Ctrl+K 命令面板、? 快捷键参考、F11 聚焦
  */
@@ -242,11 +238,10 @@ export default function Workspace() {
 
   // 根据分类和设置生成文件初始内容
   // 修复要点：
-  //   1. isNovelType 扩展支持 shared_world 类型，避免同世界观系列无法自动编号
-  //   2. 尊重 autoNumbering 设置，关闭时不生成章节号前缀和标题
-  //   3. 章节标题使用空格分隔（行业通用格式），不再使用全角冒号
-  //   4. 移除书名后缀（非标准做法，书名应保留在项目元数据中）
-  //   5. 非小说类型不再生成 N. 前缀文件名
+  //   1. 尊重 autoNumbering 设置，关闭时不生成章节号前缀和标题
+  //   2. 章节标题使用空格分隔（行业通用格式），不再使用全角冒号
+  //   3. 移除书名后缀（非标准做法，书名应保留在项目元数据中）
+  //   4. 非小说类型不再生成 N. 前缀文件名
   const getFileTemplate = useCallback(
     (fileName: string, category: SidebarCategory, chapterNum?: number): string => {
       // 清洗文件名得到纯标题：去除 .txt 扩展名与可能的前导编号前缀
@@ -254,8 +249,8 @@ export default function Workspace() {
       switch (category) {
         case "manuscript": {
           const projectType = currentProject?.meta?.type;
-          // 通过统一兼容层判定小说族文体（涵盖 novel/standard/multi_volume/short_story/shared_world 等）
-          // diary/dialogue/screenplay/poetry 等非小说类型不生成章节号
+          // 通过统一兼容层判定小说族文体（novel/script/essay 3 标准文体）
+          // 非小说类型不生成章节号
           const novelType = isNovelType(projectType);
           // 同时满足：小说类文体 + 开启自动编号 + 已计算章节号
           if (chapterNum !== undefined && novelType && autoNumbering) {
@@ -292,18 +287,6 @@ export default function Workspace() {
     // 通过统一兼容层判定小说族文体（与 getFileTemplate 保持一致）
     const novelType = isNovelType(projectType);
 
-    // shared_world 项目正文需要放入子目录（如 正文/第一部/）
-    let manuscriptSubDir = "";
-    if (activeCategory === "manuscript" && projectType === "shared_world") {
-      const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
-      const subDirs = manuscriptDir?.children.filter((f) => f.is_dir) || [];
-      if (subDirs.length > 0) {
-        manuscriptSubDir = subDirs[subDirs.length - 1].name;
-      } else {
-        manuscriptSubDir = t("workspace.defaultVolumeName");
-      }
-    }
-
     let finalFileName = fileName;
     let chapterNum: number | undefined;
     if (activeCategory === "manuscript" && novelType && autoNumbering) {
@@ -321,9 +304,7 @@ export default function Workspace() {
       if (!finalFileName.endsWith(".txt")) finalFileName += ".txt";
     }
 
-    const relativePath = manuscriptSubDir
-      ? `${dirName}/${manuscriptSubDir}/${finalFileName}`
-      : `${dirName}/${finalFileName}`;
+    const relativePath = `${dirName}/${finalFileName}`;
     const templateContent = getFileTemplate(finalFileName, activeCategory, chapterNum);
     await createFile(currentProject.path, relativePath, templateContent);
     const tree = await readProjectTree(currentProject.path);
@@ -350,21 +331,13 @@ export default function Workspace() {
     const dirName = getCategoryDir("manuscript");
     const fileName = t("workspace.defaultIntroFileName");
     const templateContent = `${t("workspace.defaultIntroContent")}\n\n`;
-
-    // shared_world 项目正文需要放入子目录
-    let relativePath = `${dirName}/${fileName}`;
-    if (currentProject.meta.type === "shared_world") {
-      const manuscriptDir = findDirByName(projectTree, dirName);
-      const subDirs = manuscriptDir?.children.filter((f) => f.is_dir) || [];
-      const subDir = subDirs.length > 0 ? subDirs[subDirs.length - 1].name : t("workspace.defaultVolumeName");
-      relativePath = `${dirName}/${subDir}/${fileName}`;
-    }
+    const relativePath = `${dirName}/${fileName}`;
 
     await createFile(currentProject.path, relativePath, templateContent);
     const tree = await readProjectTree(currentProject.path);
     setProjectTree(tree);
     showToast("success", t("workspace.fileCreated", { name: fileName }));
-  }, [currentProject, projectTree, setProjectTree, showToast, t]);
+  }, [currentProject, setProjectTree, showToast, t]);
 
   // 首次创建：第一章
   const handleCreateFirstChapter = useCallback(async () => {
@@ -404,16 +377,12 @@ export default function Workspace() {
         return <WritingStats />;
       case "search":
         return <GlobalSearch />;
-      case "volume":
-        return <VolumeManager />;
       case "codex":
         return <CodexPanel />;
       case "timeline":
         return <TimelinePanel />;
       case "characterGraph":
         return <CharacterGraphPanel />;
-      case "foreshadowing":
-        return <ForeshadowingPanel />;
       default:
         return (
           <NovelEditor

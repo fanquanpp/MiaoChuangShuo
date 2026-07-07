@@ -26,7 +26,6 @@ import {
   ChevronDown,
   GripVertical,
   ListTree,
-  BookCopy,
   Copy,
   ClipboardCopy,
   Files,
@@ -42,7 +41,6 @@ import { useSettingsStore, toChineseNumber, type ChapterFormat } from "../lib/se
 import { useUILayoutStore } from "../lib/uiStore";
 import ConfirmDialog from "./ConfirmDialog";
 import OutlineToChapters from "./OutlineToChapters";
-import VolumeChapterGenerator from "./VolumeChapterGenerator";
 import ContextMenu, { type ContextMenuItem } from "./ContextMenu";
 
 interface FileListProps {
@@ -57,7 +55,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// extractChapterNumber 已统一提取至 lib/fileTreeUtils.ts，消除与 VolumeManager 的重复定义
+// extractChapterNumber 已统一提取至 lib/fileTreeUtils.ts，消除重复定义
 
 // 从文件名中去除编号前缀，保留纯名称
 // 兼容 .txt 与 .pmd 扩展名，避免扩展名残留影响显示
@@ -536,7 +534,6 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   // 大纲生成章节对话框状态（仅正文分类有效）
   const [showOutlineToChapters, setShowOutlineToChapters] = useState(false);
-  const [showVolumeGenerator, setShowVolumeGenerator] = useState(false);
 
   // 文件选择：优先使用外部传入的保存后切换回调
   const handleFileSelect = onSelectFile || setSelectedFile;
@@ -903,9 +900,9 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
             </button>
           </div>
         </div>
-        {/* 第二行:正文分类的快捷操作按钮 - 三按钮均匀分布,主按钮突出 */}
+        {/* 第二行:正文分类的快捷操作按钮 - 双按钮均匀分布,主按钮突出 */}
         {isManuscript && (
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-2 gap-1">
             <button
               onClick={onCreateFile}
               className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 text-fandex-primary border border-fandex-primary hover:bg-fandex-primary/10 transition-all duration-fast"
@@ -921,14 +918,6 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
             >
               <ListTree className="w-3 h-3 flex-shrink-0" />
               <span className="truncate">{t("outlineToChapters.btn")}</span>
-            </button>
-            <button
-              onClick={() => setShowVolumeGenerator(true)}
-              className="nf-tool-btn h-7 px-2 text-xs flex items-center justify-center gap-1.5 text-fandex-secondary border border-fandex-secondary/50 hover:bg-fandex-secondary/10 transition-all duration-fast"
-              title={t("volumeGen.title")}
-            >
-              <BookCopy className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{t("volumeGen.title")}</span>
             </button>
           </div>
         )}
@@ -1012,21 +1001,6 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
       {showOutlineToChapters && currentProject && (
         <OutlineToChapters
           onClose={() => setShowOutlineToChapters(false)}
-          onCreated={async () => {
-            if (!currentProject) return;
-            try {
-              const tree = await readProjectTree(currentProject.path);
-              useAppStore.getState().setProjectTree(tree);
-            } catch {
-              // 刷新失败静默处理
-            }
-          }}
-        />
-      )}
-
-      {showVolumeGenerator && currentProject && (
-        <VolumeChapterGenerator
-          onClose={() => setShowVolumeGenerator(false)}
           onCreated={async () => {
             if (!currentProject) return;
             try {

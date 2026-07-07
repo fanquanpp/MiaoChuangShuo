@@ -27,14 +27,12 @@ import { create } from "zustand";
  * - entity:hover: 鼠标悬停在实体上（编辑器正文或设定面板），其他面板高亮该实体
  * - entity:click: 点击实体，其他面板聚焦/打开该实体详情
  * - scene:navigate: 跳转场景，时间线面板高亮对应节点，设定面板加载场景相关实体
- * - foreshadow:focus: 聚焦伏笔，编辑器滚动到伏笔位置，设定面板高亮伏笔条目
  * - codex:updated: 设定库数据变更（新增/删除/编辑实体），各面板刷新缓存
  */
 export type EventBusType =
   | "entity:hover"
   | "entity:click"
   | "scene:navigate"
-  | "foreshadow:focus"
   | "codex:updated";
 
 /**
@@ -48,8 +46,6 @@ export interface EventBusPayloadMap {
   "entity:click": { entityId: string; source: "editor" | "codex" | "timeline" | "graph" };
   /** 场景跳转：携带场景 ID（sceneBreak 节点的 sceneId） */
   "scene:navigate": { sceneId: string; filePath?: string };
-  /** 伏笔聚焦：携带伏笔 ID 与状态 */
-  "foreshadow:focus": { foreshadowId: string; status?: string };
   /** 设定库更新：无 payload，各面板主动刷新 */
   "codex:updated": Record<string, never>;
 }

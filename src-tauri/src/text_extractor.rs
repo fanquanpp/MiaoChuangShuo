@@ -1,8 +1,7 @@
 // 文本内容提取器模块
 //
 // 功能概述：
-// 统一处理 4 种内容格式的文本提取、搜索、替换操作，为全局搜索、Tantivy 索引、
-// 字数统计提供一致的纯文本入口。
+// 统一处理 4 种内容格式的文本提取，为 Tantivy 索引、字数统计提供一致的纯文本入口。
 //
 // 支持格式：
 // 1. PmdJson: ProseMirror JSON 文档（.pmd 文件，纯 JSON 无 --- 包裹）
@@ -13,17 +12,11 @@
 // 模块职责：
 // 1. 检测内容格式（基于扩展名与内容首行）
 // 2. 提取纯文本（剥离 JSON 结构/HTML 标签/front matter）
-// 3. 提取词汇列表（用于 Tantivy 索引分词）
-// 4. 在原始内容中搜索关键词（返回匹配位置）
-// 5. 在原始内容中替换关键词（保留格式，仅替换文本节点）
 //
 // 设计说明：
 // - HTML 标签剥离采用手写状态机，避免引入 scraper/html5ever 重依赖
 // - .pmd JSON 解析复用 serde_json，递归遍历 ProseMirror doc 节点树
 // - JSON front matter 复用 codex_commands::parse_codex_file 的解析逻辑（剥离 --- 包裹）
-// - 替换操作仅在文本节点中执行，保留所有结构化标记
-
-use serde::{Deserialize, Serialize};
 
 /// 内容格式枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,28 +29,6 @@ pub enum ContentFormat {
     PlainText,
     /// JSON front matter 设定文件（--- 包裹的 JSON + 正文）
     JsonFrontMatter,
-}
-
-/// 搜索匹配结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchMatch {
-    /// 匹配起始位置（字节偏移，基于纯文本）
-    pub start: usize,
-    /// 匹配结束位置（字节偏移）
-    pub end: usize,
-    /// 匹配文本
-    pub text: String,
-    /// 上下文预览（前后各约 30 字符）
-    pub context: String,
-}
-
-/// 替换结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReplaceResult {
-    /// 替换后的纯文本内容
-    pub new_text: String,
-    /// 替换次数
-    pub count: u32,
 }
 
 /// 根据文件扩展名与内容首行检测格式
@@ -272,155 +243,6 @@ fn extract_text_from_front_matter(content: &str) -> String {
     content.to_string()
 }
 
-/// 提取词汇列表（用于 Tantivy 索引分词）
-/// 输入: content 原始内容, format 内容格式
-/// 输出: Vec<String> 词汇列表（已去重，长度 >= 2）
-/// 流程:
-///   1. 提取纯文本
-///   2. 按非字母数字字符分割
-///   3. 过滤空串与单字符
-///   4. 去重返回
-pub fn extract_words(content: &str, format: ContentFormat) -> Vec<String> {
-    let plain = extract_plain_text(content, format);
-    let mut words: Vec<String> = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-
-    for word in plain.split(|c: char| !c.is_alphanumeric() && c != '_') {
-        let trimmed = word.trim();
-        if trimmed.chars().count() < 2 {
-            continue;
-        }
-        if seen.insert(trimmed.to_string()) {
-            words.push(trimmed.to_string());
-        }
-    }
-    words
-}
-
-/// 在内容中搜索关键词
-/// 输入:
-///   content - 原始内容
-///   query - 搜索关键词
-///   case_sensitive - 是否区分大小写
-///   format - 内容格式
-/// 输出: Vec<SearchMatch> 匹配结果列表（含位置与上下文）
-/// 流程:
-///   1. 提取纯文本
-///   2. 在纯文本中查找所有匹配位置
-///   3. 为每个匹配提取上下文预览（前后各 30 字符）
-pub fn search_in_content(
-    content: &str,
-    query: &str,
-    case_sensitive: bool,
-    format: ContentFormat,
-) -> Vec<SearchMatch> {
-    if query.is_empty() {
-        return vec![];
-    }
-
-    let plain = extract_plain_text(content, format);
-    let mut matches = Vec::new();
-
-    let (search_text, search_query) = if case_sensitive {
-        (plain.clone(), query.to_string())
-    } else {
-        (plain.to_lowercase(), query.to_lowercase())
-    };
-
-    let query_len = query.len();
-    let mut start = 0;
-    while let Some(pos) = search_text[start..].find(&search_query) {
-        let abs_pos = start + pos;
-        let abs_end = abs_pos + query_len;
-
-        // 提取匹配文本（用原始纯文本，保留大小写）
-        let matched_text = &plain[abs_pos..abs_end];
-
-        // 提取上下文（前后各 30 字符）
-        let ctx_start = abs_pos.saturating_sub(30);
-        let ctx_end = (abs_end + 30).min(plain.len());
-        let context = plain[ctx_start..ctx_end]
-            .replace('\n', " ")
-            .replace('\r', "");
-
-        matches.push(SearchMatch {
-            start: abs_pos,
-            end: abs_end,
-            text: matched_text.to_string(),
-            context,
-        });
-
-        start = abs_end;
-        if start >= search_text.len() {
-            break;
-        }
-    }
-
-    matches
-}
-
-/// 在内容中替换关键词（仅在纯文本层面，保留结构化标记）
-/// 输入:
-///   content - 原始内容
-///   query - 搜索关键词
-///   replacement - 替换文本
-///   case_sensitive - 是否区分大小写
-///   format - 内容格式
-/// 输出: ReplaceResult 替换后的纯文本与替换次数
-/// 流程:
-///   1. 提取纯文本
-///   2. 在纯文本中执行替换
-///   3. 返回新文本与替换次数
-/// 注意: 此函数返回纯文本，丢失原始结构。
-///       结构化内容的替换应由前端 ProseMirror 编辑器处理。
-pub fn replace_in_content(
-    content: &str,
-    query: &str,
-    replacement: &str,
-    case_sensitive: bool,
-    format: ContentFormat,
-) -> ReplaceResult {
-    if query.is_empty() {
-        return ReplaceResult {
-            new_text: extract_plain_text(content, format),
-            count: 0,
-        };
-    }
-
-    let plain = extract_plain_text(content, format);
-    let mut count = 0u32;
-    // Rust 的 str::replace 不接受闭包，手动循环实现带计数的替换
-    let new_text = if case_sensitive {
-        let mut result = String::with_capacity(plain.len());
-        let mut start = 0;
-        while let Some(pos) = plain[start..].find(query) {
-            let abs_pos = start + pos;
-            result.push_str(&plain[start..abs_pos]);
-            result.push_str(replacement);
-            count += 1;
-            start = abs_pos + query.len();
-        }
-        result.push_str(&plain[start..]);
-        result
-    } else {
-        let mut result = String::with_capacity(plain.len());
-        let lower_plain = plain.to_lowercase();
-        let lower_query = query.to_lowercase();
-        let mut start = 0;
-        while let Some(pos) = lower_plain[start..].find(&lower_query) {
-            let abs_pos = start + pos;
-            result.push_str(&plain[start..abs_pos]);
-            result.push_str(replacement);
-            count += 1;
-            start = abs_pos + query.len();
-        }
-        result.push_str(&plain[start..]);
-        result
-    };
-
-    ReplaceResult { new_text, count }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -444,22 +266,5 @@ mod tests {
         let content = "---\n{\"id\":\"123\"}\n---\n正文内容";
         let result = extract_text_from_front_matter(content);
         assert_eq!(result, "正文内容");
-    }
-
-    #[test]
-    fn test_search_in_content() {
-        let content = "Hello World Hello Again";
-        let matches = search_in_content(content, "Hello", true, ContentFormat::PlainText);
-        assert_eq!(matches.len(), 2);
-        assert_eq!(matches[0].start, 0);
-        assert_eq!(matches[1].start, 12);
-    }
-
-    #[test]
-    fn test_replace_in_content() {
-        let content = "Hello World Hello Again";
-        let result = replace_in_content(content, "Hello", "Hi", true, ContentFormat::PlainText);
-        assert_eq!(result.count, 2);
-        assert_eq!(result.new_text, "Hi World Hi Again");
     }
 }

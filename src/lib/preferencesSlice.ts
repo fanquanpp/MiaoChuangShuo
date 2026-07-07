@@ -11,7 +11,7 @@
 // 3. 提供 updatePreference 单字段更新方法
 // 4. localStorage 缓存保证页面刷新后设置不丢失
 // 5. 与 settingsStore 互补：settingsStore 管理应用设置（字号/自动保存），
-//    本 store 专注功能开关（Tab 补全/伏笔标记等）
+//    本 store 专注功能开关（Tab 补全/智能引号等）
 //
 // 设计说明：
 // 配置存储拆分——项目级配置存 .novelforge/config.json（阶段 2 启用），
@@ -29,8 +29,6 @@ export interface EditorPreferences {
   enableAutoIndent: boolean;
   /** 智能引号配对（默认开启） */
   enableSmartQuotes: boolean;
-  /** 伏笔标记功能（默认关闭，实验性） */
-  enableForeshadowMark: boolean;
   /** 诗歌排版模式（默认关闭） */
   enablePoetryFormat: boolean;
   /** 场景分隔辅助（默认关闭） */
@@ -55,7 +53,6 @@ const DEFAULT_PREFERENCES: EditorPreferences = {
   enableCharacterMentionPicker: false,
   enableAutoIndent: true,
   enableSmartQuotes: true,
-  enableForeshadowMark: false,
   enablePoetryFormat: false,
   enableSceneBreakHelper: false,
   enableEntityHighlight: true,

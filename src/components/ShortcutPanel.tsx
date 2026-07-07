@@ -78,7 +78,6 @@ function buildShortcuts(t: (key: string) => string): ShortcutGroup[] {
         { keys: "Alt + 3", desc: t("shortcuts.navCodex") },
         { keys: "Alt + 4", desc: t("shortcuts.navStats") },
         { keys: "Alt + 5", desc: t("shortcuts.navSearch") },
-        { keys: "Alt + 6", desc: t("shortcuts.navVolumes") },
       ],
     },
   ];

@@ -2,7 +2,7 @@
 
 import type { SidebarCategory } from "./store";
 
-export type PanelType = "editor" | "codex" | "stats" | "search" | "volume" | "timeline" | "characterGraph" | "foreshadowing";
+export type PanelType = "editor" | "codex" | "stats" | "search" | "timeline" | "characterGraph";
 
 export interface CategoryConfig {
   // 中间面板渲染类型
@@ -16,12 +16,10 @@ const CATEGORY_CONFIG: Record<SidebarCategory, CategoryConfig> = {
   manuscript:    { panelType: "editor",        showFileList: true },
   outline:      { panelType: "editor",        showFileList: true },
   codex:        { panelType: "codex",         showFileList: false },
-  volumes:      { panelType: "volume",        showFileList: true },
   stats:        { panelType: "stats",         showFileList: false },
   search:       { panelType: "search",        showFileList: false },
   timeline:     { panelType: "timeline",      showFileList: false },
   characterGraph: { panelType: "characterGraph", showFileList: false },
-  foreshadowing: { panelType: "foreshadowing", showFileList: false },
 };
 
 /**

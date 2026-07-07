@@ -54,8 +54,6 @@ pub struct TimelineNodeData {
     pub summary: String,
     #[serde(default)]
     pub core_conflict: String,
-    #[serde(default = "default_empty_string")]
-    pub foreshadowing: String,
     pub status: NodeStatus,
     pub order: i32,
     #[serde(default)]
@@ -66,11 +64,6 @@ pub struct TimelineNodeData {
     pub created_at: String,
     #[serde(default)]
     pub updated_at: String,
-}
-
-/// 默认空字符串(用于 serde default 属性)
-fn default_empty_string() -> String {
-    String::new()
 }
 
 /// 节点坐标(React Flow position 字段)
@@ -299,14 +292,14 @@ fn generate_summary(graph: &TimelineGraph) -> String {
     out.push_str("## 一、主线脉络\n\n");
     for (i, n) in mains.iter().enumerate() {
         out.push_str(&format!(
-            "[{}] {}\n    状态:{}  摘要:{}\n    核心冲突:{}\n    伏笔:{}\n\n",
+            "[{}] {}\n    状态:{}  摘要:{}\n    核心冲突:{}\n\n",
             i + 1, n.data.title,
             match n.data.status {
                 NodeStatus::Planned => "未开始",
                 NodeStatus::Writing => "写作中",
                 NodeStatus::Done => "完稿",
             },
-            n.data.summary, n.data.core_conflict, n.data.foreshadowing
+            n.data.summary, n.data.core_conflict
         ));
     }
 

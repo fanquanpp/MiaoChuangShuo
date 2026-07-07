@@ -39,8 +39,6 @@ pub struct EditorPreferences {
     pub enable_auto_indent: bool,
     /// 智能引号配对（英文引号自动转中文引号，默认开启）
     pub enable_smart_quotes: bool,
-    /// 伏笔标记功能（选中文本标记为伏笔，默认关闭，实验性）
-    pub enable_foreshadow_mark: bool,
     /// 诗歌排版模式（居中对齐、韵脚辅助，默认关闭）
     pub enable_poetry_format: bool,
     /// 场景分隔辅助（插入场景分隔线时弹出元数据填写面板，默认关闭）
@@ -59,7 +57,6 @@ impl Default for EditorPreferences {
             enable_character_mention_picker: false,
             enable_auto_indent: true,
             enable_smart_quotes: true,
-            enable_foreshadow_mark: false,
             enable_poetry_format: false,
             enable_scene_break_helper: false,
             enable_entity_highlight: true,
@@ -68,28 +65,8 @@ impl Default for EditorPreferences {
 }
 
 impl EditorPreferences {
-    /// 根据模板类型生成默认偏好
-    /// 输入: template_type 模板类型 ("novel" / "script" / "essay")
-    /// 输出: EditorPreferences 该模板对应的默认偏好
-    /// 流程: 以默认值为基线，按模板类型调整 1-2 个开关
-    pub fn defaults_for_template(template_type: &str) -> Self {
-        let mut prefs = Self::default();
-        match template_type {
-            "novel" => {
-                // 长短篇小说：开缩进、关 Tab 补全（默认值已满足，无需调整）
-            }
-            "script" => {
-                // 剧本与脚本：关缩进、开 Tab 补全
-                prefs.enable_auto_indent = false;
-                prefs.enable_character_mention_picker = true;
-            }
-            "essay" => {
-                // 散文与文章：开缩进、关 Tab 补全（默认值已满足，无需调整）
-            }
-            _ => {}
-        }
-        prefs
-    }
+    // 项目当前使用 EditorPreferences::default() 作为统一默认偏好
+    // 模板类型差异由前端项目创建流程处理，无需后端按模板生成偏好
 }
 
 // ===== 项目级配置 =====
@@ -244,34 +221,9 @@ mod tests {
         assert!(prefs.enable_auto_indent);
         assert!(!prefs.enable_character_mention_picker);
         assert!(prefs.enable_smart_quotes);
-        assert!(!prefs.enable_foreshadow_mark);
         assert!(!prefs.enable_poetry_format);
         assert!(!prefs.enable_scene_break_helper);
         assert!(prefs.enable_entity_highlight);
-    }
-
-    /// 验证剧本模板默认偏好：关缩进、开 Tab 补全
-    #[test]
-    fn test_script_template_defaults() {
-        let prefs = EditorPreferences::defaults_for_template("script");
-        assert!(!prefs.enable_auto_indent);
-        assert!(prefs.enable_character_mention_picker);
-    }
-
-    /// 验证长篇小说模板默认偏好：开缩进、关 Tab 补全
-    #[test]
-    fn test_novel_template_defaults() {
-        let prefs = EditorPreferences::defaults_for_template("novel");
-        assert!(prefs.enable_auto_indent);
-        assert!(!prefs.enable_character_mention_picker);
-    }
-
-    /// 验证散文模板默认偏好：开缩进、关 Tab 补全
-    #[test]
-    fn test_essay_template_defaults() {
-        let prefs = EditorPreferences::defaults_for_template("essay");
-        assert!(prefs.enable_auto_indent);
-        assert!(!prefs.enable_character_mention_picker);
     }
 
     /// 验证偏好序列化/反序列化

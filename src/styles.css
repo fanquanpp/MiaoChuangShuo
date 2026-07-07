@@ -628,55 +628,6 @@ select:focus-visible {
   outline-offset: 1px;
 }
 
-/* ========== 伏笔标记：状态化下划线（p5-27 波浪线 Decoration） ==========
- * 设计原则：
- *   - 纯文本风格，仅底部装饰线，无背景色、无边框、无圆角
- *   - 按状态着色：pending(主蓝虚线)/resolved(次绿实线)/abandoned(灰删除线)
- *   - 使用 text-decoration 替代 box-shadow，因波浪线需 text-decoration-style: wavy
- *   - data-foreshadowing-id 属性供伏笔面板反向定位与 AI 场景分析
- *   - 悬停态加深颜色，提示可交互（点击跳转伏笔条目）
- * 注意：快捷键 Alt+Shift-F 已避开 Alt+7（人物图）与 Alt+8（伏笔面板）冲突
- */
-.ProseMirror .nf-foreshadowing {
-  border-radius: 0;
-  transition: text-decoration-color 0.15s ease-out, color 0.15s ease-out;
-  cursor: pointer;
-}
-
-/* pending（埋设）：主蓝波浪线，提示此处埋有伏笔 */
-.ProseMirror .nf-foreshadowing--pending {
-  text-decoration: underline wavy var(--fandex-primary);
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
-  color: inherit;
-}
-
-/* resolved（回收）：次绿实线下划线，提示伏笔已回收 */
-.ProseMirror .nf-foreshadowing--resolved {
-  text-decoration: underline solid var(--fandex-secondary);
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
-  color: inherit;
-}
-
-/* abandoned（废弃）：灰删除线，提示伏笔废弃 */
-.ProseMirror .nf-foreshadowing--abandoned {
-  text-decoration: line-through var(--fandex-text-tertiary);
-  text-decoration-thickness: 1px;
-  opacity: 0.65;
-  color: inherit;
-}
-
-/* 悬停态：颜色加深（pending/resolved）或透明度提升（abandoned） */
-.ProseMirror .nf-foreshadowing--pending:hover,
-.ProseMirror .nf-foreshadowing--resolved:hover {
-  filter: brightness(1.2);
-}
-
-.ProseMirror .nf-foreshadowing--abandoned:hover {
-  opacity: 0.85;
-}
-
 /* ========== 诗歌/歌词行内排版样式 ==========
  * 设计原则：纯文本视觉表现，仅改变文字本身属性
  * 不包含任何块级装饰（无边框、无背景色、无圆角、无 padding/margin）

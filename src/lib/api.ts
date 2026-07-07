@@ -79,7 +79,7 @@ export interface TemplateInfo {
 
 // 可用的项目文体模板列表（3 种标准文体，对应 Rust StandardProjectType）
 export const PROJECT_TEMPLATES: TemplateInfo[] = [
-  { id: "novel", name: "长短篇小说", desc: "通用小说架构，统一目录结构、伏笔追踪、设定库" },
+  { id: "novel", name: "长短篇小说", desc: "通用小说架构，统一目录结构、设定库" },
   { id: "script", name: "剧本与脚本", desc: "影视剧本、舞台剧本、对话体，角色名册与分幕大纲" },
   { id: "essay", name: "散文与文章", desc: "散文、随笔、诗歌、杂文，主题构思与意象集" },
 ];
@@ -188,15 +188,6 @@ export async function pickDirectory(): Promise<string | null> {
 // 流程: 调用 Rust 后端 read_project_tree 命令
 export async function readProjectTree(projectPath: string): Promise<FileNode[]> {
   return invoke<FileNode[]>("read_project_tree", { projectPath });
-}
-
-// 检测项目是否为旧版目录结构
-// 输入: projectPath 项目路径
-// 输出: Promise<boolean> 是否为旧版项目（true 时前端弹出迁移对话框）
-// 流程: 调用 Rust 后端 is_legacy_project 命令，检测旧版 8 种目录名
-// 兼容说明: 旧版目录（角色/世界观/术语/剧情图谱/素材）任一存在即判定为旧版
-export async function isLegacyProject(projectPath: string): Promise<boolean> {
-  return invoke<boolean>("is_legacy_project", { projectPath });
 }
 
 // 读取文件内容（含项目路径校验）
@@ -348,69 +339,6 @@ export async function replaceInProject(
     query,
     replacement,
     caseSensitive,
-  });
-}
-
-// ===== 分卷章节生成 =====
-
-// 单个章节生成结果项
-export interface VolumeChapterResult {
-  /** 文件相对路径 */
-  relative_path: string;
-  /** 章节标题 */
-  chapter_title: string;
-  /** 是否为卷首语 */
-  is_prologue: boolean;
-  /** 是否为卷尾语 */
-  is_epilogue: boolean;
-  /** 是否已存在（跳过创建） */
-  already_exists: boolean;
-}
-
-// 分卷章节生成结果
-export interface VolumeGenerationResult {
-  /** 卷名（子目录名） */
-  volume_name: string;
-  /** 创建的文件数 */
-  created_count: number;
-  /** 跳过文件数（已存在） */
-  skipped_count: number;
-  /** 各文件详情 */
-  chapters: VolumeChapterResult[];
-}
-
-// 为分卷批量生成章节文件
-// 输入:
-//   projectPath 项目路径
-//   volumeName 分卷名（"正文"下的子目录名，如"第一卷"）
-//   chapterCount 章节数量
-//   startChapterNum 起始章节序号（默认1）
-//   includePrologue 是否生成卷首语
-//   includeEpilogue 是否生成卷尾语
-//   formatStr 标题格式: "chinese" | "arabic" | "english"
-//   chapterNameTemplate 章节文件名模板（含 {n} 占位符，如"第{n}章"；为空时回退为"第{n}章"）
-// 输出: Promise<VolumeGenerationResult> 生成结果统计
-// 流程: 调用后端 generate_volume_chapters，在"正文/{卷名}"下批量创建章节文件
-//       章节文件名仅由模板生成，不再追加卷号标识（文件已归类到分卷子目录）
-export async function generateVolumeChapters(
-  projectPath: string,
-  volumeName: string,
-  chapterCount: number,
-  startChapterNum?: number,
-  includePrologue?: boolean,
-  includeEpilogue?: boolean,
-  formatStr?: string,
-  chapterNameTemplate?: string
-): Promise<VolumeGenerationResult> {
-  return invoke<VolumeGenerationResult>("generate_volume_chapters", {
-    projectPath,
-    volumeName,
-    chapterCount,
-    startChapterNum,
-    includePrologue,
-    includeEpilogue,
-    formatStr,
-    chapterNameTemplate,
   });
 }
 
@@ -802,116 +730,16 @@ export async function pickOpenArchive(): Promise<string | null> {
   return typeof result === "string" ? result : null;
 }
 
-// ===== .pmd 格式迁移 API =====
-
-// 迁移进度事件 payload（与后端 MigrationProgress 对应）
-export interface MigrationProgress {
-  // 当前已处理文件数
-  processed: number;
-  // 待迁移文件总数
-  total: number;
-  // 当前处理的文件相对路径
-  current_file: string;
-  // 已完成百分比（0-100）
-  percent: number;
-  // 迁移阶段（scan / migrate / done / error）
-  stage: string;
-}
-
-// 单个文件迁移结果
-export interface FileMigrationResult {
-  // 原文件相对路径
-  relative_path: string;
-  // 是否成功
-  success: boolean;
-  // 失败原因（success=false 时有值）
-  error: string | null;
-  // 是否跳过（已是 .pmd 或为设定文件）
-  skipped: boolean;
-  // 跳过原因
-  skip_reason: string | null;
-}
-
-// 迁移统计结果
-export interface MigrationStats {
-  // 待迁移文件总数
-  total_targets: number;
-  // 成功迁移数
-  migrated: number;
-  // 跳过数
-  skipped: number;
-  // 失败数
-  failed: number;
-  // 备份文件总数
-  backups_created: number;
-  // 各文件详情
-  details: FileMigrationResult[];
-  // 是否为断点续传（true 表示从上次中断处继续）
-  resumed: boolean;
-}
-
-// 迁移状态（持久化到 .novelforge/migration_state.json）
-export interface MigrationState {
-  // 已完成迁移的文件相对路径列表
-  completed: string[];
-  // 迁移开始时间（ISO 8601）
-  started_at: string;
-  // 最后更新时间（ISO 8601）
-  updated_at: string;
-  // 是否全部完成
-  finished: boolean;
-}
-
-// 迁移进度事件名（与后端 PROGRESS_EVENT 常量一致）
-const MIGRATION_PROGRESS_EVENT = "pmd-migration-progress";
-
-// 批量迁移项目文件为 .pmd 格式
-// 输入: projectPath 项目根路径
-// 输出: Promise<MigrationStats> 迁移统计
-// 流程: 调用 Rust 后端 migrate_project_to_pmd 命令，后端推送 pmd-migration-progress 事件
-// 注意: 调用前应通过 onMigrationProgress 注册进度回调，事件可能在本函数返回前触发
-export async function migrateProjectToPmd(projectPath: string): Promise<MigrationStats> {
-  return invoke<MigrationStats>("migrate_project_to_pmd", { projectPath });
-}
-
-// 读取迁移状态（用于判断是否支持断点续传）
-// 输入: projectPath 项目根路径
-// 输出: Promise<MigrationState | null> 迁移状态（null 表示无状态文件）
-export async function getMigrationState(projectPath: string): Promise<MigrationState | null> {
-  return invoke<MigrationState | null>("get_migration_state", { projectPath });
-}
-
-// 清除迁移状态（迁移成功后重置断点）
-// 输入: projectPath 项目根路径
-// 输出: Promise<void>
-export async function clearMigrationState(projectPath: string): Promise<void> {
-  return invoke<void>("clear_migration_state", { projectPath });
-}
-
-// 注册迁移进度事件监听器
-// 输入: callback 进度回调函数
-// 输出: Promise<UnlistenFn> 取消监听函数（组件卸载时调用以避免内存泄漏）
-// 流程: 调用 Tauri event API 的 listen 函数订阅 pmd-migration-progress 事件
-// 用途: 在迁移对话框中实时显示进度条与当前处理文件名
-export async function onMigrationProgress(
-  callback: (progress: MigrationProgress) => void
-): Promise<UnlistenFn> {
-  return listen<MigrationProgress>(MIGRATION_PROGRESS_EVENT, (event) => {
-    callback(event.payload);
-  });
-}
-
 // ===== 全文索引与搜索（Tantivy + jieba 中文分词）=====
 //
 // 功能概述：
 // 基于 Tantivy 全文索引引擎，提供项目级全文搜索能力。
-// 支持中文分词（jieba）、异步索引构建、增量更新、按场景/类型过滤（AI-Ready）。
+// 支持中文分词（jieba）、异步索引构建、增量更新。
 // 索引存储于 .novelforge/index/ 目录，与项目元数据隔离。
 //
 // 设计说明：
 // - 所有索引操作通过 Tauri 命令调用 Rust 后端
 // - 索引构建进度通过 "index-progress" 事件推送到前端
-// - AI-Ready: 支持 chunk_type（manuscript/setting/outline）和 scene_id 过滤
 
 // 索引构建进度事件 payload（与后端 IndexProgress 对应）
 export interface IndexProgress {
@@ -962,10 +790,6 @@ export interface TantivySearchRequest {
   query: string;
   // 返回结果上限（默认 50）
   limit?: number;
-  // AI-Ready: 按类型过滤（manuscript/setting/outline）
-  chunk_type?: string;
-  // AI-Ready: 按场景 ID 过滤
-  scene_id?: string;
 }
 
 // 搜索响应（与后端 SearchResponse 对应）
@@ -1083,21 +907,8 @@ export interface SettingBrief {
   summary: string;
 }
 
-// 伏笔简要信息（用于场景上下文中的活跃伏笔提醒）
-export interface ForeshadowingBrief {
-  // 伏笔 ID
-  id: string;
-  // 伏笔描述
-  description: string;
-  // 状态（已埋设/已回收/待回收）
-  status: string;
-  // 重要度（高/中/低）
-  importance: string;
-}
-
 // 场景上下文（AI 续写的核心数据）
 // AI 价值：这是 AI 理解"剧情结构"的锚点
-// AI-2 扩展: currentSceneText (层1) + globalUnresolvedForeshadowings (层3b)
 export interface SceneContext {
   // 场景 ID（关联 sceneBreak 节点 id）
   sceneId: string;
@@ -1117,12 +928,8 @@ export interface SceneContext {
   presentCharacters: CharacterBrief[];
   // 相关设定引用（从设定库提取，如地点/物品/组织）
   relatedSettings: SettingBrief[];
-  // 活跃伏笔列表（从伏笔追踪提取）
-  activeForeshadowings: ForeshadowingBrief[];
   // AI-2 层1: 当前场景正文文本（从 .pmd ProseMirror JSON 提取的纯文本）
   currentSceneText: string;
-  // AI-2 层3b: 全局未回收伏笔（跨章节/跨场景的活跃伏笔）
-  globalUnresolvedForeshadowings: ForeshadowingBrief[];
 }
 
 // 角色出场记录
@@ -1193,8 +1000,6 @@ export interface ProjectContext {
   keySettings: SettingBrief[];
   // 已完成章节摘要（从 Tantivy 索引检索，前 200 字）
   chapterSummaries: ChapterSummary[];
-  // 活跃伏笔列表（状态为"已埋设"或"待回收"）
-  activeForeshadowings: ForeshadowingBrief[];
   // 总字数
   totalWords: number;
   // 章节数
@@ -1215,8 +1020,8 @@ export interface SceneContextRequest {
 // 获取场景上下文（AI-2 四层上下文组装）
 // 输入: req 场景上下文请求（项目路径 + 章节 ID + 场景索引）
 // 输出: Promise<SceneContext> 场景上下文（含 4 层数据）
-// 用途: AI 续写时提供当前场景正文/出场角色/伏笔/前文摘要
-// 实现状态: AI-2 已实现后端 4 层组装（读取 .pmd + 设定库 + 伏笔目录）
+// 用途: AI 续写时提供当前场景正文/出场角色/前文摘要
+// 实现状态: AI-2 已实现后端 4 层组装（读取 .pmd + 设定库）
 export async function getSceneContext(
   req: SceneContextRequest
 ): Promise<SceneContext> {
@@ -1244,34 +1049,4 @@ export async function getProjectContext(
   projectPath: string
 ): Promise<ProjectContext> {
   return invoke<ProjectContext>("get_project_context", { projectPath });
-}
-
-// 伏笔详细信息（用于伏笔追踪面板展示）
-// 相比 ForeshadowingBrief 增加埋设/回收/备注/来源文件字段
-export interface ForeshadowingDetail {
-  // 伏笔名称（作为 ID）
-  name: string;
-  // 状态（已埋设/待回收/已回收/已放弃 等）
-  status: string;
-  // 埋设位置描述
-  setup: string;
-  // 回收位置描述（未回收时为空）
-  payoff: string;
-  // 重要度（高/中/低）
-  importance: string;
-  // 备注
-  remark: string;
-  // 来源文件相对路径（相对于项目根）
-  sourceFile: string;
-}
-
-// 扫描项目全部伏笔（供伏笔追踪面板使用）
-// 输入: projectPath 项目根路径
-// 输出: Promise<ForeshadowingDetail[]> 全部伏笔详细列表（含已回收/已放弃）
-// 用途: 伏笔追踪面板按状态分组展示，点击跳转伏笔文件编辑
-// 实现: 后端扫描 伏笔/伏笔记录/系列伏笔 目录，解析 .txt 表格行
-export async function scanForeshadowings(
-  projectPath: string
-): Promise<ForeshadowingDetail[]> {
-  return invoke<ForeshadowingDetail[]>("scan_foreshadowings", { projectPath });
 }

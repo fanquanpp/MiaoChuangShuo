@@ -226,7 +226,7 @@ export default function Launcher({ onOpenProject }: LauncherProps): JSX.Element 
         <div className="launcher-notice">
           <strong>提示:</strong>
           在线体验版数据存储在浏览器本地 (IndexedDB), 清除浏览器数据将导致丢失。
-          桌面版提供 AI 助手、人物图谱、剧情时间线、设定库、伏笔追踪、版本快照等完整功能, 且数据以文件形式持久保存。
+          桌面版提供 AI 助手、人物图谱、剧情时间线、设定库、版本快照等完整功能, 且数据以文件形式持久保存。
         </div>
       </section>
 

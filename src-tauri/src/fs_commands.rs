@@ -21,7 +21,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::tantivy_indexer;
 use crate::text_extractor;
 use crate::project_template::{
-    create_project_meta_v2, is_legacy_project as detect_legacy, render_template,
+    create_project_meta_v2, render_template,
     standard_template_files, universal_directories, ProjectMeta, StandardProjectType, TemplateVars,
 };
 
@@ -163,13 +163,13 @@ fn validate_project_path(project_path: &str) -> Result<PathBuf, String> {
 }
 
 /// 创建小说项目命令
-/// 输入: name 项目名称, type_str 文体类型(兼容旧版 8 种字符串), genre 题材(可选),
+/// 输入: name 项目名称, type_str 文体类型(novel/script/essay), genre 题材(可选),
 ///       author 作者, description 描述, parent_path 父目录
 /// 输出: Result<String, String> 项目根目录路径或错误
 /// 流程:
 ///   1. 校验项目名称合法性
-///   2. 解析标准文体类型(旧版字符串自动映射到 Novel/Script/Essay)
-///   3. 创建统一一级目录(正文/设定/大纲/伏笔/草稿箱/.novelforge)
+///   2. 解析标准文体类型(Novel/Script/Essay)
+///   3. 创建统一一级目录(正文/设定/大纲/草稿箱/.novelforge)
 ///   4. 写入文体对应的预设引导文件
 ///   5. 写入项目元数据文件
 ///   6. 创建自定义模板目录(如果有)
@@ -193,7 +193,7 @@ pub fn create_project(
         return Err("项目名称包含非法字符".to_string());
     }
 
-    // 解析为标准文体类型(Novel/Script/Essay),旧版 8 种字符串自动映射
+    // 解析为标准文体类型(Novel/Script/Essay)
     let project_type = StandardProjectType::from_str(&type_str);
     let project_root = PathBuf::from(&parent_path).join(&name);
 
@@ -468,25 +468,6 @@ pub fn import_project(project_path: String) -> Result<ProjectInfo, String> {
 pub fn read_project_tree(project_path: String) -> Result<Vec<FileNode>, String> {
     let path = validate_project_path(&project_path)?;
     read_dir_recursive(&path, &path)
-}
-
-/// 检测项目是否为旧版目录结构
-///
-/// 输入: project_path 项目根目录路径
-/// 输出: Result<bool, String> 是否为旧版项目
-/// 流程:
-///   1. 校验项目路径
-///   2. 调用 project_template::is_legacy_project 检测旧版独有目录
-///   3. 返回检测结果（true 时前端弹出迁移提示对话框）
-///
-/// 兼容说明：
-///   旧版 8 种目录名（角色/世界观/术语/剧情图谱/正文/大纲/素材/.novelforge）
-///   新版 6 种目录名（正文/设定/大纲/伏笔/草稿箱/.novelforge）
-///   存在旧版独有目录即判定为旧版项目，触发 LegacyProjectMigrationDialog
-#[tauri::command]
-pub fn is_legacy_project(project_path: String) -> Result<bool, String> {
-    let path = validate_project_path(&project_path)?;
-    Ok(detect_legacy(&path))
 }
 
 /// 文件节点结构
@@ -1627,294 +1608,6 @@ fn case_insensitive_replace(content: &str, query: &str, replacement: &str) -> St
     }
     result.push_str(remaining);
     result
-}
-
-// ===== 分卷章节生成命令 =====
-
-/// 单个章节生成结果项
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct VolumeChapterResult {
-    /// 文件相对路径（相对项目根）
-    pub relative_path: String,
-    /// 章节标题
-    pub chapter_title: String,
-    /// 是否为卷首语
-    pub is_prologue: bool,
-    /// 是否为卷尾语
-    pub is_epilogue: bool,
-    /// 是否已存在（跳过创建）
-    pub already_exists: bool,
-}
-
-/// 分卷章节生成结果
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct VolumeGenerationResult {
-    /// 卷名（子目录名）
-    pub volume_name: String,
-    /// 创建的文件数（不含已存在）
-    pub created_count: u64,
-    /// 跳过文件数（已存在）
-    pub skipped_count: u64,
-    /// 各文件详情
-    pub chapters: Vec<VolumeChapterResult>,
-}
-
-/// 中文数字映射（1-99）
-fn number_to_chinese(n: u64) -> String {
-    const UNITS: [&str; 10] = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-    if n == 0 {
-        return "零".to_string();
-    }
-    if n < 10 {
-        return UNITS[n as usize].to_string();
-    }
-    if n < 20 {
-        if n == 10 {
-            return "十".to_string();
-        }
-        return format!("十{}", UNITS[(n - 10) as usize]);
-    }
-    if n < 100 {
-        let tens = n / 10;
-        let ones = n % 10;
-        if ones == 0 {
-            return format!("{}十", UNITS[tens as usize]);
-        }
-        return format!("{}十{}", UNITS[tens as usize], UNITS[ones as usize]);
-    }
-    // 100+ 直接用阿拉伯数字
-    n.to_string()
-}
-
-/// 根据格式生成章节标题（旧版保留用于兼容，新版使用模板）
-/// 输入:
-///   chapter_num 章节序号
-///   volume_num 卷序号（可选，已不用于追加卷标识）
-///   format_str 格式字符串: "chinese" | "arabic" | "english"
-/// 输出: 章节标题字符串
-#[allow(dead_code)]
-fn format_chapter_title(chapter_num: u64, volume_num: Option<u64>, format_str: &str) -> String {
-    // 与前端 formatChapterHeading 保持一致：
-    //   chinese → "第一章"
-    //   arabic  → "01"（纯数字零填充）
-    //   english → "Chapter 1"
-    let _ = volume_num; // 卷号不再用于追加卷标识
-    match format_str {
-        "arabic" => format!("{:02}", chapter_num),
-        "english" => format!("Chapter {}", chapter_num),
-        _ => format!("第{}章", number_to_chinese(chapter_num)),
-    }
-}
-
-/// 根据用户模板生成章节标题
-/// 输入:
-///   chapter_num 章节序号
-///   template 模板字符串（含 {n} 占位符）
-/// 输出: 章节标题字符串
-/// 流程: 若模板为空或不含 {n}，回退为 "第{n}章" 后替换 {n} 为章节序号
-fn format_chapter_title_by_template(chapter_num: u64, template: &str) -> String {
-    let tpl = if template.is_empty() || !template.contains("{n}") {
-        "第{n}章"
-    } else {
-        template
-    };
-    tpl.replace("{n}", &chapter_num.to_string())
-}
-
-/// 根据格式生成卷首/卷尾语标题
-fn format_volume_prelude(volume_num: u64, is_prologue: bool) -> String {
-    let cn = number_to_chinese(volume_num);
-    if is_prologue {
-        format!("第{}卷·卷首语", cn)
-    } else {
-        format!("第{}卷·卷尾语", cn)
-    }
-}
-
-/// 为分卷批量生成章节文件
-/// 输入:
-///   project_path 项目根路径
-///   volume_name 分卷名（"正文"下的子目录名，如"第一卷"）
-///   chapter_count 章节数量
-///   start_chapter_num 起始章节序号（默认1）
-///   include_prologue 是否生成卷首语
-///   include_epilogue 是否生成卷尾语
-///   format_str 标题格式（保留兼容，已不直接用于标题生成）
-///   chapter_name_template 章节文件名模板（含 {n} 占位符）
-/// 输出: Result<VolumeGenerationResult, String> 生成结果统计
-/// 流程:
-///   1. 校验项目路径与分卷名
-///   2. 在"正文/{volume_name}"下创建目录
-///   3. 按需生成卷首语、N 个章节、卷尾语
-///   4. 已存在的文件跳过，不覆盖
-///   5. 返回各文件创建详情
-/// 说明: 章节文件名仅由 chapter_name_template 生成，不再追加"（第X卷）"标识，
-///      因文件已归类到分卷子目录，卷号信息由目录承载
-#[tauri::command]
-pub fn generate_volume_chapters(
-    project_path: String,
-    volume_name: String,
-    chapter_count: u64,
-    start_chapter_num: Option<u64>,
-    include_prologue: Option<bool>,
-    include_epilogue: Option<bool>,
-    format_str: Option<String>,
-    chapter_name_template: Option<String>,
-) -> Result<VolumeGenerationResult, String> {
-    if volume_name.trim().is_empty() {
-        return Err("分卷名不能为空".to_string());
-    }
-    if chapter_count == 0 {
-        return Err("章节数量必须大于 0".to_string());
-    }
-    let root = validate_project_path(&project_path)?;
-    let manuscript_dir = root.join("正文");
-    if !manuscript_dir.exists() {
-        return Err("正文目录不存在，请确认项目结构".to_string());
-    }
-    let volume_dir = manuscript_dir.join(&volume_name);
-    fs::create_dir_all(&volume_dir).map_err(|e| format!("创建分卷目录失败: {}", e))?;
-
-    let start_num = start_chapter_num.unwrap_or(1);
-    let with_prologue = include_prologue.unwrap_or(false);
-    let with_epilogue = include_epilogue.unwrap_or(false);
-    let _fmt = format_str.unwrap_or_else(|| "chinese".to_string());
-    let name_template = chapter_name_template.unwrap_or_else(|| "第{n}章".to_string());
-
-    // 推算卷序号：从 volume_name 中提取数字，否则用 1
-    let volume_num = extract_volume_number(&volume_name).unwrap_or(1);
-
-    let mut chapters: Vec<VolumeChapterResult> = Vec::new();
-    let mut created_count: u64 = 0;
-    let mut skipped_count: u64 = 0;
-
-    // 卷首语
-    if with_prologue {
-        let title = format_volume_prelude(volume_num, true);
-        let file_name = "卷首语.txt";
-        let file_path = volume_dir.join(file_name);
-        let rel = relative_path_from(&file_path, &root);
-        let already_exists = file_path.exists();
-        if !already_exists {
-            let content = format!("{}\n\n", title);
-            if let Err(e) = fs::write(&file_path, content) {
-                return Err(format!("写入卷首语失败: {}", e));
-            }
-            created_count += 1;
-        } else {
-            skipped_count += 1;
-        }
-        chapters.push(VolumeChapterResult {
-            relative_path: rel,
-            chapter_title: title,
-            is_prologue: true,
-            is_epilogue: false,
-            already_exists,
-        });
-    }
-
-    // N 个章节：文件名仅由用户模板生成，不再追加卷号标识
-    for i in 0..chapter_count {
-        let chapter_num = start_num + i;
-        let title = format_chapter_title_by_template(chapter_num, &name_template);
-        // 文件名：去重非法字符
-        let safe_title = sanitize_filename(&title);
-        let file_name = format!("{}.txt", safe_title);
-        let file_path = volume_dir.join(file_name);
-        let rel = relative_path_from(&file_path, &root);
-        let already_exists = file_path.exists();
-        if !already_exists {
-            let content = format!("{}\n\n", title);
-            if let Err(e) = fs::write(&file_path, content) {
-                return Err(format!("写入章节失败: {}", e));
-            }
-            created_count += 1;
-        } else {
-            skipped_count += 1;
-        }
-        chapters.push(VolumeChapterResult {
-            relative_path: rel,
-            chapter_title: title,
-            is_prologue: false,
-            is_epilogue: false,
-            already_exists,
-        });
-    }
-
-    // 卷尾语
-    if with_epilogue {
-        let title = format_volume_prelude(volume_num, false);
-        let file_name = "卷尾语.txt";
-        let file_path = volume_dir.join(file_name);
-        let rel = relative_path_from(&file_path, &root);
-        let already_exists = file_path.exists();
-        if !already_exists {
-            let content = format!("{}\n\n", title);
-            if let Err(e) = fs::write(&file_path, content) {
-                return Err(format!("写入卷尾语失败: {}", e));
-            }
-            created_count += 1;
-        } else {
-            skipped_count += 1;
-        }
-        chapters.push(VolumeChapterResult {
-            relative_path: rel,
-            chapter_title: title,
-            is_prologue: false,
-            is_epilogue: true,
-            already_exists,
-        });
-    }
-
-    Ok(VolumeGenerationResult {
-        volume_name,
-        created_count,
-        skipped_count,
-        chapters,
-    })
-}
-
-/// 从卷名中提取数字（"第一卷" → 1，"卷2" → 2，"第3卷" → 3，"第十一卷" → 11）
-fn extract_volume_name_number(name: &str) -> Option<u64> {
-    // 优先匹配阿拉伯数字
-    if let Some(num) = name.chars().filter_map(|c| c.to_digit(10)).next() {
-        return Some(num as u64);
-    }
-    // 中文数字映射（多位数必须放在单数前，避免"十一"被"一"先匹配）
-    let chinese_map: &[(&str, u64)] = &[
-        ("十一", 11), ("十二", 12), ("十三", 13), ("十四", 14), ("十五", 15),
-        ("十六", 16), ("十七", 17), ("十八", 18), ("十九", 19), ("二十", 20),
-        ("一", 1), ("二", 2), ("三", 3), ("四", 4), ("五", 5),
-        ("六", 6), ("七", 7), ("八", 8), ("九", 9), ("十", 10),
-    ];
-    for (cn, num) in chinese_map {
-        if name.contains(cn) {
-            return Some(*num);
-        }
-    }
-    None
-}
-
-/// 简化别名（统一接口）
-fn extract_volume_number(name: &str) -> Option<u64> {
-    extract_volume_name_number(name)
-}
-
-/// 清理文件名中的非法字符
-fn sanitize_filename(name: &str) -> String {
-    name.chars()
-        .filter(|c| !matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
-        .collect::<String>()
-        .trim()
-        .to_string()
-}
-
-/// 计算文件相对路径
-fn relative_path_from(file_path: &Path, root: &Path) -> String {
-    file_path
-        .strip_prefix(root)
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default()
 }
 
 // ===== 自定义模板管理命令 =====

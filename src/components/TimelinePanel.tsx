@@ -281,7 +281,6 @@ export default function TimelinePanel() {
           nodeType: type,
           summary: "",
           coreConflict: "",
-          foreshadowing: "",
           status: "planned",
           order: 0,
           collapsed: false,

@@ -12,7 +12,7 @@
 
 ## 软件简介
 
-喵创说是一款专为独立与业余长篇创作者打造的本地化创作工作站, 坚持"完全离线、完全免费、数据归创作者所有"三大原则。项目针对长篇叙事工作流的特殊需求, 将富文本编辑、剧情时间线、人物关系图、智能设定库、伏笔追踪、命令面板六大核心模块集成于单一桌面应用, 让创作者无需在多个软件之间切换即可完成完整的长篇创作流程。
+喵创说是一款专为独立与业余长篇创作者打造的本地化创作工作站, 坚持"完全离线、完全免费、数据归创作者所有"三大原则。项目针对长篇叙事工作流的特殊需求, 将富文本编辑、剧情时间线、人物关系图、智能设定库、命令面板五大核心模块集成于单一桌面应用, 让创作者无需在多个软件之间切换即可完成完整的长篇创作流程。
 
 ### 核心定位
 
@@ -39,14 +39,14 @@
 - **发布下载**: [https://github.com/fanquanpp/MiaoChuangShuo/releases](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 
 > 在线体验版提供核心创作功能（富文本编辑、章节管理、字数统计、IndexedDB 持久化），适合快速试用。
-> 桌面版提供完整功能（全文搜索、AI 助手、人物图谱、时间线、设定库、伏笔追踪、版本快照等）。
+> 桌面版提供完整功能（全文搜索、AI 助手、人物图谱、时间线、设定库、版本快照等）。
 > 访问在线展示链接可查看完整产品介绍与界面预览, 含 15 张功能截图与 8 大章节内容说明。
 
 ---
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-26.7.27-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/badge/version-26.7.28-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
@@ -65,7 +65,6 @@
 - **中文排版优化**: 首行缩进、中文引号自动配对、诗歌/歌词排版、智能 Tab 角色名选择
 - **自定义语义节点**: SceneBreak 场景分割节点 (携带 povCharacterId/mood 元数据)、characterMention 角色 @ 提及节点
 - **实时实体高亮**: Web Worker + Aho-Corasick 多模式匹配, 自动高亮设定库实体名称, 悬浮卡片展示角色详情
-- **伏笔追踪**: Alt+8 唤起伏笔追踪面板, 自动扫描伏笔目录, 按状态分组展示 (pending/resolved/abandoned)
 
 ### 1.2 图谱可视化
 
@@ -97,11 +96,9 @@
 - **索引管理面板**: 设置面板内嵌索引统计 (文档数/文件数/索引大小/最后构建时间) + 构建/重建按钮 + 实时进度条
 - **全局搜索与替换**: 支持区分大小写、跨文件批量替换, 替换前自动创建快照
 
-### 1.5 项目管理与迁移
+### 1.5 项目管理
 
 - **3 种文体模板**: 长短篇小说 (Novel) / 剧本与脚本 (Script) / 散文与文章 (Essay), 创建时自动生成 6 个标准目录
-- **旧版项目迁移**: 自动检测旧版 8 种目录结构, 弹窗引导迁移至新版 6 种统一目录, 失败自动回滚
-- **.pmd 格式迁移**: 批量将 .txt/.html 转换为 .pmd (ProseMirror JSON), 支持断点续传与进度事件推送
 - **版本快照**: 增量快照归档, 支持项目级版本回溯, 写入前自动清理 .tmp 残留
 
 ### 1.6 AI 创作助手 (AI-1 ~ AI-4)
@@ -111,7 +108,7 @@
 | 阶段 | 能力 | 实现 |
 |------|------|------|
 | AI-1 BYOK 配置 | API Key/Base URL/Model 安全存储, SSE 流式管道 | `aiService.ts` + `ai_config.rs`, Base64 编码持久化 |
-| AI-2 上下文组装 | 4 层上下文: 项目元信息 + 章节大纲 + 当前场景文本 + 未回收伏笔 | `ai_context.rs` + `promptBuilder.ts` + `sceneUtils.ts` |
+| AI-2 上下文组装 | 3 层上下文: 项目元信息 + 章节大纲 + 当前场景文本 | `ai_context.rs` + `promptBuilder.ts` + `sceneUtils.ts` |
 | AI-3.1 工具栏触发 | 编辑器工具栏 AI 助手按钮, Ctrl+Shift+A 快捷键 | `EditorToolbar.tsx` + `NovelEditor.tsx` |
 | AI-3.2 侧边栏对话 | 右侧滑出面板, 多轮对话历史, 流式输出, 插入到文档 | `AiAssistantPanel.tsx` |
 | AI-3.4 选区右键菜单 | 润色/扩写/缩写/角色一致性检查, 角色悬停卡片 AI 操作 | `EditorBubbleMenu.tsx` + `CharacterHoverCard.tsx` |
@@ -141,7 +138,7 @@ NovelEditor 光标位置
 **Sprint 6 真实上下文数据**:
 
 - `get_character_context`: 从设定库读取角色完整设定 + Tantivy 检索出场记录 + 人物关系图读取关系列表
-- `get_project_context`: 读取项目元数据 + 提取主要角色/关键设定 + 扫描章节摘要 + 加载活跃伏笔 + 统计字数/章节数
+- `get_project_context`: 读取项目元数据 + 提取主要角色/关键设定 + 扫描章节摘要 + 统计字数/章节数
 
 **用户指令注入策略**: 不修改 `buildContinuationPrompt` 等签名, 通过 `${system}\n\n用户额外指令: ${instruction}` 追加, 保持零侵入。
 
@@ -216,7 +213,6 @@ NovelEditor 光标位置
 | `Alt + 3` | 切换到设定库 |
 | `Alt + 4` | 切换到统计 |
 | `Alt + 5` | 切换到搜索 |
-| `Alt + 6` | 切换到卷宗 |
 
 ---
 
@@ -364,7 +360,7 @@ MiaoChuangShuo/
 │   │   ├── lib.rs                      # Tauri 命令注册入口
 │   │   ├── main.rs                     # 程序入口
 │   │   ├── fs_commands.rs              # 文件系统 IO (原子写入、目录扫描)
-│   │   ├── project_template.rs         # 项目模板生成器 (3 种文体 + 旧版检测)
+│   │   ├── project_template.rs         # 项目模板生成器 (3 种标准文体)
 │   │   ├── template_schema.rs          # 模板 Schema 定义与校验
 │   │   ├── codex_commands.rs           # 设定库命令 (扫描、解析、YAML front matter)
 │   │   ├── character_commands.rs       # 角色管理命令
@@ -374,11 +370,9 @@ MiaoChuangShuo/
 │   │   ├── word_count.rs              # 字数统计引擎
 │   │   ├── editor_preferences.rs       # 编辑器偏好配置 (用户级 + 项目级)
 │   │   ├── text_extractor.rs          # 文本格式提取 (PlainText/Html/PmdJson/JsonFrontMatter)
-│   │   ├── pmd_migration.rs           # .pmd 格式迁移 (批量转换 + 断点续传)
 │   │   ├── tantivy_indexer.rs         # Tantivy 全文索引器 (Schema + 分块索引)
 │   │   ├── tantivy_search.rs          # Tantivy 全文搜索 (jieba 中文分词)
 │   │   ├── ai_context.rs              # AI 上下文提取 (场景/角色/项目级 Mock 接口)
-│   │   └── legacy_migration.rs        # 旧版项目目录结构迁移 (备份 + 回滚)
 │   ├── Cargo.toml
 │   ├── build.rs
 │   └── tauri.conf.json
@@ -415,8 +409,6 @@ MiaoChuangShuo/
 │   │   ├── EditProjectDialog.tsx       # 编辑项目设定对话框
 │   │   ├── CreateFileWizard.tsx        # 四步文件创建向导
 │   │   ├── CreateFileDialog.tsx        # 快速创建文件对话框
-│   │   ├── VolumeManager.tsx           # 卷宗管理
-│   │   ├── VolumeChapterGenerator.tsx  # 卷章批量生成
 │   │   ├── OutlineToChapters.tsx       # 大纲转章节
 │   │   ├── TemplateManager.tsx         # 模板管理
 │   │   ├── SettingsDialog.tsx          # 设置对话框
@@ -430,7 +422,6 @@ MiaoChuangShuo/
 │   │   ├── WelcomeDialog.tsx           # 欢迎对话框
 │   │   ├── UpdateNoticeDialog.tsx      # 版本更新通知对话框
 │   │   ├── ProjectArchiveDialog.tsx    # 项目归档对话框
-│   │   ├── LegacyProjectMigrationDialog.tsx # 旧版项目迁移对话框
 │   │   ├── GlobalTooltip.tsx           # 全局提示组件
 │   │   ├── SkeletonComponents.tsx      # 骨架屏组件
 │   │   └── ...                         # 其他辅助组件
@@ -459,7 +450,6 @@ MiaoChuangShuo/
 │   │   ├── eventBusSlice.ts            # Tauri 事件总线状态切片
 │   │   ├── promptBuilder.ts            # AI Prompt 统一构建器 (System+User+Constraints)
 │   │   ├── aiService.ts                # AI 服务层 (BYOK 配置 + SSE 流式调用)
-│   │   ├── foreshadowing.ts            # 伏笔追踪数据模型与解析
 │   │   ├── sceneBreak.ts              # 场景分割自定义节点 (pov/mood 元数据)
 │   │   ├── entityHighlightPlugin.ts    # 实体高亮 ProseMirror 插件 (Decoration.inline)
 │   │   ├── entityHighlightClient.ts    # 实体高亮 Web Worker 客户端
@@ -576,14 +566,14 @@ Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
 
 剧情时间线支持分支结构, 但禁止循环依赖。Rust 后端 `timeline_commands.rs` 采用 DFS 三色标记法 (白/灰/黑) 在持久化前校验图谱无环, 检测到回边时拒绝写入并返回错误。
 
-### 8.6 .pmd 存储格式与迁移
+### 8.6 .pmd 存储格式
 
-正文文件采用 `.pmd` 扩展名存储 ProseMirror JSON 文档, 替代旧版 `.txt` 纯文本格式:
+正文文件采用 `.pmd` 扩展名存储 ProseMirror JSON 文档, 替代传统 `.txt` 纯文本格式:
 
 - **格式定义**: `.pmd` 文件内容为纯 JSON (`{"type":"doc","content":[...]}`), 无 `---` front matter 包裹
 - **设定文件区别**: 设定库文件使用 JSON front matter (`---\n{"id":"..."}\n---\n正文`), 由 codex 模块独立管理
-- **迁移工具**: `pmd_migration.rs` 批量将 `.txt`/`.html` 转换为 `.pmd`, 支持断点续传 (`.novelforge/migration_state.json`) 与进度事件推送
-- **安全策略**: 迁移前自动创建 `.bak` 备份, 原子写入 (临时文件 + rename), 失败时保留备份可手动恢复
+- **原子写入**: 写入采用临时文件 + rename 原子策略, 保证崩溃或断电时文件不会半写入损坏
+- **codex 内部转换**: 用户在设定库手动创建 .txt 文件时, `migrate_codex_txt_to_pmd` 命令自动转换为 .pmd 格式, 保证设定库格式一致性
 
 ### 8.7 Tantivy 全文索引
 
@@ -595,15 +585,6 @@ Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
 - **双后端搜索切换**: 全局搜索面板 (GlobalSearch.tsx) 支持"精确匹配"(searchInProject 按行扫描) 与"语义搜索"(searchProject 走 Tantivy) 一键切换, 精确匹配支持大小写与替换, 语义搜索支持中文分词与场景级 Chunk 召回
 - **增量索引更新**: 编辑器保存后 500ms 防抖触发 `update_file_index` (先删后建策略); 文件删除/重命名时 FileList 自动清理对应索引文档 (.txt + .pmd 双路径); 项目首次打开时 Workspace 检测空索引并后台全量构建
 - **索引管理面板**: IndexManagerPanel 嵌入设置对话框, 展示统计 (文档数/文件数/索引大小/最后构建时间) + 构建/重建按钮 + index-progress 事件实时进度条
-
-### 8.8 旧版项目目录迁移
-
-`legacy_migration.rs` 将旧版 8 种目录结构迁移至新版 6 种统一目录:
-
-- **迁移映射**: 角色/世界观/术语 → 设定/子目录; 素材 → 草稿箱/素材/; 剧情图谱保留不动
-- **备份策略**: 迁移前在 `.novelforge/migration_backup_{timestamp}/` 创建完整备份
-- **回滚机制**: 任一文件迁移失败时自动触发回滚, 遍历备份目录恢复原位置, 删除已迁移的新位置文件
-- **进度推送**: 通过 `migration:progress` Tauri Event 实时推送 done/total/currentFile 进度
 
 </details>
 

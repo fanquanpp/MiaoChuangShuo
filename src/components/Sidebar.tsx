@@ -26,7 +26,6 @@ import {
   Search,
   Layers,
   Settings,
-  BookOpen,
   Folder,
   PanelLeft,
   PanelLeftClose,
@@ -34,7 +33,6 @@ import {
   Trash2,
   X,
   Users,
-  Bookmark,
 } from "lucide-react";
 import {
   useAppStore,
@@ -42,7 +40,6 @@ import {
   CATEGORY_DIRS,
 } from "../lib/store";
 import { getTypeSpecificDirs } from "../lib/templateRegistry";
-import { isMultiVolumeLike } from "../lib/projectType";
 import { CODEX_TYPE_DIRS } from "../lib/codexApi";
 import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
@@ -57,14 +54,12 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   codex: Library,
   stats: BarChart3,
   search: Search,
-  volumes: BookOpen,
   timeline: GitBranch,
   characterGraph: Users,
-  foreshadowing: Bookmark,
 };
 
-// 写作主分类：核心写作功能，常驻显示（含剧情图谱/人物关系图/伏笔追踪，归类到写作）
-const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline", "characterGraph", "foreshadowing"];
+// 写作主分类：核心写作功能，常驻显示（含剧情图谱/人物关系图，归类到写作）
+const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline", "characterGraph"];
 
 // 设定类分类：统一设定库入口（替代原 characters/worldview/glossary/materials 分散入口）
 const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex"];
@@ -128,12 +123,6 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
 
   // 分类切换：优先使用外部传入的保存后切换回调
   const switchTo = onSwitchCategory || setActiveCategory;
-
-  // 是否为分卷类型（决定是否显示分卷入口）
-  const showVolumeEntry = useMemo(() => {
-    const type = currentProject?.meta?.type;
-    return isMultiVolumeLike(type);
-  }, [currentProject]);
 
   // 根据项目类型获取专属目录列表
   const typeSpecificDirs = useMemo(() => {
@@ -405,27 +394,6 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
 
         {/* 分隔线:折叠时隐藏 */}
         {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
-
-        {/* 分卷管理入口（仅对分卷类型项目显示） */}
-        {showVolumeEntry && (
-          <>
-            <button
-              onClick={() => switchTo("volumes" as SidebarCategory)}
-              title={t("sidebar.volumes")}
-              className={`nf-sidebar-item nf-sidebar-tertiary w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-2 px-3"} py-2 text-sm relative group ${
-                activeCategory === "volumes"
-                  ? `nf-active bg-fandex-tertiary/10 text-fandex-tertiary`
-                  : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
-              }`}
-            >
-              <BookOpen className={`w-4 h-4 flex-shrink-0 transition-transform duration-fast ${
-                activeCategory === "volumes" ? 'scale-110' : ''
-              }`} />
-              {!collapsed && <span className="truncate">{t("sidebar.volumes")}</span>}
-            </button>
-            {!collapsed && <div className="mx-3 my-2 border-t border-nf-border-light/60" />}
-          </>
-        )}
 
         {/* 类型专属目录（模板扩展）- 可折叠 */}
         {typeSpecificDirs.length > 0 && (

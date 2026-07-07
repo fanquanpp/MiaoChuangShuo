@@ -47,29 +47,22 @@ import { useToast } from "../lib/toast";
  * 输出: SidebarCategory 分类字符串
  * 流程:
  *   1. 提取路径首段目录名
- *   2. 优先匹配 5 个标准目录（正文/设定/大纲/伏笔/草稿箱）
- *   3. 降级匹配旧版兼容目录名（旧项目迁移前仍需识别）
+ *   2. 优先匹配 4 个标准目录（正文/设定/大纲/草稿箱）
+ *   3. 降级匹配设定库兼容目录名（与 CODEX_TYPE_DIRS 对齐）
  *   4. 默认归入正文类
- * 设计说明：标准目录映射为主表，兼容层为降级表，
- *   迁移专项完成后旧目录名将不再出现，兼容层可安全移除。
  */
 function detectCategoryFromPath(relativePath: string): string {
   const firstDir = relativePath.split(/[\\/]/)[0] || "";
-  // 5 个标准一级目录映射（架构重构后的统一目录结构）
+  // 4 个标准一级目录映射（统一目录结构）
   const standardMap: Record<string, string> = {
     "正文": "manuscript",
     "设定": "codex",
     "大纲": "outline",
-    "伏笔": "outline",
     "草稿箱": "manuscript",
   };
-  // 旧版兼容目录映射（旧项目迁移前的降级识别，迁移后可移除）
-  const legacyMap: Record<string, string> = {
+  // 设定库兼容目录映射（与 CODEX_TYPE_DIRS 对齐，用于识别散落的设定子目录）
+  const codexDirMap: Record<string, string> = {
     "草稿": "manuscript",
-    "伏笔记录": "outline",
-    "系列伏笔": "outline",
-    "卷宗": "volumes",
-    "分卷": "volumes",
     "角色": "codex",
     "人物": "codex",
     "世界观": "codex",
@@ -79,7 +72,7 @@ function detectCategoryFromPath(relativePath: string): string {
     "资料": "codex",
     "时间线": "codex",
   };
-  return standardMap[firstDir] || legacyMap[firstDir] || "manuscript";
+  return standardMap[firstDir] || codexDirMap[firstDir] || "manuscript";
 }
 
 export default function GlobalSearch() {

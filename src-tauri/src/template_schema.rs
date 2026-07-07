@@ -681,10 +681,8 @@ fn outline_chapter_template() -> TemplateSchema {
                 "List",
                 vec![
                     FieldDef::richtext("key_points", "情节要点"),
-                    FieldDef::text("foreshadowing_plant", "埋设伏笔"),
-                    FieldDef::text("foreshadowing_payoff", "回收伏笔"),
                 ],
-            ).desc("本章的情节推进与伏笔安排"),
+            ).desc("本章的情节推进"),
             TemplateModule::new(
                 "target",
                 "写作目标",

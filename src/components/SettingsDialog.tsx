@@ -81,8 +81,6 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
     chapterFormat,
     autoFillBookTitle,
     autoOutlineSkeleton,
-    diaryAutoDate,
-    weatherAutoFill,
     autoNumbering,
     autoTemplateFill,
     indentEnabled,
@@ -99,8 +97,6 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
     setChapterFormat,
     setAutoFillBookTitle,
     setAutoOutlineSkeleton,
-    setDiaryAutoDate,
-    setWeatherAutoFill,
     setAutoNumbering,
     setAutoTemplateFill,
     setIndentEnabled,
@@ -118,7 +114,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
 
   // ===== 版本更新检测状态 =====
   // 当前应用版本号（组件挂载时异步获取）
-  const [currentVersion, setCurrentVersion] = useState("26.7.27");
+  const [currentVersion, setCurrentVersion] = useState("26.7.28");
   // 检查中状态（控制按钮 loading 动画）
   const [checking, setChecking] = useState(false);
   // 检测到的新版本信息（null=未检测到或未检查）
@@ -509,42 +505,6 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
             </div>
 
             <div className="space-y-3">
-              {/* 日记自动添加日期 */}
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={diaryAutoDate}
-                  onChange={(e) => setDiaryAutoDate(e.target.checked)}
-                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
-                />
-                <div>
-                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
-                    {t("settings.diaryAutoDate")}
-                  </span>
-                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
-                    {t("settings.diaryAutoDateDesc")}
-                  </p>
-                </div>
-              </label>
-
-              {/* 天气自动填充 */}
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={weatherAutoFill}
-                  onChange={(e) => setWeatherAutoFill(e.target.checked)}
-                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
-                />
-                <div>
-                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
-                    {t("settings.weatherAutoFill")}
-                  </span>
-                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
-                    {t("settings.weatherAutoFillDesc")}
-                  </p>
-                </div>
-              </label>
-
               {/* 章节自动编号 */}
               <label className="flex items-center gap-3 cursor-pointer group">
                 <input
@@ -728,24 +688,6 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
                   </span>
                   <p className="text-[10px] text-nf-text-tertiary mt-0.5">
                     {t("settings.featureSmartQuotesHint")}
-                  </p>
-                </div>
-              </label>
-
-              {/* 伏笔标记开关 */}
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={preferences.enableForeshadowMark}
-                  onChange={(e) => updatePreference("enableForeshadowMark", e.target.checked)}
-                  className="w-4 h-4 accent-fandex-primary cursor-pointer"
-                />
-                <div>
-                  <span className="text-xs text-nf-text-secondary group-hover:text-nf-text transition-colors">
-                    {t("settings.featureForeshadowMark")}
-                  </span>
-                  <p className="text-[10px] text-nf-text-tertiary mt-0.5">
-                    {t("settings.featureForeshadowMarkHint")}
                   </p>
                 </div>
               </label>

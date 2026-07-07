@@ -37,21 +37,6 @@ const INDEX_DIR_NAME: &str = "index";
 /// 设计依据：单段落通常 200-800 字，1000 字上限可保证查询结果具备完整语义
 const CHUNK_MAX_CHARS: usize = 1000;
 
-/// 索引文档结构（对应 Schema 字段）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IndexedChunk {
-    /// 文件相对路径（相对于项目根，含"正文/"前缀）
-    pub file_path: String,
-    /// 文件名（含扩展名）
-    pub file_name: String,
-    /// Chunk 在文件中的序号（从 0 开始）
-    pub chunk_index: u32,
-    /// Chunk 文本内容
-    pub text: String,
-    /// 文件最后修改时间（ISO 8601）
-    pub updated_at: String,
-}
-
 /// 索引构建进度事件 payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexProgress {

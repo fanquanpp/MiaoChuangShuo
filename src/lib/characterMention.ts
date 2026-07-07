@@ -14,7 +14,7 @@
 //    - attrs.characterId 关联设定库 CodexMeta.id（UUID v4）
 //    - attrs.name 显示名（与设定库 CodexMeta.name 同步）
 //    - 渲染为 span.nf-character-mention，支持点击跳转设定库
-//    - 用于阶段 5 实体高亮、悬停卡片、伏笔追踪的统一锚点
+//    - 用于阶段 5 实体高亮、悬停卡片的统一锚点
 //
 // 模块职责：
 // 1. CharacterMention: 段落级前缀补全（剧本模式）

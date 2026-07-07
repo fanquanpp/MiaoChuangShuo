@@ -21,11 +21,9 @@ mod character_graph_commands;
 mod word_count;
 mod editor_preferences;
 mod text_extractor;
-mod pmd_migration;
 mod tantivy_indexer;
 mod tantivy_search;
 mod ai_context;
-mod legacy_migration;
 mod ai_config;
 mod ai_commands;
 
@@ -54,7 +52,6 @@ pub fn run() {
             fs_commands::update_project_meta,
             // 文件操作命令
             fs_commands::read_project_tree,
-            fs_commands::is_legacy_project,
             fs_commands::read_file,
             fs_commands::write_file,
             fs_commands::create_file,
@@ -65,8 +62,6 @@ pub fn run() {
             fs_commands::search_in_project,
             fs_commands::replace_in_project,
             fs_commands::get_writing_stats,
-            // 分卷章节生成命令
-            fs_commands::generate_volume_chapters,
             // 项目导入导出命令
             fs_commands::export_project,
             fs_commands::import_archive,
@@ -112,10 +107,6 @@ pub fn run() {
             editor_preferences::set_user_preferences,
             editor_preferences::get_project_config,
             editor_preferences::set_project_config,
-            // .pmd 格式迁移命令
-            pmd_migration::migrate_project_to_pmd,
-            pmd_migration::get_migration_state,
-            pmd_migration::clear_migration_state,
             // 全文索引与搜索命令（Tantivy + jieba 中文分词）
             tantivy_search::search_project,
             tantivy_search::build_project_index,
@@ -126,9 +117,6 @@ pub fn run() {
             ai_context::get_scene_context,
             ai_context::get_character_context,
             ai_context::get_project_context,
-            ai_context::scan_foreshadowings,
-            // 旧版项目目录结构迁移命令
-            legacy_migration::migrate_legacy_project,
             // AI 配置管理命令（BYOK 模式：API Key/Base URL/Model 持久化）
             ai_config::get_ai_config,
             ai_config::set_ai_config,

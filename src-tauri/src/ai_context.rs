@@ -2,7 +2,7 @@
 //
 // 功能概述：
 // 为 AI 功能（续写、推演、一致性校验）提供结构化上下文数据。
-// 基于 Tantivy 索引、设定库数据、伏笔追踪、人物关系图，提取场景/角色/项目级上下文。
+// 基于 Tantivy 索引、设定库数据、人物关系图，提取场景/角色/项目级上下文。
 //
 // 模块职责：
 // 1. 提供 get_scene_context 命令（获取场景级上下文，用于 AI 续写，AI-2 已实现）
@@ -11,15 +11,14 @@
 // 4. 为 AI Prompt Builder 提供结构化数据源
 //
 // 设计说明：
-// - get_scene_context (AI-2) 已实现 4 层上下文组装:
+// - get_scene_context (AI-2) 已实现 3 层上下文组装:
 //     层1: 当前场景元数据 + 场景正文文本 (current_scene_text)
 //     层2: 当前场景出场角色 (present_characters, 从设定库匹配)
-//     层3: 场景内伏笔 + 全局未回收伏笔 (active_foreshadowings + global_unresolved_foreshadowings)
-//     层4: 前文摘要 (preceding_summary, 前 1-2 个场景的文本)
+//     层3: 前文摘要 (preceding_summary, 前 1-2 个场景的文本)
 // - get_character_context (Sprint 6) 已实现真实数据组装:
 //     从设定库读取角色全文 + Tantivy 检索出场记录 + 人物关系图读取关系
 // - get_project_context (Sprint 6) 已实现真实数据组装:
-//     项目元数据 + 主要角色 + 关键设定 + 章节摘要 + 活跃伏笔 + 字数统计
+//     项目元数据 + 主要角色 + 关键设定 + 章节摘要 + 字数统计
 // - get_scene_context 中 pov_character_id/mood/related_settings 为预留 TODO:
 //     待 sceneBreak 节点 attrs 扩展与设定库语义匹配完善后填充
 // - 所有上下文结构使用 #[serde(rename_all = "camelCase")] 匹配前端 camelCase JSON
@@ -62,17 +61,10 @@ pub struct SceneContext {
     pub present_characters: Vec<CharacterBrief>,
     /// 相关设定引用（从设定库提取，如地点/物品/组织）
     pub related_settings: Vec<SettingBrief>,
-    /// 活跃伏笔列表（从伏笔追踪提取，状态为"已埋设"或"待回收"）
-    pub active_foreshadowings: Vec<ForeshadowingBrief>,
     /// AI-2 层1: 当前场景正文文本（从 .pmd ProseMirror JSON 提取的纯文本）
     /// AI 价值: 让 AI 知道"当前场景已写了什么", 自然衔接续写
     #[serde(default)]
     pub current_scene_text: String,
-    /// AI-2 层3: 全局未回收伏笔（跨章节/跨场景的活跃伏笔，从 伏笔/ 目录读取）
-    /// 与 active_foreshadowings 的区别: active_foreshadowings 仅含当前场景内出现的伏笔,
-    /// global_unresolved_foreshadowings 包含整个项目中所有未回收的伏笔, 供 AI 全局视角参考
-    #[serde(default)]
-    pub global_unresolved_foreshadowings: Vec<ForeshadowingBrief>,
 }
 
 /// 角色简要信息（用于场景上下文中的出场角色列表）
@@ -101,41 +93,6 @@ pub struct SettingBrief {
     pub category: String,
     /// 设定摘要
     pub summary: String,
-}
-
-/// 伏笔简要信息（用于场景上下文中的活跃伏笔提醒）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ForeshadowingBrief {
-    /// 伏笔 ID
-    pub id: String,
-    /// 伏笔描述
-    pub description: String,
-    /// 状态（已埋设/已回收/待回收）
-    pub status: String,
-    /// 重要度（高/中/低）
-    pub importance: String,
-}
-
-/// 伏笔详细信息（用于伏笔追踪面板展示）
-/// 相比 ForeshadowingBrief 增加埋设/回收/备注/来源文件字段，供前端面板完整呈现
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ForeshadowingDetail {
-    /// 伏笔名称（作为 ID，兼容旧版无 UUID 的伏笔文件）
-    pub name: String,
-    /// 状态（已埋设/待回收/已回收/已放弃 等）
-    pub status: String,
-    /// 埋设位置描述（如"第3章 雨夜对话"）
-    pub setup: String,
-    /// 回收位置描述（如"第12章 真相揭晓"，未回收时为空）
-    pub payoff: String,
-    /// 重要度（高/中/低）
-    pub importance: String,
-    /// 备注（伏笔的补充说明）
-    pub remark: String,
-    /// 来源文件相对路径（相对于项目根，如 "伏笔/主线伏笔.txt"）
-    pub source_file: String,
 }
 
 /// 角色上下文（AI 角色一致性校验的核心数据）
@@ -191,7 +148,7 @@ pub struct RelationshipBrief {
 /// 项目全局上下文（AI 大纲生成、剧情推演的核心数据）
 ///
 /// AI 价值：当用户请求"帮我生成后续大纲"或"推演剧情走向"时，
-/// AI 需要全局视角的项目信息，包括主要角色、已完成章节、活跃伏笔。
+/// AI 需要全局视角的项目信息，包括主要角色、已完成章节。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectContext {
@@ -207,8 +164,6 @@ pub struct ProjectContext {
     pub key_settings: Vec<SettingBrief>,
     /// 已完成章节摘要（从 Tantivy 索引检索，前 200 字）
     pub chapter_summaries: Vec<ChapterSummary>,
-    /// 活跃伏笔列表（状态为"已埋设"或"待回收"）
-    pub active_foreshadowings: Vec<ForeshadowingBrief>,
     /// 总字数
     pub total_words: u64,
     /// 章节数
@@ -243,7 +198,7 @@ pub struct SceneContextRequest {
     pub scene_index: usize,
 }
 
-/// 获取场景上下文命令（AI-2 四层上下文组装）
+/// 获取场景上下文命令（AI-2 三层上下文组装）
 ///
 /// 输入:
 ///   req - 场景上下文请求（项目路径 + 章节 ID + 场景索引）
@@ -252,15 +207,12 @@ pub struct SceneContextRequest {
 ///   1. 读取 .pmd 文件（ProseMirror JSON），解析文档树
 ///   2. 层1: 定位当前场景（按 scene_index 划分），提取场景正文文本
 ///   3. 层2: 扫描当前场景中的 characterMentionNode 节点，从设定库匹配出场角色
-///   4. 层3a: 提取当前场景中的 foreshadowing Mark（场景内伏笔）
-///   5. 层3b: 扫描 伏笔/ 目录，加载全局未回收伏笔
-///   6. 层4: 提取前 1-2 个场景的文本作为前文摘要（截取前 1000 字）
-///   7. 组装 SceneContext 返回
+///   4. 层3: 提取前 1-2 个场景的文本作为前文摘要（截取前 1000 字）
+///   5. 组装 SceneContext 返回
 ///
 /// 容错策略:
 ///   - .pmd 文件不存在或解析失败: 返回空字段 SceneContext（不阻塞 AI 调用）
 ///   - 设定库为空: present_characters 返回空数组
-///   - 伏笔目录不存在: global_unresolved_foreshadowings 返回空数组
 ///   - 场景索引越界: 使用最后一场景或返回空正文
 #[tauri::command]
 pub async fn get_scene_context(
@@ -282,9 +234,7 @@ pub async fn get_scene_context(
                 preceding_summary: String::new(),
                 present_characters: vec![],
                 related_settings: vec![],
-                active_foreshadowings: vec![],
                 current_scene_text: String::new(),
-                global_unresolved_foreshadowings: vec![],
             });
         }
     };
@@ -309,18 +259,12 @@ pub async fn get_scene_context(
         (String::new(), vec![])
     };
 
-    // 步骤5: 层4 - 前文摘要（前 1-2 个场景的文本，截取前 1000 字）
+    // 步骤5: 层3 - 前文摘要（前 1-2 个场景的文本，截取前 1000 字）
     let preceding_summary = build_preceding_summary(&scene_slices, req.scene_index);
 
     // 步骤6: 层2 - 提取当前场景中的角色 ID 并匹配设定库
     let character_ids = extract_character_ids_from_nodes(&current_scene_nodes);
     let present_characters = match_character_briefs(&req.project_path, &character_ids);
-
-    // 步骤7: 层3a - 提取当前场景中的 foreshadowing Mark（场景内伏笔）
-    let active_foreshadowings = extract_foreshadowings_from_nodes(&current_scene_nodes);
-
-    // 步骤8: 层3b - 加载全局未回收伏笔（从 伏笔/ 目录）
-    let global_unresolved_foreshadowings = load_global_unresolved_foreshadowings(&req.project_path);
 
     Ok(SceneContext {
         scene_id: format!("scene-{}", req.scene_index),
@@ -332,9 +276,7 @@ pub async fn get_scene_context(
         preceding_summary,
         present_characters,
         related_settings: vec![], // TODO: 阶段 6 从设定库匹配地点/物品
-        active_foreshadowings,
         current_scene_text,
-        global_unresolved_foreshadowings,
     })
 }
 
@@ -533,244 +475,6 @@ fn match_character_briefs(
             summary: e.content.chars().take(100).collect::<String>(),
         })
         .collect()
-}
-
-/// 从节点列表中提取 foreshadowing Mark（场景内伏笔）
-/// 输入: nodes ProseMirror 节点 JSON 数组
-/// 输出: Vec<ForeshadowingBrief> 伏笔简要列表
-/// 流程:
-///   1. 递归遍历所有 text 节点的 marks 数组
-///   2. 过滤 type == "foreshadowing" 的 mark
-///   3. 提取 attrs.foreshadowingId / attrs.status 作为伏笔标识
-///   4. 去重后返回（描述使用 mark 所在的文本片段）
-fn extract_foreshadowings_from_nodes(nodes: &[Value]) -> Vec<ForeshadowingBrief> {
-    let mut result: Vec<ForeshadowingBrief> = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    for node in nodes {
-        collect_foreshadowings(node, &mut result, &mut seen);
-    }
-    result
-}
-
-/// 递归收集 foreshadowing Mark
-fn collect_foreshadowings(
-    node: &Value,
-    result: &mut Vec<ForeshadowingBrief>,
-    seen: &mut std::collections::HashSet<String>,
-) {
-    let node_type = node.get("type").and_then(|t| t.as_str()).unwrap_or("");
-    if node_type == "text" {
-        if let Some(marks) = node.get("marks").and_then(|m| m.as_array()) {
-            for mark in marks {
-                let mark_type = mark.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                if mark_type == "foreshadowing" {
-                    let attrs = mark.get("attrs");
-                    let id = attrs
-                        .and_then(|a| a.get("foreshadowingId"))
-                        .and_then(|f| f.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    if !id.is_empty() && seen.insert(id.clone()) {
-                        let status = attrs
-                            .and_then(|a| a.get("status"))
-                            .and_then(|s| s.as_str())
-                            .unwrap_or("pending")
-                            .to_string();
-                        let text = node.get("text").and_then(|t| t.as_str()).unwrap_or("");
-                        result.push(ForeshadowingBrief {
-                            id: id.clone(),
-                            description: text.to_string(),
-                            status,
-                            importance: "中".to_string(), // Mark 不携带重要度，默认中
-                        });
-                    }
-                }
-            }
-        }
-    }
-    // 递归处理 content 数组
-    if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
-        for child in content {
-            collect_foreshadowings(child, result, seen);
-        }
-    }
-}
-
-/// 加载全局未回收伏笔（从 伏笔/ 目录扫描 .txt 文件）
-/// 输入: project_path 项目根路径
-/// 输出: Vec<ForeshadowingBrief> 全局未回收伏笔列表
-/// 流程:
-///   1. 扫描 伏笔/ 目录下的 .txt 文件（兼容"伏笔记录"/"系列伏笔"目录名）
-///   2. 解析每个 .txt 文件，按表格行提取伏笔条目
-///   3. 过滤状态为"已回收"/"已放弃"/"resolved"/"abandoned"的条目
-///   4. 返回未回收伏笔列表
-fn load_global_unresolved_foreshadowings(project_path: &str) -> Vec<ForeshadowingBrief> {
-    let project = Path::new(project_path);
-    // 兼容多种伏笔目录名
-    let foreshadowing_dirs = ["伏笔", "伏笔记录", "系列伏笔"];
-    let mut result: Vec<ForeshadowingBrief> = Vec::new();
-    for dir_name in &foreshadowing_dirs {
-        let dir = project.join(dir_name);
-        if !dir.is_dir() {
-            continue;
-        }
-        if let Ok(entries) = fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some("txt") {
-                    continue;
-                }
-                if let Ok(content) = fs::read_to_string(&path) {
-                    let foreshadowings = parse_foreshadowing_file(&content);
-                    for f in foreshadowings {
-                        // 仅保留未回收的伏笔
-                        let status = f.status.as_str();
-                        if status != "已回收"
-                            && status != "已放弃"
-                            && status != "resolved"
-                            && status != "abandoned"
-                        {
-                            result.push(f);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    result
-}
-
-/// 解析伏笔 .txt 文件内容
-/// 输入: content 文件文本内容
-/// 输出: Vec<ForeshadowingBrief> 伏笔条目列表
-/// 流程:
-///   1. 按行分割文本
-///   2. 跳过表头（首行"伏笔名称"等）与分隔线（---）
-///   3. 按竖线 | 分割每行，提取字段: 名称/状态/埋设/回收/重要度/备注
-///   4. 组装 ForeshadowingBrief 返回
-/// 容错: 非表格行（无 | 分隔）跳过
-fn parse_foreshadowing_file(content: &str) -> Vec<ForeshadowingBrief> {
-    let mut result = Vec::new();
-    for (idx, line) in content.lines().enumerate() {
-        let trimmed = line.trim();
-        // 跳过空行、表头、分隔线
-        if trimmed.is_empty() || idx == 0 || trimmed.starts_with("---") {
-            continue;
-        }
-        // 按竖线分割
-        let fields: Vec<&str> = trimmed.split('|').map(|s| s.trim()).collect();
-        if fields.len() < 2 {
-            continue;
-        }
-        // 字段顺序: 名称 | 状态 | 埋设 | 回收 | 重要度 | 备注
-        let name = fields.first().copied().unwrap_or("").to_string();
-        let status = fields.get(1).copied().unwrap_or("").to_string();
-        let importance = fields.get(4).copied().unwrap_or("中").to_string();
-        let remark = fields.get(5).copied().unwrap_or("").to_string();
-        if name.is_empty() {
-            continue;
-        }
-        // 描述 = 名称 + 备注
-        let description = if remark.is_empty() {
-            name.clone()
-        } else {
-            format!("{} - {}", name, remark)
-        };
-        result.push(ForeshadowingBrief {
-            id: name.clone(), // 伏笔文件无 UUID，使用名称作为 ID
-            description,
-            status,
-            importance,
-        });
-    }
-    result
-}
-
-/// 扫描项目全部伏笔（供伏笔追踪面板使用）
-/// 输入: project_path 项目根路径
-/// 输出: Result<Vec<ForeshadowingDetail>, String> 全部伏笔详细列表（不过滤状态）
-/// 流程:
-///   1. 兼容扫描 伏笔/伏笔记录/系列伏笔 目录
-///   2. 读取每个 .txt 文件，按表格行解析伏笔条目
-///   3. 提取 名称/状态/埋设/回收/重要度/备注/来源文件 字段
-///   4. 返回全部伏笔（含已回收/已放弃），由前端按状态分组展示
-/// 设计说明: 与 load_global_unresolved_foreshadowings 区别在于：
-///   - 本命令返回全部伏笔（含已回收），供面板完整呈现
-///   - load_global_unresolved_foreshadowings 仅返回未回收伏笔，供 AI 上下文使用
-#[tauri::command]
-pub fn scan_foreshadowings(project_path: String) -> Result<Vec<ForeshadowingDetail>, String> {
-    let project = Path::new(&project_path)
-        .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
-    if !project.is_dir() {
-        return Err("项目路径不存在或不是目录".to_string());
-    }
-
-    // 兼容多种伏笔目录名
-    let foreshadowing_dirs = ["伏笔", "伏笔记录", "系列伏笔"];
-    let mut result: Vec<ForeshadowingDetail> = Vec::new();
-
-    for dir_name in &foreshadowing_dirs {
-        let dir = project.join(dir_name);
-        if !dir.is_dir() {
-            continue;
-        }
-        let entries = match fs::read_dir(&dir) {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            // 仅处理 .txt 文件（伏笔文件格式约定）
-            if path.extension().and_then(|e| e.to_str()) != Some("txt") {
-                continue;
-            }
-            let content = match fs::read_to_string(&path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-            // 计算相对项目根的路径（用于前端点击跳转编辑）
-            let rel_path = path
-                .strip_prefix(&project)
-                .map(|p| p.to_string_lossy().replace('\\', "/"))
-                .unwrap_or_default();
-
-            // 解析伏笔表格行
-            for (idx, line) in content.lines().enumerate() {
-                let trimmed = line.trim();
-                // 跳过空行、表头（首行）、分隔线
-                if trimmed.is_empty() || idx == 0 || trimmed.starts_with("---") {
-                    continue;
-                }
-                // 按竖线分割字段: 名称 | 状态 | 埋设 | 回收 | 重要度 | 备注
-                let fields: Vec<&str> = trimmed.split('|').map(|s| s.trim()).collect();
-                if fields.len() < 2 {
-                    continue;
-                }
-                let name = fields.first().copied().unwrap_or("").to_string();
-                if name.is_empty() {
-                    continue;
-                }
-                let status = fields.get(1).copied().unwrap_or("").to_string();
-                let setup = fields.get(2).copied().unwrap_or("").to_string();
-                let payoff = fields.get(3).copied().unwrap_or("").to_string();
-                let importance = fields.get(4).copied().unwrap_or("中").to_string();
-                let remark = fields.get(5).copied().unwrap_or("").to_string();
-
-                result.push(ForeshadowingDetail {
-                    name,
-                    status,
-                    setup,
-                    payoff,
-                    importance,
-                    remark,
-                    source_file: rel_path.clone(),
-                });
-            }
-        }
-    }
-
-    Ok(result)
 }
 
 /// 构建前文摘要
@@ -992,9 +696,8 @@ fn collect_character_relationships(
 ///   2. 从设定库提取主要角色（entity_type == "character"，按 sort_order 排序，取前 10 个）
 ///   3. 从设定库提取关键设定（entity_type != "character"，取前 10 个）
 ///   4. 扫描正文目录生成章节摘要（每个 .pmd/.txt 文件提取前 200 字）
-///   5. 从伏笔目录提取活跃伏笔（复用 load_global_unresolved_foreshadowings）
-///   6. 统计总字数与章节数（支持 .pmd 与 .txt 文件）
-///   7. 组装项目上下文返回
+///   5. 统计总字数与章节数（支持 .pmd 与 .txt 文件）
+///   6. 组装项目上下文返回
 /// 容错策略:
 ///   - project.json 不存在或解析失败: project_name 使用目录名，project_type 默认 "novel"
 ///   - 设定库为空: main_characters 与 key_settings 返回空数组
@@ -1044,10 +747,7 @@ pub async fn get_project_context(
     // 步骤3: 扫描正文目录生成章节摘要
     let chapter_summaries = collect_chapter_summaries(project_root);
 
-    // 步骤4: 提取活跃伏笔
-    let active_foreshadowings = load_global_unresolved_foreshadowings(&project_path);
-
-    // 步骤5: 统计总字数与章节数
+    // 步骤4: 统计总字数与章节数
     let (total_words, chapter_count) = count_project_words_and_chapters(project_root);
 
     Ok(ProjectContext {
@@ -1057,7 +757,6 @@ pub async fn get_project_context(
         main_characters,
         key_settings,
         chapter_summaries,
-        active_foreshadowings,
         total_words,
         chapter_count,
     })

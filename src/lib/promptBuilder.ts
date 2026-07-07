@@ -42,22 +42,11 @@ export interface SettingBrief {
 }
 
 /**
- * 伏笔简要信息（场景上下文中的活跃伏笔提醒）
- */
-export interface ForeshadowingBrief {
-  id: string;
-  description: string;
-  status: string;
-  importance: string;
-}
-
-/**
  * 场景上下文（AI 续写的核心数据）
  * AI 价值：理解"第几幕/谁的视角/什么氛围"，生成符合上下文的内容
  *
  * AI-2 扩展字段:
  *   - currentSceneText: 当前场景正文文本（层1），让 AI 知道"已写了什么"，自然衔接续写
- *   - globalUnresolvedForeshadowings: 全局未回收伏笔（层3b），供 AI 全局视角参考
  */
 export interface SceneContext {
   sceneId: string;
@@ -71,11 +60,8 @@ export interface SceneContext {
   precedingSummary: string;
   presentCharacters: CharacterBrief[];
   relatedSettings: SettingBrief[];
-  activeForeshadowings: ForeshadowingBrief[];
   /** AI-2 层1: 当前场景正文文本（从 .pmd ProseMirror JSON 提取的纯文本） */
   currentSceneText: string;
-  /** AI-2 层3b: 全局未回收伏笔（跨章节/跨场景的活跃伏笔） */
-  globalUnresolvedForeshadowings: ForeshadowingBrief[];
 }
 
 /**
@@ -133,7 +119,6 @@ export interface ProjectContext {
   mainCharacters: CharacterBrief[];
   keySettings: SettingBrief[];
   chapterSummaries: ChapterSummary[];
-  activeForeshadowings: ForeshadowingBrief[];
   totalWords: number;
   chapterCount: number;
 }
@@ -157,7 +142,6 @@ export interface BuiltPrompt {
       hasCharacterContext: boolean;
       hasProjectContext: boolean;
       presentCharacterCount: number;
-      activeForeshadowingCount: number;
     };
   };
 }
@@ -220,11 +204,6 @@ export class PromptBuilder {
     if (this.prefs.enablePoetryFormat) {
       constraints.push("涉及诗歌或歌词内容时，使用斜体与加大字间距的排版风格。");
     }
-    if (this.prefs.enableForeshadowMark) {
-      constraints.push(
-        "注意前文埋设的伏笔，续写时考虑伏笔回收时机，不得遗忘或矛盾已有伏笔。"
-      );
-    }
     if (this.prefs.enableEntityHighlight) {
       constraints.push(
         "角色名、地点名、术语等实体名必须与设定库完全一致，不得使用变体或错别字。"
@@ -241,23 +220,21 @@ export class PromptBuilder {
   }
 
   /**
-   * 构建续写 Prompt（AI-2 升级：4 层上下文注入）
-   * 输入: sceneCtx 场景上下文（含 4 层数据：场景正文/出场角色/伏笔/前文摘要）
+   * 构建续写 Prompt（AI-2 升级：上下文注入）
+   * 输入: sceneCtx 场景上下文（含场景正文/出场角色/前文摘要）
    * 输出: BuiltPrompt 完整提示词
    * 流程:
    *   1. System Prompt 定义角色与约束
-   *   2. User Prompt 注入 4 层上下文:
+   *   2. User Prompt 注入上下文:
    *      层1: 当前场景元数据 + 场景正文文本（让 AI 自然衔接）
    *      层2: 出场角色设定（避免角色幻觉）
-   *      层3: 场景内伏笔 + 全局未回收伏笔（提醒 AI 回收时机）
-   *      层4: 前文摘要（保持剧情连贯）
+   *      层3: 前文摘要（保持剧情连贯）
    *   3. 明确续写任务指令（字数、风格、避免重复）
    *
    * Token 控制:
    *   - currentSceneText 超 2000 字时截取最后 2000 字（保留近文上下文）
    *   - precedingSummary 超 1000 字时截取最后 1000 字
    *   - presentCharacters 最多取 5 个（避免 Token 爆炸）
-   *   - globalUnresolvedForeshadowings 最多取 5 个
    */
   buildContinuationPrompt(sceneCtx: SceneContext): BuiltPrompt {
     const system = this.buildSystemPrompt();
@@ -299,25 +276,6 @@ export class PromptBuilder {
       lines.push("");
     }
 
-    // 层3a: 场景内伏笔（当前场景已埋设的伏笔）
-    if (sceneCtx.activeForeshadowings.length > 0) {
-      lines.push("场景内活跃伏笔（需考虑回收时机）：");
-      for (const f of sceneCtx.activeForeshadowings) {
-        lines.push(`- [${f.importance}] ${f.description}（状态：${f.status}）`);
-      }
-      lines.push("");
-    }
-
-    // 层3b: 全局未回收伏笔（最多 5 个，提醒 AI 全局伏笔状态）
-    if (sceneCtx.globalUnresolvedForeshadowings.length > 0) {
-      lines.push("全局未回收伏笔（供全局参考，非必须在此场景回收）：");
-      const globalToInclude = sceneCtx.globalUnresolvedForeshadowings.slice(0, 5);
-      for (const f of globalToInclude) {
-        lines.push(`- [${f.importance}] ${f.description}（状态：${f.status}）`);
-      }
-      lines.push("");
-    }
-
     // 层1: 当前场景正文文本（截取最后 2000 字，让 AI 自然衔接）
     if (sceneCtx.currentSceneText) {
       lines.push("当前场景正文（请基于此自然衔接续写）：");
@@ -331,7 +289,7 @@ export class PromptBuilder {
     }
 
     lines.push("任务：请基于上述场景上下文续写正文，保持风格一致，约 500-800 字。");
-    lines.push("要求：不得重复前文内容，推进剧情发展，可适时埋设或回收伏笔。");
+    lines.push("要求：不得重复前文内容，推进剧情发展。");
 
     return {
       system,
@@ -343,9 +301,6 @@ export class PromptBuilder {
           hasCharacterContext: false,
           hasProjectContext: false,
           presentCharacterCount: sceneCtx.presentCharacters.length,
-          activeForeshadowingCount:
-            sceneCtx.activeForeshadowings.length +
-            sceneCtx.globalUnresolvedForeshadowings.length,
         },
       },
     };
@@ -420,7 +375,6 @@ export class PromptBuilder {
           hasCharacterContext: true,
           hasProjectContext: false,
           presentCharacterCount: sceneCtx.presentCharacters.length,
-          activeForeshadowingCount: 0,
         },
       },
     };
@@ -481,7 +435,6 @@ export class PromptBuilder {
           hasCharacterContext: true,
           hasProjectContext: false,
           presentCharacterCount: 0,
-          activeForeshadowingCount: 0,
         },
       },
     };
@@ -493,7 +446,7 @@ export class PromptBuilder {
    * 输出: BuiltPrompt 完整提示词
    * 流程:
    *   1. System Prompt 定义推演任务约束
-   *   2. User Prompt 注入项目全局信息（角色/设定/章节摘要/伏笔）
+   *   2. User Prompt 注入项目全局信息（角色/设定/章节摘要）
    *   3. 明确推演任务（识别剧情漏洞、建议后续走向）
    */
   buildPlotReviewPrompt(projectCtx: ProjectContext): BuiltPrompt {
@@ -535,19 +488,10 @@ export class PromptBuilder {
       lines.push("");
     }
 
-    if (projectCtx.activeForeshadowings.length > 0) {
-      lines.push("活跃伏笔（检查是否长期未回收）：");
-      for (const f of projectCtx.activeForeshadowings) {
-        lines.push(`- [${f.importance}] ${f.description}（状态：${f.status}）`);
-      }
-      lines.push("");
-    }
-
     lines.push("任务：审查剧情结构，识别以下问题：");
-    lines.push("1. 长期未回收的伏笔（可能被遗忘）");
-    lines.push("2. 角色出场断层（重要角色长期缺席）");
-    lines.push("3. 剧情逻辑漏洞（前后矛盾）");
-    lines.push("4. 节奏问题（拖沓或仓促）");
+    lines.push("1. 角色出场断层（重要角色长期缺席）");
+    lines.push("2. 剧情逻辑漏洞（前后矛盾）");
+    lines.push("3. 节奏问题（拖沓或仓促）");
     lines.push("输出格式：按问题类型分组，每条附建议解决方案。");
 
     return {
@@ -560,7 +504,6 @@ export class PromptBuilder {
           hasCharacterContext: false,
           hasProjectContext: true,
           presentCharacterCount: projectCtx.mainCharacters.length,
-          activeForeshadowingCount: projectCtx.activeForeshadowings.length,
         },
       },
     };
@@ -596,14 +539,6 @@ export class PromptBuilder {
       lines.push("");
     }
 
-    if (projectCtx.activeForeshadowings.length > 0) {
-      lines.push("待回收伏笔（后续大纲需安排回收）：");
-      for (const f of projectCtx.activeForeshadowings) {
-        lines.push(`- [${f.importance}] ${f.description}`);
-      }
-      lines.push("");
-    }
-
     if (projectCtx.mainCharacters.length > 0) {
       lines.push("主要角色（确保后续大纲覆盖所有重要角色）：");
       for (const c of projectCtx.mainCharacters) {
@@ -616,8 +551,7 @@ export class PromptBuilder {
     lines.push("- 章节标题");
     lines.push("- 主要事件（1-2 句）");
     lines.push("- 出场角色");
-    lines.push("- 伏笔回收/埋设计划（如有）");
-    lines.push("要求：剧情推进合理，符合已有设定，逐步回收活跃伏笔。");
+    lines.push("要求：剧情推进合理，符合已有设定。");
 
     return {
       system,
@@ -629,7 +563,6 @@ export class PromptBuilder {
           hasCharacterContext: false,
           hasProjectContext: true,
           presentCharacterCount: projectCtx.mainCharacters.length,
-          activeForeshadowingCount: projectCtx.activeForeshadowings.length,
         },
       },
     };

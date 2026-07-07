@@ -2,7 +2,7 @@
 //
 // 时间线编辑器节点详情抽屉组件
 // 双击节点或右键"编辑详情"触发, 显示在画布右侧。
-// 表单字段: 标题、状态、摘要、核心冲突、伏笔备注。
+// 表单字段: 标题、状态、摘要、核心冲突。
 // 本地草稿 300ms 防抖提交到 store, store 500ms 防抖写入磁盘。
 
 import { useEffect, useRef, useState } from "react";
@@ -44,7 +44,6 @@ function buildDrawerFields(t: (key: string) => string): DrawerField[] {
     },
     { key: "summary", label: t("timeline.drawer.summaryLabel"), type: "textarea" },
     { key: "coreConflict", label: t("timeline.drawer.conflictLabel"), type: "textarea" },
-    { key: "foreshadowing", label: t("timeline.drawer.foreshadowingLabel"), type: "textarea" },
   ];
 }
 
@@ -99,7 +98,6 @@ export default function TimelineDrawer({ nodeId, onClose }: { nodeId: string; on
         status: node.data.status,
         summary: node.data.summary,
         coreConflict: node.data.coreConflict,
-        foreshadowing: node.data.foreshadowing,
       });
     }
   }, [nodeId, node]);

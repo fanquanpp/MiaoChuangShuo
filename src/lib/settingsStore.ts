@@ -33,10 +33,6 @@ interface SettingsState {
   autoFillBookTitle: boolean;
   /** 新建大纲文件时自动生成骨架 */
   autoOutlineSkeleton: boolean;
-  /** 日记自动添加本地日期 */
-  diaryAutoDate: boolean;
-  /** 天气自动填充 */
-  weatherAutoFill: boolean;
   /** 章节自动编号 */
   autoNumbering: boolean;
   /** 模板自动填充 */
@@ -79,8 +75,6 @@ interface SettingsState {
   setChapterFormat: (format: ChapterFormat) => void;
   setAutoFillBookTitle: (enabled: boolean) => void;
   setAutoOutlineSkeleton: (enabled: boolean) => void;
-  setDiaryAutoDate: (enabled: boolean) => void;
-  setWeatherAutoFill: (enabled: boolean) => void;
   setAutoNumbering: (enabled: boolean) => void;
   setAutoTemplateFill: (enabled: boolean) => void;
   setIndentEnabled: (enabled: boolean) => void;
@@ -118,8 +112,6 @@ interface SettingsData {
   chapterFormat: ChapterFormat;
   autoFillBookTitle: boolean;
   autoOutlineSkeleton: boolean;
-  diaryAutoDate: boolean;
-  weatherAutoFill: boolean;
   autoNumbering: boolean;
   autoTemplateFill: boolean;
   indentEnabled: boolean;
@@ -145,8 +137,6 @@ const DEFAULT_SETTINGS: SettingsData = {
   chapterFormat: "chinese",
   autoFillBookTitle: true,
   autoOutlineSkeleton: true,
-  diaryAutoDate: true,
-  weatherAutoFill: false,
   autoNumbering: true,
   autoTemplateFill: true,
   indentEnabled: true,
@@ -357,18 +347,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const data = { ...get(), autoOutlineSkeleton: enabled };
     saveSettings(data);
     set({ autoOutlineSkeleton: enabled });
-  },
-
-  setDiaryAutoDate: (enabled) => {
-    const data = { ...get(), diaryAutoDate: enabled };
-    saveSettings(data);
-    set({ diaryAutoDate: enabled });
-  },
-
-  setWeatherAutoFill: (enabled) => {
-    const data = { ...get(), weatherAutoFill: enabled };
-    saveSettings(data);
-    set({ weatherAutoFill: enabled });
   },
 
   setAutoNumbering: (enabled) => {

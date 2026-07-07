@@ -204,12 +204,3 @@ pub fn decode_api_key(encoded: &str) -> Result<String, String> {
         .map_err(|e| format!("Base64 解码失败: {}", e))?;
     String::from_utf8(bytes).map_err(|e| format!("UTF-8 解码失败: {}", e))
 }
-
-/// 编码 API Key（明文 -> Base64）
-///
-/// 输入: plain 明文 API Key
-/// 输出: String Base64 编码字符串
-/// 流程: 将明文字节进行 Base64 标准编码
-pub fn encode_api_key(plain: &str) -> String {
-    general_purpose::STANDARD.encode(plain.as_bytes())
-}

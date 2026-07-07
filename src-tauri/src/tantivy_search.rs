@@ -31,7 +31,7 @@ use crate::tantivy_indexer::{
 /// 索引构建进度事件名（前端监听此事件获取进度更新）
 const INDEX_PROGRESS_EVENT: &str = "index-progress";
 
-/// 搜索请求参数（支持 AI-Ready 按类型/场景过滤）
+/// 搜索请求参数
 #[derive(Debug, Clone, Deserialize)]
 pub struct SearchRequest {
     /// 项目根路径（绝对路径）
@@ -41,12 +41,6 @@ pub struct SearchRequest {
     /// 返回结果上限（默认 50）
     #[serde(default)]
     pub limit: Option<usize>,
-    /// AI-Ready: 按类型过滤（manuscript/setting/outline），None 表示不过滤
-    #[serde(default)]
-    pub chunk_type: Option<String>,
-    /// AI-Ready: 按场景 ID 过滤，None 表示不过滤
-    #[serde(default)]
-    pub scene_id: Option<String>,
 }
 
 /// 搜索响应（包含匹配的 Chunk 信息）
@@ -68,13 +62,12 @@ pub struct SearchResponse {
 /// 当索引不存在时自动创建空索引并返回空结果。
 ///
 /// 输入:
-///   request - 搜索请求参数（项目路径、关键词、可选过滤条件）
+///   request - 搜索请求参数（项目路径、关键词、结果上限）
 /// 输出: Result<SearchResponse, String> 搜索响应
 /// 流程:
 ///   1. 校验项目路径
 ///   2. 调用 tantivy_indexer::search 执行查询
 ///   3. 封装响应并返回
-///   4. AI-Ready 过滤（chunk_type/scene_id）在内存中执行，避免复杂查询解析
 #[tauri::command]
 pub async fn search_project(request: SearchRequest) -> Result<SearchResponse, String> {
     if request.query.trim().is_empty() {
@@ -91,8 +84,6 @@ pub async fn search_project(request: SearchRequest) -> Result<SearchResponse, St
 
     // 执行查询（Tantivy 查询是阻塞操作，使用 spawn_blocking 避免阻塞异步运行时）
     let query = request.query.clone();
-    let chunk_type_filter = request.chunk_type.clone();
-    let scene_id_filter = request.scene_id.clone();
 
     let results = tokio::task::spawn_blocking(move || {
         tantivy_indexer::search(&project_root, &query, limit)
@@ -100,25 +91,12 @@ pub async fn search_project(request: SearchRequest) -> Result<SearchResponse, St
     .await
     .map_err(|e| format!("搜索任务执行失败: {}", e))??;
 
-    // AI-Ready 过滤：在内存中按 chunk_type/scene_id 过滤
-    // 设计依据：Tantivy 查询解析器对复合查询支持有限，内存过滤更稳定
-    let filtered_results: Vec<SearchResult> = results
-        .into_iter()
-        .filter(|r| {
-            // chunk_type 过滤（当前 SearchResult 不含 chunk_type 字段，待后续扩展）
-            // 此处预留过滤逻辑，阶段 3 语义节点实现后填充
-            let _ = &chunk_type_filter;
-            let _ = &scene_id_filter;
-            true
-        })
-        .collect();
-
-    let total = filtered_results.len();
+    let total = results.len();
 
     Ok(SearchResponse {
         query: request.query,
         total,
-        results: filtered_results,
+        results,
         index_stats: None,
     })
 }

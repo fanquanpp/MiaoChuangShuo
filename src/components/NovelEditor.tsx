@@ -65,7 +65,6 @@ import { FontSizeShortcut } from "../lib/fontSizeShortcut";
 import { EntityHighlight } from "../lib/entityHighlightPlugin";
 import { getEntityHighlightClient } from "../lib/entityHighlightClient";
 import { listCodexEntities } from "../lib/codexApi";
-import { Foreshadowing } from "../lib/foreshadowing";
 import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
@@ -249,16 +248,13 @@ export default function NovelEditor({
     characterName: string;
   }>({ open: false, x: 0, y: 0, characterId: null, characterName: "" });
 
-  const projectType = currentProject?.meta?.type || "standard";
+  const projectType = currentProject?.meta?.type || "novel";
   // 文体标识保留用于 UI 层条件渲染（如横幅提示文案差异）
   // 扩展注册不再依赖文体守卫，所有扩展全量注册，由全局开关控制行为
   // 通过统一兼容层判定文体族，消除分散的类型字符串比较
   const isScript = isScriptType(projectType);
-  const isDialogue = projectType === "dialogue";
-  // 兼容旧代码：日记体仍保留 isEssay 标识用于日期自动填充等场景
   const isEssay = isEssayType(projectType);
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
-  const diaryAutoDate = useSettingsStore((s) => s.diaryAutoDate);
   const indentEnabled = useSettingsStore((s) => s.indentEnabled);
   const indentWidth = useSettingsStore((s) => s.indentWidth);
   const snapshotEnabled = useSettingsStore((s) => s.snapshotEnabled);
@@ -475,16 +471,8 @@ export default function NovelEditor({
     // 诗歌排版扩展：所有文体全量注册，由全局开关控制行为
     exts.push(PoetryFormat.configure({ enabled: editorPrefs.enablePoetryFormat }));
 
-    // 伏笔标记扩展：所有文体全量注册，由全局开关控制行为
-    // p5-27：底部波浪线 Decoration 由 CSS .nf-foreshadowing--{status} 提供
-    // 快捷键 Alt+Shift-F 已避开 Alt+7（人物图）与 Alt+8（伏笔面板）
-    // Mark 持久化 foreshadowingId + status，伏笔面板状态变更通过 updateForeshadowingStatus 同步
-    // 开关关闭时 Mark 仍可被 parseHTML 解析（保证旧文件加载不丢失标记），仅 toggle 命令受开关控制
-    if (editorPrefs.enableForeshadowMark) {
-      exts.push(Foreshadowing.configure({ HTMLAttributes: {} }));
-    }
     return exts;
-  }, [characters, t, indentEnabled, indentWidth, editorPrefs, filePath, editorPrefs.enableEntityHighlight, editorPrefs.enableForeshadowMark]);
+  }, [characters, t, indentEnabled, indentWidth, editorPrefs, filePath, editorPrefs.enableEntityHighlight]);
 
   // 创建编辑器实例（Office 级富文本模式）
   const editor = useEditor({
@@ -527,32 +515,24 @@ export default function NovelEditor({
     loadPromise
       .then((content) => {
         if (cancelled) return;
-        // 日记模式：新建空文件时自动添加当天日期
-        let finalContent = content;
-        if (projectType === "diary" && diaryAutoDate && content.trim() === "") {
-          const today = new Date();
-          const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-          finalContent = `${dateStr}\n\n`;
-        }
-
         // 智能识别内容格式（三层兼容读取）：
         // - .pmd 格式（ProseMirror JSON）：JSON.parse 后 setContent(json)
         // - HTML 格式（旧富文本存储）：直接 setContent(html)
         // - 纯文本（旧 .txt 兼容）：按行转 HTML 段落再 setContent
-        if (isPmdContent(finalContent)) {
+        if (isPmdContent(content)) {
           // .pmd 格式：解析 ProseMirror JSON 并直接注入编辑器
           try {
-            const json = JSON.parse(finalContent);
+            const json = JSON.parse(content);
             editor.commands.setContent(json);
           } catch {
             // JSON 解析失败，降级为纯文本处理
-            const html = plainTextToHtml(finalContent);
+            const html = plainTextToHtml(content);
             editor.commands.setContent(html);
           }
-        } else if (isHtmlContent(finalContent)) {
-          editor.commands.setContent(finalContent);
+        } else if (isHtmlContent(content)) {
+          editor.commands.setContent(content);
         } else {
-          const html = plainTextToHtml(finalContent);
+          const html = plainTextToHtml(content);
           editor.commands.setContent(html);
         }
         if (cancelled) return;
@@ -614,7 +594,7 @@ export default function NovelEditor({
         setLoadError(t("editor.loadFailed", { error: String(e) }));
       });
     return () => { cancelled = true; };
-  }, [filePath, editor, currentProject, t, projectType, diaryAutoDate, reloadKey]);
+  }, [filePath, editor, currentProject, t, projectType, reloadKey]);
 
   // Sprint 2 任务 2.4：订阅 useCodexStore.renameQueue，设定库改名时联动更新正文中的 characterMentionNode
   // 当 CodexCardEditor 保存改名后，renameQueue 推入条目，此 effect 遍历调用 updateCharacterMentionName
@@ -883,7 +863,7 @@ export default function NovelEditor({
 
       // 保存为 .pmd 格式（ProseMirror JSON），持久化完整文档结构
       // .pmd 格式相比 .html 优势：
-      //   1. 保留 sceneBreak/characterMentionNode/foreshadowing 等自定义节点
+      //   1. 保留 sceneBreak/characterMentionNode 等自定义节点
       //   2. 便于 Tantivy 索引与 AI 上下文提取
       //   3. 避免 HTML 序列化/反序列化的信息丢失
       const json = editor.getJSON();
@@ -1393,20 +1373,6 @@ export default function NovelEditor({
           <span className="text-fandex-secondary font-medium">{t("editor.essayMode")}</span>
           <span>·</span>
           <span>{t("editor.essayHint")}</span>
-        </div>
-      )}
-
-      {isDialogue && characters.length > 0 && (
-        <div className="fandex-admonition fandex-admonition-note px-4 py-1.5 border-b border-nf-border-light text-xs text-nf-text-tertiary flex items-center gap-2">
-          <span className="text-fandex-primary font-medium">{t("editor.dialogueMode")}</span>
-          <span>·</span>
-          <span>
-            {t("editor.dialogueAutoFillHint")}
-          </span>
-          <span>·</span>
-          <span>
-            {t("editor.charRosterHint", { count: characters.length })}
-          </span>
         </div>
       )}
 

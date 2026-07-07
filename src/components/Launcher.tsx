@@ -27,10 +27,6 @@ import {
   Palette,
   FileText,
   BookMarked,
-  ScrollText,
-  MessageSquare,
-  Library,
-  Globe2,
   Clapperboard,
   Feather,
   Layers,
@@ -73,22 +69,11 @@ import { checkForUpdates, type ReleaseInfo } from "../lib/updateChecker";
 
 const SCAN_DIR_KEY = "novelforge:scanDir:v1";
 
-// 项目类型图标映射
-// 新版 3 标准文体 + 旧版 8 种文体兼容(用于显示旧项目卡片图标)
+// 项目类型图标映射（3 标准文体）
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  // 新版 3 标准文体
   novel: BookMarked,
   script: Clapperboard,
   essay: Feather,
-  // 旧版 8 种文体兼容(旧项目 meta.type 仍为旧字符串)
-  standard: BookMarked,
-  short_story: FileText,
-  diary: ScrollText,
-  dialogue: MessageSquare,
-  multi_volume: Library,
-  shared_world: Globe2,
-  screenplay: Clapperboard,
-  poetry: Feather,
 };
 
 /**
@@ -114,7 +99,7 @@ export default function Launcher() {
   const [selectedType, setSelectedType] = useState<ProjectType>("novel");
   const [typePanelExpanded, setTypePanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appVersion, setAppVersion] = useState("26.7.27");
+  const [appVersion, setAppVersion] = useState("26.7.28");
   const [deleteTarget, setDeleteTarget] = useState<ProjectInfo | null>(null);
   // 编辑项目对话框目标：非 null 时渲染 EditProjectDialog
   const [editTarget, setEditTarget] = useState<ProjectInfo | null>(null);
@@ -454,76 +439,19 @@ export default function Launcher() {
 
   const toProjectData = useCallback((p: ProjectInfo): ProjectData => {
     const typeI18nMap: Record<string, string> = {
-      // 新版 3 标准文体
       novel: t("launcher.typeNovel"),
       script: t("launcher.typeScript"),
       essay: t("launcher.typeEssay"),
-      // 旧版 8 种文体兼容(旧项目 meta.type 仍为旧字符串)
-      epic: t("launcher.typeEpic"),
-      standard: t("launcher.typeStandard"),
-      wuxia: t("launcher.typeWuxia"),
-      scifi: t("launcher.typeScifi"),
-      mystery: t("launcher.typeMystery"),
-      romance: t("launcher.typeRomance"),
-      short_story: t("launcher.typeShortStory"),
-      diary: t("launcher.typeDiary"),
-      dialogue: t("launcher.typeDialogue"),
-      multi_volume: t("launcher.typeMultiVolume"),
-      shared_world: t("launcher.typeSharedWorld"),
-      screenplay: t("launcher.typeScreenplay"),
-      poetry: t("launcher.typePoetry"),
-      // 兼容旧版 Rust 后端 format!("{:?}").to_lowercase() 产生的无下划线格式
-      shortstory: t("launcher.typeShortStory"),
-      multivolume: t("launcher.typeMultiVolume"),
-      sharedworld: t("launcher.typeSharedWorld"),
     };
     const typeColors: Record<string, string> = {
-      // 新版 3 标准文体
       novel: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
       script: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
       essay: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
-      // 旧版 8 种文体兼容
-      epic: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
-      standard: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
-      wuxia: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
-      scifi: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
-      mystery: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
-      romance: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
-      short_story: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
-      diary: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
-      dialogue: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
-      multi_volume: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
-      shared_world: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
-      screenplay: "bg-fandex-tertiary/10 text-fandex-tertiary border-fandex-tertiary/30",
-      poetry: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
-      // 兼容旧版无下划线格式
-      shortstory: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
-      multivolume: "bg-fandex-primary/10 text-fandex-primary border-fandex-primary/30",
-      sharedworld: "bg-fandex-secondary/10 text-fandex-secondary border-fandex-secondary/30",
     };
     const gradients: Record<string, string> = {
-      // 新版 3 标准文体
       novel: "from-fandex-primary to-fandex-primary/40",
       script: "from-fandex-primary to-fandex-primary/40",
       essay: "from-fandex-secondary to-fandex-secondary/40",
-      // 旧版 8 种文体兼容
-      epic: "from-fandex-tertiary to-fandex-tertiary/40",
-      standard: "from-fandex-primary to-fandex-primary/40",
-      wuxia: "from-fandex-tertiary to-fandex-tertiary/40",
-      scifi: "from-fandex-secondary to-fandex-secondary/40",
-      mystery: "from-fandex-primary to-fandex-primary/40",
-      romance: "from-fandex-tertiary to-fandex-tertiary/40",
-      short_story: "from-fandex-primary to-fandex-primary/40",
-      diary: "from-fandex-secondary to-fandex-secondary/40",
-      dialogue: "from-fandex-tertiary to-fandex-tertiary/40",
-      multi_volume: "from-fandex-primary to-fandex-primary/40",
-      shared_world: "from-fandex-secondary to-fandex-secondary/40",
-      screenplay: "from-fandex-tertiary to-fandex-tertiary/40",
-      poetry: "from-fandex-primary to-fandex-primary/40",
-      // 兼容旧版无下划线格式
-      shortstory: "from-fandex-primary to-fandex-primary/40",
-      multivolume: "from-fandex-primary to-fandex-primary/40",
-      sharedworld: "from-fandex-secondary to-fandex-secondary/40",
     };
     return {
       id: p.path,

@@ -100,21 +100,8 @@ const zhCN: TranslationDict = {
 
   // 启动器 - 项目类型名称
   "launcher.typeNovel": "长短篇小说",
-  "launcher.typeEpic": "西幻史诗",
-  "launcher.typeStandard": "标准长篇",
   "launcher.typeEssay": "散文与文章",
   "launcher.typeScript": "剧本与脚本",
-  "launcher.typeWuxia": "武侠江湖",
-  "launcher.typeScifi": "科幻未来",
-  "launcher.typeMystery": "悬疑推理",
-  "launcher.typeRomance": "言情都市",
-  "launcher.typeShortStory": "短篇小说",
-  "launcher.typeDiary": "日记体",
-  "launcher.typeDialogue": "对话体",
-  "launcher.typeMultiVolume": "长篇分卷",
-  "launcher.typeSharedWorld": "同世界观系列",
-  "launcher.typeScreenplay": "剧本式",
-  "launcher.typePoetry": "诗歌体",
 
   // ── 项目卡片 ──
   "projectcard.totalWords": "总字数",
@@ -177,9 +164,7 @@ const zhCN: TranslationDict = {
   "workspace.firstChapterHint": "直接从第一章开始，编号从 1 开始",
   "workspace.defaultIntroFileName": "序章.txt",
   "workspace.defaultIntroContent": "序章",
-  "workspace.defaultVolumeName": "第一部",
   "workspace.introBadge": "序",
-  "workspace.volumeBadge": "1",
   "error.noCurrentProject": "无当前项目",
 
   // ── 编辑器 ──
@@ -401,44 +386,6 @@ const zhCN: TranslationDict = {
   "search.replaceEmptyError": "查找内容不能为空",
   "search.replaceMode": "替换模式",
   "search.searchMode": "搜索模式",
-  "volumeGen.title": "分卷章节骨架生成器",
-  "volumeGen.subtitle": "预创建空白章节文件，用于创作初期规划分卷结构",
-  "volumeGen.volumeName": "分卷名",
-  "volumeGen.volumeNamePlaceholder": "如：第一卷、卷二、Vol.1",
-  "volumeGen.chapterCount": "章节数量",
-  "volumeGen.startChapter": "起始章节号",
-  "volumeGen.titleFormat": "标题格式",
-  "volumeGen.fmtChinese": "中文（第一章）",
-  "volumeGen.fmtArabic": "数字（第1章）",
-  "volumeGen.fmtEnglish": "英文（Chapter 1）",
-  "volumeGen.chapterNameTemplate": "章节文件名模板",
-  "volumeGen.chapterNameTemplatePlaceholder": "支持 {n} 占位符，如：第{n}章 / Chapter {n} / {n}",
-  "volumeGen.chapterNameTemplateHint": "用 {n} 代表章节序号；文件已归类到分卷目录，无需再标注卷号",
-  "volumeGen.chapterNameTemplateReset": "重置为默认",
-  "volumeGen.options": "附加选项",
-  "volumeGen.includePrologue": "生成卷首语",
-  "volumeGen.includeEpilogue": "生成卷尾语",
-  "volumeGen.preview": "预览",
-  "volumeGen.previewEmpty": "填写参数后显示预览",
-  "volumeGen.generate": "创建空白骨架",
-  "volumeGen.generating": "正在创建…",
-  "volumeGen.success": "创建完成：新建 {created} 个空白文件，跳过 {skipped} 个已存在文件",
-  "volumeGen.failed": "创建失败",
-  "volumeGen.noProject": "请先打开项目",
-  "volumeGen.nameRequired": "请填写分卷名",
-  "volumeGen.countInvalid": "章节数量必须大于 0",
-  "volumeGen.fileExists": "已存在",
-  "volumeGen.created": "新建",
-  "volumeGen.prologueTag": "卷首",
-  "volumeGen.epilogueTag": "卷尾",
-  "volumeGen.chapterTag": "章节",
-  "volumeGen.itemsCount": "{count} 项",
-  "volumeGen.skipExistingHint": "已存在的同名文件将自动跳过，不被覆盖",
-  "volumeGen.warningTitle": "功能说明",
-  "volumeGen.warningText": "本功能用于创作初期预创建分卷章节骨架，将生成空白 .txt 文件。如需整理已写好的章节，请手动将文件移入对应分卷目录。",
-  "volumeGen.confirmTitle": "确认创建空白章节骨架",
-  "volumeGen.confirmMsg": "将在「{volume}」目录下创建 {count} 个空白章节文件。此操作不会删除或移动现有文件，已存在的同名文件将跳过。",
-  "volumeGen.confirmOk": "确认创建",
 
   // ── 时间线 ──
   "timeline.title": "时间线",
@@ -497,7 +444,6 @@ const zhCN: TranslationDict = {
   "timeline.drawer.statusLabel": "节点状态",
   "timeline.drawer.summaryLabel": "剧情摘要",
   "timeline.drawer.conflictLabel": "核心冲突",
-  "timeline.drawer.foreshadowingLabel": "伏笔备注",
   "timeline.drawer.save": "保存",
   "timeline.drawer.close": "关闭",
   "timeline.status.planned": "未开始",
@@ -551,22 +497,6 @@ const zhCN: TranslationDict = {
   "characterGraph.toast.cleared": "人物关系图已清空",
   "characterGraph.toast.deleteConfirm": "确定删除此角色节点及其关联连线吗?",
   "characterGraph.toast.deleted": "节点已删除",
-
-  // ── 伏笔追踪面板 ──
-  "foreshadowing.title": "伏笔追踪",
-  "foreshadowing.subtitle": "扫描伏笔目录，按状态分组追踪埋设与回收",
-  "foreshadowing.refresh": "刷新",
-  "foreshadowing.loading": "正在加载伏笔列表…",
-  "foreshadowing.loadFailed": "加载伏笔失败：{error}",
-  "foreshadowing.noProject": "请先打开一个项目",
-  "foreshadowing.empty": "暂无伏笔记录。请在「伏笔」目录下创建 .txt 文件，按表格格式记录伏笔",
-  "foreshadowing.statTotal": "总数",
-  "foreshadowing.statSetup": "已埋设",
-  "foreshadowing.statPending": "待回收",
-  "foreshadowing.statResolved": "已回收",
-  "foreshadowing.groupCount": "共 {count} 条",
-  "foreshadowing.setupLabel": "埋设",
-  "foreshadowing.payoffLabel": "回收",
 
   // ── 卡片管理器 ──
   "cardmanager.editorPlaceholder": "开始编辑卡片内容…",
@@ -788,7 +718,6 @@ const zhCN: TranslationDict = {
   "shortcuts.navStats": "统计",
   "shortcuts.navCodex": "设定库",
   "shortcuts.navSearch": "全局搜索",
-  "shortcuts.navVolumes": "分卷管理",
   "shortcuts.findReplace": "查找替换",
   "shortcuts.replaceMode": "替换模式",
 
@@ -991,7 +920,6 @@ const zhCN: TranslationDict = {
   "findReplace.regexError": "正则错误：{error}",
 
   // ── 侧边栏扩展 ──
-  "sidebar.volumes": "分卷",
   "sidebar.settings": "设置",
   "sidebar.customSection": "自定义",
   "sidebar.newCustomCategory": "新建自定义分类",
@@ -1024,10 +952,6 @@ const zhCN: TranslationDict = {
   "settings.autoOutline": "大纲自动骨架",
   "settings.autoOutlineHint": "新建大纲文件时自动生成一、二、三…骨架",
   "settings.automationSection": "自动化",
-  "settings.diaryAutoDate": "日记自动添加日期",
-  "settings.diaryAutoDateDesc": "新建日记时自动添加本地日期",
-  "settings.weatherAutoFill": "天气自动填充",
-  "settings.weatherAutoFillDesc": "自动获取并填充天气信息",
   "settings.chapterAutoNumber": "章节自动编号",
   "settings.chapterAutoNumberDesc": "新建章节时自动编排章节序号",
   "settings.templateAutoFill": "模板自动填充",
@@ -1161,29 +1085,6 @@ const zhCN: TranslationDict = {
   "update.remindLaterHint": "将在下次启动时再次提醒",
   "update.skipVersionHint": "此版本将被跳过，直到下一个版本发布",
 
-  // ── 分卷管理 ──
-  "volume.title": "分卷管理",
-  "volume.unit": "卷",
-  "volume.chapterUnit": "章",
-  "volume.addVolume": "新建卷",
-  "volume.newVolumeName": "第{num}卷",
-  "volume.empty": "暂无分卷",
-  "volume.emptyHint": "点击右上角「新建卷」创建第一个分卷",
-  "volume.noChapters": "暂无归属章节",
-  "volume.addChapter": "添加章节到此卷",
-  "volume.removeChapter": "移除此章节",
-  "volume.unassigned": "未归卷章节",
-  "volume.allAssigned": "所有章节已归卷",
-  "volume.rename": "重命名",
-  "volume.confirmDelete": "删除卷「{name}」",
-  "volume.confirmDeleteMsg": "确定删除卷「{name}」吗？章节文件不会被删除。",
-  "volume.saved": "分卷数据已保存",
-  "volume.saveFailed": "保存失败：{error}",
-  "volume.loadFailed": "加载失败：{error}",
-  "volume.save": "保存",
-  "volume.saving": "保存中…",
-  "volume.unsaved": "未保存",
-
   // ── 启动器 - 项目目录 ──
   "launcher.projectDir": "项目存放目录",
   "launcher.projectDirPlaceholder": "选择或输入项目存放路径…",
@@ -1196,14 +1097,6 @@ const zhCN: TranslationDict = {
   "cardmanager.importSelectCards": "选择要导入的卡片",
   "cardmanager.importSuccess": "成功导入 {count} 张卡片",
   "cardmanager.importFailed": "导入失败：{error}",
-
-  // ── 编辑器 - 日记/对话 ──
-  "editor.diaryDateHint": "今日：{date}",
-  "editor.dialogueMode": "对话体模式",
-  "editor.dialogueCharHint": "输入角色名后按 Tab 快速插入",
-
-  // ── 工作台 - 共享世界 ──
-  "workspace.sharedWorldHint": "在卷宗下创建章节文件",
 
   // ── 首行缩进设置 ──
   "settings.indentSection": "首行缩进",
@@ -1225,8 +1118,6 @@ const zhCN: TranslationDict = {
   "settings.featurePoetryFormatHint": "支持诗歌专用排版格式",
   "settings.featureSmartQuotes": "智能引号",
   "settings.featureSmartQuotesHint": "自动配对中英文引号",
-  "settings.featureForeshadowMark": "伏笔标记",
-  "settings.featureForeshadowMarkHint": "伏笔文本区域添加波浪线标记（实验性）",
   "settings.featureSceneBreak": "场景分隔辅助",
   "settings.featureSceneBreakHint": "辅助插入场景分隔标记",
   "settings.featureEntityHighlight": "实体高亮",
@@ -1235,9 +1126,6 @@ const zhCN: TranslationDict = {
   // ── 文件列表 - 批量重编号 ──
   "filelist.batchRenumber": "重新编号",
   "filelist.renumbered": "章节已重新编号",
-
-  // ── 对话自动延续 ──
-  "editor.dialogueAutoFillHint": "换行自动延续上一行的角色名",
 
   // ── 版本快照 ──
   "snapshot.title": "版本历史",
@@ -1336,29 +1224,6 @@ const zhCN: TranslationDict = {
   "characterHover.aiSummarizeState": "总结该角色当前状态",
   "characterHover.aiGenerateDialogue": "生成该角色对话",
   "characterHover.aiComingSoon": "敬请期待",
-
-  // ── 旧版项目迁移对话框（m-31）──
-  "legacyMigration.title": "检测到旧版项目结构",
-  "legacyMigration.description": "该项目使用旧版目录结构，迁移至新版后可启用设定库、伏笔追踪等新功能。",
-  "legacyMigration.legacyDirs": "旧版目录",
-  "legacyMigration.newDirs": "新版目录",
-  "legacyMigration.mapping": "目录映射",
-  "legacyMigration.mappingRole": "角色 → 设定/",
-  "legacyMigration.mappingWorldview": "世界观 → 设定/",
-  "legacyMigration.mappingTerms": "术语 → 设定/",
-  "legacyMigration.mappingGraph": "剧情图谱 → 保留为自定义目录",
-  "legacyMigration.mappingMaterial": "素材 → 草稿箱/",
-  "legacyMigration.warning": "迁移前将自动创建 .bak 备份，迁移失败时自动回滚。建议关闭其他编辑器后继续。",
-  "legacyMigration.migrate": "立即迁移",
-  "legacyMigration.later": "暂不迁移",
-  "legacyMigration.migrating": "迁移中...",
-  "legacyMigration.progress": "已处理 {done}/{total} 个文件",
-  "legacyMigration.success": "迁移成功",
-  "legacyMigration.successDesc": "共迁移 {count} 个文件，备份已保存至 .bak 目录",
-  "legacyMigration.failed": "迁移失败",
-  "legacyMigration.rollback": "已自动回滚至迁移前状态",
-  "legacyMigration.close": "关闭",
-  "legacyMigration.viewReport": "查看迁移报告",
 };
 
 // 英文翻译
@@ -1443,21 +1308,8 @@ const enUS: TranslationDict = {
 
   // Launcher - Project type names
   "launcher.typeNovel": "Novel",
-  "launcher.typeEpic": "Epic Fantasy",
-  "launcher.typeStandard": "Standard Novel",
   "launcher.typeEssay": "Essay / Article",
   "launcher.typeScript": "Script",
-  "launcher.typeWuxia": "Martial Arts",
-  "launcher.typeScifi": "Sci-Fi",
-  "launcher.typeMystery": "Mystery",
-  "launcher.typeRomance": "Romance",
-  "launcher.typeShortStory": "Short Story",
-  "launcher.typeDiary": "Diary",
-  "launcher.typeDialogue": "Dialogue",
-  "launcher.typeMultiVolume": "Multi-Volume",
-  "launcher.typeSharedWorld": "Shared World",
-  "launcher.typeScreenplay": "Screenplay",
-  "launcher.typePoetry": "Poetry",
 
   // ── Project Card ──
   "projectcard.totalWords": "Total Words",
@@ -1520,9 +1372,7 @@ const enUS: TranslationDict = {
   "workspace.firstChapterHint": "Start directly from Chapter 1, numbered from 1",
   "workspace.defaultIntroFileName": "Prologue.txt",
   "workspace.defaultIntroContent": "Prologue",
-  "workspace.defaultVolumeName": "Volume 1",
   "workspace.introBadge": "P",
-  "workspace.volumeBadge": "1",
   "error.noCurrentProject": "No current project",
 
   // ── Editor ──
@@ -1740,44 +1590,6 @@ const enUS: TranslationDict = {
   "search.replaceEmptyError": "Find content cannot be empty",
   "search.replaceMode": "Replace Mode",
   "search.searchMode": "Search Mode",
-  "volumeGen.title": "Volume Chapter Skeleton Generator",
-  "volumeGen.subtitle": "Pre-create empty chapter files for planning volume structure at the start of writing",
-  "volumeGen.volumeName": "Volume Name",
-  "volumeGen.volumeNamePlaceholder": "e.g. Volume One, Vol.2",
-  "volumeGen.chapterCount": "Chapter Count",
-  "volumeGen.startChapter": "Start Chapter No.",
-  "volumeGen.titleFormat": "Title Format",
-  "volumeGen.fmtChinese": "Chinese (Chapter One)",
-  "volumeGen.fmtArabic": "Numeric (Chapter 1)",
-  "volumeGen.fmtEnglish": "English (Chapter 1)",
-  "volumeGen.chapterNameTemplate": "Chapter Filename Template",
-  "volumeGen.chapterNameTemplatePlaceholder": "Supports {n} placeholder, e.g. Chapter {n} / {n}",
-  "volumeGen.chapterNameTemplateHint": "Use {n} for chapter number; files are already in the volume folder, no need to mark volume",
-  "volumeGen.chapterNameTemplateReset": "Reset to default",
-  "volumeGen.options": "Options",
-  "volumeGen.includePrologue": "Include Prologue",
-  "volumeGen.includeEpilogue": "Include Epilogue",
-  "volumeGen.preview": "Preview",
-  "volumeGen.previewEmpty": "Fill in fields to see preview",
-  "volumeGen.generate": "Create Skeleton",
-  "volumeGen.generating": "Creating…",
-  "volumeGen.success": "Done: {created} empty files created, {skipped} skipped (already exist)",
-  "volumeGen.failed": "Creation failed",
-  "volumeGen.noProject": "Open a project first",
-  "volumeGen.nameRequired": "Volume name required",
-  "volumeGen.countInvalid": "Chapter count must be > 0",
-  "volumeGen.fileExists": "Exists",
-  "volumeGen.created": "New",
-  "volumeGen.prologueTag": "Prologue",
-  "volumeGen.epilogueTag": "Epilogue",
-  "volumeGen.chapterTag": "Chapter",
-  "volumeGen.itemsCount": "{count} items",
-  "volumeGen.skipExistingHint": "Existing files with the same name will be skipped",
-  "volumeGen.warningTitle": "Function Info",
-  "volumeGen.warningText": "This feature pre-creates empty chapter skeletons for early-stage volume planning; it generates blank .txt files. To organize already-written chapters, manually move files into the target volume directory.",
-  "volumeGen.confirmTitle": "Confirm Creating Empty Chapter Skeleton",
-  "volumeGen.confirmMsg": "Will create {count} empty chapter files in \"{volume}\" directory. This will NOT delete or move existing files; same-name files will be skipped.",
-  "volumeGen.confirmOk": "Confirm Create",
 
   // ── Timeline ──
   "timeline.title": "Timeline",
@@ -1835,7 +1647,6 @@ const enUS: TranslationDict = {
   "timeline.drawer.statusLabel": "Node Status",
   "timeline.drawer.summaryLabel": "Summary",
   "timeline.drawer.conflictLabel": "Core Conflict",
-  "timeline.drawer.foreshadowingLabel": "Foreshadowing",
   "timeline.drawer.save": "Save",
   "timeline.drawer.close": "Close",
   "timeline.status.planned": "Planned",
@@ -1889,22 +1700,6 @@ const enUS: TranslationDict = {
   "characterGraph.toast.cleared": "Character graph cleared",
   "characterGraph.toast.deleteConfirm": "Delete this node and its edges?",
   "characterGraph.toast.deleted": "Node deleted",
-
-  // ── Foreshadowing Panel ──
-  "foreshadowing.title": "Foreshadowing Tracker",
-  "foreshadowing.subtitle": "Scan foreshadowing directory, track setup and payoff by status",
-  "foreshadowing.refresh": "Refresh",
-  "foreshadowing.loading": "Loading foreshadowings…",
-  "foreshadowing.loadFailed": "Failed to load foreshadowings: {error}",
-  "foreshadowing.noProject": "Please open a project first",
-  "foreshadowing.empty": "No foreshadowings. Create .txt files under the Foreshadowing directory in table format",
-  "foreshadowing.statTotal": "Total",
-  "foreshadowing.statSetup": "Setup",
-  "foreshadowing.statPending": "Pending",
-  "foreshadowing.statResolved": "Resolved",
-  "foreshadowing.groupCount": "{count} item(s)",
-  "foreshadowing.setupLabel": "Setup",
-  "foreshadowing.payoffLabel": "Payoff",
 
   // ── Card Manager ──
   "cardmanager.editorPlaceholder": "Start editing card content…",
@@ -2129,7 +1924,6 @@ const enUS: TranslationDict = {
   "shortcuts.navStats": "Statistics",
   "shortcuts.navCodex": "Codex",
   "shortcuts.navSearch": "Global Search",
-  "shortcuts.navVolumes": "Volumes",
   "shortcuts.findReplace": "Find & Replace",
   "shortcuts.replaceMode": "Replace Mode",
   "shortcuts.paragraphOps": "Paragraph Operations",
@@ -2251,29 +2045,6 @@ const enUS: TranslationDict = {
   "characterHover.aiGenerateDialogue": "Generate dialogue for this character",
   "characterHover.aiComingSoon": "Coming soon",
 
-  // ── Legacy project migration dialog (m-31) ──
-  "legacyMigration.title": "Legacy project structure detected",
-  "legacyMigration.description": "This project uses legacy directory structure. Migrate to enable codex library, foreshadowing tracking, and other new features.",
-  "legacyMigration.legacyDirs": "Legacy directories",
-  "legacyMigration.newDirs": "New directories",
-  "legacyMigration.mapping": "Directory mapping",
-  "legacyMigration.mappingRole": "角色 (Characters) → 设定/ (Codex)",
-  "legacyMigration.mappingWorldview": "世界观 (Worldview) → 设定/ (Codex)",
-  "legacyMigration.mappingTerms": "术语 (Terms) → 设定/ (Codex)",
-  "legacyMigration.mappingGraph": "剧情图谱 (Plot graph) → kept as custom directory",
-  "legacyMigration.mappingMaterial": "素材 (Materials) → 草稿箱/ (Drafts)",
-  "legacyMigration.warning": "A .bak backup will be created before migration. Automatic rollback on failure. Close other editors before proceeding.",
-  "legacyMigration.migrate": "Migrate now",
-  "legacyMigration.later": "Migrate later",
-  "legacyMigration.migrating": "Migrating...",
-  "legacyMigration.progress": "Processed {done}/{total} files",
-  "legacyMigration.success": "Migration succeeded",
-  "legacyMigration.successDesc": "Migrated {count} files. Backup saved to .bak directory.",
-  "legacyMigration.failed": "Migration failed",
-  "legacyMigration.rollback": "Automatically rolled back to pre-migration state",
-  "legacyMigration.close": "Close",
-  "legacyMigration.viewReport": "View migration report",
-
   // ── Character Linkage (appearance stats / global rename) ──
   "characterLinkage.appearanceBtn": "Appearance Stats",
   "characterLinkage.renameBtn": "Global Rename",
@@ -2366,7 +2137,6 @@ const enUS: TranslationDict = {
   "findReplace.regexError": "Regex error: {error}",
 
   // ── Sidebar extensions ──
-  "sidebar.volumes": "Volumes",
   "sidebar.settings": "Settings",
   "sidebar.customSection": "Custom",
   "sidebar.newCustomCategory": "New Custom Category",
@@ -2399,10 +2169,6 @@ const enUS: TranslationDict = {
   "settings.autoOutline": "Auto Outline Skeleton",
   "settings.autoOutlineHint": "Generate I, II, III… skeleton in new outline files",
   "settings.automationSection": "Automation",
-  "settings.diaryAutoDate": "Auto-add Date to Diary",
-  "settings.diaryAutoDateDesc": "Automatically add local date when creating diary entries",
-  "settings.weatherAutoFill": "Auto-fill Weather",
-  "settings.weatherAutoFillDesc": "Automatically fetch and fill weather information",
   "settings.chapterAutoNumber": "Auto-number Chapters",
   "settings.chapterAutoNumberDesc": "Automatically assign chapter numbers when creating new chapters",
   "settings.templateAutoFill": "Auto-fill Template",
@@ -2536,29 +2302,6 @@ const enUS: TranslationDict = {
   "update.remindLaterHint": "You'll be reminded again on next launch",
   "update.skipVersionHint": "This version will be skipped until the next release",
 
-  // ── Volume Manager ──
-  "volume.title": "Volume Manager",
-  "volume.unit": "volumes",
-  "volume.chapterUnit": "ch",
-  "volume.addVolume": "New Volume",
-  "volume.newVolumeName": "Volume {num}",
-  "volume.empty": "No volumes yet",
-  "volume.emptyHint": "Click \"New Volume\" to create your first volume",
-  "volume.noChapters": "No chapters assigned",
-  "volume.addChapter": "Add chapter to this volume",
-  "volume.removeChapter": "Remove from volume",
-  "volume.unassigned": "Unassigned Chapters",
-  "volume.allAssigned": "All chapters assigned",
-  "volume.rename": "Rename",
-  "volume.confirmDelete": "Delete volume \"{name}\"",
-  "volume.confirmDeleteMsg": "Delete volume \"{name}\"? Chapter files will not be deleted.",
-  "volume.saved": "Volume data saved",
-  "volume.saveFailed": "Save failed: {error}",
-  "volume.loadFailed": "Load failed: {error}",
-  "volume.save": "Save",
-  "volume.saving": "Saving…",
-  "volume.unsaved": "Unsaved",
-
   // ── Launcher - Project Directory ──
   "launcher.projectDir": "Project Directory",
   "launcher.projectDirPlaceholder": "Select or enter project directory path…",
@@ -2571,14 +2314,6 @@ const enUS: TranslationDict = {
   "cardmanager.importSelectCards": "Select cards to import",
   "cardmanager.importSuccess": "Successfully imported {count} cards",
   "cardmanager.importFailed": "Import failed: {error}",
-
-  // ── Editor - Diary/Dialogue ──
-  "editor.diaryDateHint": "Today: {date}",
-  "editor.dialogueMode": "Dialogue mode",
-  "editor.dialogueCharHint": "Type character name then press Tab to insert",
-
-  // ── Workspace - Shared World ──
-  "workspace.sharedWorldHint": "Create chapter files under volumes",
 
   // ── Indent Settings ──
   "settings.indentSection": "First-line Indent",
@@ -2601,8 +2336,6 @@ const enUS: TranslationDict = {
   "settings.featurePoetryFormatHint": "Support poetry-specific formatting",
   "settings.featureSmartQuotes": "Smart Quotes",
   "settings.featureSmartQuotesHint": "Auto-pair Chinese and English quotes",
-  "settings.featureForeshadowMark": "Foreshadow Mark",
-  "settings.featureForeshadowMarkHint": "Add wavy underline to foreshadow text (experimental)",
   "settings.featureSceneBreak": "Scene Break Helper",
   "settings.featureSceneBreakHint": "Assist inserting scene break markers",
   "settings.featureEntityHighlight": "Entity Highlight",
@@ -2611,9 +2344,6 @@ const enUS: TranslationDict = {
   // ── File List - Batch Renumber ──
   "filelist.batchRenumber": "Renumber",
   "filelist.renumbered": "Chapters renumbered",
-
-  // ── Dialogue Auto-fill ──
-  "editor.dialogueAutoFillHint": "Auto-continue character name on new line",
 
   // ── Version Snapshots ──
   "snapshot.title": "Version History",

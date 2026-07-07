@@ -31,8 +31,6 @@ export interface TimelineNodeData {
   summary: string;
   /** 核心冲突(本节点的主要矛盾) */
   coreConflict: string;
-  /** 伏笔备注(埋设/回收的伏笔标记) */
-  foreshadowing: string;
   /** 节点状态(决定状态徽章颜色) */
   status: NodeStatus;
   /** 排序序号(同一主轴位置内的顺序) */

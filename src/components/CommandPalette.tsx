@@ -25,7 +25,6 @@ import {
   FileText,
   ListTree,
   Library,
-  BookOpen,
   BarChart3,
   Search as SearchIcon,
   Sun,
@@ -38,7 +37,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAppStore, CATEGORY_NAMES, type SidebarCategory } from "../lib/store";
-import { getTypeSpecificDirs } from "../lib/templateRegistry";
 import { useThemeStore } from "../lib/themeStore";
 import { useSettingsStore } from "../lib/settingsStore";
 import { useI18n } from "../lib/i18n";
@@ -141,26 +139,11 @@ export default function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const setActiveCategory = useAppStore((s) => s.setActiveCategory);
-  const currentProject = useAppStore((s) => s.currentProject);
   const { toggleTheme, theme } = useThemeStore();
   const settings = useSettingsStore();
 
   // 分类切换：优先使用外部传入的保存后切换回调
   const switchTo = onSwitchCategory || setActiveCategory;
-
-  // 类型专属目录导航命令（动态生成）
-  const typeSpecificCommands: Command[] = useMemo(() => {
-    if (!currentProject) return [];
-    const dirs = getTypeSpecificDirs(currentProject.meta.type);
-    return dirs.map((dirName) => ({
-      id: `cat-tpl-${dirName}`,
-      label: dirName,
-      category: t("command.categoryNav"),
-      keywords: [dirName, "设定", "扩展"],
-      action: () => switchTo(dirName as SidebarCategory),
-      icon: BookOpen,
-    }));
-  }, [currentProject, switchTo, t]);
 
   // 分类导航命令（带图标）
   const categoryCommands: Command[] = useMemo(
@@ -168,12 +151,10 @@ export default function CommandPalette({
       { id: "cat-manuscript", label: CATEGORY_NAMES["manuscript"], category: t("command.categoryNav"), keywords: ["正文", "manuscript", "章节"], action: () => switchTo("manuscript"), icon: FileText },
       { id: "cat-outline", label: CATEGORY_NAMES["outline"], category: t("command.categoryNav"), keywords: ["大纲", "outline"], action: () => switchTo("outline"), icon: ListTree },
       { id: "cat-codex", label: CATEGORY_NAMES["codex"], category: t("command.categoryNav"), keywords: ["设定", "设定库", "角色", "世界观", "术语", "codex"], action: () => switchTo("codex"), icon: Library },
-      { id: "cat-volumes", label: CATEGORY_NAMES["volumes"], category: t("command.categoryNav"), keywords: ["分卷", "卷宗", "volumes"], action: () => switchTo("volumes"), icon: BookOpen },
       { id: "cat-stats", label: CATEGORY_NAMES["stats"], category: t("command.categoryNav"), keywords: ["统计", "stats", "字数"], action: () => switchTo("stats"), icon: BarChart3 },
       { id: "cat-search", label: CATEGORY_NAMES["search"], category: t("command.categoryNav"), keywords: ["搜索", "search", "查找"], action: () => switchTo("search"), icon: SearchIcon },
-      ...typeSpecificCommands,
     ],
-    [switchTo, t, typeSpecificCommands]
+    [switchTo, t]
   );
 
   // 应用操作命令（带图标与快捷键提示）
@@ -236,7 +217,7 @@ export default function CommandPalette({
   // 新建文件命令（按分类动态生成）
   const createFileCommands: Command[] = useMemo(() => {
     if (!onCreateFile) return [];
-    const categories: SidebarCategory[] = ["manuscript", "outline", "codex", "volumes"];
+    const categories: SidebarCategory[] = ["manuscript", "outline", "codex"];
     return categories.map((cat) => ({
       id: `new-file-${cat}`,
       label: t("command.newFile", { category: CATEGORY_NAMES[cat] }),
