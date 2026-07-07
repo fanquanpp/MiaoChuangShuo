@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 喵创说应用图标源文件
+     设计: 浅蓝色渐变背景 + 白色 M 字母
+     尺寸: 512x512 (SVG 矢量, 可缩放至任意尺寸) -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <!-- 浅蓝色渐变: 从左上 #6EA8FE 到右下 #4A7FE8 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6EA8FE"/>
+      <stop offset="100%" stop-color="#4A7FE8"/>
+    </linearGradient>
+    <!-- M 字母渐变: 白色到极浅蓝白 -->
+    <linearGradient id="mGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E8F0FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角矩形背景 -->
+  <rect x="0" y="0" width="512" height="512" rx="96" ry="96" fill="url(#bgGradient)"/>
+
+  <!-- M 字母: 居中, 粗体, 占据约 60% 宽度 -->
+  <text x="256" y="256"
+        font-family="Arial, sans-serif"
+        font-size="320"
+        font-weight="900"
+        fill="url(#mGradient)"
+        text-anchor="middle"
+        dominant-baseline="central">M</text>
+
+  <!-- 右下角装饰小圆点 (呼应 Logo 的 dot 装饰) -->
+  <circle cx="400" cy="400" r="16" fill="#FFFFFF" opacity="0.9"/>
+</svg>
