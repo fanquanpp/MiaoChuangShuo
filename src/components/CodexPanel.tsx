@@ -38,6 +38,7 @@ import { useAppStore } from "../lib/store";
 import { useCodexStore } from "../lib/stores/useCodexStore";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import { readProjectTree } from "../lib/api";
 import {
   scanEntityMentions,
   createCodexEntity,
@@ -58,6 +59,53 @@ const TYPE_ICONS: Record<CodexEntityType, React.ComponentType<{ className?: stri
   glossary: Book,
   material: Package,
 };
+
+/**
+ * ProseMirror JSON 节点结构（用于内容预览提取的类型安全遍历）
+ */
+interface ProseMirrorNode {
+  type?: string;
+  text?: string;
+  content?: ProseMirrorNode[];
+}
+
+/**
+ * 从 ProseMirror JSON 内容中提取纯文本预览
+ * 输入: contentJson ProseMirror JSON 字符串（.pmd 文件正文部分）
+ * 输出: string 纯文本预览（段落以换行分隔，截断至 200 字符）
+ * 流程:
+ *   1. 解析 JSON，递归遍历节点树
+ *   2. 收集 text 节点的 text 字段
+ *   3. 段落间以换行分隔，超长内容截断并追加省略号
+ */
+function extractContentPreview(contentJson: string): string {
+  if (!contentJson) return "";
+  try {
+    const doc = JSON.parse(contentJson) as ProseMirrorNode;
+    const lines: string[] = [];
+    // 递归遍历 ProseMirror 节点树，收集所有 text 节点的文本内容
+    const walk = (node: ProseMirrorNode) => {
+      if (node.text) {
+        lines.push(node.text);
+      }
+      if (Array.isArray(node.content)) {
+        for (const child of node.content) {
+          walk(child);
+        }
+      }
+    };
+    walk(doc);
+    // 段落间换行分隔，首尾空白清理
+    const text = lines.join("\n").trim();
+    if (!text) return "";
+    // 截断至 200 字符，超出追加省略号
+    return text.length > 200 ? text.slice(0, 200) + "..." : text;
+  } catch {
+    // content 非合法 JSON，返回原始字符串截断
+    const text = contentJson.trim();
+    return text.length > 200 ? text.slice(0, 200) + "..." : text;
+  }
+}
 
 /**
  * Codex 面板组件
@@ -130,6 +178,18 @@ export default function CodexPanel() {
     }
   }, [currentProject, loadAll, showToast, t]);
 
+  // 同步刷新项目目录树：设定卡片 CRUD 后触发，确保 FileList 显示最新文件状态
+  // 静默执行，失败仅记录日志不阻塞主流程（FileList 订阅 projectTree 自动重渲染）
+  const refreshProjectTree = useCallback(async () => {
+    if (!currentProject) return;
+    try {
+      const tree = await readProjectTree(currentProject.path);
+      useAppStore.getState().setProjectTree(tree);
+    } catch (err) {
+      console.error("刷新项目目录树失败:", err);
+    }
+  }, [currentProject]);
+
   useEffect(() => {
     // 项目切换时先重置 Store，避免上一个项目的卡片残留
     resetStore();
@@ -173,9 +233,11 @@ export default function CodexPanel() {
   }, [selectedEntity, loadMentions]);
 
   // Sprint 2 任务 2.3：选中实体变化时退出编辑模式，避免上一个卡片的未保存改动残留
-  useEffect(() => {
-    setEditing(false);
-  }, [selectedId]);
+  // 设计说明：原实现使用 useEffect 监听 selectedId 变化重置 editing，
+  // 但会与 pendingEditMode（右键菜单"编辑设定"）冲突 —— 程序化选中后 setEditing(true)
+  // 会被 selectedId 变化触发的 effect 覆盖为 false。
+  // 修正：移除 effect，改为在用户手动点击卡片时调用 handleSelectCard 重置编辑态，
+  // 程序化选中（pendingSelectCardId / 新建后选中）不受影响，保留其编辑态控制权。
 
   // Sprint 3 任务 3.3：订阅 pendingSelectCardId 实现跨组件跳转
   // 当 NovelEditor 双击 characterMentionNode 时设置此值，CodexPanel 消费后选中对应卡片
@@ -297,15 +359,21 @@ export default function CodexPanel() {
       setAddDialogOpen(false);
       // 刷新 Store 以加载新创建的卡片（后端生成 UUID，前端需重新拉取）
       await loadEntities();
-      // 通过名称查找新卡片并自动选中
-      const newCard = useCodexStore.getState().getByName(name);
+      // 同步刷新项目目录树：新建的 .pmd 文件需在 FileList 中显示
+      refreshProjectTree();
+      // 精确选中新建卡片：按名称 + 类型双重匹配，避免同名跨类型卡片误选
+      // getByName 仅按名称匹配，同名不同类型时可能返回错误卡片
+      const allCards = Array.from(useCodexStore.getState().cards.values());
+      const newCard = allCards.find(
+        (c) => c.name === name && c.cardType === newEntityType
+      );
       if (newCard) setSelectedId(newCard.id);
     } catch (e) {
       showToast("error", t("codex.createFailed", { error: String(e) }));
     } finally {
       setCreating(false);
     }
-  }, [currentProject, newEntityName, newEntityAliases, newEntityContent, newEntityType, cardsList, showToast, t, loadEntities]);
+  }, [currentProject, newEntityName, newEntityAliases, newEntityContent, newEntityType, cardsList, showToast, t, loadEntities, refreshProjectTree]);
 
   // 删除实体：先扫描正文中引用该卡片的 characterMentionNode，再打开确认对话框
   // Sprint 2 任务 2.5：若检测到失效引用，确认对话框追加警告提示
@@ -345,6 +413,8 @@ export default function CodexPanel() {
       showToast("success", t("codex.deleteSuccess", { name: deleteTarget.name }));
       // 从 Store 中移除该卡片（SSOT：Store 删除即 UI 更新）
       deleteCardFromStore(deleteTarget.id);
+      // 同步刷新项目目录树：删除的 .pmd 文件需从 FileList 中移除
+      refreshProjectTree();
       // 若删除的是当前选中项，清空选中
       if (selectedId === deleteTarget.id) {
         setSelectedId(null);
@@ -354,7 +424,7 @@ export default function CodexPanel() {
     } catch (e) {
       showToast("error", t("codex.deleteFailed", { error: String(e) }));
     }
-  }, [currentProject, deleteTarget, selectedId, showToast, t, deleteCardFromStore]);
+  }, [currentProject, deleteTarget, selectedId, showToast, t, deleteCardFromStore, refreshProjectTree]);
 
   // 取消删除：重置删除目标与失效计数
   const handleCancelDelete = useCallback(() => {
@@ -367,6 +437,13 @@ export default function CodexPanel() {
     if (!mentions) return 0;
     return mentions.reduce((sum, m) => sum + m.count, 0);
   }, [mentions]);
+
+  // 用户手动点击卡片选中：重置编辑态，避免上一个卡片的未保存改动残留
+  // 程序化选中（pendingSelectCardId / 新建后选中）不经过此路径，保留其编辑态控制权
+  const handleSelectCard = useCallback((cardId: string) => {
+    setSelectedId(cardId);
+    setEditing(false);
+  }, []);
 
   return (
     <div className="flex h-full w-full flex-1 bg-nf-bg-panel min-w-0">
@@ -485,7 +562,7 @@ export default function CodexPanel() {
                           style={{ transformOrigin: "center" }}
                         />
                         <button
-                          onClick={() => setSelectedId(card.id)}
+                          onClick={() => handleSelectCard(card.id)}
                           className="flex items-center gap-2 flex-1 min-w-0 text-left"
                         >
                           <FileText className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
@@ -527,7 +604,11 @@ export default function CodexPanel() {
               card={selectedEntity}
               projectPath={currentProject.path}
               onCancel={() => setEditing(false)}
-              onSaved={() => setEditing(false)}
+              onSaved={() => {
+                setEditing(false);
+                // 同步刷新项目目录树：卡片改名会重命名 .pmd 文件，需更新 FileList
+                refreshProjectTree();
+              }}
             />
           ) : (
             <>
@@ -577,6 +658,16 @@ export default function CodexPanel() {
                     {selectedEntity.summary}
                   </div>
                 )}
+                {/* 正文内容预览：从 ProseMirror JSON 提取纯文本，截断至 200 字符 */}
+                {/* 为只读详情视图提供快速内容预览，避免每次查看都需进入编辑模式 */}
+                {(() => {
+                  const preview = extractContentPreview(selectedEntity.content);
+                  return preview ? (
+                    <div className="mt-2 text-xs text-nf-text-tertiary leading-relaxed whitespace-pre-wrap border-l-2 border-nf-border-light pl-2">
+                      {preview}
+                    </div>
+                  ) : null;
+                })()}
                 {/* 标签展示（Sprint 2 新增字段，非空时显示） */}
                 {selectedEntity.tags.length > 0 && (
                   <div className="mt-2 flex items-center gap-1.5 flex-wrap">

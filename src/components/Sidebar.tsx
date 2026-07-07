@@ -41,6 +41,7 @@ import {
   CATEGORY_DIRS,
 } from "../lib/store";
 import { getTypeSpecificDirs } from "../lib/templateRegistry";
+import { CODEX_TYPE_DIRS } from "../lib/codexApi";
 import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
 import { readProjectTree, createFile, deletePath } from "../lib/api";
@@ -67,6 +68,12 @@ const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex"];
 
 // 工具分类列表
 const TOOL_CATEGORIES: SidebarCategory[] = ["stats", "search"];
+
+// Codex 保留目录名集合：设定库兼容目录（角色/人物/世界观/设定/术语/名词/素材/资料）
+// 自定义分类创建时拦截这些名称，避免与设定库扫描逻辑冲突导致数据双向同步异常
+const CODEX_RESERVED_DIRS: Set<string> = new Set(
+  Object.values(CODEX_TYPE_DIRS).flat()
+);
 
 // 左侧导航栏属性接口
 interface SidebarProps {
@@ -139,6 +146,8 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
     if (!currentProject) { setExtraDirs([]); return; }
     try {
       const tree = await readProjectTree(currentProject.path);
+      // 同步更新全局 projectTree：自定义分类增删后 FileList 需感知目录变化
+      useAppStore.getState().setProjectTree(tree);
       // 收集所有已知目录名（标准分类 + 类型专属）
       const knownDirs = new Set<string>();
       for (const dir of Object.values(CATEGORY_DIRS)) {
@@ -201,6 +210,13 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
     for (const d of typeSpecificDirs) knownDirs.add(d);
     if (knownDirs.has(name) || extraDirs.includes(name)) {
       setCategoryError(t("sidebar.customCategoryNameExists"));
+      return;
+    }
+    // 拦截 Codex 保留目录名：设定库兼容目录（角色/人物/世界观/设定/术语/名词/素材/资料）
+    // 这些目录由设定库子系统（CodexPanel）统一管理，自定义分类使用同名目录会导致
+    // 文件被双向同步逻辑误处理，引发数据冲突与卡片错乱
+    if (CODEX_RESERVED_DIRS.has(name)) {
+      setCategoryError(t("sidebar.customCategoryCodexReserved"));
       return;
     }
     try {
@@ -312,8 +328,9 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         )}
         {/* 折叠容器:使用 max-height + opacity 实现舒缓展开/关闭 */}
         {/* 整体折叠时强制展开以显示图标列 */}
-        <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
-          (collapsed || writingExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        {/* max-h-[70vh] 自适应视口高度，避免长列表被截断；overflow-y-auto 内部滚动 */}
+        <div className={`overflow-hidden overflow-y-auto transition-all duration-300 ease-fandex ${
+          (collapsed || writingExpanded) ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0'
         }`}>
           {PRIMARY_CATEGORIES.map((cat) => {
             const Icon = ICON_MAP[cat];
@@ -356,8 +373,9 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
         )}
         {/* 折叠容器:使用 max-height + opacity 实现舒缓展开/关闭 */}
         {/* 整体折叠时强制展开以显示图标列 */}
-        <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
-          (collapsed || settingsExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        {/* max-h-[70vh] 自适应视口高度，避免长列表被截断；overflow-y-auto 内部滚动 */}
+        <div className={`overflow-hidden overflow-y-auto transition-all duration-300 ease-fandex ${
+          (collapsed || settingsExpanded) ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0'
         }`}>
           {SETTINGS_CATEGORIES.map((cat) => {
             const Icon = ICON_MAP[cat];
@@ -423,8 +441,8 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
                 {t("sidebar.extensionSection")}
               </button>
             )}
-            <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
-              (collapsed || extensionExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            <div className={`overflow-hidden overflow-y-auto transition-all duration-300 ease-fandex ${
+              (collapsed || extensionExpanded) ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0'
             }`}>
               {typeSpecificDirs.map((dirName) => {
                 const isActive = activeCategory === dirName;
@@ -478,8 +496,8 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
             </button>
           </div>
         )}
-        <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
-          (collapsed || customExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        <div className={`overflow-hidden overflow-y-auto transition-all duration-300 ease-fandex ${
+          (collapsed || customExpanded) ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0'
         }`}>
           {extraDirs.map((dirName) => {
             const isActive = activeCategory === dirName;
@@ -550,7 +568,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
           </button>
         )}
         <div className={`overflow-hidden transition-all duration-300 ease-fandex ${
-          (collapsed || toolExpanded) ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          (collapsed || toolExpanded) ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0'
         }`}>
           {TOOL_CATEGORIES.map((cat) => {
             const Icon = ICON_MAP[cat];

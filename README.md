@@ -43,7 +43,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-26.7.25-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/badge/version-26.7.26-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
@@ -77,6 +77,13 @@
 - **实体识别**: 自动扫描项目内所有 .txt/.pmd 文件, 统计实体出场次数与章节分布
 - **别名支持**: 一个实体可拥有多个别名, 全部参与实体高亮匹配
 - **AI-Ready 预留**: CodexEntity 接口预留 `ai_tags`/`embeddings` 字段, 为未来 RAG 检索留出位置
+- **设定库与自定义分类联动**: 设定库 CRUD 自动同步 FileList 文件列表, FileList 增删改自动同步 Codex Store, 双向刷新闭环
+- **Codex 保留目录拦截**: 自定义分类创建时拦截设定库兼容目录名 (角色/人物/世界观/设定/术语/名词/素材/资料), 避免目录冲突导致数据双向同步异常
+- **.pmd 扩展名兼容**: FileList 显示/过滤/重命名/复制全链路兼容 .txt 与 .pmd 双扩展名, 重命名保留原扩展名避免格式降级
+- **.pmd 转换边界限制**: NovelEditor.toPmdPath 仅对 Codex 目录下文件转换扩展名, 自定义分类文件保持原格式
+- **编辑态精确控制**: CodexPanel 移除 selectedId effect 重置, 改为用户手动点击时重置编辑态, 程序化选中保留编辑态控制权
+- **新建卡片精确选中**: 按名称+类型双重匹配, 避免同名跨类型卡片误选
+- **正文内容预览**: 只读详情视图从 ProseMirror JSON 提取纯文本预览 (200字符截断), 无需进入编辑模式即可快速查看
 
 ### 1.4 全文搜索与索引
 

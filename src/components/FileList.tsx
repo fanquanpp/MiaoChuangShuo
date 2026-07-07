@@ -32,6 +32,7 @@ import {
   Files,
 } from "lucide-react";
 import { useAppStore, getCategoryDir } from "../lib/store";
+import { useCodexStore } from "../lib/stores/useCodexStore";
 import type { FileNode } from "../lib/api";
 import { deletePath, readProjectTree, renamePath, copyFile, removeFileIndex, updateFileIndex } from "../lib/api";
 import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
@@ -62,9 +63,10 @@ function formatSize(bytes: number): string {
 //   - 正文章节（第N章/Chapter N/N.标题） → 按序号升序
 //   - 续章/尾声/后记/番外/终章/卷尾语 → 排在最后（返回 Infinity）
 // 卷首语/卷尾语纳入分卷目录排序逻辑，确保卷首语始终在顶部、卷尾语始终在底部
+// 兼容 .txt 与 .pmd 扩展名，避免设定文件等带扩展名文件被误排序
 function extractChapterNumber(name: string): number {
-  // 去除扩展名后的小写基准名，用于关键词匹配
-  const base = name.replace(/\.txt$/i, "").trim().toLowerCase();
+  // 去除扩展名后的小写基准名，用于关键词匹配（兼容 .txt 与 .pmd）
+  const base = name.replace(/\.(txt|pmd)$/i, "").trim().toLowerCase();
   // 序章类与卷首语前置于所有章节之前
   const prologueKeywords = ["序章", "楔子", "引子", "前言", "引言", "卷首语", "prologue", "preface"];
   if (prologueKeywords.some((kw) => base === kw || base.startsWith(kw))) {
@@ -90,10 +92,11 @@ function extractChapterNumber(name: string): number {
 }
 
 // 从文件名中去除编号前缀，保留纯名称
+// 兼容 .txt 与 .pmd 扩展名，避免扩展名残留影响显示
 function stripNumberPrefix(name: string): string {
   return name
     .replace(/^\d+[._\-\s]*/, "")
-    .replace(/\.txt$/i, "")
+    .replace(/\.(txt|pmd)$/i, "")
     .trim();
 }
 
@@ -106,19 +109,20 @@ function stripNumberPrefix(name: string): string {
  *   - "第一章 开端.txt" → "第一章 开端"（仅去除扩展名，保留章节号前缀）
  *   - "序章.txt" → "序章"
  *   - "角色档案.txt" → "角色档案"
+ *   - "亚瑟.pmd" → "亚瑟"（兼容 .pmd 设定文件扩展名）
  *
  * 输入: name 物理文件名（含扩展名）
  * 输出: string 用户友好的显示标题
  */
 function getDisplayTitle(name: string): string {
-  // 去除扩展名
-  let title = name.replace(/\.txt$/i, "").trim();
+  // 去除扩展名（兼容 .txt 与 .pmd）
+  let title = name.replace(/\.(txt|pmd)$/i, "").trim();
   // 去除阿拉伯数字前缀（如 "1." / "1_" / "1-" / "1 "）
   // 仅当文件名以 "数字.标题" 格式开头时去除，保留 "第一章" 等中文格式前缀
   title = title.replace(/^\d+[._\-\s]+/, "").trim();
   // 如果去除后为空（如文件名就是 "1.txt"），回退到原始名去扩展名
   if (!title) {
-    title = name.replace(/\.txt$/i, "").trim();
+    title = name.replace(/\.(txt|pmd)$/i, "").trim();
   }
   return title;
 }
@@ -140,8 +144,8 @@ function formatManuscriptTitle(
   chapterFormat: ChapterFormat,
   autoNumbering: boolean
 ): string {
-  // 去除扩展名
-  const baseName = name.replace(/\.txt$/i, "").trim();
+  // 去除扩展名（兼容 .txt 与 .pmd）
+  const baseName = name.replace(/\.(txt|pmd)$/i, "").trim();
   // 匹配 "N.标题" / "N_标题" / "N-标题" / "N 标题" 格式
   const match = baseName.match(/^(\d+)[._\-\s]+(.+)/);
   if (match && autoNumbering) {
@@ -695,6 +699,11 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
           }
         }
       }
+      // 同步刷新 Codex Store：删除的文件若属于设定库目录，需更新卡片列表
+      // 避免已删除的设定卡片仍显示在列表中，点击跳转失败
+      useCodexStore.getState().loadAll(currentProject.path).catch((err) => {
+        console.error("同步设定库失败:", err);
+      });
     } catch (e) {
       showToast("error", t("filelist.deleteFailed", { error: String(e) }));
     }
@@ -715,10 +724,15 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
     }
     const { currentProject } = useAppStore.getState();
     if (!currentProject) return;
-    // 文件确保 .txt 扩展名，目录不添加扩展名
+    // 文件扩展名保留策略：
+    //   - 目录：不添加扩展名
+    //   - 文件：保留原扩展名（.txt / .pmd）；用户输入已含扩展名则直接使用；
+    //           未含扩展名则追加原扩展名，原扩展名缺失时回退到 .txt
     const ensuredName = node.is_dir
       ? newName
-      : (newName.endsWith(".txt") ? newName : `${newName}.txt`);
+      : (/\.(txt|pmd)$/i.test(newName)
+        ? newName
+        : `${newName}${node.name.match(/\.(txt|pmd)$/i)?.[0] ?? ".txt"}`);
     const dirPath = node.relative_path.substring(
       0,
       node.relative_path.lastIndexOf("/") + 1
@@ -729,6 +743,11 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
       showToast("success", t("filelist.renamed", { name: ensuredName }));
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
+      // 同步刷新 Codex Store：若文件位于设定库目录，重命名后需更新卡片列表
+      // 避免设定卡片残留旧文件路径，导致点击跳转失败
+      useCodexStore.getState().loadAll(currentProject.path).catch((err) => {
+        console.error("同步设定库失败:", err);
+      });
       // Sprint 4 任务 4.4：文件重命名后更新 Tantivy 索引（静默执行）
       // 策略：先清理旧路径索引（.txt 与 .pmd），再异步触发新路径索引构建
       if (!node.is_dir) {
@@ -745,7 +764,7 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
           }
         }
         // 异步触发新路径索引构建（文件可能为 .pmd 格式）
-        const newPmdPath = newRelPath.replace(/\.txt$/i, ".pmd");
+        const newPmdPath = newRelPath.replace(/\.(txt|pmd)$/i, ".pmd");
         updateFileIndex(currentProject.path, newPmdPath).catch((err) => {
           console.error("更新新路径索引失败:", err);
         });
@@ -766,14 +785,22 @@ export default function FileList({ onCreateFile, onSelectFile }: FileListProps) 
     setCtxMenu((prev) => ({ ...prev, open: false }));
     if (!node || node.is_dir || !currentProject) return;
     const dirPath = node.relative_path.substring(0, node.relative_path.lastIndexOf("/") + 1);
-    const baseName = node.name.replace(/\.txt$/i, "");
-    const newName = `${t("filelist.copyPrefix")}${baseName}.txt`;
+    // 扩展名保留策略：去除原扩展名得到 baseName，再追加原扩展名（.txt / .pmd），
+    // 原扩展名缺失时回退到 .txt，保证副本与源文件格式一致
+    const extMatch = node.name.match(/\.(txt|pmd)$/i);
+    const ext = extMatch ? extMatch[0] : ".txt";
+    const baseName = node.name.replace(/\.(txt|pmd)$/i, "");
+    const newName = `${t("filelist.copyPrefix")}${baseName}${ext}`;
     const newRelPath = dirPath + newName;
     try {
       await copyFile(currentProject.path, node.relative_path, newRelPath);
       showToast("success", t("ctxmenu.duplicated", { name: newName }));
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
+      // 同步刷新 Codex Store：副本若位于设定库目录，需更新卡片列表
+      useCodexStore.getState().loadAll(currentProject.path).catch((err) => {
+        console.error("同步设定库失败:", err);
+      });
     } catch (e) {
       showToast("error", t("ctxmenu.duplicateFailed", { error: String(e) }));
     }

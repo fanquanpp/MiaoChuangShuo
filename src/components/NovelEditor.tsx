@@ -117,16 +117,38 @@ function isPmdContent(content: string): boolean {
 }
 
 /**
- * 将文件路径转换为 .pmd 扩展名
+ * Codex 兼容目录名集合：设定库子系统管理的目录
+ * 仅这些目录下的文件才允许转换为 .pmd 格式，其他目录（自定义分类等）保持原扩展名
+ */
+const CODEX_DIR_SET: Set<string> = new Set([
+  "设定", "角色", "人物", "世界观", "术语", "名词", "素材", "资料",
+]);
+
+/**
+ * 检测文件路径是否位于 Codex 兼容目录下
+ * 输入: filePath 文件相对路径或绝对路径（含目录分隔符）
+ * 输出: boolean 是否位于设定库目录
+ * 流程: 按 / 与 \ 分割路径，检查是否存在 Codex 兼容目录段
+ */
+function isCodexPath(filePath: string): boolean {
+  const segments = filePath.split(/[\\/]/);
+  return segments.some((seg) => CODEX_DIR_SET.has(seg));
+}
+
+/**
+ * 将文件路径转换为 .pmd 扩展名（仅限 Codex 目录下的文件）
  * 输入: filePath 原始文件路径
- * 输出: string .pmd 扩展名的文件路径
+ * 输出: string .pmd 扩展名的文件路径（非 Codex 目录返回原路径）
  * 流程:
  *   1. 已是 .pmd 则原样返回
- *   2. .txt/.html/.htm 替换为 .pmd
- *   3. 无扩展名则追加 .pmd
+ *   2. 非 Codex 目录的文件保持原扩展名（自定义分类等不强制 .pmd）
+ *   3. Codex 目录下：.txt/.html/.htm 替换为 .pmd，无扩展名则追加 .pmd
+ * 边界限制：避免自定义分类文件被误转为 .pmd，导致 FileList 显示异常
  */
 function toPmdPath(filePath: string): string {
   if (filePath.toLowerCase().endsWith(".pmd")) return filePath;
+  // 非 Codex 目录的文件不强制转换扩展名，保持原格式
+  if (!isCodexPath(filePath)) return filePath;
   const lower = filePath.toLowerCase();
   if (lower.endsWith(".txt") || lower.endsWith(".html") || lower.endsWith(".htm")) {
     return filePath.replace(/\.(txt|html|htm)$/i, ".pmd");
