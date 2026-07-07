@@ -1,11 +1,11 @@
 # 喵创说 Web 在线体验版自动部署工作流
 #
 # 功能概述：
-# 当 main 分支的 web/ 目录或 package.json 发生变更时，自动构建 Web 版本
-# 并部署到 GitHub Pages，访问地址：https://fanquanpp.github.io/MiaoChuangShuo/web/
+# 当 master 分支的 web/ 目录或 package.json 发生变更时，自动构建 Web 版本
+# 并部署到 GitHub Pages，访问地址：https://fanquanpp.github.io/MiaoChuangShuo/
 #
 # 触发条件：
-#   1. push 到 main 分支且改动 web/ 或 package.json
+#   1. push 到 master 分支且改动 web/ 或 package.json
 #   2. 手动触发（workflow_dispatch）
 #
 # 权限要求：
@@ -16,7 +16,7 @@ name: Deploy Web to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "web/**"
       - "package.json"
@@ -42,13 +42,13 @@ jobs:
     steps:
       # 步骤1: 检出仓库代码
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 步骤2: 配置 Node.js 运行环境（与本地开发版本一致）
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       # 步骤3: 安装项目依赖（基于 package-lock.json）
@@ -66,15 +66,15 @@ jobs:
 
       # 步骤6: 配置 GitHub Pages
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v6
 
       # 步骤7: 上传 dist-web/ 作为 Pages 部署产物
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./dist-web
 
       # 步骤8: 部署到 GitHub Pages
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v3
+        uses: actions/deploy-pages@v5
