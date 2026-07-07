@@ -126,6 +126,7 @@ pub fn run() {
             ai_context::get_scene_context,
             ai_context::get_character_context,
             ai_context::get_project_context,
+            ai_context::scan_foreshadowings,
             // 旧版项目目录结构迁移命令
             legacy_migration::migrate_legacy_project,
             // AI 配置管理命令（BYOK 模式：API Key/Base URL/Model 持久化）

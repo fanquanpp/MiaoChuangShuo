@@ -33,17 +33,20 @@
 
 ### 项目主页
 
+- **在线体验版 (Web 版, 无需下载)**: [https://fanquanpp.github.io/MiaoChuangShuo/web/](https://fanquanpp.github.io/MiaoChuangShuo/web/)
 - **在线展示 (报名网页)**: [https://fanquanpp.github.io/MiaoChuangShuo/docs/](https://fanquanpp.github.io/MiaoChuangShuo/docs/)
 - **源码仓库**: [https://github.com/fanquanpp/MiaoChuangShuo](https://github.com/fanquanpp/MiaoChuangShuo)
 - **发布下载**: [https://github.com/fanquanpp/MiaoChuangShuo/releases](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 
+> 在线体验版提供核心创作功能（富文本编辑、章节管理、字数统计、IndexedDB 持久化），适合快速试用。
+> 桌面版提供完整功能（全文搜索、AI 助手、人物图谱、时间线、设定库、伏笔追踪、版本快照等）。
 > 访问在线展示链接可查看完整产品介绍与界面预览, 含 15 张功能截图与 8 大章节内容说明。
 
 ---
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-26.7.26-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/badge/version-26.7.27-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)

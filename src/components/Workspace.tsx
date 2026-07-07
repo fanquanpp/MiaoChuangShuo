@@ -35,9 +35,11 @@ import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import { isTemplateSupported, getTemplateCategory } from "../lib/templateSchema";
 import { findDirByName } from "../lib/fileTreeUtils";
+import { isNovelType } from "../lib/projectType";
 import CodexPanel from "./CodexPanel";
 import TimelinePanel from "./TimelinePanel";
 import CharacterGraphPanel from "./CharacterGraphPanel";
+import ForeshadowingPanel from "./ForeshadowingPanel";
 
 /** Alt+数字键 → 侧边栏分类映射 */
 const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
@@ -48,6 +50,7 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "5": "search",
   "6": "volumes",
   "7": "characterGraph",
+  "8": "foreshadowing",
   "9": "timeline",
 };
 
@@ -251,16 +254,11 @@ export default function Workspace() {
       switch (category) {
         case "manuscript": {
           const projectType = currentProject?.meta?.type;
-          // 判定是否为小说类文体：standard/multi_volume/short_story/shared_world 均视为小说类
+          // 通过统一兼容层判定小说族文体（涵盖 novel/standard/multi_volume/short_story/shared_world 等）
           // diary/dialogue/screenplay/poetry 等非小说类型不生成章节号
-          const isNovelType =
-            projectType === "novel" ||
-            projectType === "standard" ||
-            projectType === "multi_volume" ||
-            projectType === "short_story" ||
-            projectType === "shared_world";
+          const novelType = isNovelType(projectType);
           // 同时满足：小说类文体 + 开启自动编号 + 已计算章节号
-          if (chapterNum !== undefined && isNovelType && autoNumbering) {
+          if (chapterNum !== undefined && novelType && autoNumbering) {
             // 生成章节标题（第N章 / 01 / Chapter N），不追加书名
             const heading = formatChapterHeading(chapterNum, "", chapterFormat, false);
             // 用空格连接章节号与章节名（番茄/起点通行格式）
@@ -291,13 +289,8 @@ export default function Workspace() {
     if (!currentProject) throw new Error(t("error.noCurrentProject"));
     const dirName = getCategoryDir(activeCategory);
     const projectType = currentProject.meta.type;
-    // 判定是否为小说类文体（与 getFileTemplate 保持一致）
-    const isNovelType =
-      projectType === "novel" ||
-      projectType === "standard" ||
-      projectType === "multi_volume" ||
-      projectType === "short_story" ||
-      projectType === "shared_world";
+    // 通过统一兼容层判定小说族文体（与 getFileTemplate 保持一致）
+    const novelType = isNovelType(projectType);
 
     // shared_world 项目正文需要放入子目录（如 正文/第一部/）
     let manuscriptSubDir = "";
@@ -313,7 +306,7 @@ export default function Workspace() {
 
     let finalFileName = fileName;
     let chapterNum: number | undefined;
-    if (activeCategory === "manuscript" && isNovelType && autoNumbering) {
+    if (activeCategory === "manuscript" && novelType && autoNumbering) {
       // 仅小说类文体 + 开启自动编号时才推算章节号并添加前缀
       const manuscriptDir = findDirByName(projectTree, getCategoryDir("manuscript"));
       const existingFiles = manuscriptDir?.children.filter((f) => !f.is_dir) || [];
@@ -419,6 +412,8 @@ export default function Workspace() {
         return <TimelinePanel />;
       case "characterGraph":
         return <CharacterGraphPanel />;
+      case "foreshadowing":
+        return <ForeshadowingPanel />;
       default:
         return (
           <NovelEditor
@@ -450,7 +445,9 @@ export default function Workspace() {
           <FocusTimer onClose={() => setShowFocusTimer(false)} />
         )}
         <div className="flex-1 flex min-h-0">
-          <ErrorBoundary>{renderMiddlePanel()}</ErrorBoundary>
+          {/* P2-9 撕裂点修复: key={activeCategory} 确保切换分类时 ErrorBoundary 重置错误状态,
+              避免上一个面板的错误 UI 粘连到新面板 */}
+          <ErrorBoundary key={activeCategory}>{renderMiddlePanel()}</ErrorBoundary>
         </div>
       </div>
 
@@ -459,9 +456,15 @@ export default function Workspace() {
           显示规则由 categoryRegistry.showFileList 统一控制：
           - codex：CodexPanel 自身已内嵌右侧实体列表，避免双栏堆叠
           - timeline：画布需独占中右栏以呈现完整图谱
-          - stats/search：统计与搜索需全屏展示，不显示文件列表 */}
-      {!focusMode && getCategoryConfig(activeCategory).showFileList && (
-        <div className="relative z-10 flex flex-shrink-0">
+          - stats/search：统计与搜索需全屏展示，不显示文件列表
+          P2-9 撕裂点修复: 改为 CSS 隐藏(display:none)而非条件渲染,
+          保留 FileList 内部状态(目录展开/滚动位置/选中高亮),避免布局抖动 */}
+      {!focusMode && (
+        <div
+          className={`relative z-10 flex flex-shrink-0 ${
+            getCategoryConfig(activeCategory).showFileList ? "" : "hidden"
+          }`}
+        >
           <FileList onCreateFile={handleNewFileRequest} onSelectFile={handleSelectFile} />
         </div>
       )}

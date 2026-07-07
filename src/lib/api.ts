@@ -1245,3 +1245,33 @@ export async function getProjectContext(
 ): Promise<ProjectContext> {
   return invoke<ProjectContext>("get_project_context", { projectPath });
 }
+
+// 伏笔详细信息（用于伏笔追踪面板展示）
+// 相比 ForeshadowingBrief 增加埋设/回收/备注/来源文件字段
+export interface ForeshadowingDetail {
+  // 伏笔名称（作为 ID）
+  name: string;
+  // 状态（已埋设/待回收/已回收/已放弃 等）
+  status: string;
+  // 埋设位置描述
+  setup: string;
+  // 回收位置描述（未回收时为空）
+  payoff: string;
+  // 重要度（高/中/低）
+  importance: string;
+  // 备注
+  remark: string;
+  // 来源文件相对路径（相对于项目根）
+  sourceFile: string;
+}
+
+// 扫描项目全部伏笔（供伏笔追踪面板使用）
+// 输入: projectPath 项目根路径
+// 输出: Promise<ForeshadowingDetail[]> 全部伏笔详细列表（含已回收/已放弃）
+// 用途: 伏笔追踪面板按状态分组展示，点击跳转伏笔文件编辑
+// 实现: 后端扫描 伏笔/伏笔记录/系列伏笔 目录，解析 .txt 表格行
+export async function scanForeshadowings(
+  projectPath: string
+): Promise<ForeshadowingDetail[]> {
+  return invoke<ForeshadowingDetail[]>("scan_foreshadowings", { projectPath });
+}

@@ -35,7 +35,7 @@ import { useAppStore, getCategoryDir } from "../lib/store";
 import { useCodexStore } from "../lib/stores/useCodexStore";
 import type { FileNode } from "../lib/api";
 import { deletePath, readProjectTree, renamePath, copyFile, removeFileIndex, updateFileIndex } from "../lib/api";
-import { findDirByName, isValidFileName } from "../lib/fileTreeUtils";
+import { findDirByName, isValidFileName, extractChapterNumber } from "../lib/fileTreeUtils";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 import { useSettingsStore, toChineseNumber, type ChapterFormat } from "../lib/settingsStore";
@@ -57,39 +57,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// 从文件名中提取章节序号，用于正文文件自动排序
-// 排序规则：
-//   - 序章/楔子/引子/前言/引言/卷首语 → 排在最前面（返回 -2）
-//   - 正文章节（第N章/Chapter N/N.标题） → 按序号升序
-//   - 续章/尾声/后记/番外/终章/卷尾语 → 排在最后（返回 Infinity）
-// 卷首语/卷尾语纳入分卷目录排序逻辑，确保卷首语始终在顶部、卷尾语始终在底部
-// 兼容 .txt 与 .pmd 扩展名，避免设定文件等带扩展名文件被误排序
-function extractChapterNumber(name: string): number {
-  // 去除扩展名后的小写基准名，用于关键词匹配（兼容 .txt 与 .pmd）
-  const base = name.replace(/\.(txt|pmd)$/i, "").trim().toLowerCase();
-  // 序章类与卷首语前置于所有章节之前
-  const prologueKeywords = ["序章", "楔子", "引子", "前言", "引言", "卷首语", "prologue", "preface"];
-  if (prologueKeywords.some((kw) => base === kw || base.startsWith(kw))) {
-    return -2;
-  }
-  // 续章/尾声/后记/番外/终章/卷尾语 排在所有正文章节之后
-  const epilogueKeywords = ["续章", "尾声", "后记", "番外", "终章", "卷尾语", "epilogue", "afterword"];
-  if (epilogueKeywords.some((kw) => base === kw || base.startsWith(kw))) {
-    return Infinity;
-  }
-  const patterns = [
-    /第(\d+)章/,
-    /第(\d+)节/,
-    /第(\d+)回/,
-    /[Cc]hapter\s*(\d+)/,
-    /^(\d+)[._\-]/,
-  ];
-  for (const p of patterns) {
-    const m = name.match(p);
-    if (m) return parseInt(m[1], 10);
-  }
-  return Infinity; // 非章节文件排在最后
-}
+// extractChapterNumber 已统一提取至 lib/fileTreeUtils.ts，消除与 VolumeManager 的重复定义
 
 // 从文件名中去除编号前缀，保留纯名称
 // 兼容 .txt 与 .pmd 扩展名，避免扩展名残留影响显示

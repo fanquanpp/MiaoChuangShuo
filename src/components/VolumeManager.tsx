@@ -30,45 +30,12 @@ import {
 import { useAppStore, getCategoryDir } from "../lib/store";
 import { readProjectTree, readFile, writeFile, createFile } from "../lib/api";
 import type { FileNode } from "../lib/api";
-import { findDirByName } from "../lib/fileTreeUtils";
+import { findDirByName, extractChapterNumber } from "../lib/fileTreeUtils";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import ConfirmDialog from "./ConfirmDialog";
 
-/**
- * 从文件名中提取章节序号，用于分卷内章节排序
- * 排序规则（与 FileList.tsx 保持一致，避免行为分裂）：
- *   - 序章/楔子/引子/前言/引言/卷首语 → 排在最前面（返回 -2）
- *   - 正文章节（第N章/Chapter N/N.标题） → 按序号升序
- *   - 续章/尾声/后记/番外/终章/卷尾语 → 排在最后（返回 Infinity）
- *   - 未识别章节 → 排在最后（返回 Infinity），避免被误排到首位
- *
- * 输入: name 文件名（可能含 .txt 扩展名）
- * 输出: 章节排序权重数值
- */
-function extractChapterNumber(name: string): number {
-  const base = name.replace(/\.txt$/i, "").trim().toLowerCase();
-  const prologueKeywords = ["序章", "楔子", "引子", "前言", "引言", "卷首语", "prologue", "preface"];
-  if (prologueKeywords.some((kw) => base === kw || base.startsWith(kw))) {
-    return -2;
-  }
-  const epilogueKeywords = ["续章", "尾声", "后记", "番外", "终章", "卷尾语", "epilogue", "afterword"];
-  if (epilogueKeywords.some((kw) => base === kw || base.startsWith(kw))) {
-    return Infinity;
-  }
-  const patterns = [
-    /第(\d+)章/,
-    /第(\d+)节/,
-    /第(\d+)回/,
-    /[Cc]hapter\s*(\d+)/,
-    /^(\d+)[._\-]/,
-  ];
-  for (const p of patterns) {
-    const m = name.match(p);
-    if (m) return parseInt(m[1], 10);
-  }
-  return Infinity;
-}
+// extractChapterNumber 已统一提取至 lib/fileTreeUtils.ts，消除与 FileList 的重复定义
 
 // 卷数据结构
 interface Volume {
@@ -132,14 +99,8 @@ export default function VolumeManager() {
   const [editName, setEditName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Volume | null>(null);
 
-  // 卷宗目录名（根据项目类型确定）
-  const volumeDirName = useMemo(() => {
-    if (!currentProject) return "卷宗";
-    const type = currentProject.meta.type;
-    if (type === "multi_volume") return "卷宗";
-    if (type === "standard") return "卷宗";
-    return "卷宗";
-  }, [currentProject]);
+  // 卷宗目录名（所有分卷类文体统一为"卷宗"）
+  const volumeDirName = "卷宗";
 
   useEffect(() => {
     let cancelled = false;

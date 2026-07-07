@@ -61,7 +61,11 @@ interface ToolbarButtonProps {
 }
 
 // 工具栏按钮 - 统一直角几何风格
-// 关键设计：tabIndex={-1} 防止 Tab 键焦点跳到工具栏按钮，保证写作时焦点常驻编辑器
+// 关键设计：
+//   - tabIndex={-1} 防止 Tab 键焦点跳到工具栏按钮，保证写作时焦点常驻编辑器
+//   - onMouseDown preventDefault 阻止浏览器默认 mousedown 行为抢夺编辑器焦点
+//     这是 IME（中文输入法）组合输入期间的关键保护：若 mousedown 触发编辑器 blur，
+//     正在进行的 compositionend 事件会丢失或乱序，导致候选词被错误提交或字符丢失
 // 视觉规范 (v26.7.24 统一重构):
 //   - 尺寸: h-8 w-8 (32x32px) 固定容器 + w-4 h-4 图标
 //   - 色彩: 默认 text-nf-text-tertiary / 悬停 text-nf-text / 激活 text-fandex-primary + bg-fandex-primary/10
@@ -77,6 +81,7 @@ export function ToolbarButton({
     <button
       type="button"
       onClick={onClick}
+      onMouseDown={(e) => e.preventDefault()}
       title={title}
       tabIndex={-1}
       className={`nf-tool-btn relative h-8 w-8 flex items-center justify-center ease-fandex border border-transparent transition-colors duration-fast ${
@@ -142,6 +147,7 @@ function Dropdown({ trigger, children, panelWidth = "w-56", active = false, titl
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
+        onMouseDown={(e) => e.preventDefault()}
         title={title}
         tabIndex={-1}
         className={`nf-tool-btn relative h-8 px-2 transition-colors duration-fast ease-fandex border border-transparent flex items-center gap-1 ${
@@ -157,6 +163,7 @@ function Dropdown({ trigger, children, panelWidth = "w-56", active = false, titl
         <div
           className={`absolute top-full left-0 mt-1 ${panelWidth} nf-glass-panel bg-nf-bg-card border border-nf-border-light shadow-lg z-50 max-h-96 overflow-y-auto`}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.preventDefault()}
         >
           {children}
         </div>
@@ -275,6 +282,7 @@ function FontSizeAdjuster() {
       <button
         type="button"
         onClick={() => setFontSize(fontSize - 1)}
+        onMouseDown={(e) => e.preventDefault()}
         disabled={fontSize <= 12}
         title={t("shortcuts.fontSizeDecrease")}
         tabIndex={-1}
@@ -286,6 +294,7 @@ function FontSizeAdjuster() {
       <button
         type="button"
         onClick={() => setFontSize(DEFAULT_SIZE)}
+        onMouseDown={(e) => e.preventDefault()}
         title={t("shortcuts.fontSizeReset")}
         tabIndex={-1}
         className="nf-tool-btn h-8 px-1.5 text-[11px] tabular-nums text-nf-text-secondary hover:text-fandex-primary transition-colors duration-fast min-w-[32px] text-center flex items-center justify-center border-x border-nf-border-light/30"
@@ -296,6 +305,7 @@ function FontSizeAdjuster() {
       <button
         type="button"
         onClick={() => setFontSize(fontSize + 1)}
+        onMouseDown={(e) => e.preventDefault()}
         disabled={fontSize >= 28}
         title={t("shortcuts.fontSizeIncrease")}
         tabIndex={-1}
@@ -404,6 +414,7 @@ function SessionStats({
       <button
         type="button"
         onClick={onTogglePause}
+        onMouseDown={(e) => e.preventDefault()}
         title={paused ? t("editor.sessionResume") : t("editor.sessionPause")}
         tabIndex={-1}
         className={`nf-tool-btn h-8 w-8 flex items-center justify-center transition-colors duration-fast ease-fandex border ${
@@ -432,6 +443,7 @@ function SessionStats({
       <button
         type="button"
         onClick={handleOpenDialog}
+        onMouseDown={(e) => e.preventDefault()}
         title={t("editor.setTarget")}
         tabIndex={-1}
         className={`nf-tool-btn flex items-center gap-1.5 h-8 px-2 transition-colors duration-fast ease-fandex border ${
@@ -462,6 +474,7 @@ function SessionStats({
         <button
           type="button"
           onClick={() => setResetConfirmOpen(true)}
+          onMouseDown={(e) => e.preventDefault()}
           title={t("editor.sessionReset")}
           tabIndex={-1}
           className="nf-tool-btn h-8 w-8 flex items-center justify-center text-nf-text-tertiary hover:text-fandex-tertiary transition-colors duration-fast"
@@ -759,6 +772,7 @@ export default function EditorToolbar({
             <button
               type="button"
               onClick={onExportTxt}
+              onMouseDown={(e) => e.preventDefault()}
               title={t("editor.exportTxt")}
               tabIndex={-1}
               className="nf-tool-btn flex items-center gap-1 h-8 px-2 text-xs text-fandex-secondary border border-fandex-secondary/30 hover:bg-fandex-secondary/10 hover:border-fandex-secondary/50 transition-colors duration-fast ease-fandex"
@@ -770,6 +784,7 @@ export default function EditorToolbar({
           <button
             type="button"
             onClick={onSave}
+            onMouseDown={(e) => e.preventDefault()}
             disabled={!dirty || saving}
             title={t("app.save")}
             tabIndex={-1}
@@ -921,6 +936,7 @@ export default function EditorToolbar({
           <button
             type="button"
             onClick={() => onToggleAiPanel?.()}
+            onMouseDown={(e) => e.preventDefault()}
             title={t("ai.panel.toggleHint")}
             tabIndex={-1}
             className={`nf-tool-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium transition-colors duration-fast ease-fandex border ${

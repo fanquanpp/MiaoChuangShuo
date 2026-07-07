@@ -3,11 +3,11 @@
 // 功能概述：
 // 提供"角色 ↔ 正文"双向数据联动能力，是 喵创说 模块联动的核心组成。
 // 包含两个高价值能力：
-// 1. 角色出场统计：扫描项目内所有 .txt 文件，统计每个角色名的出现次数与分布
-// 2. 全局改名：在项目所有 .txt 文件中批量替换角色名，解决作家改名时的痛苦
+// 1. 角色出场统计：扫描项目内所有支持文档文件，统计每个角色名的出现次数与分布
+// 2. 全局改名：在项目所有支持文档文件中批量替换角色名，解决作家改名时的痛苦
 //
 // 模块职责：
-// 1. 递归扫描项目内 .txt 文件（跳过 .novelforge 元数据目录）
+// 1. 递归扫描项目内支持文档(.txt/.pmd/.html/.htm)（跳过 .novelforge 元数据目录）
 // 2. 统计角色名出现次数，返回按文件分布的详细数据
 // 3. 批量替换角色名，返回修改文件数与替换次数
 // 4. 全程路径沙箱内操作，确保不越界
@@ -15,6 +15,8 @@
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use crate::text_extractor;
 
 /// 单个文件中角色出场统计
 #[derive(Debug, Clone, Serialize)]
@@ -52,15 +54,15 @@ pub struct RenameResult {
 }
 
 /**
- * 递归收集项目内所有 .txt 文件路径
- * 输入: dir 当前目录, project_root 项目根目录, files 输出列表
+ * 递归收集项目内所有支持文档文件路径（.txt/.pmd/.html/.htm）
+ * 输入: dir 当前目录, files 输出列表
  * 流程:
  *   1. 读取目录条目
  *   2. 跳过 .novelforge 等隐藏目录
  *   3. 子目录递归处理
- *   4. .txt 文件加入列表
+ *   4. 支持文档加入列表
  */
-fn collect_txt_files(dir: &Path, files: &mut Vec<PathBuf>) {
+fn collect_supported_files(dir: &Path, files: &mut Vec<PathBuf>) {
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -76,9 +78,13 @@ fn collect_txt_files(dir: &Path, files: &mut Vec<PathBuf>) {
             if name.starts_with('.') {
                 continue;
             }
-            collect_txt_files(&path, files);
-        } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
-            files.push(path);
+            collect_supported_files(&path, files);
+        } else {
+            // 支持文档格式：.txt/.pmd/.html/.htm
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if matches!(ext.to_lowercase().as_str(), "txt" | "pmd" | "html" | "htm") {
+                files.push(path);
+            }
         }
     }
 }
@@ -94,13 +100,13 @@ fn is_manuscript_file(relative_path: &str) -> bool {
 }
 
 /**
- * 统计角色在项目所有 .txt 文件中的出场情况
+ * 统计角色在项目所有支持文档中的出场情况
  * 输入: project_path 项目根路径, names 待统计的角色名列表
  * 输出: Result<Vec<CharacterAppearance>, String> 每个角色的出场统计
  * 流程:
  *   1. canonicalize 项目根路径
- *   2. 递归收集所有 .txt 文件
- *   3. 读取每个文件内容，统计每个角色名出现次数
+ *   2. 递归收集所有支持文档(.txt/.pmd/.html/.htm)
+ *   3. 读取每个文件内容，接入 text_extractor 提取纯文本后统计角色名出现次数
  *   4. 按角色汇总，返回按总次数降序的结果
  */
 #[tauri::command]
@@ -126,9 +132,9 @@ pub fn count_character_appearances(
         return Ok(Vec::new());
     }
 
-    // 收集所有 .txt 文件
-    let mut txt_files: Vec<PathBuf> = Vec::new();
-    collect_txt_files(&root, &mut txt_files);
+    // 收集所有支持文档文件
+    let mut doc_files: Vec<PathBuf> = Vec::new();
+    collect_supported_files(&root, &mut doc_files);
 
     // 初始化每个角色的统计
     let mut appearances: Vec<CharacterAppearance> = valid_names
@@ -142,11 +148,16 @@ pub fn count_character_appearances(
         .collect();
 
     // 遍历文件统计
-    for file_path in &txt_files {
+    for file_path in &doc_files {
         let content = match fs::read_to_string(file_path) {
             Ok(c) => c,
             Err(_) => continue, // 跳过无法读取的文件（如编码问题）
         };
+
+        // 接入 text_extractor 提取纯文本，避免 HTML 标签/JSON 结构污染匹配
+        let file_name = file_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let format = text_extractor::detect_format(&file_name, &content);
+        let plain = text_extractor::extract_plain_text(&content, format);
 
         // 计算相对路径
         let relative = file_path
@@ -156,7 +167,8 @@ pub fn count_character_appearances(
         let is_mscript = is_manuscript_file(&relative);
 
         for (idx, name) in valid_names.iter().enumerate() {
-            let count = content.matches(name.as_str()).count() as u64;
+            // 在纯文本中统计角色名出现次数
+            let count = plain.matches(name.as_str()).count() as u64;
             if count > 0 {
                 appearances[idx].total_count += count;
                 appearances[idx].file_count += 1;
@@ -242,16 +254,18 @@ fn replace_name_with_boundary(content: &str, old_name: &str, new_name: &str) -> 
 }
 
 /**
- * 在项目所有 .txt 文件中全局替换角色名
+ * 在项目所有支持文档中全局替换角色名
  * 输入: project_path 项目根路径, old_name 旧角色名, new_name 新角色名
  * 输出: Result<RenameResult, String> 修改文件数与替换次数
  * 流程:
  *   1. 校验新旧名称非空且不同
  *   2. canonicalize 项目根路径
- *   3. 递归收集所有 .txt 文件
+ *   3. 递归收集所有支持文档(.txt/.pmd/.html/.htm)
  *   4. 逐文件读取、带词边界检测替换、写回（仅在有变更时写入）
  *   5. 返回修改的文件列表与替换总次数
  * 安全说明: 采用词边界检测, 避免子串误伤(如"林"不会误伤"林中漫步"),
+ *   对 .pmd/HTML 文件的替换在原始内容上进行，词边界检测保证不误伤 JSON/HTML 结构
+ *   （角色名通常为中文，不会与 JSON 键名/HTML 标签名冲突）
  *   建议前端提示作者改名前先保存以创建版本快照, 便于回滚
  */
 #[tauri::command]
@@ -281,15 +295,15 @@ pub fn rename_character_in_project(
         return Err("项目路径不存在或不是目录".to_string());
     }
 
-    // 收集所有 .txt 文件
-    let mut txt_files: Vec<PathBuf> = Vec::new();
-    collect_txt_files(&root, &mut txt_files);
+    // 收集所有支持文档文件
+    let mut doc_files: Vec<PathBuf> = Vec::new();
+    collect_supported_files(&root, &mut doc_files);
 
     let mut files_modified: u64 = 0;
     let mut occurrences: u64 = 0;
     let mut renamed_files: Vec<String> = Vec::new();
 
-    for file_path in &txt_files {
+    for file_path in &doc_files {
         let content = match fs::read_to_string(file_path) {
             Ok(c) => c,
             Err(_) => continue,

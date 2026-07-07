@@ -249,6 +249,7 @@ const zhCN: TranslationDict = {
   "editor.charRosterHint": "在空行按 Tab 键呼出角色名选择（共 {count} 个角色）",
   "editor.essayHint": "已启用首行双字缩进",
   "editor.loadFailed": "加载文件失败：{error}",
+  "editor.codexLoadFailed": "设定库加载失败：{error}",
   "editor.commandPaletteHint": "按 Ctrl+K 打开命令面板",
   "editor.editor": "编辑器",
   "editor.defaultExportName": "导出.txt",
@@ -550,6 +551,22 @@ const zhCN: TranslationDict = {
   "characterGraph.toast.cleared": "人物关系图已清空",
   "characterGraph.toast.deleteConfirm": "确定删除此角色节点及其关联连线吗?",
   "characterGraph.toast.deleted": "节点已删除",
+
+  // ── 伏笔追踪面板 ──
+  "foreshadowing.title": "伏笔追踪",
+  "foreshadowing.subtitle": "扫描伏笔目录，按状态分组追踪埋设与回收",
+  "foreshadowing.refresh": "刷新",
+  "foreshadowing.loading": "正在加载伏笔列表…",
+  "foreshadowing.loadFailed": "加载伏笔失败：{error}",
+  "foreshadowing.noProject": "请先打开一个项目",
+  "foreshadowing.empty": "暂无伏笔记录。请在「伏笔」目录下创建 .txt 文件，按表格格式记录伏笔",
+  "foreshadowing.statTotal": "总数",
+  "foreshadowing.statSetup": "已埋设",
+  "foreshadowing.statPending": "待回收",
+  "foreshadowing.statResolved": "已回收",
+  "foreshadowing.groupCount": "共 {count} 条",
+  "foreshadowing.setupLabel": "埋设",
+  "foreshadowing.payoffLabel": "回收",
 
   // ── 卡片管理器 ──
   "cardmanager.editorPlaceholder": "开始编辑卡片内容…",
@@ -1571,6 +1588,7 @@ const enUS: TranslationDict = {
   "editor.charRosterHint": "Press Tab on an empty line to pick a character ({count} available)",
   "editor.essayHint": "First-line indent enabled",
   "editor.loadFailed": "Failed to load file: {error}",
+  "editor.codexLoadFailed": "Codex load failed: {error}",
   "editor.commandPaletteHint": "Press Ctrl+K to open Command Palette",
   "editor.editor": "Editor",
   "editor.defaultExportName": "export.txt",
@@ -1871,6 +1889,22 @@ const enUS: TranslationDict = {
   "characterGraph.toast.cleared": "Character graph cleared",
   "characterGraph.toast.deleteConfirm": "Delete this node and its edges?",
   "characterGraph.toast.deleted": "Node deleted",
+
+  // ── Foreshadowing Panel ──
+  "foreshadowing.title": "Foreshadowing Tracker",
+  "foreshadowing.subtitle": "Scan foreshadowing directory, track setup and payoff by status",
+  "foreshadowing.refresh": "Refresh",
+  "foreshadowing.loading": "Loading foreshadowings…",
+  "foreshadowing.loadFailed": "Failed to load foreshadowings: {error}",
+  "foreshadowing.noProject": "Please open a project first",
+  "foreshadowing.empty": "No foreshadowings. Create .txt files under the Foreshadowing directory in table format",
+  "foreshadowing.statTotal": "Total",
+  "foreshadowing.statSetup": "Setup",
+  "foreshadowing.statPending": "Pending",
+  "foreshadowing.statResolved": "Resolved",
+  "foreshadowing.groupCount": "{count} item(s)",
+  "foreshadowing.setupLabel": "Setup",
+  "foreshadowing.payoffLabel": "Payoff",
 
   // ── Card Manager ──
   "cardmanager.editorPlaceholder": "Start editing card content…",

@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
+use crate::tantivy_indexer;
+use crate::text_extractor;
 use crate::project_template::{
     create_project_meta_v2, is_legacy_project as detect_legacy, render_template,
     standard_template_files, universal_directories, ProjectMeta, StandardProjectType, TemplateVars,
@@ -363,14 +365,14 @@ fn count_project_chapters(project_root: &Path) -> u64 {
 /// 递归统计目录下的章节数
 /// 输入: dir 目录路径, total 累计章节数
 /// 输出: 无
-/// 流程: 遍历目录，对 .txt 文件计数
+/// 流程: 遍历目录，对支持的文档文件计数（.txt/.pmd/.html/.htm）
 fn count_chapters_recursive(dir: &Path, total: &mut u64) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 count_chapters_recursive(&path, total);
-            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
+            } else if is_supported_doc(&path) {
                 *total += 1;
             }
         }
@@ -380,21 +382,34 @@ fn count_chapters_recursive(dir: &Path, total: &mut u64) {
 /// 递归统计目录下文件字数
 /// 输入: dir 目录路径, total 累计字数
 /// 输出: 无
-/// 流程: 遍历目录，对 .txt 文件统计字符数
+/// 流程: 遍历目录，对支持的文档文件提取纯文本后统计字数
+///       接入 text_extractor 统一层，避免 HTML 标签字符被计入字数
 fn count_words_recursive(dir: &Path, total: &mut u64) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 count_words_recursive(&path, total);
-            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
+            } else if is_supported_doc(&path) {
                 if let Ok(content) = fs::read_to_string(&path) {
+                    // 通过 text_extractor 提取纯文本，剥离 HTML 标签/ProseMirror JSON 结构
+                    let file_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    let format = text_extractor::detect_format(&file_name, &content);
+                    let plain = text_extractor::extract_plain_text(&content, format);
                     // 中文字符按 1 字计算，英文单词按 1 字计算
-                    *total += count_chinese_and_words(&content);
+                    *total += count_chinese_and_words(&plain);
                 }
             }
         }
     }
+}
+
+/// 判断文件是否为支持的文档格式（.txt/.pmd/.html/.htm）
+/// 输入: path 文件路径
+/// 输出: 是否为支持的文档
+fn is_supported_doc(path: &Path) -> bool {
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    matches!(ext.to_lowercase().as_str(), "txt" | "pmd" | "html" | "htm")
 }
 
 /// 统计中文字符与英文单词数（委托至共享 word_count 模块）
@@ -571,20 +586,23 @@ pub fn read_file(file_path: String, project_path: String) -> Result<String, Stri
 /// 写入文件内容（含路径沙箱校验）
 /// 输入: file_path 文件路径, content 内容, project_path 项目根目录
 /// 输出: Result<(), String> 成功或错误
-/// 流程: 校验路径后创建父目录并写入
+/// 流程: 校验路径后创建父目录并写入；写入成功后同步 Tantivy 索引（P1-4）
 #[tauri::command]
 pub fn write_file(file_path: String, content: String, project_path: String) -> Result<(), String> {
     let validated = validate_path_in_project(&file_path, &project_path)?;
     if let Some(parent) = validated.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    fs::write(&validated, content).map_err(|e| format!("写入文件失败: {}", e))
+    fs::write(&validated, content).map_err(|e| format!("写入文件失败: {}", e))?;
+    // P1-4: 写入后同步 Tantivy 索引（仅对可索引格式，失败仅记录日志）
+    try_sync_index_add(&project_path, &validated);
+    Ok(())
 }
 
 /// 创建新文件（含路径沙箱校验）
 /// 输入: project_path 项目路径, relative_path 相对路径, content 内容
 /// 输出: Result<String, String> 文件绝对路径或错误
-/// 流程: 在校验后的项目目录内创建新文件
+/// 流程: 在校验后的项目目录内创建新文件；创建成功后同步 Tantivy 索引（P1-4）
 #[tauri::command]
 pub fn create_file(
     project_path: String,
@@ -609,23 +627,28 @@ pub fn create_file(
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
     fs::write(&validated, content).map_err(|e| format!("创建文件失败: {}", e))?;
+    // P1-4: 创建后同步 Tantivy 索引（仅对可索引格式，失败仅记录日志）
+    try_sync_index_add(&project_path, &validated);
     Ok(validated.to_string_lossy().to_string())
 }
 
 /// 删除文件或目录（含路径沙箱校验，移至回收站）
 /// 输入: path 路径, project_path 项目根目录
 /// 输出: Result<(), String> 成功或错误
-/// 流程: 校验路径后移至系统回收站
+/// 流程: 校验路径；删除前同步 Tantivy 索引（目录需递归收集子文件路径）；移至系统回收站
+/// 设计说明: 索引同步在 trash::delete 之前完成，因为目录删除后无法再枚举子文件路径
 #[tauri::command]
 pub fn delete_path(path: String, project_path: String) -> Result<(), String> {
     let p = validate_path_in_project(&path, &project_path)?;
+    // P1-4: 删除前同步 Tantivy 索引（目录需递归收集子文件 relative_path）
+    try_sync_index_remove(&project_path, &p);
     trash::delete(&p).map_err(|e| format!("删除失败: {}", e))
 }
 
 /// 重命名文件或目录（含路径沙箱校验）
 /// 输入: old_path 原路径, new_path 新路径, project_path 项目根目录
 /// 输出: Result<(), String> 成功或错误
-/// 流程: 校验原路径在项目内，校验新路径在项目内且不存在，执行重命名
+/// 流程: 校验原路径在项目内，校验新路径在项目内且不存在，执行重命名；重命名后同步 Tantivy 索引（P1-4）
 #[tauri::command]
 pub fn rename_path(
     old_path: String,
@@ -651,13 +674,16 @@ pub fn rename_path(
     }
 
     // 执行重命名
-    fs::rename(&old_abs, &new_abs).map_err(|e| format!("重命名失败: {}", e))
+    fs::rename(&old_abs, &new_abs).map_err(|e| format!("重命名失败: {}", e))?;
+    // P1-4: 重命名后同步 Tantivy 索引（删除旧路径索引 + 添加新路径索引）
+    try_sync_index_rename(&project_path, &old_abs, &new_abs);
+    Ok(())
 }
 
 /// 复制文件（在项目内复制文件到新路径）
 /// 输入: src_path 源文件路径, dest_path 目标文件路径, project_path 项目根目录
 /// 输出: Result<String, String> 目标文件绝对路径或错误
-/// 流程: 校验源路径存在且为文件，校验目标路径在项目内且不存在，执行复制
+/// 流程: 校验源路径存在且为文件，校验目标路径在项目内且不存在，执行复制；复制后同步 Tantivy 索引（P1-4）
 #[tauri::command]
 pub fn copy_file(
     src_path: String,
@@ -680,6 +706,8 @@ pub fn copy_file(
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
     fs::copy(&src_abs, &dest_abs).map_err(|e| format!("复制文件失败: {}", e))?;
+    // P1-4: 复制后同步 Tantivy 索引（仅对可索引格式，失败仅记录日志）
+    try_sync_index_add(&project_path, &dest_abs);
     Ok(dest_abs.to_string_lossy().to_string())
 }
 
@@ -1015,7 +1043,7 @@ pub fn get_writing_stats(project_path: String) -> Result<WritingStats, String> {
 /// 递归收集章节字数统计
 /// 输入: dir 目录路径, root 项目根路径, total_words 累计字数, chapters 章节列表
 /// 输出: 无
-/// 流程: 遍历正文目录，统计每个 .txt 文件的字数
+/// 流程: 遍历正文目录，统计每个支持文档的字数（接入 text_extractor 统一层）
 fn collect_chapter_stats(
     dir: &Path,
     root: &Path,
@@ -1027,17 +1055,17 @@ fn collect_chapter_stats(
             let path = entry.path();
             if path.is_dir() {
                 collect_chapter_stats(&path, root, total_words, chapters);
-            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
+            } else if is_supported_doc(&path) {
                 if let Ok(content) = fs::read_to_string(&path) {
-                    let words = count_chinese_and_words(&content);
+                    // 接入 text_extractor 提取纯文本，避免 HTML 标签字符计入字数
+                    let file_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    let format = text_extractor::detect_format(&file_name, &content);
+                    let plain = text_extractor::extract_plain_text(&content, format);
+                    let words = count_chinese_and_words(&plain);
                     *total_words += words;
                     let relative_path = path
                         .strip_prefix(root)
                         .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    let file_name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
                     chapters.push(ChapterWordCount {
                         file_name,
@@ -1053,16 +1081,19 @@ fn collect_chapter_stats(
 /// 递归统计目录下文件字数
 /// 输入: dir 目录路径, total 累计字数
 /// 输出: 无
-/// 流程: 遍历目录，对 .txt 文件统计字数
+/// 流程: 遍历目录，对支持文档统计字数（接入 text_extractor 统一层）
 fn count_dir_words(dir: &Path, total: &mut u64) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 count_dir_words(&path, total);
-            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
+            } else if is_supported_doc(&path) {
                 if let Ok(content) = fs::read_to_string(&path) {
-                    *total += count_chinese_and_words(&content);
+                    let file_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    let format = text_extractor::detect_format(&file_name, &content);
+                    let plain = text_extractor::extract_plain_text(&content, format);
+                    *total += count_chinese_and_words(&plain);
                 }
             }
         }
@@ -1072,7 +1103,7 @@ fn count_dir_words(dir: &Path, total: &mut u64) {
 /// 递归统计目录下文件数
 /// 输入: dir 目录路径, total 累计文件数
 /// 输出: 无
-/// 流程: 遍历目录，统计 .txt 文件数量
+/// 流程: 遍历目录，统计支持文档数量（.txt/.pmd/.html/.htm）
 fn count_files_recursive(dir: &Path, total: &mut u64) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -1083,7 +1114,7 @@ fn count_files_recursive(dir: &Path, total: &mut u64) {
             }
             if path.is_dir() {
                 count_files_recursive(&path, total);
-            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
+            } else if is_supported_doc(&path) {
                 *total += 1;
             }
         }
@@ -1123,11 +1154,15 @@ pub struct ReplaceResult {
 /// 输出: Result<ReplaceResult, String> 替换结果统计
 /// 流程:
 ///   1. 校验项目路径与查找词非空
-///   2. 递归遍历项目内所有 .txt 文件（跳过 .开头目录）
-///   3. 逐文件读取内容，按行执行替换（保留原始换行符）
+///   2. 递归遍历项目内所有支持文档（.txt/.pmd/.html/.htm，跳过 .开头目录）
+///   3. 按格式分派结构感知替换:
+///      - PmdJson: 递归遍历 ProseMirror JSON，仅替换 text 节点 text 字段
+///      - Html: 状态机识别标签边界，仅替换标签间文本
+///      - JsonFrontMatter: 保留 --- 包裹的 JSON 元数据，仅替换正文
+///      - PlainText: 直接字符串替换
 ///   4. 仅当内容有变化时写回文件
 ///   5. 统计修改文件数与替换次数
-/// 安全: 仅 .txt 文件可被修改，所有路径经沙箱校验
+/// 安全: 仅支持文档格式可被修改，所有路径经沙箱校验
 #[tauri::command]
 pub fn replace_in_project(
     project_path: String,
@@ -1184,7 +1219,7 @@ struct ReplaceContext {
 ///   root 项目根路径
 ///   ctx 替换上下文（含配置与结果累加器）
 /// 输出: 无
-/// 流程: 遍历目录，对每个 .txt 文件执行替换并写回
+/// 流程: 遍历目录，对每个支持的文档文件（.txt/.pmd/.html/.htm）执行结构感知替换并写回
 fn replace_recursive(current: &Path, ctx: &mut ReplaceContext) {
     if let Ok(entries) = fs::read_dir(current) {
         for entry in entries.flatten() {
@@ -1196,7 +1231,9 @@ fn replace_recursive(current: &Path, ctx: &mut ReplaceContext) {
             }
             if path.is_dir() {
                 replace_recursive(&path, ctx);
-            } else if path.extension().map(|e| e == "txt").unwrap_or(false) {
+            } else if is_supported_doc(&path) {
+                // P1-6: 扩展为支持 .txt/.pmd/.html/.htm 四种格式
+                // replace_in_file 内部根据 detect_format 分派到结构感知替换函数
                 let count = replace_in_file(&path, ctx);
                 if count > 0 {
                     ctx.total_replacements += count;
@@ -1207,52 +1244,351 @@ fn replace_recursive(current: &Path, ctx: &mut ReplaceContext) {
     }
 }
 
-/// 在单个文件中执行替换并写回
+/// 在单个文件中执行结构感知替换并写回
 /// 输入:
 ///   file_path 文件路径
 ///   ctx 替换上下文（含配置与结果集合）
 /// 输出: u64 替换次数
 /// 流程:
 ///   1. 读取文件内容
-///   2. 先统计匹配次数（避免替换后无法定位）
-///   3. 执行替换生成新内容
-///   4. 仅当有替换发生时写回文件
+///   2. 通过 text_extractor::detect_format 检测格式
+///   3. 按格式分派到结构感知替换函数（保留 JSON 结构/HTML 标签/front matter）
+///   4. 仅当有替换发生且内容变化时写回文件
 ///   5. 记录文件结果到 ctx.files
+///   6. P1-4: 写回后同步 Tantivy 索引（仅对可索引格式，失败仅记录日志）
 fn replace_in_file(file_path: &Path, ctx: &mut ReplaceContext) -> u64 {
     let content = match fs::read_to_string(file_path) {
         Ok(c) => c,
         Err(_) => return 0,
     };
-    // 先统计原始内容中的匹配次数
-    let count = count_matches(&content, &ctx.query, ctx.case_sensitive);
-    if count == 0 {
-        return 0;
-    }
-    // 执行替换
-    let new_content = if ctx.case_sensitive {
-        content.replace(&ctx.query, &ctx.replacement)
-    } else {
-        case_insensitive_replace(&content, &ctx.query, &ctx.replacement)
+    let file_name = file_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    // P1-6: 通过 text_extractor 检测格式，按格式分派到结构感知替换
+    let format = text_extractor::detect_format(&file_name, &content);
+    let (new_content, count) = match format {
+        text_extractor::ContentFormat::PmdJson => {
+            replace_in_pmd_json(&content, &ctx.query, &ctx.replacement, ctx.case_sensitive)
+        }
+        text_extractor::ContentFormat::Html => {
+            replace_in_html(&content, &ctx.query, &ctx.replacement, ctx.case_sensitive)
+        }
+        text_extractor::ContentFormat::JsonFrontMatter => replace_in_front_matter(
+            &content,
+            &ctx.query,
+            &ctx.replacement,
+            ctx.case_sensitive,
+        ),
+        text_extractor::ContentFormat::PlainText => {
+            // 纯文本：直接字符串替换（保留原始换行符）
+            let count = count_matches(&content, &ctx.query, ctx.case_sensitive);
+            if count == 0 {
+                return 0;
+            }
+            let new_content = if ctx.case_sensitive {
+                content.replace(&ctx.query, &ctx.replacement)
+            } else {
+                case_insensitive_replace(&content, &ctx.query, &ctx.replacement)
+            };
+            (new_content, count)
+        }
     };
-    // 仅当内容确实变化时写回（避免无意义的磁盘写入）
-    if new_content == content {
+    if count == 0 || new_content == content {
         return 0;
     }
     let _ = fs::write(file_path, &new_content);
     let relative_path = file_path
         .strip_prefix(&ctx.root)
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
-    let file_name = file_path
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
         .unwrap_or_default();
     ctx.files.push(ReplaceFileResult {
-        relative_path,
+        relative_path: relative_path.clone(),
         file_name,
         replacements: count,
     });
+    // P1-4: 替换写回后同步 Tantivy 索引（仅对可索引格式，失败仅记录日志）
+    if is_indexable_file(file_path) {
+        if let Err(e) = sync_index_add(&ctx.root, file_path, &relative_path) {
+            eprintln!("[索引同步] 替换后同步失败 {}: {}", relative_path, e);
+        }
+    }
     count
+}
+
+/// 在 ProseMirror JSON 文档中执行结构感知替换
+/// 输入:
+///   content ProseMirror JSON 字符串
+///   query 查找词
+///   replacement 替换字符串
+///   case_sensitive 是否区分大小写
+/// 输出: (String, u64) 替换后的 JSON 字符串与替换次数
+/// 流程:
+///   1. 解析 JSON 为 serde_json::Value
+///   2. 递归遍历节点树，仅对 text 节点的 text 字段执行替换
+///   3. 保留所有结构化标记（节点类型/属性/嵌套关系不变）
+///   4. 序列化回 JSON 字符串（pretty 格式，保持与编辑器输出一致）
+/// 容错: JSON 解析失败时降级为纯文本替换（避免阻塞替换流程）
+fn replace_in_pmd_json(
+    content: &str,
+    query: &str,
+    replacement: &str,
+    case_sensitive: bool,
+) -> (String, u64) {
+    let mut parsed: serde_json::Value = match serde_json::from_str(content) {
+        Ok(v) => v,
+        Err(_) => {
+            // JSON 解析失败：降级为纯文本替换
+            let count = count_matches(content, query, case_sensitive);
+            if count == 0 {
+                return (content.to_string(), 0);
+            }
+            let new_content = if case_sensitive {
+                content.replace(query, replacement)
+            } else {
+                case_insensitive_replace(content, query, replacement)
+            };
+            return (new_content, count);
+        }
+    };
+    let mut total_count: u64 = 0;
+    replace_text_in_node_recursive(&mut parsed, query, replacement, case_sensitive, &mut total_count);
+    if total_count == 0 {
+        return (content.to_string(), 0);
+    }
+    // 序列化回 JSON（pretty 格式，保持与 NovelEditor 输出一致）
+    match serde_json::to_string_pretty(&parsed) {
+        Ok(new_content) => (new_content, total_count),
+        Err(_) => (content.to_string(), 0),
+    }
+}
+
+/// 递归遍历 ProseMirror 节点树，在 text 节点中执行替换
+/// 输入:
+///   node 当前节点（可变引用）
+///   query 查找词
+///   replacement 替换字符串
+///   case_sensitive 是否区分大小写
+///   total_count 替换次数累加器
+/// 流程:
+///   1. 若节点 type == "text"，对其 attrs.text 或 text 字段执行替换
+///   2. 递归处理 content 数组中的所有子节点
+///   3. characterMentionNode 的 attrs.name 也参与替换（角色名可能被替换）
+fn replace_text_in_node_recursive(
+    node: &mut serde_json::Value,
+    query: &str,
+    replacement: &str,
+    case_sensitive: bool,
+    total_count: &mut u64,
+) {
+    if let Some(node_type) = node.get("type").and_then(|v| v.as_str()) {
+        let node_type = node_type.to_string();
+        match node_type.as_str() {
+            // text 节点：替换 text 字段
+            "text" => {
+                if let Some(text_val) = node.get_mut("text").and_then(|v| v.as_str().map(|s| s.to_string())) {
+                    let old_text = text_val;
+                    let (new_text, count) = replace_with_count(&old_text, query, replacement, case_sensitive);
+                    if count > 0 {
+                        if let Some(text_field) = node.get_mut("text") {
+                            *text_field = serde_json::Value::String(new_text);
+                        }
+                        *total_count += count;
+                    }
+                }
+            }
+            // characterMentionNode：替换 attrs.name 字段（角色名可能需要批量替换）
+            "characterMentionNode" => {
+                if let Some(attrs) = node.get_mut("attrs") {
+                    if let Some(name_val) = attrs.get_mut("name").and_then(|v| v.as_str().map(|s| s.to_string())) {
+                        let old_name = name_val;
+                        let (new_name, count) = replace_with_count(&old_name, query, replacement, case_sensitive);
+                        if count > 0 {
+                            if let Some(name_field) = attrs.get_mut("name") {
+                                *name_field = serde_json::Value::String(new_name);
+                            }
+                            *total_count += count;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    // 递归处理子节点
+    if let Some(content) = node.get_mut("content").and_then(|v| v.as_array_mut()) {
+        for child in content.iter_mut() {
+            replace_text_in_node_recursive(child, query, replacement, case_sensitive, total_count);
+        }
+    }
+}
+
+/// 在 HTML 文档中执行结构感知替换（保留标签与属性，仅替换标签间文本）
+/// 输入:
+///   content HTML 字符串
+///   query 查找词
+///   replacement 替换字符串
+///   case_sensitive 是否区分大小写
+/// 输出: (String, u64) 替换后的 HTML 与替换次数
+/// 流程:
+///   1. 逐字符扫描，识别 < > 包裹的标签区域
+///   2. 标签外的文本执行替换
+///   3. 标签内的内容（含属性值）原样保留
+/// 设计依据: 避免引入 HTML 解析器重依赖，手写状态机足够覆盖项目内的简单 HTML
+fn replace_in_html(
+    content: &str,
+    query: &str,
+    replacement: &str,
+    case_sensitive: bool,
+) -> (String, u64) {
+    let mut result = String::with_capacity(content.len());
+    let mut in_tag = false;
+    let mut text_buffer = String::new();
+    let mut total_count: u64 = 0;
+
+    for ch in content.chars() {
+        if in_tag {
+            result.push(ch);
+            if ch == '>' {
+                in_tag = false;
+            }
+        } else if ch == '<' {
+            // 标签开始前：先处理累积的文本
+            if !text_buffer.is_empty() {
+                let (new_text, count) = replace_with_count(&text_buffer, query, replacement, case_sensitive);
+                result.push_str(&new_text);
+                total_count += count;
+                text_buffer.clear();
+            }
+            result.push(ch);
+            in_tag = true;
+        } else {
+            text_buffer.push(ch);
+        }
+    }
+    // 处理末尾残余文本
+    if !text_buffer.is_empty() {
+        let (new_text, count) = replace_with_count(&text_buffer, query, replacement, case_sensitive);
+        result.push_str(&new_text);
+        total_count += count;
+    }
+    (result, total_count)
+}
+
+/// 在 JSON front matter 设定文件中执行替换（保留 --- 包裹的 JSON 元数据）
+/// 输入:
+///   content 设定文件内容
+///   query 查找词
+///   replacement 替换字符串
+///   case_sensitive 是否区分大小写
+/// 输出: (String, u64) 替换后的内容与替换次数
+/// 流程:
+///   1. 检测首行是否为 ---
+///   2. 查找第二个 --- 结束标记
+///   3. 仅对结束标记后的正文执行替换
+///   4. 保留 front matter JSON 不变
+fn replace_in_front_matter(
+    content: &str,
+    query: &str,
+    replacement: &str,
+    case_sensitive: bool,
+) -> (String, u64) {
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.len() < 3 || lines[0].trim() != "---" {
+        // 无 front matter：按纯文本处理
+        let count = count_matches(content, query, case_sensitive);
+        if count == 0 {
+            return (content.to_string(), 0);
+        }
+        let new_content = if case_sensitive {
+            content.replace(query, replacement)
+        } else {
+            case_insensitive_replace(content, query, replacement)
+        };
+        return (new_content, count);
+    }
+    // 查找结束标记 ---
+    let mut end_marker_idx: Option<usize> = None;
+    for (i, line) in lines[1..].iter().enumerate() {
+        if line.trim() == "---" {
+            end_marker_idx = Some(i + 1); // 转换回原索引
+            break;
+        }
+    }
+    match end_marker_idx {
+        Some(idx) => {
+            // 分离 front matter 与正文
+            let front_matter = lines[..=idx].join("\n");
+            let body = lines[idx + 1..].join("\n");
+            let (new_body, count) = replace_with_count(&body, query, replacement, case_sensitive);
+            if count == 0 {
+                return (content.to_string(), 0);
+            }
+            // 拼接时保留原始换行结构
+            let mut result = front_matter;
+            if !result.ends_with('\n') {
+                result.push('\n');
+            }
+            result.push_str(&new_body);
+            (result, count)
+        }
+        None => {
+            // 无结束标记：按纯文本处理
+            let count = count_matches(content, query, case_sensitive);
+            if count == 0 {
+                return (content.to_string(), 0);
+            }
+            let new_content = if case_sensitive {
+                content.replace(query, replacement)
+            } else {
+                case_insensitive_replace(content, query, replacement)
+            };
+            (new_content, count)
+        }
+    }
+}
+
+/// 带计数的字符串替换（区分大小写）
+/// 输入: text 原文, query 查找词, replacement 替换字符串, case_sensitive 区分大小写
+/// 输出: (String, u64) 替换后的文本与替换次数
+fn replace_with_count(
+    text: &str,
+    query: &str,
+    replacement: &str,
+    case_sensitive: bool,
+) -> (String, u64) {
+    if query.is_empty() {
+        return (text.to_string(), 0);
+    }
+    let mut count: u64 = 0;
+    let new_text = if case_sensitive {
+        let mut result = String::with_capacity(text.len());
+        let mut start = 0;
+        while let Some(pos) = text[start..].find(query) {
+            let abs_pos = start + pos;
+            result.push_str(&text[start..abs_pos]);
+            result.push_str(replacement);
+            count += 1;
+            start = abs_pos + query.len();
+        }
+        result.push_str(&text[start..]);
+        result
+    } else {
+        let lower_text = text.to_lowercase();
+        let lower_query = query.to_lowercase();
+        let mut result = String::with_capacity(text.len());
+        let mut start = 0;
+        while let Some(pos) = lower_text[start..].find(&lower_query) {
+            let abs_pos = start + pos;
+            result.push_str(&text[start..abs_pos]);
+            result.push_str(replacement);
+            count += 1;
+            start = abs_pos + query.len();
+        }
+        result.push_str(&text[start..]);
+        result
+    };
+    (new_text, count)
 }
 
 /// 统计字符串中匹配次数
@@ -1844,4 +2180,289 @@ pub struct ImportResult {
     pub total_size: u64,
     /// 推断的项目名
     pub project_name: String,
+}
+
+// ===== Tantivy 索引增量同步辅助函数（P1-4） =====
+//
+// 设计目的：
+//   fs_commands 中的 write_file/create_file/delete_path/rename_path/copy_file/replace_in_project
+//   原本仅执行磁盘操作，不更新 Tantivy 索引，导致全文搜索结果滞后于文件系统真实状态。
+//   本节提供同步辅助函数，在文件操作成功后自动同步索引（"先删后建"策略）。
+//
+// 同步策略：
+//   - 写入/创建/复制 → sync_index_add（先删旧 Chunk 文档，再按新内容重新索引）
+//   - 删除           → sync_index_remove（按 file_path 字段删除该文件所有 Chunk 文档）
+//   - 重命名         → 旧路径 sync_index_remove + 新路径 sync_index_add
+//   - 全局替换       → 对每个修改文件 sync_index_add
+//
+// 错误处理：
+//   索引同步失败仅记录日志（eprintln），不传播错误，避免影响主流程的文件操作。
+//   下次全量构建索引时可修复任何遗漏。
+//
+// 性能考量：
+//   - 仅对可索引格式（.txt/.pmd/.html/.htm）触发同步，避免对 .json/.md 等无意义操作
+//   - 单文件同步开销 < 100ms（含 open_or_create + delete + index + commit）
+//   - 目录重命名/删除时递归枚举可索引文件，逐个同步
+
+/// 判断文件是否为可索引格式（.txt/.pmd/.html/.htm）
+/// 输入: path 文件路径
+/// 输出: 是否为可索引格式
+fn is_indexable_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| matches!(e.to_lowercase().as_str(), "txt" | "pmd" | "html" | "htm"))
+        .unwrap_or(false)
+}
+
+/// 同步索引：删除旧文档 + 重新索引（用于写入/创建/复制/重命名后）
+/// 输入:
+///   project_root - 项目根目录（canonicalize 后）
+///   abs_path - 文件绝对路径（必须存在）
+///   relative_path - 文件相对路径（相对于项目根，正斜杠分隔，如 "正文/第一章.txt"）
+/// 输出: Result<(), String> 同步结果（错误由调用方记录日志）
+/// 流程:
+///   1. 打开或创建索引
+///   2. 创建索引写入器（50MB 堆内存）
+///   3. 先删除该文件的所有旧 Chunk 文档（"先删后建"策略）
+///   4. 读取文件修改时间
+///   5. 推断 Chunk 类型（manuscript/setting/outline）
+///   6. 调用 tantivy_indexer::index_file 重新索引
+///   7. 提交索引变更
+fn sync_index_add(project_root: &Path, abs_path: &Path, relative_path: &str) -> Result<(), String> {
+    let (index, schema) = tantivy_indexer::open_or_create_index(project_root)?;
+    let mut index_writer = index
+        .writer(50_000_000)
+        .map_err(|e| format!("创建索引写入器失败: {}", e))?;
+
+    // 先删除旧文档（保证文件内容变更后索引一致性）
+    tantivy_indexer::delete_file_from_index(&mut index_writer, &schema, relative_path)?;
+
+    // 重新索引
+    let updated_at = abs_path
+        .metadata()
+        .and_then(|m| m.modified())
+        .map(|t| {
+            let dt: chrono::DateTime<chrono::Local> = t.into();
+            dt.to_rfc3339()
+        })
+        .unwrap_or_default();
+    let chunk_type = tantivy_indexer::infer_chunk_type(relative_path);
+    tantivy_indexer::index_file(
+        &mut index_writer,
+        &schema,
+        abs_path,
+        relative_path,
+        &updated_at,
+        chunk_type,
+    )?;
+
+    index_writer
+        .commit()
+        .map_err(|e| format!("提交索引失败: {}", e))?;
+    Ok(())
+}
+
+/// 同步索引：仅删除文档（用于删除文件后）
+/// 输入:
+///   project_root - 项目根目录
+///   relative_path - 文件相对路径（相对于项目根）
+/// 输出: Result<(), String> 同步结果
+fn sync_index_remove(project_root: &Path, relative_path: &str) -> Result<(), String> {
+    let (index, schema) = tantivy_indexer::open_or_create_index(project_root)?;
+    let mut index_writer = index
+        .writer(50_000_000)
+        .map_err(|e| format!("创建索引写入器失败: {}", e))?;
+    tantivy_indexer::delete_file_from_index(&mut index_writer, &schema, relative_path)?;
+    index_writer
+        .commit()
+        .map_err(|e| format!("提交索引失败: {}", e))?;
+    Ok(())
+}
+
+/// 递归收集目录下所有可索引文件的相对路径（用于目录删除/重命名前同步索引）
+/// 输入:
+///   dir - 当前扫描目录
+///   project_root - 项目根目录（用于计算相对路径）
+///   result - 输出参数，收集相对路径（正斜杠分隔）
+/// 输出: 无（通过 result 累加）
+fn collect_indexable_rel_paths(dir: &Path, project_root: &Path, result: &mut Vec<String>) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_indexable_rel_paths(&path, project_root, result);
+            } else if is_indexable_file(&path) {
+                if let Ok(rel) = path.strip_prefix(project_root) {
+                    result.push(rel.to_string_lossy().replace('\\', "/"));
+                }
+            }
+        }
+    }
+}
+
+/// 递归收集目录下所有可索引文件的绝对路径与相对路径（用于重命名后同步新路径索引）
+/// 输入:
+///   dir - 当前扫描目录
+///   project_root - 项目根目录
+///   result - 输出参数，收集 (绝对路径, 相对路径) 元组
+/// 输出: 无（通过 result 累加）
+fn collect_indexable_abs_paths(
+    dir: &Path,
+    project_root: &Path,
+    result: &mut Vec<(PathBuf, String)>,
+) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_indexable_abs_paths(&path, project_root, result);
+            } else if is_indexable_file(&path) {
+                if let Ok(rel) = path.strip_prefix(project_root) {
+                    result.push((path.clone(), rel.to_string_lossy().replace('\\', "/")));
+                }
+            }
+        }
+    }
+}
+
+/// 计算文件相对路径（正斜杠分隔）
+/// 输入: abs_path 绝对路径, project_root 项目根目录
+/// 输出: Option<String> 相对路径（无法计算时返回 None）
+fn compute_relative_path(abs_path: &Path, project_root: &Path) -> Option<String> {
+    abs_path
+        .strip_prefix(project_root)
+        .ok()
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+}
+
+/// 安全同步索引：写入/创建/复制后调用（失败仅记录日志，不传播错误）
+/// 输入:
+///   project_path - 项目根路径字符串（未 canonicalize）
+///   abs_path - 文件绝对路径（已 canonicalize）
+/// 流程: 计算相对路径后调用 sync_index_add，失败时 eprintln 记录
+fn try_sync_index_add(project_path: &str, abs_path: &Path) {
+    if !is_indexable_file(abs_path) {
+        return;
+    }
+    let project_root = match PathBuf::from(project_path).canonicalize() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[索引同步] 解析项目路径失败 {}: {}", project_path, e);
+            return;
+        }
+    };
+    let rel = match compute_relative_path(abs_path, &project_root) {
+        Some(r) => r,
+        None => {
+            eprintln!(
+                "[索引同步] 计算相对路径失败: abs={}, root={}",
+                abs_path.display(),
+                project_root.display()
+            );
+            return;
+        }
+    };
+    if let Err(e) = sync_index_add(&project_root, abs_path, &rel) {
+        eprintln!("[索引同步] 写入后同步失败 {}: {}", rel, e);
+    }
+}
+
+/// 安全同步索引：删除后调用（失败仅记录日志）
+/// 输入:
+///   project_path - 项目根路径字符串
+///   abs_path - 被删除路径的绝对路径（删除前快照）
+/// 流程:
+///   - 文件：直接 sync_index_remove
+///   - 目录：递归收集所有可索引文件相对路径，逐个 sync_index_remove
+fn try_sync_index_remove(project_path: &str, abs_path: &Path) {
+    let project_root = match PathBuf::from(project_path).canonicalize() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[索引同步] 解析项目路径失败 {}: {}", project_path, e);
+            return;
+        }
+    };
+    if abs_path.is_dir() {
+        // 目录删除：递归收集所有可索引文件相对路径
+        let mut rel_paths: Vec<String> = Vec::new();
+        collect_indexable_rel_paths(abs_path, &project_root, &mut rel_paths);
+        for rel in rel_paths {
+            if let Err(e) = sync_index_remove(&project_root, &rel) {
+                eprintln!("[索引同步] 删除后同步失败 {}: {}", rel, e);
+            }
+        }
+    } else if is_indexable_file(abs_path) {
+        if let Some(rel) = compute_relative_path(abs_path, &project_root) {
+            if let Err(e) = sync_index_remove(&project_root, &rel) {
+                eprintln!("[索引同步] 删除后同步失败 {}: {}", rel, e);
+            }
+        }
+    }
+}
+
+/// 安全同步索引：重命名后调用（失败仅记录日志）
+/// 输入:
+///   project_path - 项目根路径字符串
+///   old_abs - 旧路径绝对路径（已不存在）
+///   new_abs - 新路径绝对路径（已存在）
+/// 流程:
+///   - 删除旧路径索引（文件或目录递归）
+///   - 添加新路径索引（文件或目录递归）
+fn try_sync_index_rename(project_path: &str, old_abs: &Path, new_abs: &Path) {
+    let project_root = match PathBuf::from(project_path).canonicalize() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[索引同步] 解析项目路径失败 {}: {}", project_path, e);
+            return;
+        }
+    };
+
+    // 步骤1: 删除旧路径索引
+    // 注意：old_abs 已不存在，无法用 is_dir() 判断，需根据 new_abs 推断
+    if new_abs.is_dir() {
+        // 目录重命名：递归收集旧路径下可索引文件相对路径
+        // 由于 old_abs 已不存在，无法直接遍历；改用 new_abs 推算旧相对路径
+        // 旧相对路径 = old_abs 的相对路径前缀 + new_abs 子路径
+        if let (Some(old_rel_prefix), Some(new_rel_prefix)) = (
+            compute_relative_path(old_abs, &project_root),
+            compute_relative_path(new_abs, &project_root),
+        ) {
+            // 遍历 new_abs 收集子文件相对路径，推算 old 相对路径
+            let mut new_paths: Vec<(PathBuf, String)> = Vec::new();
+            collect_indexable_abs_paths(new_abs, &project_root, &mut new_paths);
+            for (_new_abs_path, new_rel) in new_paths {
+                // 旧相对路径 = old_rel_prefix + new_rel 去掉 new_rel_prefix 的部分
+                if let Some(suffix) = new_rel.strip_prefix(&new_rel_prefix) {
+                    let old_rel = format!("{}{}", old_rel_prefix, suffix);
+                    if let Err(e) = sync_index_remove(&project_root, &old_rel) {
+                        eprintln!("[索引同步] 重命名删除旧索引失败 {}: {}", old_rel, e);
+                    }
+                }
+            }
+        }
+    } else if is_indexable_file(new_abs) {
+        // 文件重命名：直接按旧相对路径删除
+        if let Some(old_rel) = compute_relative_path(old_abs, &project_root) {
+            if let Err(e) = sync_index_remove(&project_root, &old_rel) {
+                eprintln!("[索引同步] 重命名删除旧索引失败 {}: {}", old_rel, e);
+            }
+        }
+    }
+
+    // 步骤2: 添加新路径索引
+    if new_abs.is_dir() {
+        let mut new_paths: Vec<(PathBuf, String)> = Vec::new();
+        collect_indexable_abs_paths(new_abs, &project_root, &mut new_paths);
+        for (abs, rel) in new_paths {
+            if let Err(e) = sync_index_add(&project_root, &abs, &rel) {
+                eprintln!("[索引同步] 重命名添加新索引失败 {}: {}", rel, e);
+            }
+        }
+    } else if is_indexable_file(new_abs) {
+        if let Some(rel) = compute_relative_path(new_abs, &project_root) {
+            if let Err(e) = sync_index_add(&project_root, new_abs, &rel) {
+                eprintln!("[索引同步] 重命名添加新索引失败 {}: {}", rel, e);
+            }
+        }
+    }
 }

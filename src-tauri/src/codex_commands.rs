@@ -27,6 +27,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::text_extractor;
+
 /// 实体出现位置（单文件维度）
 #[derive(Debug, Clone, Serialize)]
 pub struct EntityMention {
@@ -94,8 +96,8 @@ pub fn scan_entity_mentions(
 /// 流程:
 ///   1. 遍历目录条目
 ///   2. 子目录递归扫描
-///   3. .txt/.html 文件读取内容并查找实体名称
-///   4. 记录出现次数和上下文预览
+///   3. 支持文档(.txt/.pmd/.html/.htm)读取内容并提取纯文本后查找实体名称
+///   4. 记录出现次数和上下文预览（预览为纯文本，无 HTML 标签污染）
 fn scan_dir_for_mentions(
     dir: &Path,
     names: &[String],
@@ -110,12 +112,10 @@ fn scan_dir_for_mentions(
             // 递归扫描子目录
             scan_dir_for_mentions(&path, names, project_root, mentions)?;
         } else {
-            // 仅处理 .txt 和 .html 文件
-            let is_text = path
-                .extension()
-                .map(|e| e == "txt" || e == "html")
-                .unwrap_or(false);
-            if !is_text {
+            // 支持文档格式：.txt/.pmd/.html/.htm
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            let is_supported = matches!(ext.to_lowercase().as_str(), "txt" | "pmd" | "html" | "htm");
+            if !is_supported {
                 continue;
             }
 
@@ -124,6 +124,11 @@ fn scan_dir_for_mentions(
                 Err(_) => continue,
             };
 
+            // 接入 text_extractor 统一层：提取纯文本，避免 HTML 标签/JSON 结构污染匹配
+            let file_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            let format = text_extractor::detect_format(&file_name, &content);
+            let plain = text_extractor::extract_plain_text(&content, format);
+
             let mut total_count: u32 = 0;
             let mut first_preview = String::new();
 
@@ -131,16 +136,16 @@ fn scan_dir_for_mentions(
                 if name.is_empty() {
                     continue;
                 }
-                // 查找名称在文件中的位置
-                if let Some(pos) = content.find(name) {
-                    // 统计该名称在文件中的总出现次数
-                    total_count += content.matches(name).count() as u32;
+                // 在纯文本中查找名称位置（避免匹配到 HTML 标签内部）
+                if let Some(pos) = plain.find(name) {
+                    // 统计该名称在纯文本中的总出现次数
+                    total_count += plain.matches(name).count() as u32;
 
-                    // 提取首次出现的上下文预览（前 20 字符 + 名称 + 后 40 字符）
+                    // 提取首次出现的上下文预览（前 20 字符 + 名称 + 后 40 字符，纯文本无标签污染）
                     if first_preview.is_empty() {
                         let start = pos.saturating_sub(20);
-                        let end = (pos + name.len() + 40).min(content.len());
-                        let raw_preview = &content[start..end];
+                        let end = (pos + name.len() + 40).min(plain.len());
+                        let raw_preview = &plain[start..end];
                         // 去除换行符，保留可读预览
                         first_preview = format!("...{}...", raw_preview.replace('\n', " ").replace('\r', ""));
                     }

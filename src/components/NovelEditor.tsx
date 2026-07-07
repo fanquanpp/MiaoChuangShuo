@@ -49,7 +49,7 @@ import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { readFile, writeFile, readProjectTree, createSnapshot, updateFileIndex } from "../lib/api";
+import { readFile, writeFile, createSnapshot, updateFileIndex } from "../lib/api";
 import { useAppStore } from "../lib/store";
 import { useCodexStore } from "../lib/stores/useCodexStore";
 import { useSettingsStore } from "../lib/settingsStore";
@@ -70,6 +70,7 @@ import { countWords } from "../lib/wordCounter";
 import { addRecentFile } from "../lib/recentFiles";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import { isScriptType, isEssayType } from "../lib/projectType";
 import { useWritingSession } from "../hooks/useWritingSession";
 import EditorToolbar from "./EditorToolbar";
 import EditorBubbleMenu from "./EditorBubbleMenu";
@@ -185,30 +186,6 @@ function plainTextToHtml(text: string): string {
 }
 
 /**
- * 验证字符串是否为有效的角色名
- * 输入: name 待验证的字符串
- * 输出: boolean 是否有效
- * 流程:
- *   1. 非空且长度 <= 20
- *   2. 不包含冒号（:或：）—— 排除字段行如"姓名:张三"
- *   3. 不以常见标签词开头（角色/姓名/声线/外貌/性格/背景等）
- *   4. 不全是数字或纯符号
- */
-function isValidCharacterName(name: string): boolean {
-  if (!name || name.length === 0 || name.length > 20) return false;
-  // 包含冒号的行视为字段而非角色名
-  if (name.includes(":") || name.includes("：")) return false;
-  // 以常见标签词开头的行视为字段标签
-  const labelPrefixes = ["角色", "姓名", "声线", "外貌", "性格", "背景", "动机", "关系", "语言", "口头禅"];
-  for (const prefix of labelPrefixes) {
-    if (name.startsWith(prefix)) return false;
-  }
-  // 不允许纯数字或纯符号
-  if (/^[\d\s\p{P}]+$/u.test(name)) return false;
-  return true;
-}
-
-/**
  * TipTap 纯文本编辑器组件
  * 输入:
  *   filePath 当前打开的文件路径（null 时显示空状态）
@@ -232,7 +209,20 @@ export default function NovelEditor({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [characters, setCharacters] = useState<string[]>([]);
+  // 角色名列表：从 useCodexStore 的 cards 派生（SSOT），过滤 cardType === 'character'
+  // 替代旧版 extractNames（扫描 .txt 首行的三轨制之一），统一数据源避免不一致
+  const codexCards = useCodexStore((s) => s.cards);
+  const codexLoaded = useCodexStore((s) => s.loaded);
+  const loadAllCodex = useCodexStore((s) => s.loadAll);
+  const characters = useMemo<string[]>(() => {
+    const names: string[] = [];
+    for (const card of codexCards.values()) {
+      if (card.cardType === "character" && card.name) {
+        names.push(card.name);
+      }
+    }
+    return names;
+  }, [codexCards]);
   const { showToast } = useToast();
   // 角色悬停卡片状态：鼠标悬停在正文中的角色名上时显示摘要卡片
   // characterId 字段（p5-26）：从实体高亮装饰的 data-entity-id 属性提取，供 AI 操作区使用
@@ -262,10 +252,11 @@ export default function NovelEditor({
   const projectType = currentProject?.meta?.type || "standard";
   // 文体标识保留用于 UI 层条件渲染（如横幅提示文案差异）
   // 扩展注册不再依赖文体守卫，所有扩展全量注册，由全局开关控制行为
-  const isScript = projectType === "script" || projectType === "screenplay";
+  // 通过统一兼容层判定文体族，消除分散的类型字符串比较
+  const isScript = isScriptType(projectType);
   const isDialogue = projectType === "dialogue";
   // 兼容旧代码：日记体仍保留 isEssay 标识用于日期自动填充等场景
-  const isEssay = projectType === "diary";
+  const isEssay = isEssayType(projectType);
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
   const diaryAutoDate = useSettingsStore((s) => s.diaryAutoDate);
   const indentEnabled = useSettingsStore((s) => s.indentEnabled);
@@ -302,104 +293,20 @@ export default function NovelEditor({
   // 写作会话追踪：记录本次会话字数、时长、WPM
   const session = useWritingSession(wordCount, filePath);
 
-  // 从角色目录自动提取角色名（扫描每个 .txt 文件首行）
-  // 文件格式约定：第一行为角色名（纯文本，不含冒号、不以分隔符开头）
-  // 过滤规则：跳过模板文件（文件名包含"模板"/"名册"/"template"/"roster"）
-  // 回退方案：读取 角色名册.txt（手动维护的花名册）
-  // 目录兼容：同时扫描"角色"与"人物"目录，消除目录名硬编码导致的静默失败
-  // 全文体扫描：所有文体均加载角色列表，由全局开关控制 Tab 补全行为
+  // 项目切换时触发 useCodexStore.loadAll（若未加载），确保角色名数据源就绪
+  // 角色名列表由 codexCards 派生（见上方 useMemo），此处仅负责数据加载触发
+  // 避免与 CodexPanel 重复加载：loaded 标记防止重复调用
   useEffect(() => {
+    if (!currentProject) return;
+    if (codexLoaded) return;
     let cancelled = false;
-    if (!currentProject) {
-      setCharacters([]);
-      return;
-    }
-
-    const extractNames = async () => {
-      try {
-        // 优先方案：扫描角色目录，从每个 .txt 文件首行提取角色名
-        // 兼容"角色"与"人物"两种目录名（codexApi 同样兼容这两种命名）
-        const tree = await readProjectTree(currentProject.path);
-        const charDir = tree.find(
-          (n) => n.is_dir && (n.name === "角色" || n.name === "人物")
-        );
-        if (charDir?.children) {
-          const charDirPath = `${currentProject.path}/${charDir.name}`;
-          const names: string[] = [];
-          for (const child of charDir.children) {
-            if (child.is_dir || !child.name.endsWith(".txt")) continue;
-            // 过滤模板文件和名册文件（这些不是单个角色的设定文件）
-            const lowerName = child.name.toLowerCase();
-            if (lowerName.includes("模板") || lowerName.includes("名册") ||
-                lowerName.includes("template") || lowerName.includes("roster") ||
-                lowerName.includes("readme")) {
-              continue;
-            }
-            try {
-              const filePath = `${charDirPath}/${child.name}`;
-              const content = await readFile(filePath, currentProject.path);
-              const firstLine = content
-                .split(/\r?\n/)
-                .map((l) => l.trim())
-                .find((l) => l && !l.startsWith("#") && !l.startsWith("---") && !l.startsWith("==="));
-              // 验证首行是否为有效角色名
-              if (firstLine && isValidCharacterName(firstLine)) {
-                names.push(firstLine);
-              }
-            } catch {
-              // 单个文件读取失败，跳过
-            }
-          }
-          if (!cancelled && names.length > 0) {
-            setCharacters(names);
-            return;
-          }
-        }
-      } catch {
-        // 目录扫描失败，回退到角色名册
+    loadAllCodex(currentProject.path).catch((err) => {
+      if (!cancelled) {
+        showToast("error", t("editor.codexLoadFailed", { error: String(err) }));
       }
-
-      // 回退方案：读取 角色名册.txt（兼容角色与人物两种目录）
-      const rosterPaths = [
-        `${currentProject.path}/角色/角色名册.txt`,
-        `${currentProject.path}/人物/角色名册.txt`,
-      ];
-      try {
-        // 依次尝试候选路径，读取第一个存在的名册文件
-        let content: string | null = null;
-        for (const p of rosterPaths) {
-          try {
-            content = await readFile(p, currentProject.path);
-            break;
-          } catch {
-            // 当前路径不存在，尝试下一个
-          }
-        }
-        if (content) {
-          const names = content
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter(
-              (line) =>
-                line &&
-                !line.startsWith("#") &&
-                !line.startsWith(">") &&
-                !line.startsWith("-") &&
-                !/^[-=]{3,}$/.test(line)
-            )
-            .filter(isValidCharacterName);
-          if (!cancelled) setCharacters(names);
-        } else {
-          if (!cancelled) setCharacters([]);
-        }
-      } catch {
-        if (!cancelled) setCharacters([]);
-      }
-    };
-
-    extractNames();
+    });
     return () => { cancelled = true; };
-  }, [currentProject]);
+  }, [currentProject, codexLoaded, loadAllCodex, showToast, t]);
 
   // 构建 Aho-Corasick 实体高亮自动机
   // 依赖：阶段 1 设定库（listCodexEntities）提供结构化实体（含 UUID 与别名）

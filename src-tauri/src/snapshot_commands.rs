@@ -24,9 +24,16 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
-use chrono::Local;
+use chrono::{Duration, Local};
 
 use crate::fs_commands::validate_path_in_project;
+
+/// 单文件快照数量上限（含 manual/pre-restore，超过后优先淘汰 auto）
+const MAX_SNAPSHOTS: usize = 50;
+
+/// auto 类型快照最大保留天数（超过此天数的 auto 快照会被自动清理）
+/// manual 与 pre-restore 快照不受时间维度约束，仅受数量上限保护
+const MAX_AUTO_SNAPSHOT_AGE_DAYS: i64 = 30;
 
 /// 单条快照元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -210,17 +217,8 @@ pub fn create_snapshot(
     let mut entries = read_snapshot_index(&snapshot_dir)?;
     entries.insert(0, meta.clone());
 
-    // 清理超出上限的旧快照（默认保留 50 个）
-    const MAX_SNAPSHOTS: usize = 50;
-    if entries.len() > MAX_SNAPSHOTS {
-        let to_remove: Vec<&SnapshotMeta> = entries.iter().skip(MAX_SNAPSHOTS).collect();
-        for old in to_remove {
-            let old_file = snapshot_dir.join(format!("{}.txt", old.timestamp));
-            // 删除旧快照文件（忽略错误：文件可能已被手动删除）
-            let _ = fs::remove_file(&old_file);
-        }
-        entries.truncate(MAX_SNAPSHOTS);
-    }
+    // P1-7: 执行统一快照清理（时间维度 + 数量维度，保护 manual/pre-restore）
+    enforce_snapshot_limits(&snapshot_dir, &mut entries);
 
     write_snapshot_index(&snapshot_dir, &entries)?;
     Ok(meta)
@@ -494,16 +492,89 @@ fn create_snapshot_inner(
     let mut entries = read_snapshot_index(&snapshot_dir)?;
     entries.insert(0, meta.clone());
 
-    const MAX_SNAPSHOTS: usize = 50;
-    if entries.len() > MAX_SNAPSHOTS {
-        let to_remove: Vec<&SnapshotMeta> = entries.iter().skip(MAX_SNAPSHOTS).collect();
-        for old in to_remove {
-            let old_file = snapshot_dir.join(format!("{}.txt", old.timestamp));
-            let _ = fs::remove_file(&old_file);
-        }
-        entries.truncate(MAX_SNAPSHOTS);
-    }
+    // P1-7: 执行统一快照清理（时间维度 + 数量维度，保护 manual/pre-restore）
+    enforce_snapshot_limits(&snapshot_dir, &mut entries);
 
     write_snapshot_index(&snapshot_dir, &entries)?;
     Ok(meta)
+}
+
+/// 执行快照清理（时间维度 + 数量维度）
+/// 输入:
+///   snapshot_dir 快照目录路径
+///   entries 快照索引列表（可变引用，按时间倒序，最新在前）
+/// 输出: 无（直接修改 entries 并删除对应文件）
+/// 流程:
+///   1. 时间维度: 删除超过 MAX_AUTO_SNAPSHOT_AGE_DAYS 天的 auto 快照
+///      manual 与 pre-restore 快照不受时间维度约束（用户手动创建的版本必须保留）
+///   2. 数量维度: 超过 MAX_SNAPSHOTS 时优先淘汰 auto 快照
+///      仅当 auto 快照全部淘汰后仍超限，才淘汰 manual/pre-restore（按 FIFO）
+///   3. 同步删除对应的快照文件（忽略错误：文件可能已被手动删除）
+/// 设计依据:
+///   - auto 快照是高频自动保存，历史价值低，可按时间清理
+///   - manual 快照是用户主动创建的里程碑版本，必须长期保留
+///   - pre-restore 快照是恢复前的安全备份，必须保留以支持再次回滚
+fn enforce_snapshot_limits(snapshot_dir: &Path, entries: &mut Vec<SnapshotMeta>) {
+    if entries.is_empty() {
+        return;
+    }
+
+    let now = Local::now();
+    let max_age = Duration::days(MAX_AUTO_SNAPSHOT_AGE_DAYS);
+
+    // 步骤1: 时间维度清理 - 删除超期的 auto 快照
+    let mut expired_timestamps: Vec<i64> = Vec::new();
+    entries.retain(|meta| {
+        if meta.trigger == "auto" {
+            // 解析快照创建时间
+            let should_remove = if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&meta.created_at) {
+                let age = now.signed_duration_since(created.with_timezone(&Local));
+                age > max_age
+            } else {
+                // 时间解析失败：回退为按时间戳判断
+                let age_ms = now.timestamp_millis() - meta.timestamp;
+                age_ms > max_age.num_milliseconds()
+            };
+            if should_remove {
+                expired_timestamps.push(meta.timestamp);
+                return false; // 从索引中移除
+            }
+        }
+        true // 保留
+    });
+
+    // 删除超期快照的文件
+    for ts in &expired_timestamps {
+        let old_file = snapshot_dir.join(format!("{}.txt", ts));
+        let _ = fs::remove_file(&old_file);
+    }
+
+    // 步骤2: 数量维度清理 - 超限时优先淘汰 auto
+    if entries.len() > MAX_SNAPSHOTS {
+        // 按 trigger 分组：auto 快照优先淘汰
+        // 稳定排序：auto 在后（被优先截断），manual/pre-restore 在前（优先保留）
+        // 注意: entries 按时间倒序（最新在前），需在保持时间顺序的前提下优先淘汰 auto
+        // 策略: 从最旧的开始淘汰（entries 末尾），优先淘汰 auto 类型
+        while entries.len() > MAX_SNAPSHOTS {
+            // 从末尾向前查找第一个 auto 快照（最旧的 auto）
+            // 若无 auto 快照可淘汰，则按 FIFO 淘汰最旧的（末尾元素）
+            let remove_idx = entries
+                .iter()
+                .rposition(|m| m.trigger == "auto")
+                .or_else(|| {
+                    if entries.is_empty() {
+                        None
+                    } else {
+                        Some(entries.len() - 1)
+                    }
+                });
+            if let Some(idx) = remove_idx {
+                let removed = entries.remove(idx);
+                let old_file = snapshot_dir.join(format!("{}.txt", removed.timestamp));
+                let _ = fs::remove_file(&old_file);
+            } else {
+                break;
+            }
+        }
+    }
 }

@@ -16,7 +16,12 @@
 //     层2: 当前场景出场角色 (present_characters, 从设定库匹配)
 //     层3: 场景内伏笔 + 全局未回收伏笔 (active_foreshadowings + global_unresolved_foreshadowings)
 //     层4: 前文摘要 (preceding_summary, 前 1-2 个场景的文本)
-// - get_character_context / get_project_context 仍为 Mock, 待后续阶段实现
+// - get_character_context (Sprint 6) 已实现真实数据组装:
+//     从设定库读取角色全文 + Tantivy 检索出场记录 + 人物关系图读取关系
+// - get_project_context (Sprint 6) 已实现真实数据组装:
+//     项目元数据 + 主要角色 + 关键设定 + 章节摘要 + 活跃伏笔 + 字数统计
+// - get_scene_context 中 pov_character_id/mood/related_settings 为预留 TODO:
+//     待 sceneBreak 节点 attrs 扩展与设定库语义匹配完善后填充
 // - 所有上下文结构使用 #[serde(rename_all = "camelCase")] 匹配前端 camelCase JSON
 // - AI-Ready: SceneContext 的 povCharacterId 和 mood 为强类型化字段
 //             直接决定 AI Prompt 中 Context 的精准度
@@ -110,6 +115,27 @@ pub struct ForeshadowingBrief {
     pub status: String,
     /// 重要度（高/中/低）
     pub importance: String,
+}
+
+/// 伏笔详细信息（用于伏笔追踪面板展示）
+/// 相比 ForeshadowingBrief 增加埋设/回收/备注/来源文件字段，供前端面板完整呈现
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForeshadowingDetail {
+    /// 伏笔名称（作为 ID，兼容旧版无 UUID 的伏笔文件）
+    pub name: String,
+    /// 状态（已埋设/待回收/已回收/已放弃 等）
+    pub status: String,
+    /// 埋设位置描述（如"第3章 雨夜对话"）
+    pub setup: String,
+    /// 回收位置描述（如"第12章 真相揭晓"，未回收时为空）
+    pub payoff: String,
+    /// 重要度（高/中/低）
+    pub importance: String,
+    /// 备注（伏笔的补充说明）
+    pub remark: String,
+    /// 来源文件相对路径（相对于项目根，如 "伏笔/主线伏笔.txt"）
+    pub source_file: String,
 }
 
 /// 角色上下文（AI 角色一致性校验的核心数据）
@@ -658,6 +684,93 @@ fn parse_foreshadowing_file(content: &str) -> Vec<ForeshadowingBrief> {
         });
     }
     result
+}
+
+/// 扫描项目全部伏笔（供伏笔追踪面板使用）
+/// 输入: project_path 项目根路径
+/// 输出: Result<Vec<ForeshadowingDetail>, String> 全部伏笔详细列表（不过滤状态）
+/// 流程:
+///   1. 兼容扫描 伏笔/伏笔记录/系列伏笔 目录
+///   2. 读取每个 .txt 文件，按表格行解析伏笔条目
+///   3. 提取 名称/状态/埋设/回收/重要度/备注/来源文件 字段
+///   4. 返回全部伏笔（含已回收/已放弃），由前端按状态分组展示
+/// 设计说明: 与 load_global_unresolved_foreshadowings 区别在于：
+///   - 本命令返回全部伏笔（含已回收），供面板完整呈现
+///   - load_global_unresolved_foreshadowings 仅返回未回收伏笔，供 AI 上下文使用
+#[tauri::command]
+pub fn scan_foreshadowings(project_path: String) -> Result<Vec<ForeshadowingDetail>, String> {
+    let project = Path::new(&project_path)
+        .canonicalize()
+        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+    if !project.is_dir() {
+        return Err("项目路径不存在或不是目录".to_string());
+    }
+
+    // 兼容多种伏笔目录名
+    let foreshadowing_dirs = ["伏笔", "伏笔记录", "系列伏笔"];
+    let mut result: Vec<ForeshadowingDetail> = Vec::new();
+
+    for dir_name in &foreshadowing_dirs {
+        let dir = project.join(dir_name);
+        if !dir.is_dir() {
+            continue;
+        }
+        let entries = match fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            // 仅处理 .txt 文件（伏笔文件格式约定）
+            if path.extension().and_then(|e| e.to_str()) != Some("txt") {
+                continue;
+            }
+            let content = match fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            // 计算相对项目根的路径（用于前端点击跳转编辑）
+            let rel_path = path
+                .strip_prefix(&project)
+                .map(|p| p.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_default();
+
+            // 解析伏笔表格行
+            for (idx, line) in content.lines().enumerate() {
+                let trimmed = line.trim();
+                // 跳过空行、表头（首行）、分隔线
+                if trimmed.is_empty() || idx == 0 || trimmed.starts_with("---") {
+                    continue;
+                }
+                // 按竖线分割字段: 名称 | 状态 | 埋设 | 回收 | 重要度 | 备注
+                let fields: Vec<&str> = trimmed.split('|').map(|s| s.trim()).collect();
+                if fields.len() < 2 {
+                    continue;
+                }
+                let name = fields.first().copied().unwrap_or("").to_string();
+                if name.is_empty() {
+                    continue;
+                }
+                let status = fields.get(1).copied().unwrap_or("").to_string();
+                let setup = fields.get(2).copied().unwrap_or("").to_string();
+                let payoff = fields.get(3).copied().unwrap_or("").to_string();
+                let importance = fields.get(4).copied().unwrap_or("中").to_string();
+                let remark = fields.get(5).copied().unwrap_or("").to_string();
+
+                result.push(ForeshadowingDetail {
+                    name,
+                    status,
+                    setup,
+                    payoff,
+                    importance,
+                    remark,
+                    source_file: rel_path.clone(),
+                });
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 /// 构建前文摘要

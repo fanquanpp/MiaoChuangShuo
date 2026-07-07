@@ -34,6 +34,7 @@ import {
   Trash2,
   X,
   Users,
+  Bookmark,
 } from "lucide-react";
 import {
   useAppStore,
@@ -41,6 +42,7 @@ import {
   CATEGORY_DIRS,
 } from "../lib/store";
 import { getTypeSpecificDirs } from "../lib/templateRegistry";
+import { isMultiVolumeLike } from "../lib/projectType";
 import { CODEX_TYPE_DIRS } from "../lib/codexApi";
 import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
@@ -58,10 +60,11 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   volumes: BookOpen,
   timeline: GitBranch,
   characterGraph: Users,
+  foreshadowing: Bookmark,
 };
 
-// 写作主分类：核心写作功能，常驻显示（含剧情图谱/人物关系图，归类到写作）
-const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline", "characterGraph"];
+// 写作主分类：核心写作功能，常驻显示（含剧情图谱/人物关系图/伏笔追踪，归类到写作）
+const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline", "characterGraph", "foreshadowing"];
 
 // 设定类分类：统一设定库入口（替代原 characters/worldview/glossary/materials 分散入口）
 const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex"];
@@ -129,7 +132,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
   // 是否为分卷类型（决定是否显示分卷入口）
   const showVolumeEntry = useMemo(() => {
     const type = currentProject?.meta?.type;
-    return type === "novel" || type === "multi_volume" || type === "standard" || type === "shared_world";
+    return isMultiVolumeLike(type);
   }, [currentProject]);
 
   // 根据项目类型获取专属目录列表
