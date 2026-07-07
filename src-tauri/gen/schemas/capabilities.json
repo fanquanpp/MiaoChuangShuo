@@ -1,1 +1,0 @@
-{"default":{"identifier":"default","description":"喵创说默认权限配置","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-destroy","core:window:allow-close","core:window:allow-set-title","core:window:allow-set-fullscreen","core:window:allow-is-fullscreen","dialog:default","fs:default","shell:default"]}}
