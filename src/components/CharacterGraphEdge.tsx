@@ -9,6 +9,7 @@ import { type EdgeProps, getBezierPath, EdgeLabelRenderer } from "@xyflow/react"
 import { getRelationMeta } from "../lib/stores/characterGraphTypes";
 import type { CharacterGraphEdge } from "../lib/stores/characterGraphTypes";
 import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
+import { useI18n } from "../lib/i18n";
 
 /**
  * 自定义连线组件
@@ -37,11 +38,15 @@ export default function CharacterGraphEdgeComponent(props: EdgeProps<CharacterGr
 
   // 获取 selectEdge 方法(用于中点关系标签点击触发连线抽屉编辑)
   const selectEdge = useCharacterGraphStore((s) => s.selectEdge);
+  // 获取 i18n 翻译函数(用于将 fallback label 的 i18n key 转换为本地化文案)
+  const { t } = useI18n();
 
   // 关系类型默认 other(data 可能未初始化时回退)
   // 使用 getRelationMeta 统一查询内置与自定义关系类型的标签/颜色
+  // 注意: fallback 时 label 为 i18n key 字符串,需通过 t() 转换;内置/自定义类型 label 为本地化文案,t() 找不到 key 时原样返回
   const relationType: string = data?.relationType ?? "other";
   const { color, label } = getRelationMeta(relationType);
+  const labelText = t(label);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -81,9 +86,9 @@ export default function CharacterGraphEdgeComponent(props: EdgeProps<CharacterGr
             }}
             className="inline-block px-1.5 py-0.5 text-[10px] font-medium text-white border border-nf-bg shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
             style={{ backgroundColor: color }}
-            title={data?.description || label}
+            title={data?.description || labelText}
           >
-            {label}
+            {labelText}
           </span>
         </div>
       </EdgeLabelRenderer>

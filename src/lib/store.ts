@@ -19,16 +19,11 @@ import type { CategorySlice } from "./stores/categorySlice";
 import { createCategorySlice } from "./stores/categorySlice";
 import type { ViewSlice } from "./stores/viewSlice";
 import { createViewSlice } from "./stores/viewSlice";
-
-// 左侧导航分类枚举
-export type SidebarCategory =
-  | "manuscript"
-  | "outline"
-  | "codex"
-  | "stats"
-  | "search"
-  | "timeline"
-  | "characterGraph";
+// SidebarCategory 类型已迁移至 ./stores/types 以打破循环依赖，
+// 此处通过 type-only re-export 保持对外 API 向后兼容，
+// 避免下游模块（如 categoryRegistry、templateSchema、组件层）调整导入路径。
+import type { SidebarCategory } from "./stores/types";
+export type { SidebarCategory };
 
 // 分类中文名称
 export const CATEGORY_NAMES: Record<SidebarCategory, string> = {

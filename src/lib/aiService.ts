@@ -6,7 +6,7 @@
 //
 // 模块职责：
 // 1. 封装 chat_completion_stream 命令，将 Tauri Event 转换为 Promise + 回调模式
-// 2. 封装 cancel_chat_completion 命令（取消进行中的流式请求）
+// 2. 封装 cancel_chat_completion 命令（按 request_id 取消指定流式请求）
 // 3. 封装 get_ai_config / set_ai_config / test_ai_connection 配置管理命令
 // 4. 提供 TypeScript 类型定义（与后端 Rust 结构体字段对齐）
 //
@@ -14,7 +14,7 @@
 // - 前端永不直接接触明文 API Key，所有 LLM 调用通过后端代理
 // - 流式补全采用"事件驱动"模型：调用方注册回调，Promise 在流结束时 resolve/reject
 // - 事件监听在流结束（done/error）后自动清理，避免内存泄漏
-// - AI-1 阶段假设同时只有一个活跃请求（后端使用全局 AtomicBool 取消）
+// - AI-2 阶段采用 request_id 粒度取消机制，支持多请求并发精准取消
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -72,16 +72,34 @@ export interface StreamCallbacks {
 }
 
 /**
+ * 生成请求唯一标识（UUID v4）
+ *
+ * 输出: string 36 字符 UUID 字符串
+ * 说明: 优先使用 Web Crypto API 的 crypto.randomUUID()，
+ *   若运行环境不支持则回退到基于 Date.now + Math.random 的伪 UUID
+ */
+export function generateRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // 回退方案：拼接时间戳与随机数，保证基本唯一性
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 10);
+  return `${timestamp}-${random}`;
+}
+
+/**
  * 流式聊天补全
  *
  * 输入:
  *   messages - 聊天消息列表（system + user + assistant 历史）
  *   config - AI 配置（含 Base64 编码的 API Key）
  *   callbacks - 回调（onChunk 必填，onDone 可选）
+ *   requestId - 请求唯一标识（用于精准取消，由调用方生成）
  * 输出: Promise<void> 流正常结束 resolve，错误 reject
  * 流程:
  *   1. 注册 ai:stream:chunk / ai:stream:done / ai:stream:error 三个事件监听
- *   2. 调用后端 chat_completion_stream 命令发起流式请求
+ *   2. 调用后端 chat_completion_stream 命令发起流式请求（携带 requestId）
  *   3. chunk 事件触发 onChunk 回调
  *   4. done 事件触发 onDone 回调并 resolve Promise
  *   5. error 事件 reject Promise
@@ -91,7 +109,8 @@ export interface StreamCallbacks {
 export async function streamChatCompletion(
   messages: ChatMessage[],
   config: AiConfig,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
+  requestId: string
 ): Promise<void> {
   let resolvePromise!: () => void;
   let rejectPromise!: (err: string) => void;
@@ -137,8 +156,9 @@ export async function streamChatCompletion(
   });
 
   // 异步调用后端命令（不 await，通过事件驱动完成）
+  // 携带 requestId 供后端注册按请求粒度的取消令牌
   // 若启动失败（如 API Key 为空、网络错误），直接 reject
-  invoke("chat_completion_stream", { messages, config }).catch((err) => {
+  invoke("chat_completion_stream", { messages, config, requestId }).catch((err) => {
     if (!settled) {
       settled = true;
       cleanup();
@@ -152,15 +172,17 @@ export async function streamChatCompletion(
 /**
  * 取消进行中的流式请求
  *
- * 输入: 无
+ * 输入: requestId 请求唯一标识（与 streamChatCompletion 调用时传入的值一致）
  * 输出: Promise<void> 取消命令完成
  * 流程:
- *   1. 调用后端 cancel_chat_completion 命令
- *   2. 后端将全局取消标志置为 true
- *   3. 流式循环检测到标志后退出，推送 done 事件（error="用户取消请求"）
+ *   1. 调用后端 cancel_chat_completion 命令，传入 requestId
+ *   2. 后端在取消令牌映射表中查找对应 request_id
+ *   3. 将对应令牌置为 true，流式循环检测后退出
+ *   4. 推送 done 事件（error="用户取消请求"）
+ * 说明: 仅取消指定请求，不影响其他并发请求；未找到 requestId 视为请求已结束，幂等安全
  */
-export async function cancelStreamCompletion(): Promise<void> {
-  await invoke("cancel_chat_completion");
+export async function cancelStreamCompletion(requestId: string): Promise<void> {
+  await invoke("cancel_chat_completion", { requestId });
 }
 
 /**

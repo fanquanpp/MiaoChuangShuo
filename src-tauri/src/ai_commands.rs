@@ -5,9 +5,9 @@
 // 请求，将 LLM 增量输出通过 Tauri Event 实时推送到前端。
 //
 // 模块职责：
-// 1. 提供 chat_completion_stream 命令（流式聊天补全）
-// 2. 提供 cancel_chat_completion 命令（取消进行中的请求）
-// 3. 解析 SSE 数据流，提取增量内容
+// 1. 提供 chat_completion_stream 命令（流式聊天补全，按 request_id 粒度管理取消）
+// 2. 提供 cancel_chat_completion 命令（按 request_id 精准取消指定请求）
+// 3. 解析 SSE 数据流，使用 chunk 边界缓冲区拼接不完整的事件
 // 4. 通过 Tauri Event 推送 chunk/done/error 三类事件
 //
 // 协议说明：
@@ -22,19 +22,75 @@
 // - ai:stream:done   流结束（payload: StreamChunk，done=true）
 // - ai:stream:error  错误推送（payload: StreamChunk，error 字段填充）
 //
-// 限制说明：
-// - AI-1 阶段采用全局 AtomicBool 实现取消，假设同时只有一个活跃请求
-// - 后续阶段可升级为 HashMap<String, Arc<AtomicBool>> 按 request_id 管理多请求
+// 取消机制说明（AI-2 阶段升级）：
+// - 取消标志由全局 AtomicBool 升级为 HashMap<String, Arc<AtomicBool>>
+// - 每个流式请求通过 request_id 注册独立的取消令牌
+// - cancel_chat_completion 按 request_id 精准取消，不影响其他并发请求
+// - 令牌在流式结束（正常/异常/取消）时自动清理，避免内存泄漏
 
 use crate::ai_config::{decode_api_key, AiConfig};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{command, AppHandle, Emitter};
 
-/// 全局取消标志（AI-1 阶段单请求模型）
-/// 当 cancel_chat_completion 被调用时置为 true，流式循环检测后退出
-static CANCEL_FLAG: AtomicBool = AtomicBool::new(false);
+/// 单个请求的取消令牌类型
+/// 使用 Arc<AtomicBool> 实现轻量级跨线程取消信号
+type CancelToken = Arc<AtomicBool>;
+
+/// 获取全局取消令牌映射表的不可变引用
+///
+/// 使用 OnceLock 实现延迟初始化，避免静态变量初始化顺序问题。
+/// 映射表以 request_id 为键，存储每个活跃流式请求的取消令牌。
+/// 使用 std::sync::Mutex 而非 tokio::sync::Mutex，因为锁定时间极短
+/// （仅 HashMap insert/remove/get），无需跨 await 持锁。
+fn cancel_tokens() -> &'static Mutex<HashMap<String, CancelToken>> {
+    static TOKENS: OnceLock<Mutex<HashMap<String, CancelToken>>> = OnceLock::new();
+    TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 注册取消令牌
+///
+/// 输入: request_id 请求标识（由前端生成的 UUID）
+/// 输出: CancelToken 供流式循环检测的令牌副本（Arc 克隆）
+/// 流程:
+///   1. 创建初始为 false 的 AtomicBool
+///   2. 插入到全局映射表
+///   3. 返回 Arc 副本供流式循环持有
+fn register_cancel_token(request_id: &str) -> CancelToken {
+    let token = Arc::new(AtomicBool::new(false));
+    if let Ok(mut map) = cancel_tokens().lock() {
+        map.insert(request_id.to_string(), token.clone());
+    }
+    token
+}
+
+/// 移除取消令牌（流式结束时调用，避免内存泄漏）
+///
+/// 输入: request_id 请求标识
+/// 说明: 无论令牌是否存在都安全调用，移除后 Arc 引用计数归零自动释放
+fn remove_cancel_token(request_id: &str) {
+    if let Ok(mut map) = cancel_tokens().lock() {
+        map.remove(request_id);
+    }
+}
+
+/// 触发指定请求的取消信号
+///
+/// 输入: request_id 请求标识
+/// 输出: bool 是否成功找到并触发取消
+/// 说明: 未找到返回 false（如请求已结束或 request_id 错误），调用方应忽略此情况
+fn trigger_cancel(request_id: &str) -> bool {
+    if let Ok(map) = cancel_tokens().lock() {
+        if let Some(token) = map.get(request_id) {
+            token.store(true, Ordering::SeqCst);
+            return true;
+        }
+    }
+    false
+}
 
 /// 聊天消息结构体（OpenAI 协议）
 ///
@@ -73,30 +129,34 @@ pub struct StreamChunk {
 ///   app - Tauri 应用句柄（用于 emit 事件）
 ///   messages - 聊天消息列表（system + user + assistant 历史）
 ///   config - AI 配置（含 Base64 编码的 API Key）
+///   request_id - 请求唯一标识（前端生成 UUID，用于精准取消）
 /// 输出: Result<(), String> 成功返回空 Ok，失败返回错误信息
 /// 流程:
-///   1. 重置取消标志
+///   1. 按 request_id 注册取消令牌到全局映射表
 ///   2. 解码 API Key 并校验非空
 ///   3. 构造请求 URL（{base_url}/chat/completions）
 ///   4. 构造请求体（含 stream: true）
 ///   5. 发起 POST 请求，获取响应流
-///   6. 逐块读取响应，按行解析 SSE
-///   7. 每个 delta.content 通过 ai:stream:chunk 事件推送
-///   8. 收到 [DONE] 或流结束时推送 ai:stream:done
-///   9. HTTP 错误或解析异常推送 ai:stream:error
+///   6. 逐块读取响应，使用缓冲区拼接 chunk 边界不完整的 SSE 事件
+///   7. 每次循环检测取消令牌，被取消时推送 done 并清理
+///   8. 每个 delta.content 通过 ai:stream:chunk 事件推送
+///   9. 收到 [DONE] 或流结束时推送 ai:stream:done 并清理令牌
+///   10. HTTP 错误或解析异常推送 ai:stream:error 并清理令牌
 #[command]
 pub async fn chat_completion_stream(
     app: AppHandle,
     messages: Vec<ChatMessage>,
     config: AiConfig,
+    request_id: String,
 ) -> Result<(), String> {
-    // 重置取消标志，允许新请求开始
-    CANCEL_FLAG.store(false, Ordering::SeqCst);
+    // 按 request_id 注册取消令牌（支持多请求并发，互不影响）
+    let cancel_token = register_cancel_token(&request_id);
 
     // 解码 API Key
     let api_key = decode_api_key(&config.api_key)
         .map_err(|e| format!("API Key 解码失败: {}", e))?;
     if api_key.is_empty() {
+        remove_cancel_token(&request_id);
         return Err("API Key 为空，请先在设置中配置 API Key".to_string());
     }
 
@@ -135,6 +195,8 @@ pub async fn chat_completion_stream(
                 done: true,
                 error: Some(msg.clone()),
             });
+            // 清理取消令牌，避免映射表残留
+            remove_cancel_token(&request_id);
             msg
         })?;
 
@@ -148,22 +210,26 @@ pub async fn chat_completion_stream(
             done: true,
             error: Some(msg.clone()),
         });
+        remove_cancel_token(&request_id);
         return Err(msg);
     }
 
     // 获取响应字节流
     let mut stream = response.bytes_stream();
+    // SSE chunk 边界缓冲区：HTTP 流可能将一个 SSE 事件分割到多个 chunk
+    // 使用 buffer 累积未解析完成的内容，仅在遇到换行符时处理完整行
     let mut buffer = String::new();
 
     // 逐块读取并解析 SSE
     while let Some(chunk_result) = stream.next().await {
-        // 检查取消标志
-        if CANCEL_FLAG.load(Ordering::SeqCst) {
+        // 检查取消标志（按 request_id 粒度，不影响其他并发请求）
+        if cancel_token.load(Ordering::SeqCst) {
             let _ = app.emit("ai:stream:done", StreamChunk {
                 content: String::new(),
                 done: true,
                 error: Some("用户取消请求".to_string()),
             });
+            remove_cancel_token(&request_id);
             return Ok(());
         }
 
@@ -175,14 +241,24 @@ pub async fn chat_completion_stream(
                 done: true,
                 error: Some(msg.clone()),
             });
+            // 清理取消令牌，避免映射表残留
+            remove_cancel_token(&request_id);
             msg
         })?;
         buffer.push_str(&String::from_utf8_lossy(&chunk));
 
         // 按行解析 SSE 协议
+        // 使用 drain 而非 to_string() 避免 O(n²) 内存分配
+        // buffer 始终保留最后一段不含换行符的不完整数据，等下一个 chunk 拼接
         while let Some(pos) = buffer.find('\n') {
-            let line = buffer[..pos].trim().to_string();
-            buffer = buffer[pos + 1..].to_string();
+            // 提取一行内容（不含换行符），同时从缓冲区移除
+            let line: String = buffer.drain(..pos).collect();
+            // 移除换行符本身
+            if !buffer.is_empty() {
+                buffer.remove(0);
+            }
+            // 兼容 CRLF 行尾（部分 SSE 服务器使用 \r\n），并去除首尾空白
+            let line = line.trim_end_matches('\r').trim();
 
             // 跳过空行（SSE 协议中事件分隔符）
             if line.is_empty() {
@@ -198,6 +274,7 @@ pub async fn chat_completion_stream(
                         done: true,
                         error: None,
                     });
+                    remove_cancel_token(&request_id);
                     return Ok(());
                 }
 
@@ -224,20 +301,24 @@ pub async fn chat_completion_stream(
         done: true,
         error: None,
     });
+    // 清理取消令牌，避免内存泄漏
+    remove_cancel_token(&request_id);
 
     Ok(())
 }
 
 /// 取消聊天补全命令
 ///
-/// 输入: 无
-/// 输出: Result<(), String> 始终返回 Ok
+/// 输入: request_id 请求唯一标识（与 chat_completion_stream 调用时传入的值一致）
+/// 输出: Result<(), String> 始终返回 Ok（未找到令牌视为请求已结束，幂等安全）
 /// 流程:
-///   1. 将全局取消标志置为 true
-///   2. chat_completion_stream 的循环检测到标志后退出
-///   3. 推送 ai:stream:done 事件（error 字段填充"用户取消请求"）
+///   1. 在全局映射表中查找 request_id 对应的取消令牌
+///   2. 将令牌置为 true，通知流式循环退出
+///   3. 流式循环检测到取消后推送 ai:stream:done（error="用户取消请求"）
+///   4. 令牌清理由流式循环完成（避免重复清理）
+/// 说明: 仅取消指定请求，不影响其他并发的流式请求
 #[command]
-pub async fn cancel_chat_completion() -> Result<(), String> {
-    CANCEL_FLAG.store(true, Ordering::SeqCst);
+pub async fn cancel_chat_completion(request_id: String) -> Result<(), String> {
+    trigger_cancel(&request_id);
     Ok(())
 }

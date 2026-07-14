@@ -216,10 +216,10 @@ export default function CharacterGraphEdgeDrawer({
                 type="button"
                 onClick={() => setShowAddForm((v) => !v)}
                 className="text-[10px] text-fandex-primary hover:text-fandex-secondary transition-colors duration-fast flex items-center gap-0.5"
-                title="新增自定义关系类型"
+                title={t("edgeDrawer.customAddTitle")}
               >
                 <Plus className="w-3 h-3" />
-                自定义
+                {t("edgeDrawer.customToggle")}
               </button>
             </div>
             <select
@@ -252,13 +252,13 @@ export default function CharacterGraphEdgeDrawer({
                     if (e.key === "Enter") handleAddCustomRelation();
                     if (e.key === "Escape") setShowAddForm(false);
                   }}
-                  placeholder="关系名称(如 师徒/宿敌/同盟)"
+                  placeholder={t("edgeDrawer.customPlaceholder")}
                   className="w-full h-7 px-2 text-xs bg-nf-bg-sidebar border border-nf-border-light text-nf-text placeholder:text-nf-text-tertiary focus:outline-none focus:border-fandex-primary"
                   autoFocus
                 />
                 {/* 颜色选择器 */}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] text-nf-text-tertiary">颜色:</span>
+                  <span className="text-[10px] text-nf-text-tertiary">{t("edgeDrawer.colorLabel")}</span>
                   {COLOR_CHOICES.map((c) => (
                     <button
                       key={c}
@@ -268,7 +268,7 @@ export default function CharacterGraphEdgeDrawer({
                         newRelColor === c ? "border-white scale-110" : "border-nf-border-light"
                       }`}
                       style={{ backgroundColor: c }}
-                      aria-label={`选择颜色 ${c}`}
+                      aria-label={t("edgeDrawer.colorAria", { color: c })}
                     />
                   ))}
                 </div>
@@ -278,14 +278,14 @@ export default function CharacterGraphEdgeDrawer({
                     onClick={() => setShowAddForm(false)}
                     className="px-2 h-6 text-[11px] text-nf-text-tertiary hover:text-nf-text border border-nf-border-light hover:bg-nf-bg-hover transition-colors duration-fast"
                   >
-                    取消
+                    {t("app.cancel")}
                   </button>
                   <button
                     type="button"
                     onClick={handleAddCustomRelation}
                     className="px-2 h-6 text-[11px] text-white bg-fandex-primary hover:opacity-90 transition-opacity duration-fast"
                   >
-                    添加
+                    {t("edgeDrawer.customAdd")}
                   </button>
                 </div>
               </div>
@@ -294,7 +294,7 @@ export default function CharacterGraphEdgeDrawer({
             {/* 已有自定义关系类型列表(可删除) */}
             {relationOptions.some((o) => !o.builtin) && (
               <div className="mt-2 space-y-1">
-                <div className="text-[10px] text-nf-text-tertiary">自定义关系类型:</div>
+                <div className="text-[10px] text-nf-text-tertiary">{t("edgeDrawer.customList")}</div>
                 {relationOptions.filter((o) => !o.builtin).map((o) => (
                   <div key={o.value} className="flex items-center justify-between px-2 py-1 bg-nf-bg border border-nf-border-light">
                     <div className="flex items-center gap-1.5">
@@ -305,7 +305,7 @@ export default function CharacterGraphEdgeDrawer({
                       type="button"
                       onClick={() => handleDeleteCustomRelation(o.value)}
                       className="text-nf-text-tertiary hover:text-fandex-tertiary transition-colors duration-fast"
-                      title="删除此自定义关系类型"
+                      title={t("edgeDrawer.customDeleteTitle")}
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -343,7 +343,7 @@ export default function CharacterGraphEdgeDrawer({
                 style={{ backgroundColor: currentColor }}
               />
               <span className="text-nf-text-tertiary">
-                {currentMeta.label}
+                {t(currentMeta.label)}
               </span>
             </div>
           </div>

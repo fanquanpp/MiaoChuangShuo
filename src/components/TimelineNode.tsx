@@ -27,6 +27,7 @@ import { Handle, Position, useNodesData, type NodeProps } from "@xyflow/react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { NODE_TYPE_COLORS, NODE_STATUS_MAP, EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
 import type { TimelineNodeData } from "../lib/stores/timelineTypes";
+import { useI18n } from "../lib/i18n";
 
 /**
  * 自定义节点组件(性能优化版)
@@ -48,6 +49,8 @@ export default function TimelineNode({ id, selected }: NodeProps) {
   // 本地折叠状态 (视图级操作, 与 CharacterGraphNode 保持一致, 不持久化)
   // 折叠时仅显示标题行, 展开时显示类型标签/状态徽章/摘要 (向下展开为长卡片)
   const [collapsed, setCollapsed] = useState(false);
+  // 获取 i18n 翻译函数(用于将 NODE_STATUS_MAP 中 label 的 i18n key 转换为本地化文案)
+  const { t } = useI18n();
 
   // 仅订阅当前节点的 data 字段变化(避免其他节点变化触发重渲染)
   // 不带泛型时返回 Node | undefined, data 为 Record<string, unknown>
@@ -151,7 +154,7 @@ export default function TimelineNode({ id, selected }: NodeProps) {
                   {data.nodeType === "ending" && "结局"}
                 </span>
                 <span className={`text-[10px] px-1.5 py-0.5 font-medium ${statusInfo.color} text-white`}>
-                  {statusInfo.label}
+                  {t(statusInfo.label)}
                 </span>
               </div>
 

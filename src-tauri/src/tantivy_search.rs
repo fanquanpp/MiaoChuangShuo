@@ -24,6 +24,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
+use crate::error::AppError;
 use crate::tantivy_indexer::{
     self, IndexProgress, IndexStats, SearchResult,
 };
@@ -63,13 +64,13 @@ pub struct SearchResponse {
 ///
 /// 输入:
 ///   request - 搜索请求参数（项目路径、关键词、结果上限）
-/// 输出: Result<SearchResponse, String> 搜索响应
+/// 输出: Result<SearchResponse, AppError> 搜索响应
 /// 流程:
 ///   1. 校验项目路径
-///   2. 调用 tantivy_indexer::search 执行查询
+///   2. 调用 tantivy_indexer::search 执行查询（内部使用 IndexHandle 缓存）
 ///   3. 封装响应并返回
 #[tauri::command]
-pub async fn search_project(request: SearchRequest) -> Result<SearchResponse, String> {
+pub async fn search_project(request: SearchRequest) -> Result<SearchResponse, AppError> {
     if request.query.trim().is_empty() {
         return Ok(SearchResponse {
             query: request.query,
@@ -89,7 +90,7 @@ pub async fn search_project(request: SearchRequest) -> Result<SearchResponse, St
         tantivy_indexer::search(&project_root, &query, limit)
     })
     .await
-    .map_err(|e| format!("搜索任务执行失败: {}", e))??;
+    .map_err(|e| AppError::index_error(format!("搜索任务执行失败: {}", e)))??;
 
     let total = results.len();
 
@@ -110,10 +111,10 @@ pub async fn search_project(request: SearchRequest) -> Result<SearchResponse, St
 /// 输入:
 ///   app - Tauri AppHandle（用于推送进度事件）
 ///   project_path - 项目根路径
-/// 输出: Result<IndexStats, String> 索引统计信息
+/// 输出: Result<IndexStats, AppError> 索引统计信息
 /// 流程:
 ///   1. 校验项目路径
-///   2. 使用 spawn_blocking 执行阻塞的索引构建
+///   2. 使用 spawn_blocking 执行阻塞的索引构建（内部使用 IndexHandle 缓存）
 ///   3. 构建过程中通过 app.emit 推送进度事件
 ///   4. 返回索引统计信息
 /// HVCI 注意: 不使用 Command::output()，直接调用 Tantivy API
@@ -121,7 +122,7 @@ pub async fn search_project(request: SearchRequest) -> Result<SearchResponse, St
 pub async fn build_project_index(
     app: AppHandle,
     project_path: String,
-) -> Result<IndexStats, String> {
+) -> Result<IndexStats, AppError> {
     let project_root = PathBuf::from(project_path);
 
     // 克隆 AppHandle 用于在 spawn_blocking 闭包中推送进度
@@ -136,7 +137,7 @@ pub async fn build_project_index(
         })
     })
     .await
-    .map_err(|e| format!("索引构建任务失败: {}", e))??;
+    .map_err(|e| AppError::index_error(format!("索引构建任务失败: {}", e)))??;
 
     // 推送完成事件
     let _ = app.emit(
@@ -159,20 +160,20 @@ pub async fn build_project_index(
 /// 不触发索引重建，仅读取索引元数据。
 ///
 /// 输入: project_path 项目根路径
-/// 输出: Result<IndexStats, String> 索引统计
+/// 输出: Result<IndexStats, AppError> 索引统计
 /// 流程:
 ///   1. 校验项目路径
-///   2. 调用 tantivy_indexer::get_index_stats 读取统计
+///   2. 调用 tantivy_indexer::get_index_stats 读取统计（内部使用 IndexHandle 缓存）
 ///   3. 返回统计信息（索引不存在时返回空统计）
 #[tauri::command]
-pub async fn get_project_index_stats(project_path: String) -> Result<IndexStats, String> {
+pub async fn get_project_index_stats(project_path: String) -> Result<IndexStats, AppError> {
     let project_root = PathBuf::from(project_path);
 
     tokio::task::spawn_blocking(move || {
         tantivy_indexer::get_index_stats(&project_root)
     })
     .await
-    .map_err(|e| format!("获取索引统计任务失败: {}", e))?
+    .map_err(|e| AppError::index_error(format!("获取索引统计任务失败: {}", e)))?
 }
 
 /// 增量更新单文件索引
@@ -183,10 +184,10 @@ pub async fn get_project_index_stats(project_path: String) -> Result<IndexStats,
 /// 输入:
 ///   project_path - 项目根路径
 ///   relative_path - 文件相对路径（相对于项目根，如 "正文/第一章.txt"）
-/// 输出: Result<u32, String> 写入的 Chunk 数量
+/// 输出: Result<u32, AppError> 写入的 Chunk 数量
 /// 流程:
 ///   1. 校验项目路径与文件路径
-///   2. 打开或创建索引
+///   2. 从缓存获取 IndexHandle，锁定 writer
 ///   3. 删除该文件的旧索引文档
 ///   4. 如果文件存在，重新索引（按 Chunk 切分写入）
 ///   5. 提交索引变更
@@ -194,21 +195,20 @@ pub async fn get_project_index_stats(project_path: String) -> Result<IndexStats,
 ///   - 增量更新避免全量重建的开销
 ///   - "先删后建"保证文件内容变更后索引一致性
 ///   - 文件删除时仅执行删除步骤（步骤 4 跳过）
+///   - 使用 IndexHandle 缓存避免重复创建 IndexWriter（Tantivy 限制每索引一个 writer）
 #[tauri::command]
 pub async fn update_file_index(
     project_path: String,
     relative_path: String,
-) -> Result<u32, String> {
+) -> Result<u32, AppError> {
     let project_root = PathBuf::from(&project_path);
     let abs_path = project_root.join(&relative_path);
 
-    tokio::task::spawn_blocking(move || -> Result<u32, String> {
-        // 打开或创建索引
-        let (index, schema) = tantivy_indexer::open_or_create_index(&project_root)?;
-        // 创建索引写入器（50MB 堆内存）
-        let mut index_writer = index
-            .writer(50_000_000)
-            .map_err(|e| format!("创建索引写入器失败: {}", e))?;
+    tokio::task::spawn_blocking(move || -> Result<u32, AppError> {
+        // 从缓存获取 IndexHandle（避免重复创建 IndexWriter）
+        let (handle, schema) = tantivy_indexer::open_or_create_index(&project_root)?;
+        // 锁定 writer（Mutex 保证写入串行化，避免并发 panic）
+        let mut index_writer = handle.lock_writer()?;
 
         // 先删除该文件的所有旧 Chunk 文档
         tantivy_indexer::delete_file_from_index(&mut index_writer, &schema, &relative_path)?;
@@ -244,12 +244,12 @@ pub async fn update_file_index(
         // 提交索引变更
         index_writer
             .commit()
-            .map_err(|e| format!("提交索引失败: {}", e))?;
+            .map_err(|e| AppError::index_error(format!("提交索引失败: {}", e)))?;
 
         Ok(chunk_count)
     })
     .await
-    .map_err(|e| format!("索引更新任务失败: {}", e))?
+    .map_err(|e| AppError::index_error(format!("索引更新任务失败: {}", e)))?
 }
 
 /// 删除单文件索引
@@ -260,33 +260,35 @@ pub async fn update_file_index(
 /// 输入:
 ///   project_path - 项目根路径
 ///   relative_path - 文件相对路径
-/// 输出: Result<(), String> 删除结果
+/// 输出: Result<(), AppError> 删除结果
 /// 流程:
 ///   1. 校验项目路径
-///   2. 打开索引
+///   2. 从缓存获取 IndexHandle，锁定 writer
 ///   3. 按 file_path 字段删除所有匹配文档
 ///   4. 提交索引变更
+/// 设计依据:
+///   - 使用 IndexHandle 缓存避免重复创建 IndexWriter（Tantivy 限制每索引一个 writer）
 #[tauri::command]
 pub async fn remove_file_index(
     project_path: String,
     relative_path: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let project_root = PathBuf::from(&project_path);
 
-    tokio::task::spawn_blocking(move || -> Result<(), String> {
-        let (index, schema) = tantivy_indexer::open_or_create_index(&project_root)?;
-        let mut index_writer = index
-            .writer(50_000_000)
-            .map_err(|e| format!("创建索引写入器失败: {}", e))?;
+    tokio::task::spawn_blocking(move || -> Result<(), AppError> {
+        // 从缓存获取 IndexHandle（避免重复创建 IndexWriter）
+        let (handle, schema) = tantivy_indexer::open_or_create_index(&project_root)?;
+        // 锁定 writer（Mutex 保证写入串行化，避免并发 panic）
+        let mut index_writer = handle.lock_writer()?;
 
         tantivy_indexer::delete_file_from_index(&mut index_writer, &schema, &relative_path)?;
 
         index_writer
             .commit()
-            .map_err(|e| format!("提交索引失败: {}", e))?;
+            .map_err(|e| AppError::index_error(format!("提交索引失败: {}", e)))?;
 
         Ok(())
     })
     .await
-    .map_err(|e| format!("索引删除任务失败: {}", e))?
+    .map_err(|e| AppError::index_error(format!("索引删除任务失败: {}", e)))?
 }

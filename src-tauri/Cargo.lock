@@ -2172,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "miaochuangshuo"
-version = "26.7.28"
+version = "26.7.29"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -2188,7 +2188,9 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-shell",
+ "thiserror 1.0.69",
  "tokio",
+ "toml 0.8.2",
  "trash",
  "uuid",
  "walkdir",

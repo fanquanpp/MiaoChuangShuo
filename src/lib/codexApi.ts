@@ -232,7 +232,7 @@ export function getCodexDirName(type: CodexEntityType): string {
  * 流程:
  *   1. 根据 type 解析目标目录名
  *   2. 生成 UUID 作为实体唯一标识
- *   3. 构造 CodexMeta front matter（含新字段 summary/tags/avatar/sort_order/updated_at）
+ *   3. 构造 CodexMeta front matter（含新字段 summary/tags/avatar/sortOrder/updatedAt）
  *   4. 将纯文本正文转换为 ProseMirror JSON
  *   5. 组合为 .pmd 文件内容（front matter + ProseMirror JSON）
  *   6. 调用 createFile 创建 .pmd 文件
@@ -256,13 +256,13 @@ export async function createCodexEntity(
     id: generateCodexUuid(),
     name: safeName,
     aliases,
-    entity_type: type,
+    entityType: type,
     created: now,
     summary: "",
     tags: [],
     avatar: null,
-    sort_order: 0,
-    updated_at: now,
+    sortOrder: 0,
+    updatedAt: now,
   };
   // 构造 ProseMirror JSON 正文（空文档或含初始内容）
   const pmdContent = content
@@ -305,8 +305,8 @@ export interface CodexMeta {
   /** 别名列表 */
   aliases: string[];
   /** 实体类型：character / worldview / glossary / material
-   *  注：对应方案中的 card_type，保留 entity_type 以向后兼容旧 front matter */
-  entity_type: string;
+   *  注：对应方案中的 card_type，保留 entityType 以向后兼容旧 front matter */
+  entityType: string;
   /** 创建时间（ISO 8601） */
   created: string;
   /** 一句话简介（用于 Hover 预览和 AI 快速读取） */
@@ -316,9 +316,9 @@ export interface CodexMeta {
   /** 头像/图标 URL（可选） */
   avatar?: string | null;
   /** 排序权重（数字越小越靠前，默认 0） */
-  sort_order?: number;
+  sortOrder?: number;
   /** 更新时间（ISO 8601 格式） */
-  updated_at?: string;
+  updatedAt?: string;
 }
 
 /**
@@ -378,7 +378,7 @@ export interface CodexCard {
   id: string;
   /** 卡片名称（来自 CodexMeta.name） */
   name: string;
-  /** 卡片类型（来自 CodexMeta.entity_type） */
+  /** 卡片类型（来自 CodexMeta.entityType） */
   cardType: CodexEntityType;
   /** 别名列表 */
   aliases: string[];
@@ -457,15 +457,15 @@ export function convertTextToPmd(text: string): string {
  * 输出: CodexCard 前端 Store 使用的扁平结构
  * 流程:
  *   1. 从 meta 提取字段，应用默认值（兼容旧文件缺失新字段的情况）
- *   2. 映射 entity_type 为 CodexEntityType 枚举
+ *   2. 映射 entityType 为 CodexEntityType 枚举
  *   3. 返回扁平化的 CodexCard 对象
  */
 export function toCodexCard(entity: StructuredCodexEntity): CodexCard {
   const meta = entity.meta;
   // 类型映射：未知类型降级为 material（素材）以避免前端渲染崩溃
   const cardType = (
-    ["character", "worldview", "glossary", "material"].includes(meta.entity_type)
-      ? meta.entity_type
+    ["character", "worldview", "glossary", "material"].includes(meta.entityType)
+      ? meta.entityType
       : "material"
   ) as CodexEntityType;
 
@@ -477,9 +477,9 @@ export function toCodexCard(entity: StructuredCodexEntity): CodexCard {
     summary: meta.summary ?? "",
     tags: meta.tags ?? [],
     avatar: meta.avatar ?? null,
-    sortOrder: meta.sort_order ?? 0,
+    sortOrder: meta.sortOrder ?? 0,
     createdAt: meta.created,
-    updatedAt: meta.updated_at ?? meta.created,
+    updatedAt: meta.updatedAt ?? meta.created,
     sourceFile: entity.source_file,
     content: entity.content,
   };
@@ -494,11 +494,11 @@ export function toCodexCard(entity: StructuredCodexEntity): CodexCard {
 export interface CodexMetaPatch {
   name?: string;
   aliases?: string[];
-  entity_type?: string;
+  entityType?: string;
   summary?: string;
   tags?: string[];
   avatar?: string | null;
-  sort_order?: number;
+  sortOrder?: number;
 }
 
 /**

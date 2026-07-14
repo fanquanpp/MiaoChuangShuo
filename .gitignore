@@ -57,6 +57,10 @@ _*.tmp
 .novelforge/snapshots/
 .novelforge/*.tmp
 
+# 迁移备份目录（覆盖任意层级路径）
+migration_backup_*/
+**/migration_backup_*/
+
 # 备份文件（.pmd 迁移与旧版迁移产生）
 *.bak
 *.txt.bak

@@ -26,6 +26,7 @@ import {
   type IndexStats,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { logger } from "../lib/logger";
 import { useToast } from "../lib/toast";
 
 // 索引构建进度事件 payload（与后端 IndexProgress 对应）
@@ -111,7 +112,7 @@ export default function IndexManagerPanel({}: IndexManagerPanelProps) {
       const result = await getProjectIndexStats(currentProject.path);
       setStats(result);
     } catch (err) {
-      console.error("加载索引统计失败:", err);
+      logger.error("加载索引统计失败:", err instanceof Error ? err : String(err));
     } finally {
       setLoadingStats(false);
     }

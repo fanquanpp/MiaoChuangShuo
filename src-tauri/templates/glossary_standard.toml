@@ -1,0 +1,65 @@
+# 标准术语模板
+# 专有名词解释模板
+
+id = "glossary-standard"
+name = "标准术语"
+category = "glossary"
+description = "专有名词解释模板"
+icon = "BookOpen"
+default_enabled_modules = ["context", "related"]
+
+# ===== 基础字段 =====
+[[base_fields]]
+key = "term"
+label = "术语"
+field_type = "text"
+required = true
+placeholder = "要解释的专有名词"
+
+[[base_fields]]
+key = "definition"
+label = "释义"
+field_type = "richtext"
+required = true
+placeholder = "术语的含义解释"
+
+# ===== 可选模块 =====
+[[optional_modules]]
+id = "context"
+name = "使用场景"
+description = "术语的使用场景与语境"
+icon = "MapPin"
+
+[[optional_modules.fields]]
+key = "usage_context"
+label = "使用场景"
+field_type = "richtext"
+placeholder = "该术语在何种情境下使用"
+
+[[optional_modules]]
+id = "related"
+name = "相关条目"
+description = "与该术语相关的其他条目"
+icon = "Link"
+
+[[optional_modules.fields]]
+key = "related_entries"
+label = "相关条目"
+field_type = "richtext"
+placeholder = "关联的其他术语或概念"
+
+[[optional_modules]]
+id = "etymology"
+name = "词源考据"
+description = "术语的词源与含义演变历史"
+icon = "History"
+
+[[optional_modules.fields]]
+key = "origin"
+label = "词源"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "evolution"
+label = "含义演变"
+field_type = "richtext"

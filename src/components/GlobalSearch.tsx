@@ -39,6 +39,7 @@ import {
   type TantivySearchResult,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { logger } from "../lib/logger";
 import { useToast } from "../lib/toast";
 
 /**
@@ -148,7 +149,7 @@ export default function GlobalSearch() {
         setSemanticIndexEmpty(false);
       }
     } catch (e) {
-      console.error("搜索失败:", e);
+      logger.error("搜索失败:", e instanceof Error ? e : String(e));
       showToast("error", t("search.failed"));
       setResults([]);
       setSemanticResults([]);

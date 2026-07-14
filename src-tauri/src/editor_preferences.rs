@@ -19,7 +19,13 @@
 // 通常希望沿用相同开关设置。项目级仅存储项目固有属性（类型、创建时间），
 // 功能开关存用户级，新建项目时以用户级为默认值，用户可针对单项目覆盖。
 // 当前阶段仅实现用户级偏好的读写，项目级配置在阶段 2 模板重构时启用。
+//
+// 错误处理：
+// 本模块作为 AppError 试点，全量替换 Result<T, String> 为 Result<T, AppError>，
+// 通过结构化错误类型向前端传递 { kind, message, context } 信息，便于前端
+// 根据 kind 字段进行差异化处理与 i18n 本地化映射。
 
+use crate::error::AppError;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -32,6 +38,7 @@ use tauri::command;
 /// 存储位置：AppData/MiaoChuangShuo/preferences.json
 /// 跨项目共享，新建项目时作为默认值
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EditorPreferences {
     /// Tab 键角色名补全（原 CharacterMention 扩展，默认关闭）
     pub enable_character_mention_picker: bool,
@@ -49,7 +56,7 @@ pub struct EditorPreferences {
 
 impl Default for EditorPreferences {
     /// 默认偏好：以散文与文章场景为基线
-    /// 长短篇小说：开缩进、关 Tab 补全
+    /// 长篇小说：开缩进、关 Tab 补全
     /// 剧本与脚本：关缩进、开 Tab 补全
     /// 散文与文章：开缩进、关 Tab 补全
     fn default() -> Self {
@@ -75,6 +82,7 @@ impl EditorPreferences {
 ///
 /// 仅包含项目固有属性，功能开关存用户级偏好
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectConfig {
     /// 模板类型："novel" / "script" / "essay"
     pub template_type: String,
@@ -95,32 +103,43 @@ impl Default for ProjectConfig {
 
 /// 获取用户级偏好文件路径
 /// 输入: 无
-/// 输出: Result<PathBuf, String> 偏好文件路径
-/// 流程: 定位 AppData/novelforge/preferences.json
-fn get_preferences_path() -> Result<PathBuf, String> {
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| "无法获取配置目录".to_string())?;
+/// 输出: Result<PathBuf, AppError> 偏好文件路径
+/// 流程: 定位 AppData/novelforge/preferences.json，必要时创建偏好目录
+/// 错误:
+///   - ConfigError: 系统无法提供配置目录（如环境变量缺失）
+///   - IoError: 创建偏好目录失败
+fn get_preferences_path() -> Result<PathBuf, AppError> {
+    let config_dir = dirs::config_dir().ok_or_else(|| {
+        AppError::ConfigError("无法获取配置目录".to_string())
+    })?;
     let prefs_dir = config_dir.join("novelforge");
     if !prefs_dir.exists() {
-        fs::create_dir_all(&prefs_dir)
-            .map_err(|e| format!("创建偏好目录失败: {}", e))?;
+        fs::create_dir_all(&prefs_dir).map_err(|e| AppError::IoError {
+            source: e,
+            context: "创建偏好目录失败".to_string(),
+        })?;
     }
     Ok(prefs_dir.join("preferences.json"))
 }
 
 /// 获取项目级配置文件路径
 /// 输入: project_root 项目根目录
-/// 输出: Result<PathBuf, String> 配置文件路径
-/// 流程: 拼接 {project_root}/.novelforge/config.json
-fn get_project_config_path(project_root: &str) -> Result<PathBuf, String> {
+/// 输出: Result<PathBuf, AppError> 配置文件路径
+/// 流程: 拼接 {project_root}/.novelforge/config.json，必要时创建配置目录
+/// 错误:
+///   - PathValidationError: 项目路径不存在
+///   - IoError: 创建项目配置目录失败
+fn get_project_config_path(project_root: &str) -> Result<PathBuf, AppError> {
     let root = PathBuf::from(project_root);
     if !root.exists() {
-        return Err("项目路径不存在".to_string());
+        return Err(AppError::PathValidationError("项目路径不存在".to_string()));
     }
     let config_dir = root.join(".novelforge");
     if !config_dir.exists() {
-        fs::create_dir_all(&config_dir)
-            .map_err(|e| format!("创建项目配置目录失败: {}", e))?;
+        fs::create_dir_all(&config_dir).map_err(|e| AppError::IoError {
+            source: e,
+            context: "创建项目配置目录失败".to_string(),
+        })?;
     }
     Ok(config_dir.join("config.json"))
 }
@@ -129,51 +148,73 @@ fn get_project_config_path(project_root: &str) -> Result<PathBuf, String> {
 
 /// 原子写入文件（先写 .tmp 再 rename）
 /// 输入: path 目标路径, content 内容
-/// 输出: Result<(), String> 写入结果
+/// 输出: Result<(), AppError> 写入结果
 /// 流程:
 ///   1. 写入 {path}.tmp 临时文件
 ///   2. rename 到目标路径（原子操作）
-///   3. 失败时清理临时文件
-fn atomic_write(path: &PathBuf, content: &str) -> Result<(), String> {
+///   3. rename 失败时清理临时文件后返回错误
+/// 错误:
+///   - IoError: 写入临时文件失败 / 重命名临时文件失败
+fn atomic_write(path: &PathBuf, content: &str) -> Result<(), AppError> {
     let tmp_path = path.with_extension("tmp");
-    fs::write(&tmp_path, content)
-        .map_err(|e| format!("写入临时文件失败: {}", e))?;
-    fs::rename(&tmp_path, path)
-        .map_err(|e| {
-            // rename 失败时清理临时文件
-            let _ = fs::remove_file(&tmp_path);
-            format!("重命名临时文件失败: {}", e)
-        })
+    fs::write(&tmp_path, content).map_err(|e| AppError::IoError {
+        source: e,
+        context: "写入临时文件失败".to_string(),
+    })?;
+    fs::rename(&tmp_path, path).map_err(|e| {
+        // rename 失败时清理临时文件，避免残留
+        let _ = fs::remove_file(&tmp_path);
+        AppError::IoError {
+            source: e,
+            context: "重命名临时文件失败".to_string(),
+        }
+    })
 }
 
 // ===== Tauri 命令：用户级偏好 =====
 
 /// 读取用户级编辑器偏好
 /// 输入: 无
-/// 输出: Result<EditorPreferences, String> 偏好数据
-/// 流程: 读取 AppData/preferences.json，失败返回默认值
+/// 输出: Result<EditorPreferences, AppError> 偏好数据
+/// 流程: 读取 AppData/preferences.json，文件不存在则返回默认值
+/// 错误:
+///   - IoError: 读取偏好文件失败
+///   - SerializeError: 解析偏好文件失败
 #[command]
-pub fn get_user_preferences() -> Result<EditorPreferences, String> {
+pub fn get_user_preferences() -> Result<EditorPreferences, AppError> {
     let path = get_preferences_path()?;
     if !path.exists() {
         return Ok(EditorPreferences::default());
     }
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("读取偏好文件失败: {}", e))?;
-    let prefs: EditorPreferences = serde_json::from_str(&content)
-        .map_err(|e| format!("解析偏好文件失败: {}", e))?;
+    let content = fs::read_to_string(&path).map_err(|e| AppError::IoError {
+        source: e,
+        context: "读取偏好文件失败".to_string(),
+    })?;
+    let prefs: EditorPreferences = serde_json::from_str(&content).map_err(|e| {
+        AppError::SerializeError {
+            source: e,
+            context: "解析偏好文件失败".to_string(),
+        }
+    })?;
     Ok(prefs)
 }
 
 /// 保存用户级编辑器偏好
 /// 输入: preferences 偏好数据
-/// 输出: Result<(), String> 保存结果
+/// 输出: Result<(), AppError> 保存结果
 /// 流程: 序列化为 JSON 并原子写入 AppData/preferences.json
+/// 错误:
+///   - SerializeError: 序列化偏好失败
+///   - IoError: 原子写入失败（写入临时文件或重命名失败）
 #[command]
-pub fn set_user_preferences(preferences: EditorPreferences) -> Result<(), String> {
+pub fn set_user_preferences(preferences: EditorPreferences) -> Result<(), AppError> {
     let path = get_preferences_path()?;
-    let content = serde_json::to_string_pretty(&preferences)
-        .map_err(|e| format!("序列化偏好失败: {}", e))?;
+    let content = serde_json::to_string_pretty(&preferences).map_err(|e| {
+        AppError::SerializeError {
+            source: e,
+            context: "序列化偏好失败".to_string(),
+        }
+    })?;
     atomic_write(&path, &content)
 }
 
@@ -181,30 +222,48 @@ pub fn set_user_preferences(preferences: EditorPreferences) -> Result<(), String
 
 /// 读取项目级配置
 /// 输入: project_root 项目根目录
-/// 输出: Result<ProjectConfig, String> 配置数据
-/// 流程: 读取 {project_root}/.novelforge/config.json，失败返回默认值
+/// 输出: Result<ProjectConfig, AppError> 配置数据
+/// 流程: 读取 {project_root}/.novelforge/config.json，文件不存在则返回默认值
+/// 错误:
+///   - PathValidationError: 项目路径不存在
+///   - IoError: 读取项目配置失败
+///   - SerializeError: 解析项目配置失败
 #[command]
-pub fn get_project_config(project_root: String) -> Result<ProjectConfig, String> {
+pub fn get_project_config(project_root: String) -> Result<ProjectConfig, AppError> {
     let path = get_project_config_path(&project_root)?;
     if !path.exists() {
         return Ok(ProjectConfig::default());
     }
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("读取项目配置失败: {}", e))?;
-    let config: ProjectConfig = serde_json::from_str(&content)
-        .map_err(|e| format!("解析项目配置失败: {}", e))?;
+    let content = fs::read_to_string(&path).map_err(|e| AppError::IoError {
+        source: e,
+        context: "读取项目配置失败".to_string(),
+    })?;
+    let config: ProjectConfig = serde_json::from_str(&content).map_err(|e| {
+        AppError::SerializeError {
+            source: e,
+            context: "解析项目配置失败".to_string(),
+        }
+    })?;
     Ok(config)
 }
 
 /// 保存项目级配置
 /// 输入: project_root 项目根目录, config 配置数据
-/// 输出: Result<(), String> 保存结果
+/// 输出: Result<(), AppError> 保存结果
 /// 流程: 序列化为 JSON 并原子写入 {project_root}/.novelforge/config.json
+/// 错误:
+///   - PathValidationError: 项目路径不存在
+///   - SerializeError: 序列化项目配置失败
+///   - IoError: 原子写入失败（写入临时文件或重命名失败）
 #[command]
-pub fn set_project_config(project_root: String, config: ProjectConfig) -> Result<(), String> {
+pub fn set_project_config(project_root: String, config: ProjectConfig) -> Result<(), AppError> {
     let path = get_project_config_path(&project_root)?;
-    let content = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("序列化项目配置失败: {}", e))?;
+    let content = serde_json::to_string_pretty(&config).map_err(|e| {
+        AppError::SerializeError {
+            source: e,
+            context: "序列化项目配置失败".to_string(),
+        }
+    })?;
     atomic_write(&path, &content)
 }
 
@@ -237,5 +296,43 @@ mod tests {
             prefs.enable_character_mention_picker,
             deserialized.enable_character_mention_picker
         );
+    }
+
+    /// 验证 AppError 错误类型的序列化输出结构
+    /// 确保前端能收到 { kind, message, context } 三个字段
+    #[test]
+    fn test_app_error_serialization_structure() {
+        let err = AppError::PathValidationError("测试路径校验失败".to_string());
+        let json = serde_json::to_string(&err).expect("AppError 应可序列化");
+        // 验证三个字段均存在
+        let v: serde_json::Value = serde_json::from_str(&json).expect("应解析为合法 JSON");
+        assert!(v.get("kind").is_some(), "序列化结果应包含 kind 字段");
+        assert!(v.get("message").is_some(), "序列化结果应包含 message 字段");
+        assert!(
+            v.get("context").is_some(),
+            "序列化结果应包含 context 字段"
+        );
+    }
+
+    /// 验证 AppError::ConfigError 错误类型的序列化
+    #[test]
+    fn test_app_error_config_error_kind() {
+        let err = AppError::ConfigError("无法获取配置目录".to_string());
+        let json = serde_json::to_string(&err).expect("AppError 应可序列化");
+        let v: serde_json::Value = serde_json::from_str(&json).expect("应解析为合法 JSON");
+        assert_eq!(v["kind"], "configError");
+    }
+
+    /// 验证路径不存在时返回 PathValidationError
+    #[test]
+    fn test_get_project_config_path_not_exist() {
+        let result = get_project_config_path("/nonexistent/path/that/should/not/exist");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PathValidationError(msg) => {
+                assert!(msg.contains("项目路径不存在"));
+            }
+            other => panic!("预期 PathValidationError，实际得到: {:?}", other),
+        }
     }
 }

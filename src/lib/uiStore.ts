@@ -125,50 +125,50 @@ export const useUILayoutStore = create<UILayoutState>((set, get) => ({
   // 初始值从 localStorage 加载（已合并默认值）
   ...loadLayout(),
 
-  setFileListViewMode: (mode) => {
+  setFileListViewMode: (mode): void => {
     const data = { ...get(), fileListViewMode: mode };
     saveLayout(data);
     set({ fileListViewMode: mode });
   },
 
-  setSidebarCollapsed: (collapsed) => {
+  setSidebarCollapsed: (collapsed): void => {
     const data = { ...get(), sidebarCollapsed: collapsed };
     saveLayout(data);
     set({ sidebarCollapsed: collapsed });
   },
 
-  toggleSidebarCollapsed: () => {
+  toggleSidebarCollapsed: (): void => {
     const next = !get().sidebarCollapsed;
     const data = { ...get(), sidebarCollapsed: next };
     saveLayout(data);
     set({ sidebarCollapsed: next });
   },
 
-  setSidebarWritingExpanded: (expanded) => {
+  setSidebarWritingExpanded: (expanded): void => {
     const data = { ...get(), sidebarWritingExpanded: expanded };
     saveLayout(data);
     set({ sidebarWritingExpanded: expanded });
   },
 
-  setSidebarSettingsExpanded: (expanded) => {
+  setSidebarSettingsExpanded: (expanded): void => {
     const data = { ...get(), sidebarSettingsExpanded: expanded };
     saveLayout(data);
     set({ sidebarSettingsExpanded: expanded });
   },
 
-  setSidebarExtensionExpanded: (expanded) => {
+  setSidebarExtensionExpanded: (expanded): void => {
     const data = { ...get(), sidebarExtensionExpanded: expanded };
     saveLayout(data);
     set({ sidebarExtensionExpanded: expanded });
   },
 
-  setSidebarCustomExpanded: (expanded) => {
+  setSidebarCustomExpanded: (expanded): void => {
     const data = { ...get(), sidebarCustomExpanded: expanded };
     saveLayout(data);
     set({ sidebarCustomExpanded: expanded });
   },
 
-  setSidebarToolExpanded: (expanded) => {
+  setSidebarToolExpanded: (expanded): void => {
     const data = { ...get(), sidebarToolExpanded: expanded };
     saveLayout(data);
     set({ sidebarToolExpanded: expanded });

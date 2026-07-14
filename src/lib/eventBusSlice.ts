@@ -19,6 +19,7 @@
 // 4. 监听器异常不会中断其他监听器的执行（try-catch 包裹）
 
 import { create } from "zustand";
+import { logger } from "./logger";
 
 // ===== 事件类型定义 =====
 
@@ -117,7 +118,7 @@ interface EventBusState {
 export const useEventBus = create<EventBusState>(( _set, get) => ({
   listeners: new Map(),
 
-  on: (type, listener) => {
+  on: (type, listener): (() => void) => {
     const { listeners } = get();
     // 获取或创建该事件类型的监听器集合
     let set_ = listeners.get(type);
@@ -128,7 +129,7 @@ export const useEventBus = create<EventBusState>(( _set, get) => ({
     set_.add(listener as EventListener<EventBusType>);
 
     // 返回取消订阅函数
-    return () => {
+    return (): void => {
       const currentSet = get().listeners.get(type);
       if (currentSet) {
         currentSet.delete(listener as EventListener<EventBusType>);
@@ -140,7 +141,7 @@ export const useEventBus = create<EventBusState>(( _set, get) => ({
     };
   },
 
-  off: (type, listener) => {
+  off: (type, listener): void => {
     const set_ = get().listeners.get(type);
     if (set_) {
       set_.delete(listener as EventListener<EventBusType>);
@@ -150,7 +151,7 @@ export const useEventBus = create<EventBusState>(( _set, get) => ({
     }
   },
 
-  emit: (type, payload) => {
+  emit: (type, payload): void => {
     const set_ = get().listeners.get(type);
     if (!set_) return;
     // 依次同步调用监听器，异常隔离
@@ -158,8 +159,8 @@ export const useEventBus = create<EventBusState>(( _set, get) => ({
       try {
         (listener as EventListener<typeof type>)(payload);
       } catch (err) {
-        // 监听器异常不中断其他监听器，记录到控制台便于调试
-        console.error(`[EventBus] 监听器执行异常 (${type}):`, err);
+        // 监听器异常不中断其他监听器，记录到日志便于调试
+        logger.error(`监听器执行异常 (${type}):`, err instanceof Error ? err : String(err), "EventBus");
       }
     }
   },

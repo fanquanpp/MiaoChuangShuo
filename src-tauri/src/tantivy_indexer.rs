@@ -17,18 +17,22 @@
 // - 索引损坏时（加载失败）自动重建，保证可用性
 // - Windows HVCI 限制：本模块不使用 Command::output()，全部基于 Tauri 事件推送进度
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
 use serde::{Deserialize, Serialize};
 use tantivy::collector::TopDocs;
 use tantivy::doc;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Field, Schema, INDEXED, STORED, STRING, TEXT, Value};
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::Index;
+use tantivy::{Index, IndexReader, IndexWriter};
 use tantivy_jieba::JiebaTokenizer;
 
-use crate::text_extractor::{detect_format, extract_plain_text};
+use crate::error::AppError;
+use crate::prosemirror_parser::extract_scene_id_from_doc;
+use crate::text_extractor::{detect_format, extract_plain_text, ContentFormat};
 
 /// 索引目录名（位于 .novelforge/ 下）
 const INDEX_DIR_NAME: &str = "index";
@@ -36,6 +40,80 @@ const INDEX_DIR_NAME: &str = "index";
 /// 单 Chunk 最大字符数（超出则按段落切分）
 /// 设计依据：单段落通常 200-800 字，1000 字上限可保证查询结果具备完整语义
 const CHUNK_MAX_CHARS: usize = 1000;
+
+/// 索引 Chunk（文本片段 + 场景 ID 元数据）
+///
+/// 由 split_into_chunks 返回，每个 Chunk 携带文本内容与所属场景 ID。
+/// scene_id 关联 ProseMirror sceneBreak 节点的 attrs.id，
+/// 用于 AI 按场景语义召回索引片段。
+#[derive(Debug, Clone)]
+pub struct Chunk {
+    /// Chunk 文本内容
+    pub text: String,
+    /// 场景 ID（关联 sceneBreak 节点 attrs.id，无场景分隔时为 None）
+    pub scene_id: Option<String>,
+}
+
+/// 索引写入器堆内存大小（50MB）
+/// 设计依据：兼顾内存占用与写入吞吐量，适用于桌面端单用户场景
+const INDEX_WRITER_HEAP_SIZE: usize = 50_000_000;
+
+/// 索引句柄（缓存单元）
+///
+/// 封装 Tantivy 索引的三大核心组件，实现索引的复用与并发安全访问：
+/// - index: Tantivy 索引实例，提供 schema 与目录访问
+/// - reader: 索引读取器，支持 OnCommit 自动重载，供查询使用
+/// - writer: 索引写入器，通过 Mutex 串行化写入，避免并发 panic
+///
+/// 设计说明：
+/// - Tantivy 限制每个索引同一时刻仅能存在一个 IndexWriter，缓存 writer 避免重复创建
+/// - reader 使用 OnCommit 策略，写入提交后自动感知变更，无需手动 reload
+/// - writer 通过 Mutex 保护，保证多线程环境下写入串行化
+pub struct IndexHandle {
+    /// Tantivy 索引实例
+    index: Index,
+    /// 索引读取器（支持自动重载）
+    reader: IndexReader,
+    /// 索引写入器（Mutex 保护，串行化写入）
+    writer: Mutex<IndexWriter>,
+}
+
+/// 索引缓存全局静态变量
+///
+/// 使用 OnceLock + Mutex 实现线程安全的索引句柄缓存：
+/// - 外层 OnceLock 保证全局单例初始化
+/// - 内层 Mutex 保护 HashMap 的读写访问
+/// - 键为索引目录路径（PathBuf），值为 Arc<IndexHandle>
+///
+/// 死锁规避策略：
+/// - 查询缓存时短暂持有 Mutex 锁，获取 Arc clone 后立即释放
+/// - 不在持有缓存锁的情况下获取 writer 锁，避免锁顺序倒置
+static INDEX_CACHE: OnceLock<Mutex<HashMap<PathBuf, Arc<IndexHandle>>>> = OnceLock::new();
+
+impl IndexHandle {
+    /// 获取索引写入器锁
+    ///
+    /// 输出: Result<MutexGuard<IndexWriter>, AppError> 写入器锁守卫
+    /// 流程: 锁定 Mutex，处理毒锁（poisoned）异常
+    /// 注意: 调用方应在尽量短的作用域内持有锁，避免阻塞其他写入操作
+    pub fn lock_writer(&self) -> Result<std::sync::MutexGuard<'_, IndexWriter>, AppError> {
+        self.writer
+            .lock()
+            .map_err(|e| AppError::index_error(format!("索引写入器锁获取失败: {}", e)))
+    }
+
+    /// 获取索引实例引用（供 QueryParser 等需要 &Index 的场景使用）
+    pub fn index(&self) -> &Index {
+        &self.index
+    }
+
+    /// 获取索引读取器引用（供搜索操作使用）
+    ///
+    /// reader 使用 OnCommit 策略，写入提交后自动感知变更
+    pub fn reader(&self) -> &IndexReader {
+        &self.reader
+    }
+}
 
 /// 索引构建进度事件 payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,22 +199,53 @@ pub fn get_index_dir(project_root: &Path) -> PathBuf {
     project_root.join(".novelforge").join(INDEX_DIR_NAME)
 }
 
-/// 打开或创建索引
+/// 打开或创建索引（带缓存）
+///
 /// 输入: project_root 项目根目录
-/// 输出: Result<(Index, IndexSchema), String> 索引实例与字段集合
+/// 输出: Result<(Arc<IndexHandle>, IndexSchema), AppError> 索引句柄与字段集合
 /// 流程:
-///   1. 构建索引目录路径
-///   2. 目录存在且可加载时打开已有索引
-///   3. 目录不存在或加载失败时创建新索引
-///   4. 注册 jieba 分词器到 TokenizerManager
-///   5. 索引损坏（加载失败）时删除并重建
-pub fn open_or_create_index(project_root: &Path) -> Result<(Index, IndexSchema), String> {
+///   1. 获取缓存实例，加锁检查缓存是否命中
+///   2. 缓存命中时返回 Arc clone（schema 由 build 重新生成，字段 ID 确定性一致）
+///   3. 缓存未命中时创建新索引：
+///      a. 构建索引目录路径，确保父目录存在
+///      b. 目录存在且可加载时打开已有索引
+///      c. 目录不存在或加载失败时创建新索引
+///      d. 注册 jieba 分词器到 TokenizerManager
+///      e. 创建 IndexReader（OnCommit 策略）与 IndexWriter
+///      f. 封装为 IndexHandle 并存入缓存
+///   4. 索引损坏（加载失败）时删除并重建
+///
+/// 并发安全说明：
+/// - "检查-创建-插入"在同一个缓存锁作用域内完成，避免并发重复创建 IndexWriter
+/// - Tantivy 限制每个索引同一时刻仅能存在一个 IndexWriter
+/// - 缓存锁仅在初始化阶段持有，后续 writer 操作使用 IndexHandle 内部的 Mutex
+pub fn open_or_create_index(
+    project_root: &Path,
+) -> Result<(Arc<IndexHandle>, IndexSchema), AppError> {
     let index_dir = get_index_dir(project_root);
+    let cache_key = index_dir.clone();
+
+    // 获取缓存实例（OnceLock 首次调用时初始化）
+    let cache = INDEX_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+
+    // 持有缓存锁完成"检查-创建-插入"原子操作，避免并发重复创建 IndexWriter
+    let mut cache_guard = cache
+        .lock()
+        .map_err(|e| AppError::index_error(format!("索引缓存锁获取失败: {}", e)))?;
+
+    // 优先从缓存读取
+    if let Some(handle) = cache_guard.get(&cache_key) {
+        // 缓存命中：返回 Arc clone，schema 由 build 重新生成（字段 ID 确定性一致）
+        let schema = IndexSchema::build().1;
+        return Ok((Arc::clone(handle), schema));
+    }
+
+    // 缓存未命中，创建新索引实例
     let (schema, schema_fields) = IndexSchema::build();
 
     // 确保父目录存在
     if let Some(parent) = index_dir.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建索引父目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| AppError::io_error(e, "创建索引父目录失败"))?;
     }
 
     // 尝试打开已有索引，失败则重建
@@ -150,45 +259,74 @@ pub fn open_or_create_index(project_root: &Path) -> Result<(Index, IndexSchema),
                 eprintln!("索引损坏，将重建: {}", e);
                 let _ = fs::remove_dir_all(&index_dir);
                 fs::create_dir_all(&index_dir)
-                    .map_err(|rebuild_e| format!("重建索引目录失败: {}", rebuild_e))?;
+                    .map_err(|rebuild_e| AppError::io_error(rebuild_e, "重建索引目录失败"))?;
                 Index::create_in_dir(&index_dir, schema.clone())
-                    .map_err(|create_e| format!("创建索引失败: {}", create_e))?
+                    .map_err(|create_e| AppError::index_error(format!("创建索引失败: {}", create_e)))?
             }
         }
     } else {
-        fs::create_dir_all(&index_dir).map_err(|e| format!("创建索引目录失败: {}", e))?;
+        fs::create_dir_all(&index_dir).map_err(|e| AppError::io_error(e, "创建索引目录失败"))?;
         Index::create_in_dir(&index_dir, schema.clone())
-            .map_err(|e| format!("创建索引失败: {}", e))?
+            .map_err(|e| AppError::index_error(format!("创建索引失败: {}", e)))?
     };
 
     // 注册 jieba 分词器（中文按词切分）
     let tokenizer_manager: &TokenizerManager = index.tokenizers();
     tokenizer_manager.register("jieba", JiebaTokenizer);
 
-    Ok((index, schema_fields))
+    // 创建 reader（OnCommit 策略，写入提交后自动感知变更）
+    let reader = index
+        .reader()
+        .map_err(|e| AppError::index_error(format!("创建索引 reader 失败: {}", e)))?;
+
+    // 创建 writer（50MB 堆内存），Tantivy 限制每个索引仅能有一个 writer
+    let writer = index
+        .writer(INDEX_WRITER_HEAP_SIZE)
+        .map_err(|e| AppError::index_error(format!("创建索引写入器失败: {}", e)))?;
+
+    // 封装为 IndexHandle 并存入缓存
+    let handle = Arc::new(IndexHandle {
+        index,
+        reader,
+        writer: Mutex::new(writer),
+    });
+
+    cache_guard.insert(cache_key, Arc::clone(&handle));
+
+    Ok((handle, schema_fields))
 }
 
 /// 将文本按段落切分为 Chunk
-/// 输入: text 原始文本
-/// 输出: Vec<String> Chunk 列表
+///
+/// 输入:
+///   text - 原始文本
+///   scene_id - 场景 ID（关联 sceneBreak 节点 attrs.id，传递给每个 Chunk 的元数据）
+/// 输出: Vec<Chunk> Chunk 列表（每个 Chunk 携带文本与 scene_id）
 /// 流程:
 ///   1. 按换行符分割段落
 ///   2. 累积段落至超过 CHUNK_MAX_CHARS 时切出 Chunk
 ///   3. 末尾不足一个 Chunk 的剩余文本作为最后一个 Chunk
 ///   4. 空文本返回单个空段落 Chunk（保证至少一篇文档）
-pub fn split_into_chunks(text: &str) -> Vec<String> {
+///   5. 每个 Chunk 的 scene_id 均设为传入的 scene_id
+pub fn split_into_chunks(text: &str, scene_id: Option<String>) -> Vec<Chunk> {
     if text.is_empty() {
-        return vec![String::new()];
+        return vec![Chunk {
+            text: String::new(),
+            scene_id,
+        }];
     }
 
-    let mut chunks: Vec<String> = Vec::new();
+    let mut chunks: Vec<Chunk> = Vec::new();
     let mut current = String::with_capacity(CHUNK_MAX_CHARS);
 
     // 按换行分割段落，兼容 Windows CRLF
     for line in text.split('\n').map(|l| l.trim_end_matches('\r')) {
         // 当前 Chunk 已满且非空，先推入结果
         if current.len() + line.len() + 1 > CHUNK_MAX_CHARS && !current.is_empty() {
-            chunks.push(std::mem::take(&mut current));
+            chunks.push(Chunk {
+                text: std::mem::take(&mut current),
+                scene_id: scene_id.clone(),
+            });
         }
         if !current.is_empty() {
             current.push('\n');
@@ -198,12 +336,18 @@ pub fn split_into_chunks(text: &str) -> Vec<String> {
 
     // 推入最后一个 Chunk
     if !current.is_empty() {
-        chunks.push(current);
+        chunks.push(Chunk {
+            text: current,
+            scene_id,
+        });
     }
 
     // 极端情况：全部为空行，返回单个空段落
     if chunks.is_empty() {
-        chunks.push(String::new());
+        chunks.push(Chunk {
+            text: String::new(),
+            scene_id: None,
+        });
     }
 
     chunks
@@ -217,12 +361,13 @@ pub fn split_into_chunks(text: &str) -> Vec<String> {
 ///   relative_path - 文件相对路径（相对于项目根，含"正文/"前缀）
 ///   updated_at - 文件最后修改时间（ISO 8601）
 ///   chunk_type - Chunk 类型（manuscript/setting/outline，AI-Ready 字段）
-/// 输出: Result<u32, String> 写入的 Chunk 数量
+/// 输出: Result<u32, AppError> 写入的 Chunk 数量
 /// 流程:
 ///   1. 读取文件内容
 ///   2. 调用 text_extractor 提取纯文本（自动识别 .txt/.html/.pmd 格式）
-///   3. 按段落切分为 Chunk
-///   4. 每个 Chunk 作为一篇文档写入索引，scene_id 暂为空（待阶段 3 语义节点填充）
+///   3. 对于 .pmd 文件，解析 ProseMirror JSON 提取 sceneBreak 节点的 scene_id
+///   4. 按段落切分为 Chunk（携带 scene_id 元数据）
+///   5. 每个 Chunk 作为一篇文档写入索引，scene_id 来自 Chunk 元数据
 pub fn index_file(
     index_writer: &mut tantivy::IndexWriter,
     schema: &IndexSchema,
@@ -230,9 +375,9 @@ pub fn index_file(
     relative_path: &str,
     updated_at: &str,
     chunk_type: &str,
-) -> Result<u32, String> {
+) -> Result<u32, AppError> {
     let content = fs::read_to_string(file_path)
-        .map_err(|e| format!("读取文件失败 {}: {}", file_path.display(), e))?;
+        .map_err(|e| AppError::io_error(e, format!("读取文件失败 {}", file_path.display())))?;
 
     // 检测格式并提取纯文本（detect_format 需要文件名作为格式判断辅助）
     let file_name_str = file_path
@@ -242,26 +387,38 @@ pub fn index_file(
     let format = detect_format(&file_name_str, &content);
     let plain_text = extract_plain_text(&content, format);
 
-    // 按 Chunk 切分并写入索引
-    let chunks = split_into_chunks(&plain_text);
+    // 对于 ProseMirror JSON (.pmd) 文件，提取 sceneBreak 节点的 scene_id
+    // 非 .pmd 文件 scene_id 为 None，写入索引时降级为空字符串
+    let scene_id: Option<String> = if format == ContentFormat::PmdJson {
+        // 解析 JSON 并提取首个 sceneBreak 节点的 attrs.id
+        // 解析失败时降级为 None，不阻塞索引流程
+        serde_json::from_str::<serde_json::Value>(&content)
+            .ok()
+            .and_then(|doc| extract_scene_id_from_doc(&doc))
+    } else {
+        None
+    };
+
+    // 按 Chunk 切分并写入索引（携带 scene_id 元数据）
+    let chunks = split_into_chunks(&plain_text, scene_id);
     let mut chunk_count: u32 = 0;
 
-    for (idx, chunk_text) in chunks.iter().enumerate() {
+    for (idx, chunk) in chunks.iter().enumerate() {
         let chunk_idx = idx as u64;
-        // scene_id 暂为空字符串，待阶段 3 sceneBreak 节点实现后由语义分析填充
-        let scene_id = "";
+        // 从 Chunk 元数据获取 scene_id，None 时降级为空字符串写入索引
+        let scene_id_str = chunk.scene_id.as_deref().unwrap_or("");
         let doc = doc!(
             schema.file_path => relative_path,
             schema.file_name => file_name_str.as_str(),
             schema.chunk_index => chunk_idx,
-            schema.text => chunk_text.as_str(),
+            schema.text => chunk.text.as_str(),
             schema.updated_at => updated_at,
-            schema.scene_id => scene_id,
+            schema.scene_id => scene_id_str,
             schema.chunk_type => chunk_type,
         );
         index_writer
             .add_document(doc)
-            .map_err(|e| format!("写入文档失败: {}", e))?;
+            .map_err(|e| AppError::index_error(format!("写入文档失败: {}", e)))?;
         chunk_count += 1;
     }
 
@@ -273,14 +430,14 @@ pub fn index_file(
 ///   index_writer - Tantivy 索引写入器
 ///   schema - 索引字段集合
 ///   relative_path - 文件相对路径
-/// 输出: Result<(), String> 删除结果
+/// 输出: Result<(), AppError> 删除结果
 /// 流程: 按 file_path 字段构造 Term 删除所有匹配文档
 ///       注意: delete_term 返回 u64（删除文档数）而非 Result，无需错误处理
 pub fn delete_file_from_index(
     index_writer: &mut tantivy::IndexWriter,
     schema: &IndexSchema,
     relative_path: &str,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let term = tantivy::Term::from_field_text(schema.file_path, relative_path);
     // Tantivy 0.22 API: delete_term 返回 u64（实际删除的文档数），不返回 Result
     let _deleted_count = index_writer.delete_term(term);
@@ -291,10 +448,10 @@ pub fn delete_file_from_index(
 /// 输入:
 ///   project_root - 项目根目录
 ///   emit - 进度事件发射器（可选，传 None 则不推送进度）
-/// 输出: Result<IndexStats, String> 索引统计信息
+/// 输出: Result<IndexStats, AppError> 索引统计信息
 /// 流程:
-///   1. 打开或创建索引
-///   2. 清空旧索引（delete_all_documents）
+///   1. 打开或创建索引（从缓存获取 IndexHandle）
+///   2. 锁定 writer，清空旧索引（delete_all_documents）
 ///   3. 扫描正文目录下所有 .txt/.html/.pmd 文件
 ///   4. 逐文件提取文本、切分 Chunk、写入索引
 ///   5. 每处理 10 个文件推送一次进度
@@ -302,26 +459,25 @@ pub fn delete_file_from_index(
 pub fn build_full_index<F>(
     project_root: &Path,
     emit: F,
-) -> Result<IndexStats, String>
+) -> Result<IndexStats, AppError>
 where
     F: Fn(IndexProgress),
 {
-    let (index, schema) = open_or_create_index(project_root)?;
-    let mut index_writer = index
-        .writer(50_000_000)
-        .map_err(|e| format!("创建索引写入器失败: {}", e))?;
+    let (handle, schema) = open_or_create_index(project_root)?;
+    // 锁定 writer（Mutex 保证写入串行化）
+    let mut index_writer = handle.lock_writer()?;
 
     // 清空旧索引
     index_writer
         .delete_all_documents()
-        .map_err(|e| format!("清空旧索引失败: {}", e))?;
+        .map_err(|e| AppError::index_error(format!("清空旧索引失败: {}", e)))?;
 
     let manuscript_dir = project_root.join("正文");
     if !manuscript_dir.exists() {
         // 空项目：直接提交并返回空统计
         index_writer
             .commit()
-            .map_err(|e| format!("提交索引失败: {}", e))?;
+            .map_err(|e| AppError::index_error(format!("提交索引失败: {}", e)))?;
         return Ok(IndexStats {
             doc_count: 0,
             file_count: 0,
@@ -409,7 +565,7 @@ where
 
     index_writer
         .commit()
-        .map_err(|e| format!("提交索引失败: {}", e))?;
+        .map_err(|e| AppError::index_error(format!("提交索引失败: {}", e)))?;
 
     // 计算索引大小
     let index_size = calculate_dir_size(&get_index_dir(project_root));
@@ -456,11 +612,11 @@ pub fn infer_chunk_type(rel_path: &str) -> &'static str {
 /// 输入:
 ///   dir - 当前扫描目录
 ///   project_root - 项目根目录（用于计算相对路径）
-/// 输出: Result<Vec<(PathBuf, String)>, String> 文件绝对路径与相对路径列表
+/// 输出: Result<Vec<(PathBuf, String)>, AppError> 文件绝对路径与相对路径列表
 fn collect_indexable_files(
     dir: &Path,
     project_root: &Path,
-) -> Result<Vec<(PathBuf, String)>, String> {
+) -> Result<Vec<(PathBuf, String)>, AppError> {
     let mut result = Vec::new();
     collect_files_recursive(dir, project_root, &mut result)?;
     Ok(result)
@@ -471,8 +627,8 @@ fn collect_files_recursive(
     dir: &Path,
     project_root: &Path,
     result: &mut Vec<(PathBuf, String)>,
-) -> Result<(), String> {
-    let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {}", e))?;
+) -> Result<(), AppError> {
+    let entries = fs::read_dir(dir).map_err(|e| AppError::io_error(e, "读取目录失败"))?;
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -517,12 +673,12 @@ fn calculate_dir_size(dir: &Path) -> u64 {
 
 /// 获取索引统计信息（不重建索引）
 /// 输入: project_root 项目根目录
-/// 输出: Result<IndexStats, String> 索引统计
+/// 输出: Result<IndexStats, AppError> 索引统计
 /// 流程:
 ///   1. 打开索引（失败则返回空统计）
-///   2. 读取索引 reader 统计文档数
+///   2. 从缓存获取 IndexHandle，使用 reader 统计文档数
 ///   3. 计算索引目录大小
-pub fn get_index_stats(project_root: &Path) -> Result<IndexStats, String> {
+pub fn get_index_stats(project_root: &Path) -> Result<IndexStats, AppError> {
     let index_dir = get_index_dir(project_root);
     if !index_dir.exists() {
         return Ok(IndexStats {
@@ -533,11 +689,9 @@ pub fn get_index_stats(project_root: &Path) -> Result<IndexStats, String> {
         });
     }
 
-    let (index, _schema) = open_or_create_index(project_root)?;
-    let reader = index
-        .reader()
-        .map_err(|e| format!("创建索引 reader 失败: {}", e))?;
-    let searcher = reader.searcher();
+    let (handle, _schema) = open_or_create_index(project_root)?;
+    // 使用缓存的 reader（OnCommit 策略自动感知最新提交）
+    let searcher = handle.reader().searcher();
     let doc_count = searcher.num_docs();
 
     let index_size = calculate_dir_size(&index_dir);
@@ -565,26 +719,28 @@ pub fn get_index_stats(project_root: &Path) -> Result<IndexStats, String> {
 ///   project_root - 项目根目录
 ///   query_str - 查询字符串
 ///   limit - 返回结果上限
-/// 输出: Result<Vec<SearchResult>, String> 查询结果列表
+/// 输出: Result<Vec<SearchResult>, AppError> 查询结果列表
+/// 流程:
+///   1. 从缓存获取 IndexHandle（避免重复打开索引）
+///   2. 使用缓存的 reader 进行搜索（OnCommit 策略自动感知最新提交）
+///   3. 解析查询并执行搜索，返回匹配的 Chunk 列表
 pub fn search(
     project_root: &Path,
     query_str: &str,
     limit: usize,
-) -> Result<Vec<SearchResult>, String> {
-    let (index, schema) = open_or_create_index(project_root)?;
-    let reader = index
-        .reader()
-        .map_err(|e| format!("创建索引 reader 失败: {}", e))?;
-    let searcher = reader.searcher();
+) -> Result<Vec<SearchResult>, AppError> {
+    let (handle, schema) = open_or_create_index(project_root)?;
+    // 使用缓存的 reader（OnCommit 策略自动感知最新提交）
+    let searcher = handle.reader().searcher();
 
-    let query_parser = QueryParser::for_index(&index, vec![schema.text]);
+    let query_parser = QueryParser::for_index(handle.index(), vec![schema.text]);
     let query = query_parser
         .parse_query(query_str)
-        .map_err(|e| format!("解析查询失败: {}", e))?;
+        .map_err(|e| AppError::index_error(format!("解析查询失败: {}", e)))?;
 
     let top_docs = searcher
         .search(&query, &TopDocs::with_limit(limit))
-        .map_err(|e| format!("执行查询失败: {}", e))?;
+        .map_err(|e| AppError::index_error(format!("执行查询失败: {}", e)))?;
 
     let mut results = Vec::new();
     for (_score, doc_address) in top_docs {
@@ -592,7 +748,7 @@ pub fn search(
         // （Document 是 trait，TantivyDocument 是其默认实现的具体类型）
         let doc: tantivy::TantivyDocument = searcher
             .doc(doc_address)
-            .map_err(|e| format!("读取文档失败: {}", e))?;
+            .map_err(|e| AppError::index_error(format!("读取文档失败: {}", e)))?;
         let file_path = doc
             .get_first(schema.file_path)
             .and_then(|v| v.as_str())
@@ -653,16 +809,17 @@ mod tests {
 
     #[test]
     fn test_split_into_chunks_empty() {
-        let chunks = split_into_chunks("");
+        let chunks = split_into_chunks("", None);
         assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0], "");
+        assert_eq!(chunks[0].text, "");
+        assert!(chunks[0].scene_id.is_none());
     }
 
     #[test]
     fn test_split_into_chunks_short() {
-        let chunks = split_into_chunks("短文本");
+        let chunks = split_into_chunks("短文本", None);
         assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0], "短文本");
+        assert_eq!(chunks[0].text, "短文本");
     }
 
     #[test]
@@ -670,17 +827,40 @@ mod tests {
         // 构造超过 CHUNK_MAX_CHARS 的文本
         let long_line = "测试".repeat(CHUNK_MAX_CHARS);
         let text = format!("{}\n第二段", long_line);
-        let chunks = split_into_chunks(&text);
+        let chunks = split_into_chunks(&text, None);
         assert!(chunks.len() >= 2);
     }
 
     #[test]
     fn test_split_into_chunks_paragraphs() {
         let text = "第一段\n\n第二段\n\n第三段";
-        let chunks = split_into_chunks(text);
+        let chunks = split_into_chunks(text, None);
         assert!(!chunks.is_empty());
         // 三段加两个空行，应至少切出一个 Chunk
-        assert!(chunks.iter().any(|c| c.contains("第一段")));
+        assert!(chunks.iter().any(|c| c.text.contains("第一段")));
+    }
+
+    /// 测试: scene_id 元数据正确传递到每个 Chunk
+    #[test]
+    fn test_split_into_chunks_with_scene_id() {
+        let text = "第一段\n\n第二段";
+        let scene_id = Some("scene_test_001".to_string());
+        let chunks = split_into_chunks(text, scene_id.clone());
+        assert!(!chunks.is_empty());
+        // 每个 Chunk 的 scene_id 均应与传入值一致
+        for chunk in &chunks {
+            assert_eq!(chunk.scene_id, scene_id);
+        }
+    }
+
+    /// 测试: 空文本时 scene_id 仍正确附加
+    #[test]
+    fn test_split_into_chunks_empty_with_scene_id() {
+        let scene_id = Some("scene_empty".to_string());
+        let chunks = split_into_chunks("", scene_id.clone());
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].text, "");
+        assert_eq!(chunks[0].scene_id, scene_id);
     }
 
     #[test]

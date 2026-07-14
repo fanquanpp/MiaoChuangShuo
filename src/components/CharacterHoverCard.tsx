@@ -24,6 +24,7 @@ import { useEffect, useState, useRef } from "react";
 import { Loader2, UserCircle, AlertCircle, FileText, Sparkles, MessageSquare } from "lucide-react";
 import { readCharacterSummary, type CharacterSummary } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import type { CharacterAiActionType } from "../hooks/useEditorAiCommands";
 
 interface CharacterHoverCardProps {
   /** 是否显示 */
@@ -47,7 +48,7 @@ interface CharacterHoverCardProps {
    *   characterName - 角色显示名
    * 流程: 由 NovelEditor 接收并组装指令，打开 AiAssistantPanel 自动发送
    */
-  onAiAction?: (action: string, characterId: string | undefined, characterName: string) => void;
+  onAiAction?: (action: CharacterAiActionType, characterId: string | undefined, characterName: string) => void;
 }
 
 /**

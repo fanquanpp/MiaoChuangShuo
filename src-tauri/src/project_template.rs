@@ -62,18 +62,24 @@ pub fn render_template(content: &str, vars: &TemplateVars) -> String {
 /// 项目元数据结构
 /// 存储在项目根目录的 .novelforge/project.json 中
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectMeta {
     /// 项目名称
     pub name: String,
     /// 项目文体类型
-    #[serde(rename = "type")]
+    /// 注：通过 alias = "type" 兼容旧 meta.json 中的 "type" 字段名
+    #[serde(alias = "type")]
     pub project_type: String,
     /// 题材（可选，如玄幻/科幻/言情等）
-    #[serde(rename = "genre", default, skip_serializing_if = "String::is_empty")]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub genre: String,
     /// 创建时间(ISO 8601)
+    /// 注：通过 alias 兼容旧 meta.json 中的 snake_case 字段名
+    #[serde(alias = "created_at")]
     pub created_at: String,
     /// 最后修改时间(ISO 8601)
+    /// 注：通过 alias 兼容旧 meta.json 中的 snake_case 字段名
+    #[serde(alias = "updated_at")]
     pub updated_at: String,
     /// 项目版本
     pub version: String,
@@ -82,6 +88,8 @@ pub struct ProjectMeta {
     /// 项目描述
     pub description: String,
     /// 总字数
+    /// 注：通过 alias 兼容旧 meta.json 中的 snake_case 字段名
+    #[serde(alias = "word_count")]
     pub word_count: u64,
 }
 
@@ -200,5 +208,112 @@ pub fn create_project_meta_v2(
         author: author.to_string(),
         description: description.to_string(),
         word_count: 0,
+    }
+}
+
+// ===== 单元测试 =====
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 测试旧 meta.json（含 "type" 字段与 snake_case 字段名）能正确反序列化为 ProjectMeta
+    ///
+    /// 验证 BREAKING 变更的向后兼容性：
+    /// - 旧 meta.json 使用 "type" 字段名，新版本通过 #[serde(alias = "type")] 兼容读取
+    /// - 旧 meta.json 使用 snake_case 字段名（created_at/updated_at/word_count），
+    ///   新版本通过 #[serde(alias = "...")] 兼容读取
+    #[test]
+    fn test_deserialize_old_meta_with_type_field() {
+        let old_json = r#"{
+            "name": "测试项目",
+            "type": "长篇小说",
+            "genre": "奇幻",
+            "author": "测试作者",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "version": "1.0.0",
+            "description": "测试描述",
+            "word_count": 0
+        }"#;
+
+        let meta: ProjectMeta = serde_json::from_str(old_json)
+            .expect("旧 meta.json 应能反序列化");
+        assert_eq!(meta.name, "测试项目");
+        assert_eq!(meta.project_type, "长篇小说");
+        assert_eq!(meta.genre, "奇幻");
+        assert_eq!(meta.author, "测试作者");
+        assert_eq!(meta.created_at, "2026-01-01T00:00:00Z");
+        assert_eq!(meta.updated_at, "2026-01-01T00:00:00Z");
+        assert_eq!(meta.version, "1.0.0");
+        assert_eq!(meta.description, "测试描述");
+        assert_eq!(meta.word_count, 0);
+    }
+
+    /// 测试新 meta.json 序列化为 "projectType" 字段名（camelCase）
+    ///
+    /// 验证 BREAKING 变更的正向行为：
+    /// - 新写入的 meta.json 使用 "projectType" 字段名（camelCase）
+    /// - 不再输出旧版的 "type" 字段名
+    #[test]
+    fn test_serialize_new_meta_with_project_type_field() {
+        let meta = ProjectMeta {
+            name: "新项目".to_string(),
+            project_type: "长篇小说".to_string(),
+            genre: "科幻".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+            version: "1.0.0".to_string(),
+            author: "新作者".to_string(),
+            description: "新描述".to_string(),
+            word_count: 0,
+        };
+
+        let json = serde_json::to_string(&meta).expect("序列化应成功");
+        assert!(
+            json.contains("\"projectType\""),
+            "序列化结果应包含 projectType 字段: {}",
+            json
+        );
+        assert!(
+            !json.contains("\"type\""),
+            "序列化结果不应包含 type 字段: {}",
+            json
+        );
+        assert!(
+            json.contains("\"createdAt\""),
+            "序列化结果应包含 createdAt 字段: {}",
+            json
+        );
+        assert!(
+            json.contains("\"wordCount\""),
+            "序列化结果应包含 wordCount 字段: {}",
+            json
+        );
+    }
+
+    /// 测试新格式 meta.json（camelCase 字段名）能正确反序列化
+    ///
+    /// 验证新版本读写自身产生的 meta.json 不受影响
+    #[test]
+    fn test_deserialize_new_meta_with_camel_case() {
+        let new_json = r#"{
+            "name": "新格式项目",
+            "projectType": "散文",
+            "genre": "随笔",
+            "author": "新作者",
+            "createdAt": "2026-02-01T00:00:00Z",
+            "updatedAt": "2026-02-01T00:00:00Z",
+            "version": "2.0.0",
+            "description": "新格式描述",
+            "wordCount": 100
+        }"#;
+
+        let meta: ProjectMeta = serde_json::from_str(new_json)
+            .expect("新格式 meta.json 应能反序列化");
+        assert_eq!(meta.name, "新格式项目");
+        assert_eq!(meta.project_type, "散文");
+        assert_eq!(meta.genre, "随笔");
+        assert_eq!(meta.word_count, 100);
     }
 }

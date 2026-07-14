@@ -11,7 +11,8 @@
 
 import type { StateCreator } from "zustand";
 import type { ProjectInfo, FileNode } from "../api";
-import type { SidebarCategory } from "../store";
+// SidebarCategory 从本目录 types.ts 导入，避免回引 store.ts 形成循环依赖。
+import type { SidebarCategory } from "./types";
 
 export type ViewMode = "launcher" | "workspace";
 
@@ -56,15 +57,15 @@ export const createViewSlice: StateCreator<CrossSliceState, [], [], ViewSlice> =
   viewMode: "launcher",
   editorDirty: false,
 
-  setViewMode: (mode) => set({ viewMode: mode }),
+  setViewMode: (mode): void => set({ viewMode: mode }),
 
-  setEditorDirty: (dirty) => set({ editorDirty: dirty }),
+  setEditorDirty: (dirty): void => set({ editorDirty: dirty }),
 
-  registerEditorSave: (fn) => {
+  registerEditorSave: (fn): void => {
     editorSaveFnRef = fn;
   },
 
-  openProject: (project) =>
+  openProject: (project): void =>
     set({
       currentProject: project,
       viewMode: "workspace",
@@ -73,7 +74,7 @@ export const createViewSlice: StateCreator<CrossSliceState, [], [], ViewSlice> =
       projectTree: [],
     }),
 
-  closeProject: () =>
+  closeProject: (): void =>
     set({
       currentProject: null,
       viewMode: "launcher",

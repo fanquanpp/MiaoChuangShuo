@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use chrono::{Duration, Local};
 
-use crate::fs_commands::validate_path_in_project;
+use crate::commands::validate_path_in_project;
 
 /// 单文件快照数量上限（含 manual/pre-restore，超过后优先淘汰 auto）
 const MAX_SNAPSHOTS: usize = 50;
@@ -186,7 +186,7 @@ pub fn create_snapshot(
     trigger: String,
 ) -> Result<SnapshotMeta, String> {
     // 校验源文件路径在项目内（仅校验路径合法性，不要求文件存在）
-    let validated = validate_path_in_project(&file_path, &project_path)?;
+    let validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
         .map_err(|e| format!("无法解析项目路径: {}", e))?;
@@ -234,7 +234,7 @@ pub fn list_snapshots(
     file_path: String,
     project_path: String,
 ) -> Result<Vec<SnapshotInfo>, String> {
-    let validated = validate_path_in_project(&file_path, &project_path)?;
+    let validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
         .map_err(|e| format!("无法解析项目路径: {}", e))?;
@@ -272,7 +272,7 @@ pub fn read_snapshot(
     project_path: String,
 ) -> Result<String, String> {
     // 快照路径必须在项目内（.novelforge/snapshots/ 下）
-    let validated = validate_path_in_project(&snapshot_path, &project_path)?;
+    let validated = validate_path_in_project(&snapshot_path, &project_path).map_err(|e| e.to_string())?;
     fs::read_to_string(&validated).map_err(|e| format!("读取快照失败: {}", e))
 }
 
@@ -294,8 +294,8 @@ pub fn restore_snapshot(
     file_path: String,
     project_path: String,
 ) -> Result<(), String> {
-    let snapshot_validated = validate_path_in_project(&snapshot_path, &project_path)?;
-    let file_validated = validate_path_in_project(&file_path, &project_path)?;
+    let snapshot_validated = validate_path_in_project(&snapshot_path, &project_path).map_err(|e| e.to_string())?;
+    let file_validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
         .map_err(|e| format!("无法解析项目路径: {}", e))?;
@@ -339,8 +339,8 @@ pub fn delete_snapshot(
     file_path: String,
     project_path: String,
 ) -> Result<(), String> {
-    let snapshot_validated = validate_path_in_project(&snapshot_path, &project_path)?;
-    let file_validated = validate_path_in_project(&file_path, &project_path)?;
+    let snapshot_validated = validate_path_in_project(&snapshot_path, &project_path).map_err(|e| e.to_string())?;
+    let file_validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
         .map_err(|e| format!("无法解析项目路径: {}", e))?;
@@ -371,7 +371,7 @@ pub fn clear_snapshots(
     file_path: String,
     project_path: String,
 ) -> Result<u64, String> {
-    let file_validated = validate_path_in_project(&file_path, &project_path)?;
+    let file_validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
         .map_err(|e| format!("无法解析项目路径: {}", e))?;

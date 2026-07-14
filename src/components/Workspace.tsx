@@ -32,6 +32,7 @@ import { getCategoryConfig } from "../lib/categoryRegistry";
 import { useSettingsStore, formatChapterHeading, getNextChapterNum } from "../lib/settingsStore";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import { logger } from "../lib/logger";
 import { isTemplateSupported, getTemplateCategory } from "../lib/templateSchema";
 import { findDirByName } from "../lib/fileTreeUtils";
 import { isNovelType } from "../lib/projectType";
@@ -127,7 +128,7 @@ export default function Workspace() {
         setProjectTree(tree);
       })
       .catch((e) => {
-        console.error("加载目录树失败:", e);
+        logger.error("加载目录树失败:", e instanceof Error ? e : String(e));
         if (cancelled) return;
         showToast("error", t("cardmanager.loadFailedShort"));
       })
@@ -142,7 +143,7 @@ export default function Workspace() {
   // 设计依据：
   //   - 索引不存在（doc_count=0 且 last_built_at 为空）时静默触发全量构建
   //   - 构建过程通过 index-progress 事件推送进度，不在主界面显示（不干扰用户）
-  //   - 构建失败仅 console.error，不弹 toast（避免首次打开项目时干扰）
+  //   - 构建失败仅 logger.error，不弹 toast（避免首次打开项目时干扰）
   //   - 已有索引的项目不触发重建，避免重复开销
   useEffect(() => {
     if (!currentProject) return;
@@ -155,12 +156,12 @@ export default function Workspace() {
         if (stats.doc_count === 0 && !stats.last_built_at) {
           // 静默构建，不等待完成（后台执行）
           buildProjectIndex(currentProject.path).catch((err) => {
-            console.error("后台构建索引失败:", err);
+            logger.error("后台构建索引失败:", err instanceof Error ? err : String(err));
           });
         }
       } catch (err) {
         // 索引检查失败不影响项目打开，仅记录日志
-        console.error("检查索引状态失败:", err);
+        logger.error("检查索引状态失败:", err instanceof Error ? err : String(err));
       }
     };
     checkAndBuildIndex();
@@ -248,7 +249,7 @@ export default function Workspace() {
       const title = fileName.replace(/\.txt$/i, "").replace(/^\d+[._\-\s]*/, "").trim();
       switch (category) {
         case "manuscript": {
-          const projectType = currentProject?.meta?.type;
+          const projectType = currentProject?.meta?.projectType;
           // 通过统一兼容层判定小说族文体（novel/script/essay 3 标准文体）
           // 非小说类型不生成章节号
           const novelType = isNovelType(projectType);
@@ -283,7 +284,7 @@ export default function Workspace() {
   const handleCreateFile = useCallback(async (fileName: string) => {
     if (!currentProject) throw new Error(t("error.noCurrentProject"));
     const dirName = getCategoryDir(activeCategory);
-    const projectType = currentProject.meta.type;
+    const projectType = currentProject.meta.projectType;
     // 通过统一兼容层判定小说族文体（与 getFileTemplate 保持一致）
     const novelType = isNovelType(projectType);
 

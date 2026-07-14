@@ -617,6 +617,19 @@ npm run tauri build
 
 构建产物位于 `src-tauri/target/release/bundle/` 目录下。
 
+### 9.3 桌面端发布流程
+
+桌面端发布通过 GitHub Actions 自动化，流程如下：
+
+1. 维护者更新版本号（同步 7 处位置）
+2. 创建并推送 tag：`git tag v26.8.0 && git push origin v26.8.0`
+3. GitHub Actions 自动触发 `release-desktop.yml` 工作流
+4. 工作流在 `windows-latest` runner 上执行 `npm ci` → `npm run build` → `npm run tauri build`
+5. 构建产物自动上传至 GitHub Release：
+   - `MiaoChuangShuo_<version>_x64.msi`（MSI 安装包）
+   - `MiaoChuangShuo_<version>_x64-setup.exe`（NSIS 安装包）
+6. Release 自动生成 changelog 并发布
+
 ---
 
 ## 十、项目事项
@@ -627,7 +640,30 @@ npm run tauri build
 
 ### 10.2 图标系统
 
-应用图标通过 `npx tauri icon` 从源图 (`icon_source.png`) 一次性生成全平台图标 (Windows .ico / macOS .icns / Linux .png / iOS / Android), 保证视觉一致性。
+应用图标通过 `npx tauri icon` 从源图 (`src-tauri/icons/icon_source.svg` 或 `icon_source.png`) 一次性生成全平台图标 (Windows .ico / macOS .icns / Linux .png / iOS / Android), 保证视觉一致性。
+
+**图标生成流程（唯一官方流程）**:
+
+```bash
+# 1. 准备源图（推荐 1024x1024 PNG 或 SVG）
+#    源图位置: src-tauri/icons/icon_source.svg
+
+# 2. 执行 Tauri 官方图标生成命令
+npx tauri icon src-tauri/icons/icon_source.svg
+
+# 3. 命令将自动生成以下文件:
+#    - src-tauri/icons/icon.png            (512x512 主图标)
+#    - src-tauri/icons/128x128.png         (128x128)
+#    - src-tauri/icons/128x128@2x.png      (256x256)
+#    - src-tauri/icons/32x32.png           (32x32)
+#    - src-tauri/icons/icon.ico            (Windows 多尺寸 ICO)
+#    - src-tauri/icons/icon.icns           (macOS ICNS)
+#    以及 iOS / Android 各尺寸图标
+```
+
+**历史脚本归档说明**:
+
+项目早期使用的 Python 图标生成脚本 `generate_icon.py` (基于 Pillow 绘制渐变背景 + 白色 M 字母) 已归档至 `scripts/archive/generate_icon.py`, 不再作为正式图标生成流程, 仅保留作为设计参考。所有图标更新均通过 `npx tauri icon` 流程完成, 避免双流程导致图标尺寸/格式不一致。
 
 ### 10.3 国际化
 

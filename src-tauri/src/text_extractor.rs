@@ -16,7 +16,7 @@
 // 设计说明：
 // - HTML 标签剥离采用手写状态机，避免引入 scraper/html5ever 重依赖
 // - .pmd JSON 解析复用 serde_json，递归遍历 ProseMirror doc 节点树
-// - JSON front matter 复用 codex_commands::parse_codex_file 的解析逻辑（剥离 --- 包裹）
+// - JSON front matter 复用 codex::parse_codex_file 的解析逻辑（剥离 --- 包裹）
 
 /// 内容格式枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -101,6 +101,32 @@ interface CodexState {
    */
   search: (query: string) => CodexCard[];
 
+  /**
+   * 获取所有卡片数组（保持 Map 插入顺序，不排序）
+   * 输出: CodexCard[] 所有卡片数组
+   * 设计说明: 与 search("") 的区别在于不进行排序，适用于需要保持原始顺序的 UI 列表渲染
+   */
+  getAll: () => CodexCard[];
+
+  /**
+   * 按搜索关键词过滤卡片（不排序，匹配 name/aliases/tags/summary）
+   * 输入: query 搜索关键词（不区分大小写，空字符串返回全部）
+   * 输出: CodexCard[] 匹配的卡片数组（保持 Map 插入顺序）
+   * 设计说明: 与 search(query) 的区别在于不进行排序，保持组件原行为，避免改变 UI 显示顺序
+   */
+  getFiltered: (query: string) => CodexCard[];
+
+  /**
+   * 按类型分组卡片（可选搜索过滤）
+   * 输入: query 可选搜索关键词（空字符串或不传表示不过滤）
+   * 输出: Partial<Record<CodexEntityType, CodexCard[]>> 按类型分组的卡片映射
+   * 流程:
+   *   1. 若提供 query，先调用 getFiltered 过滤
+   *   2. 遍历过滤后卡片，按 cardType 分组
+   * 设计说明: 用于 CodexPanel 等需要按类型分组渲染的 UI 场景
+   */
+  getGrouped: (query?: string) => Partial<Record<CodexEntityType, CodexCard[]>>;
+
   // === CRUD 操作方法 ===
   /**
    * 加载项目下所有 Codex 卡片
@@ -220,7 +246,7 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
   pendingEditMode: false,
 
   // === 派生查询 ===
-  getByType: (type) => {
+  getByType: (type): CodexCard[] => {
     const cards = get().cards;
     const result: CodexCard[] = [];
     for (const card of cards.values()) {
@@ -230,7 +256,7 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     return result;
   },
 
-  getByName: (name) => {
+  getByName: (name): CodexCard | undefined => {
     const cards = get().cards;
     // 优先匹配主名称
     for (const card of cards.values()) {
@@ -243,11 +269,11 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     return undefined;
   },
 
-  getById: (id) => {
+  getById: (id): CodexCard | undefined => {
     return get().cards.get(id);
   },
 
-  search: (query) => {
+  search: (query): CodexCard[] => {
     const cards = get().cards;
     const q = query.trim().toLowerCase();
     if (!q) {
@@ -282,8 +308,57 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     return result;
   },
 
+  getAll: (): CodexCard[] => {
+    // 保持 Map 插入顺序，不排序（与 search("") 的排序行为区分）
+    return Array.from(get().cards.values());
+  },
+
+  getFiltered: (query): CodexCard[] => {
+    const cards = get().cards;
+    const q = query.trim().toLowerCase();
+    // 空查询返回全部卡片（保持插入顺序，不排序）
+    if (!q) {
+      return Array.from(cards.values());
+    }
+    const result: CodexCard[] = [];
+    for (const card of cards.values()) {
+      // 匹配主名称（不区分大小写）
+      if (card.name.toLowerCase().includes(q)) {
+        result.push(card);
+        continue;
+      }
+      // 匹配别名
+      if (card.aliases.some((a) => a.toLowerCase().includes(q))) {
+        result.push(card);
+        continue;
+      }
+      // 匹配标签
+      if (card.tags.some((tag) => tag.toLowerCase().includes(q))) {
+        result.push(card);
+        continue;
+      }
+      // 匹配简介
+      if (card.summary.toLowerCase().includes(q)) {
+        result.push(card);
+      }
+    }
+    // 不排序，保持 Map 插入顺序，与 CodexPanel 原 filteredEntities 行为一致
+    return result;
+  },
+
+  getGrouped: (query = ""): Partial<Record<CodexEntityType, CodexCard[]>> => {
+    // 先按 query 过滤，再按 cardType 分组
+    const filtered = get().getFiltered(query);
+    const groups: Partial<Record<CodexEntityType, CodexCard[]>> = {};
+    for (const card of filtered) {
+      if (!groups[card.cardType]) groups[card.cardType] = [];
+      groups[card.cardType]!.push(card);
+    }
+    return groups;
+  },
+
   // === CRUD 操作 ===
-  loadAll: async (projectPath) => {
+  loadAll: async (projectPath): Promise<void> => {
     try {
       const entities = await listCodexEntities(projectPath);
       const newCards = new Map<string, CodexCard>();
@@ -298,7 +373,7 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     }
   },
 
-  addCard: (card) => {
+  addCard: (card): void => {
     set((state) => {
       const newCards = new Map(state.cards);
       newCards.set(card.id, card);
@@ -306,7 +381,7 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     });
   },
 
-  updateCard: (id, patch) => {
+  updateCard: (id, patch): void => {
     set((state) => {
       const existing = state.cards.get(id);
       if (!existing) return state;
@@ -336,7 +411,7 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     });
   },
 
-  persistCardUpdate: async (id, patch, projectPath, content = "") => {
+  persistCardUpdate: async (id, patch, projectPath, content = ""): Promise<void> => {
     const existing = get().cards.get(id);
     if (!existing) {
       throw new Error(`卡片不存在: ${id}`);
@@ -362,15 +437,15 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
       name: updatedMeta.name,
       aliases: updatedMeta.aliases,
       cardType: (
-        ["character", "worldview", "glossary", "material"].includes(updatedMeta.entity_type)
-          ? updatedMeta.entity_type
+        ["character", "worldview", "glossary", "material"].includes(updatedMeta.entityType)
+          ? updatedMeta.entityType
           : "material"
       ) as CodexEntityType,
       summary: updatedMeta.summary ?? "",
       tags: updatedMeta.tags ?? [],
       avatar: updatedMeta.avatar ?? null,
-      sortOrder: updatedMeta.sort_order ?? 0,
-      updatedAt: updatedMeta.updated_at || updatedMeta.created,
+      sortOrder: updatedMeta.sortOrder ?? 0,
+      updatedAt: updatedMeta.updatedAt || updatedMeta.created,
       sourceFile: newSourceFile,
       // 若 content 非空，更新正文
       content: content || existing.content,
@@ -397,19 +472,19 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     });
   },
 
-  consumeRenameQueue: () => {
+  consumeRenameQueue: (): void => {
     set({ renameQueue: [] });
   },
 
-  setPendingSelectCardId: (id) => {
+  setPendingSelectCardId: (id): void => {
     set({ pendingSelectCardId: id });
   },
 
-  setPendingEditMode: (mode) => {
+  setPendingEditMode: (mode): void => {
     set({ pendingEditMode: mode });
   },
 
-  deleteCard: (id) => {
+  deleteCard: (id): void => {
     set((state) => {
       if (!state.cards.has(id)) return state;
       const newCards = new Map(state.cards);
@@ -418,7 +493,7 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     });
   },
 
-  reset: () => {
+  reset: (): void => {
     set({ cards: new Map(), loaded: false, error: null, renameQueue: [], pendingSelectCardId: null, pendingEditMode: false });
   },
 }));

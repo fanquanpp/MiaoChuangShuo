@@ -23,7 +23,8 @@ export const RELEASES_PAGE_URL =
   "https://github.com/fanquanpp/MiaoChuangShuo/releases";
 
 // 本地回退版本号（Tauri API 不可用时使用，需与 package.json/tauri.conf.json 保持同步）
-const FALLBACK_VERSION = "26.7.28";
+// 导出供前端组件作为默认版本号使用
+export const FALLBACK_VERSION = "26.7.29";
 
 /**
  * 远程 Release 信息结构

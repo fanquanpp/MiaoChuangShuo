@@ -127,7 +127,7 @@ export default function Sidebar({ onCreateFile, onOpenSettings, onOpenAppearance
   // 根据项目类型获取专属目录列表
   const typeSpecificDirs = useMemo(() => {
     if (!currentProject) return [];
-    return getTypeSpecificDirs(currentProject.meta.type);
+    return getTypeSpecificDirs(currentProject.meta.projectType);
   }, [currentProject]);
 
   // 读取项目目录树，找出不在标准分类和类型专属目录中的额外目录

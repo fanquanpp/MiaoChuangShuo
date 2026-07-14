@@ -1,0 +1,180 @@
+# 标准世界观模板
+# 通用世界观模板，包含地理、历史、社会、文化等维度
+
+id = "world-standard"
+name = "标准世界观"
+category = "worldview"
+description = "通用世界观模板，包含地理、历史、社会、文化等维度"
+icon = "Globe"
+default_enabled_modules = ["geography", "history"]
+
+# ===== 基础字段 =====
+[[base_fields]]
+key = "world_name"
+label = "世界名称"
+field_type = "text"
+required = true
+placeholder = "如：九州/中土/艾泽拉斯"
+
+[[base_fields]]
+key = "overview"
+label = "世界概述"
+field_type = "richtext"
+placeholder = "一句话概括这个世界"
+
+# ===== 可选模块 =====
+[[optional_modules]]
+id = "geography"
+name = "地理环境"
+description = "世界的地理环境与自然资源"
+icon = "Map"
+
+[[optional_modules.fields]]
+key = "terrain"
+label = "地形地貌"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "climate"
+label = "气候特征"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "landmarks"
+label = "重要地标"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "transport"
+label = "交通与通道"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "resources"
+label = "资源分布"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "history"
+name = "历史背景"
+description = "世界的历史发展脉络"
+icon = "Clock"
+
+[[optional_modules.fields]]
+key = "era_system"
+label = "纪年体系"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "major_events"
+label = "重大历史事件"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "dynasties"
+label = "朝代/时期划分"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "society"
+name = "社会结构"
+description = "世界的社会组织与权力结构"
+icon = "Building"
+
+[[optional_modules.fields]]
+key = "social_hierarchy"
+label = "社会阶层"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "political_system"
+label = "政治制度"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "economic_system"
+label = "经济体系"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "legal_system"
+label = "法律与禁忌"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "culture"
+name = "文化体系"
+description = "世界的文化传统与精神生活"
+icon = "Palette"
+
+[[optional_modules.fields]]
+key = "religion"
+label = "宗教信仰"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "language"
+label = "语言文字"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "customs"
+label = "风俗习惯"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "art"
+label = "艺术与美学"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "power_system"
+name = "力量体系"
+description = "世界的魔法/修炼/科技力量体系"
+icon = "Zap"
+
+[[optional_modules.fields]]
+key = "power_source"
+label = "力量来源"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "power_levels"
+label = "等级划分"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "cultivation"
+label = "修炼进阶"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "power_cost"
+label = "限制与代价"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "special_abilities"
+label = "特殊能力"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "factions"
+name = "势力阵营"
+description = "世界的政治势力与阵营对立"
+icon = "Flag"
+
+[[optional_modules.fields]]
+key = "major_factions"
+label = "主要势力"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "faction_relations"
+label = "阵营关系"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "conflicts"
+label = "核心冲突"
+field_type = "richtext"

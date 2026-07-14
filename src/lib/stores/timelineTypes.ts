@@ -129,11 +129,11 @@ export const NODE_TYPE_COLORS: Record<TimelineNodeType, {
   },
 };
 
-/** 节点状态徽章文案与颜色 */
+/** 节点状态徽章文案与颜色(label 为 i18n key 字符串,由消费方调用 t() 转换) */
 export const NODE_STATUS_MAP: Record<NodeStatus, { label: string; color: string }> = {
-  planned: { label: "未开始", color: "bg-zinc-500" },
-  writing: { label: "写作中", color: "bg-fandex-tertiary" },
-  done: { label: "完稿", color: "bg-fandex-secondary" },
+  planned: { label: "timeline.statusPlanned", color: "bg-zinc-500" },
+  writing: { label: "timeline.statusWriting", color: "bg-fandex-tertiary" },
+  done: { label: "timeline.statusDone", color: "bg-fandex-secondary" },
 };
 
 /** 边类型颜色映射(用于自定义连线 SVG stroke) */

@@ -98,7 +98,7 @@ function syncBackgroundWithTheme(nextTheme: ThemeMode): void {
 export const useThemeStore = create<ThemeState>((set, get) => ({
   theme: "dark",
 
-  toggleTheme: () => {
+  toggleTheme: (): void => {
     const current = get().theme;
     const next: ThemeMode = current === "dark" ? "light" : "dark";
     applyThemeToDom(next);
@@ -108,14 +108,14 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     syncBackgroundWithTheme(next);
   },
 
-  setTheme: (theme) => {
+  setTheme: (theme): void => {
     applyThemeToDom(theme);
     saveThemeToStorage(theme);
     set({ theme });
     syncBackgroundWithTheme(theme);
   },
 
-  initTheme: () => {
+  initTheme: (): void => {
     const stored = loadThemeFromStorage();
     applyThemeToDom(stored);
     set({ theme: stored });

@@ -17,7 +17,7 @@ const TYPE_SPECIFIC_DIRS: Record<string, string[]> = {
 
 /**
  * 获取项目类型的专属目录列表
- * 输入: 项目类型字符串（来自 ProjectMeta.type）
+ * 输入: 项目类型字符串（来自 ProjectMeta.projectType）
  * 输出: 专属目录名数组（如未匹配则返回空数组）
  */
 export function getTypeSpecificDirs(projectType: string): string[] {

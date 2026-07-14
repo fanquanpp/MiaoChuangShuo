@@ -38,6 +38,7 @@ import { useAppStore } from "../lib/store";
 import { useCodexStore } from "../lib/stores/useCodexStore";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import { logger } from "../lib/logger";
 import { readProjectTree } from "../lib/api";
 import {
   scanEntityMentions,
@@ -131,6 +132,10 @@ export default function CodexPanel() {
   const loadAll = useCodexStore((s) => s.loadAll);
   const deleteCardFromStore = useCodexStore((s) => s.deleteCard);
   const resetStore = useCodexStore((s) => s.reset);
+  // 派生查询 selector：getAll / getFiltered / getGrouped 已下沉至 store，组件仅订阅引用与 cards 触发更新
+  const getAllCards = useCodexStore((s) => s.getAll);
+  const getFilteredCards = useCodexStore((s) => s.getFiltered);
+  const getGroupedCards = useCodexStore((s) => s.getGrouped);
   // Sprint 3 任务 3.3：订阅 pendingSelectCardId 实现跨组件跳转
   // NovelEditor 双击 characterMentionNode 时设置此值，CodexPanel 消费后选中对应卡片
   const pendingSelectCardId = useCodexStore((s) => s.pendingSelectCardId);
@@ -186,7 +191,7 @@ export default function CodexPanel() {
       const tree = await readProjectTree(currentProject.path);
       useAppStore.getState().setProjectTree(tree);
     } catch (err) {
-      console.error("刷新项目目录树失败:", err);
+      logger.error("刷新项目目录树失败:", err instanceof Error ? err : String(err));
     }
   }, [currentProject]);
 
@@ -196,8 +201,9 @@ export default function CodexPanel() {
     loadEntities();
   }, [loadEntities, resetStore]);
 
-  // cards Map 转为数组（便于过滤与分组）
-  const cardsList = useMemo(() => Array.from(cards.values()), [cards]);
+  // cards 全量数组：通过 store.getAll() selector 派生（保持 Map 插入顺序，不排序）
+  // 依赖 cards 触发 useMemo 重新计算，派生逻辑下沉至 store
+  const cardsList = useMemo(() => getAllCards(), [getAllCards, cards]);
 
   // 选中实体后懒加载出现追踪
   const selectedEntity = useMemo(
@@ -259,28 +265,19 @@ export default function CodexPanel() {
     setPendingSelectCardId(null);
   }, [pendingSelectCardId, cards, setPendingSelectCardId, pendingEditMode, setPendingEditMode, showToast, t]);
 
-  // 搜索过滤（基于 CodexCard 字段：name / aliases / tags / summary）
-  const filteredEntities = useMemo(() => {
-    if (!searchQuery.trim()) return cardsList;
-    const q = searchQuery.toLowerCase();
-    return cardsList.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.aliases.some((a) => a.toLowerCase().includes(q)) ||
-        c.tags.some((tag) => tag.toLowerCase().includes(q)) ||
-        c.summary.toLowerCase().includes(q)
-    );
-  }, [cardsList, searchQuery]);
+  // 搜索过滤：通过 store.getFiltered(query) selector 派生（不排序，保持原 UI 顺序）
+  // 匹配 name / aliases / tags / summary 四个字段，逻辑下沉至 store
+  const filteredEntities = useMemo(
+    () => getFilteredCards(searchQuery),
+    [getFilteredCards, searchQuery, cards]
+  );
 
-  // 按类型分组
-  const groupedEntities = useMemo(() => {
-    const groups: Partial<Record<CodexEntityType, CodexCard[]>> = {};
-    for (const card of filteredEntities) {
-      if (!groups[card.cardType]) groups[card.cardType] = [];
-      groups[card.cardType]!.push(card);
-    }
-    return groups;
-  }, [filteredEntities]);
+  // 按类型分组：通过 store.getGrouped(query) selector 派生
+  // 内部基于 getFiltered 过滤后按 cardType 分组，逻辑下沉至 store
+  const groupedEntities = useMemo(
+    () => getGroupedCards(searchQuery),
+    [getGroupedCards, searchQuery, cards]
+  );
 
   // 点击文件项跳转到正文编辑
   const handleJumpToFile = useCallback(

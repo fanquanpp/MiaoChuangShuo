@@ -25,6 +25,9 @@
 import { Extension, Node, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
+import { createElement } from "react";
+import { createRoot } from "react-dom/client";
+import CharacterMentionPicker, { type CharacterMentionPickerLabels } from "../components/CharacterMentionPicker";
 
 // 角色名选择扩展的配置选项
 export interface CharacterMentionOptions {
@@ -32,13 +35,8 @@ export interface CharacterMentionOptions {
   onSelect: (name: string) => void;
   /** 功能开关：false 时 Tab 键不拦截，交还默认缩进行为（默认 true） */
   enabled: boolean;
-  labels?: {
-    pickerAriaLabel?: string;
-    listboxAriaLabel?: string;
-    customInputAriaLabel?: string;
-    customInputPlaceholder?: string;
-    hintText?: string;
-  };
+  /** 浮层显示文案标签（由父组件通过 useI18n 翻译后传入） */
+  labels?: CharacterMentionPickerLabels;
 }
 
 /**
@@ -238,219 +236,76 @@ export const CharacterMention = Extension.create<CharacterMentionOptions>({
 });
 
 /**
- * 获取当前浮层中的菜单项 DOM 列表与选中索引
+ * 当前挂载的 React Root（用于在下次打开时先卸载旧浮层，避免重复浮层）
  */
-function getPickerItems(picker: HTMLElement): { items: HTMLElement[]; index: number } {
-  const items = Array.from(picker.querySelectorAll<HTMLElement>('[role="option"]'));
-  const activeItem = picker.querySelector<HTMLElement>('[aria-selected="true"]');
-  const index = activeItem ? items.indexOf(activeItem) : -1;
-  return { items, index: index >= 0 ? index : 0 };
-}
+let currentPickerRoot: ReturnType<typeof createRoot> | null = null;
 
 /**
- * 更新选中项并触发 aria-selected
+ * 显示角色名选择浮层
+ * 输入:
+ *   - rect: 浮层定位锚点（光标坐标）
+ *   - characters: 角色名列表
+ *   - callback: 选择角色名后的回调
+ *   - labels: 浮层显示文案（由父组件通过 useI18n 翻译后传入）
+ * 输出: 无（将浮层挂载到 document.body）
+ * 流程:
+ *   1. 卸载已存在的浮层（避免重复浮层）
+ *   2. 创建容器 div 并挂载到 document.body
+ *   3. 通过 createRoot 渲染 CharacterMentionPicker React 组件
+ *   4. onSelect/onClose 回调中卸载 React Root 并移除容器
+ *   5. 事件监听的清理由 React useEffect cleanup 自动完成，杜绝内存泄漏
  */
-function setSelectedItem(picker: HTMLElement, items: HTMLElement[], newIndex: number) {
-  items.forEach((it, i) => {
-    it.setAttribute("aria-selected", i === newIndex ? "true" : "false");
-    if (i === newIndex) {
-      it.style.background = "var(--fandex-bg-hover, #282828)";
-      it.style.color = "var(--fandex-primary, #6ea8fe)";
-    } else {
-      it.style.background = "transparent";
-      it.style.color = "var(--fandex-text, #ebebeb)";
-    }
-  });
-  // 更新 aria-activedescendant
-  const listbox = picker.querySelector<HTMLElement>('[role="listbox"]');
-  if (listbox) {
-    listbox.setAttribute("aria-activedescendant", items[newIndex]?.id || "");
-  }
-}
-
 function showCharacterPicker(
   rect: DOMRect,
   characters: string[],
   callback: (name: string) => void,
-  labels: {
-    pickerAriaLabel?: string;
-    listboxAriaLabel?: string;
-    customInputAriaLabel?: string;
-    customInputPlaceholder?: string;
-    hintText?: string;
-  } = {}
+  labels: CharacterMentionPickerLabels = {}
 ) {
+  // 卸载已存在的浮层（避免重复浮层）
+  if (currentPickerRoot) {
+    currentPickerRoot.unmount();
+    currentPickerRoot = null;
+  }
   const existing = document.getElementById("character-picker");
   if (existing) existing.remove();
 
-  const pickerAria = labels.pickerAriaLabel || "角色名选择";
-  const listboxAria = labels.listboxAriaLabel || "可选角色名";
-  const inputAria = labels.customInputAriaLabel || "自定义角色名输入";
-  const inputPlaceholder = labels.customInputPlaceholder || "自定义角色名…";
-  const hintLabel = labels.hintText || "Tab 选择 | ↑↓ 导航 | Esc 关闭";
+  // 创建容器并挂载到 body
+  const container = document.createElement("div");
+  container.id = "character-picker";
+  document.body.appendChild(container);
 
-  const picker = document.createElement("div");
-  picker.id = "character-picker";
-  picker.setAttribute("role", "dialog");
-  picker.setAttribute("aria-label", pickerAria);
-  picker.style.cssText = `
-    position: fixed;
-    left: ${rect.left}px;
-    top: ${rect.bottom + 4}px;
-    z-index: 9999;
-    background: var(--fandex-bg-card, #181818);
-    border: 1px solid var(--fandex-border-light, #383838);
-    border-radius: 8px;
-    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.4);
-    padding: 4px;
-    min-width: 160px;
-    max-height: 240px;
-    overflow-y: auto;
-    font-family: 'Noto Sans SC', sans-serif;
-  `;
+  // 创建 React Root
+  const root = createRoot(container);
+  currentPickerRoot = root;
 
-  // 角色列表容器
-  const listbox = document.createElement("div");
-  listbox.setAttribute("role", "listbox");
-  listbox.setAttribute("aria-label", listboxAria);
-  picker.appendChild(listbox);
-
-  characters.forEach((name, i) => {
-    const item = document.createElement("div");
-    item.textContent = name;
-    item.setAttribute("role", "option");
-    item.id = `character-picker-item-${i}`;
-    item.setAttribute("aria-selected", "false");
-    item.style.cssText = `
-      padding: 6px 12px;
-      font-size: 13px;
-      color: var(--fandex-text, #ebebeb);
-      cursor: pointer;
-      border-radius: 4px;
-      transition: background 0.12s;
-    `;
-    item.onmouseenter = () => {
-      const { items } = getPickerItems(picker);
-      setSelectedItem(picker, items, i);
-    };
-    item.onmouseleave = () => {
-      // Check if focus is on the custom input (by checking active element tag)
-      const activeEl = document.activeElement;
-      if (activeEl && activeEl.tagName === 'INPUT' && picker.contains(activeEl)) return;
-      item.style.background = "transparent";
-      item.style.color = "var(--fandex-text, #ebebeb)";
-      item.setAttribute("aria-selected", "false");
-    };
-    item.onclick = () => {
-      callback(name);
-      picker.remove();
-    };
-    listbox.appendChild(item);
-  });
-
-  // 分隔线
-  const divider = document.createElement("div");
-  divider.style.cssText = `height: 1px; background: var(--fandex-border-light, #383838); margin: 4px 0;`;
-  picker.appendChild(divider);
-
-  // 自定义输入框
-  const customInput = document.createElement("input");
-  customInput.type = "text";
-  customInput.placeholder = inputPlaceholder;
-  customInput.setAttribute("aria-label", inputAria);
-  customInput.style.cssText = `
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 12px;
-    font-size: 13px;
-    background: var(--fandex-bg, #0d0d0d);
-    border: 1px solid var(--fandex-border-light, #383838);
-    border-radius: 4px;
-    color: var(--fandex-text, #ebebeb);
-    outline: none;
-  `;
-
-  const submitCustom = () => {
-    const customName = customInput.value.trim();
-    if (customName) {
-      callback(customName);
-      picker.remove();
+  /**
+   * 清理函数：卸载 React Root 并移除容器
+   * 在选择角色名或关闭浮层时调用
+   */
+  const cleanup = () => {
+    root.unmount();
+    if (currentPickerRoot === root) {
+      currentPickerRoot = null;
+    }
+    if (container.parentNode) {
+      container.remove();
     }
   };
 
-  // 键盘导航：ArrowUp/ArrowDown 在菜单项间移动
-  const navigateItems = (direction: 1 | -1) => {
-    const { items, index } = getPickerItems(picker);
-    if (items.length === 0) return;
-    const nextIdx = ((index + direction) % items.length + items.length) % items.length;
-    setSelectedItem(picker, items, nextIdx);
-    items[nextIdx]?.scrollIntoView({ block: "nearest" });
-  };
-
-  customInput.onkeydown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      submitCustom();
-    } else if (e.key === "Escape") {
-      picker.remove();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      navigateItems(-1);
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      navigateItems(1);
-    }
-  };
-  picker.appendChild(customInput);
-
-  // 菜单项也可通过 picker 层键盘事件导航
-  picker.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      navigateItems(-1);
-      customInput.focus();
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      navigateItems(1);
-      customInput.focus();
-    } else if (e.key === "Enter") {
-      const { items, index } = getPickerItems(picker);
-      if (items[index]) {
-        e.preventDefault();
-        const name = items[index].textContent || "";
+  // 渲染角色名选择浮层 React 组件
+  // 使用 createElement 而非 JSX，因为本文件为 .ts（非 .tsx）
+  root.render(
+    createElement(CharacterMentionPicker, {
+      rect,
+      characters,
+      labels,
+      onSelect: (name: string) => {
         callback(name);
-        picker.remove();
-      }
-    }
-  });
-
-  // 底部提示
-  const hint = document.createElement("div");
-  hint.textContent = hintLabel;
-  hint.setAttribute("aria-hidden", "true");
-  hint.style.cssText = `padding: 4px 12px; font-size: 11px; color: var(--fandex-text-tertiary, #8a8a8a);`;
-  picker.appendChild(hint);
-
-  document.body.appendChild(picker);
-
-  // 默认选中第一项
-  requestAnimationFrame(() => {
-    const { items } = getPickerItems(picker);
-    if (items.length > 0) setSelectedItem(picker, items, 0);
-    customInput.focus();
-  });
-
-  // 点击外部关闭
-  setTimeout(() => {
-    const handler = (e: MouseEvent) => {
-      // 使用 globalThis.Node 避免与 ProseMirror Node 类冲突
-      if (!picker.contains(e.target as globalThis.Node)) {
-        picker.remove();
-        document.removeEventListener("mousedown", handler);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-  }, 100);
+        cleanup();
+      },
+      onClose: cleanup,
+    })
+  );
 }
 
 // ===== CharacterMentionNode: 行内 Inline Node（小说模式） =====

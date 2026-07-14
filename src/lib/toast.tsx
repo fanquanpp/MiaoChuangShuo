@@ -11,6 +11,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from "lucide-react";
+import { useI18n } from "./i18n";
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -55,6 +56,7 @@ const BG_MAP: Record<ToastType, string> = {
 const MAX_TOASTS = 5;
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const showToast = useCallback(
@@ -88,7 +90,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div
         className="fixed bottom-4 right-4 z-[100] flex flex-col-reverse gap-2 max-w-sm w-full pointer-events-none"
         role="region"
-        aria-label="通知"
+        aria-label={t("toast.ariaLabel")}
       >
         {toasts.map((toast) => (
           <ToastItemComponent
@@ -109,6 +111,7 @@ function ToastItemComponent({
   toast: ToastItem;
   onRemove: (id: number) => void;
 }) {
+  const { t } = useI18n();
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
   const Icon = ICON_MAP[toast.type];
 
@@ -149,7 +152,7 @@ function ToastItemComponent({
       <button
         onClick={() => onRemove(toast.id)}
         className="flex-shrink-0 text-nf-text-tertiary hover:text-nf-text transition duration-fast"
-        aria-label="关闭通知"
+        aria-label={t("toast.closeAria")}
       >
         <X className="w-3.5 h-3.5" />
       </button>

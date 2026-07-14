@@ -1,0 +1,110 @@
+# 标准大纲模板
+# 故事总体大纲模板，包含梗概、主题、冲突、结构
+
+id = "outline-standard"
+name = "总体大纲"
+category = "outline"
+description = "故事总体大纲模板，包含梗概、主题、冲突、结构"
+icon = "FileText"
+default_enabled_modules = ["conflict", "structure"]
+
+# ===== 基础字段 =====
+[[base_fields]]
+key = "logline"
+label = "一句话梗概"
+field_type = "richtext"
+required = true
+placeholder = "用一句话概括故事核心"
+
+[[base_fields]]
+key = "theme"
+label = "主题立意"
+field_type = "richtext"
+placeholder = "故事想表达的核心思想"
+
+# ===== 可选模块 =====
+[[optional_modules]]
+id = "conflict"
+name = "冲突设定"
+description = "故事的核心矛盾与角色动机"
+icon = "Swords"
+
+[[optional_modules.fields]]
+key = "main_conflict"
+label = "主要冲突"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "character_motivations"
+label = "人物动机"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "structure"
+name = "情节结构"
+description = "故事的情节组织与结构划分"
+icon = "List"
+
+[[optional_modules.fields]]
+key = "plot_structure"
+label = "情节结构"
+field_type = "richtext"
+placeholder = "如：三幕式/英雄之旅/起承转合"
+
+[[optional_modules.fields]]
+key = "act_breakdown"
+label = "分幕概要"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "ending"
+label = "结局走向"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "beats"
+name = "情节卡点"
+description = "故事的关键情节节点"
+icon = "Milestone"
+
+[[optional_modules.fields]]
+key = "inciting_incident"
+label = "触发事件"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "first_turn"
+label = "第一转折"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "midpoint"
+label = "中点"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "second_turn"
+label = "第二转折"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "climax"
+label = "高潮"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "resolution"
+label = "结局"
+field_type = "text"
+
+[[optional_modules]]
+id = "character_arcs"
+name = "人物弧线"
+description = "主要角色的成长弧线规划"
+icon = "TrendingUp"
+
+[[optional_modules.fields]]
+key = "arc_summary"
+label = "弧线总览"
+field_type = "richtext"
+placeholder = "各角色的成长轨迹概要"

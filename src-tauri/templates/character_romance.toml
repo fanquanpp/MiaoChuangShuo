@@ -1,0 +1,190 @@
+# 言情角色模板
+# 适用于言情/都市/情感题材，包含情感弧光
+# 派生自 character_standard，扩展 romance_arc 模块
+
+id = "char-romance"
+name = "言情角色"
+category = "character"
+description = "适用于言情/都市/情感题材，包含情感弧光"
+icon = "User"
+default_enabled_modules = ["personality", "background", "motivation", "romance_arc"]
+
+# ===== 基础字段（继承自标准角色）=====
+[[base_fields]]
+key = "name"
+label = "姓名"
+field_type = "text"
+required = true
+placeholder = "角色的全名"
+
+[[base_fields]]
+key = "age"
+label = "年龄"
+field_type = "text"
+placeholder = "如：25"
+
+[[base_fields]]
+key = "gender"
+label = "性别"
+field_type = "select"
+options = ["男", "女", "其他"]
+
+[[base_fields]]
+key = "identity"
+label = "身份/职业"
+field_type = "text"
+placeholder = "如：剑客/学者/商人"
+
+[[base_fields]]
+key = "appearance"
+label = "外貌描述"
+field_type = "richtext"
+placeholder = "体型、面容、穿着、标志性特征"
+
+# ===== 可选模块（继承自标准角色 + 情感弧光扩展）=====
+[[optional_modules]]
+id = "personality"
+name = "性格档案"
+description = "角色的核心性格特征与行为习惯"
+icon = "Heart"
+
+[[optional_modules.fields]]
+key = "core_trait"
+label = "核心特质"
+field_type = "text"
+placeholder = "如：执着、温柔、阴鸷"
+
+[[optional_modules.fields]]
+key = "strengths"
+label = "优点"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "weaknesses"
+label = "缺点"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "habit"
+label = "口头禅/习惯动作"
+field_type = "text"
+
+[[optional_modules]]
+id = "background"
+name = "背景故事"
+description = "角色的过去经历与性格形成原因"
+icon = "BookOpen"
+
+[[optional_modules.fields]]
+key = "origin"
+label = "出身来历"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "key_experience"
+label = "关键经历"
+field_type = "richtext"
+
+[[optional_modules.fields]]
+key = "personality_cause"
+label = "性格成因"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "motivation"
+name = "动机与目标"
+description = "驱动角色行动的内在动机与外在目标"
+icon = "Target"
+
+[[optional_modules.fields]]
+key = "inner_motivation"
+label = "内在动机"
+field_type = "text"
+help_text = "角色内心真正想要什么"
+
+[[optional_modules.fields]]
+key = "outer_goal"
+label = "外在目标"
+field_type = "text"
+help_text = "角色表面上要做什么"
+
+[[optional_modules.fields]]
+key = "core_conflict"
+label = "核心冲突"
+field_type = "text"
+help_text = "什么阻碍角色达成目标"
+
+[[optional_modules]]
+id = "arc"
+name = "成长弧光"
+description = "角色在故事中的成长轨迹与转变"
+icon = "TrendingUp"
+
+[[optional_modules.fields]]
+key = "arc_start"
+label = "起点状态"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "arc_turning"
+label = "转折契机"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "arc_end"
+label = "终点蜕变"
+field_type = "text"
+
+[[optional_modules]]
+id = "relations"
+name = "人物关系"
+description = "角色与其他人物的关系网络"
+icon = "Users"
+
+[[optional_modules.fields]]
+key = "relationships"
+label = "关系网络"
+field_type = "richtext"
+placeholder = "与其他角色的关系描述"
+
+[[optional_modules]]
+id = "quotes"
+name = "经典台词"
+description = "角色的标志性台词与金句集合"
+icon = "Quote"
+
+[[optional_modules.fields]]
+key = "classic_quotes"
+label = "金句与标志性台词"
+field_type = "richtext"
+placeholder = "收集角色的代表性台词"
+
+# ===== 言情专属模块 =====
+[[optional_modules]]
+id = "romance_arc"
+name = "情感弧光"
+description = "角色的情感发展轨迹"
+icon = "Heart"
+
+[[optional_modules.fields]]
+key = "love_language"
+label = "爱的语言"
+field_type = "text"
+placeholder = "如：服务行动/肯定言语/陪伴"
+
+[[optional_modules.fields]]
+key = "chemistry"
+label = "化学反应对象"
+field_type = "text"
+placeholder = "与谁的化学反应"
+
+[[optional_modules.fields]]
+key = "relationship_status"
+label = "关系状态"
+field_type = "select"
+options = ["单身", "暧昧", "恋爱中", "已婚", "分手"]
+
+[[optional_modules.fields]]
+key = "emotional_arc"
+label = "情感转变轨迹"
+field_type = "richtext"

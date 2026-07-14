@@ -367,10 +367,12 @@ pub struct CharacterSummary {
  * 输入: project_path 项目根路径, character_name 角色名
  * 输出: Result<CharacterSummary, String> 角色摘要
  * 流程:
- *   1. 扫描角色目录下所有 .txt 文件
- *   2. 检查每个文件首行是否匹配角色名
- *   3. 匹配成功则解析身份、性格、简介字段
- *   4. 未匹配则返回 found=false 的空摘要
+ *   1. 校验项目路径与角色名非空
+ *   2. 优先扫描角色目录下 .pmd 文件, 检查首行是否匹配角色名
+ *   3. .pmd 未命中则扫描 .txt 文件
+ *   4. 匹配成功则解析身份、性格、简介字段
+ *   5. 均未匹配则返回 found=false 的空摘要
+ * 说明: 优先级 .pmd > .txt, 适配设定库向 .pmd 迁移的渐进式场景
  */
 #[tauri::command]
 pub fn read_character_summary(
@@ -402,15 +404,64 @@ pub fn read_character_summary(
         });
     }
 
-    // 遍历角色目录，查找首行匹配角色名的文件
-    let entries = fs::read_dir(&char_dir)
+    // 按优先级依次查找 .pmd 与 .txt 格式的角色设定文件
+    // .pmd 为新版格式, 优先匹配; .txt 为兼容旧项目的回退格式
+    for target_ext in &["pmd", "txt"] {
+        if let Some(summary) = try_find_character_summary(&char_dir, &root, &name, target_ext)? {
+            return Ok(summary);
+        }
+    }
+
+    // 未找到匹配的角色设定文件
+    Ok(CharacterSummary {
+        name: name.clone(),
+        source_file: String::new(),
+        identity: String::new(),
+        personality: String::new(),
+        brief: String::new(),
+        found: false,
+    })
+}
+
+/**
+ * 在角色目录中查找指定扩展名且首行匹配角色名的设定文件
+ * 输入:
+ *   char_dir - 角色目录路径
+ *   root - 项目根路径 (用于计算相对路径)
+ *   name - 角色名 (需与文件首行一致)
+ *   target_ext - 目标扩展名 (pmd 或 txt, 大小写不敏感)
+ * 输出: Result<Option<CharacterSummary>, String>
+ *   - Some(summary) 命中并解析成功
+ *   - None 未命中
+ * 流程:
+ *   1. 读取角色目录条目
+ *   2. 跳过子目录与非目标扩展名文件
+ *   3. 跳过模板/名册等特殊文件
+ *   4. 读取内容并校验首行是否为角色名
+ *   5. 命中则解析身份、性格、简介字段并返回
+ * 说明: 单次调用仅扫描指定扩展名, 多扩展名场景由调用方按优先级多次调用
+ */
+fn try_find_character_summary(
+    char_dir: &Path,
+    root: &Path,
+    name: &str,
+    target_ext: &str,
+) -> Result<Option<CharacterSummary>, String> {
+    let entries = fs::read_dir(char_dir)
         .map_err(|e| format!("读取角色目录失败: {}", e))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() || path.extension().map(|e| e != "txt").unwrap_or(true) {
+        // 跳过子目录与非目标扩展名文件
+        if path.is_dir() {
             continue;
         }
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if !ext.eq_ignore_ascii_case(target_ext) {
+            continue;
+        }
+
+        // 跳过模板/名册/汇总等非角色设定文件
         let file_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         let lower = file_name.to_lowercase();
         if lower.contains("模板") || lower.contains("名册") ||
@@ -429,39 +480,31 @@ pub fn read_character_summary(
             .map(|l| l.trim())
             .find(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with("---") && !l.starts_with("==="));
 
-        if first_line != Some(name.as_str()) {
+        if first_line != Some(name) {
             continue;
         }
 
         // 匹配成功，解析摘要字段
         let relative = path
-            .strip_prefix(&root)
+            .strip_prefix(root)
             .map(|p| p.to_string_lossy().replace('\\', "/"))
             .unwrap_or_default();
 
         let identity = extract_field(&content, &["身份", "职业", "身份/职业"]);
         let personality = extract_field(&content, &["核心特质", "性格", "性格关键词"]);
-        let brief = extract_brief(&content, &name);
+        let brief = extract_brief(&content, name);
 
-        return Ok(CharacterSummary {
-            name: name.clone(),
+        return Ok(Some(CharacterSummary {
+            name: name.to_string(),
             source_file: relative,
             identity,
             personality,
             brief,
             found: true,
-        });
+        }));
     }
 
-    // 未找到匹配的角色设定文件
-    Ok(CharacterSummary {
-        name: name.clone(),
-        source_file: String::new(),
-        identity: String::new(),
-        personality: String::new(),
-        brief: String::new(),
-        found: false,
-    })
+    Ok(None)
 }
 
 /**

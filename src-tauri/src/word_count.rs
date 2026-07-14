@@ -1,8 +1,8 @@
 // 共享字数统计模块
 //
 // 功能概述：
-// 提供统一的中英文字数统计函数，供 fs_commands 与 snapshot_commands 复用，
-// 消除原先在两个模块中重复实现的 count_chinese_and_words / count_words_simple。
+// 提供统一的中英文字数统计函数，供 commands 与 snapshot_commands 复用，
+// 消除原先在多个模块中重复实现的 count_chinese_and_words / count_words_simple。
 //
 // 模块职责：
 // 1. 统一中文汉字 + 英文单词的计数规则

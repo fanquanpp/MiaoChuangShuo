@@ -37,15 +37,15 @@ export const createCategorySlice: StateCreator<CategorySlice> = (set) => ({
   // P2-9 撕裂点修复: 切换分类时不再强制清空 selectedFile,
   // 保留用户已选中的文件上下文, 切回编辑器分类时无需重新选文件
   // 仅重置字数(等待编辑器重新推送)与待定位行号(切换分类后行号失效)
-  setActiveCategory: (category) =>
+  setActiveCategory: (category): void =>
     set({ activeCategory: category, activeFileWordCount: 0, pendingScrollLine: null }),
 
-  setSelectedFile: (file) => set({ selectedFile: file, activeFileWordCount: 0, pendingScrollLine: null }),
+  setSelectedFile: (file): void => set({ selectedFile: file, activeFileWordCount: 0, pendingScrollLine: null }),
 
-  setActiveFileWordCount: (count) => set({ activeFileWordCount: count }),
+  setActiveFileWordCount: (count): void => set({ activeFileWordCount: count }),
 
-  navigateToFile: (file, category) =>
+  navigateToFile: (file, category): void =>
     set({ activeCategory: category, selectedFile: file, activeFileWordCount: 0 }),
 
-  setPendingScrollLine: (line) => set({ pendingScrollLine: line }),
+  setPendingScrollLine: (line): void => set({ pendingScrollLine: line }),
 });

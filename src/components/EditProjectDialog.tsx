@@ -51,7 +51,7 @@ export default function EditProjectDialog({ project, onClose, onSuccess }: EditP
   const handleSaveRef = useRef<() => void>(() => {});
 
   // 当前项目文体类型（只读展示，兼容旧版字符串与新版 3 标准文体）
-  const currentType: string = project.meta.type || "novel";
+  const currentType: string = project.meta.projectType || "novel";
 
   // Esc 关闭, Enter 提交（编辑中禁用 Esc 防止误触丢失修改）
   const handleKeyDown = useCallback(

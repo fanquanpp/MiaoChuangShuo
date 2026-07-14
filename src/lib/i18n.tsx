@@ -889,6 +889,18 @@ const zhCN: TranslationDict = {
   "editor.highlightColor": "高亮颜色",
   "editor.clearColor": "清除颜色",
   "editor.clearHighlight": "清除高亮",
+  "editor.customColorInput": "自定义颜色",
+  "editor.tableMenu": "表格操作",
+  "editor.insertTable": "插入表格",
+  "editor.addRowBefore": "在上方添加行",
+  "editor.addRowAfter": "在下方添加行",
+  "editor.addColumnBefore": "在左侧添加列",
+  "editor.addColumnAfter": "在右侧添加列",
+  "editor.deleteRow": "删除行",
+  "editor.deleteColumn": "删除列",
+  "editor.mergeCells": "合并单元格",
+  "editor.splitCell": "拆分单元格",
+  "editor.deleteTable": "删除表格",
   "editor.link": "链接",
   "editor.insertLink": "插入链接",
   "editor.aiAssistant": "AI 助手",
@@ -898,6 +910,8 @@ const zhCN: TranslationDict = {
   "editor.aiCharacterCheck": "角色一致性检查",
   "editor.heading3": "三级标题",
   "editor.heading4": "四级标题",
+  "editor.heading5": "五级标题",
+  "editor.heading6": "六级标题",
   "editor.paragraph": "正文",
   "editor.headingLevel": "标题层级",
   "editor.findReplace": "查找替换",
@@ -935,6 +949,8 @@ const zhCN: TranslationDict = {
 
   // ── 设置对话框 ──
   "settings.title": "设置",
+  "settings.generalSection": "常规",
+  "settings.aboutSection": "关于",
   "settings.editorSection": "编辑器",
   "settings.fontSize": "字体大小",
   "settings.fontPreview": "这是一段预览文字，展示当前字号效果。",
@@ -1224,6 +1240,29 @@ const zhCN: TranslationDict = {
   "characterHover.aiSummarizeState": "总结该角色当前状态",
   "characterHover.aiGenerateDialogue": "生成该角色对话",
   "characterHover.aiComingSoon": "敬请期待",
+
+  // ── 关系详情抽屉(自定义关系类型表单) ──
+  "edgeDrawer.customToggle": "自定义",
+  "edgeDrawer.customPlaceholder": "关系名称(如 师徒/宿敌/同盟)",
+  "edgeDrawer.colorLabel": "颜色:",
+  "edgeDrawer.customAdd": "添加",
+  "edgeDrawer.customList": "自定义关系类型:",
+  "edgeDrawer.customAddTitle": "新增自定义关系类型",
+  "edgeDrawer.customDeleteTitle": "删除此自定义关系类型",
+  "edgeDrawer.colorAria": "选择颜色 {color}",
+
+  // ── 时间线扩展(清空图谱与状态徽章) ──
+  "timeline.clearGraphTitle": "清空图谱",
+  "timeline.statusPlanned": "未开始",
+  "timeline.statusWriting": "写作中",
+  "timeline.statusDone": "完稿",
+
+  // ── Toast 通知 ──
+  "toast.ariaLabel": "通知",
+  "toast.closeAria": "关闭通知",
+
+  // ── 人物关系图扩展(fallback 文案) ──
+  "characterGraph.relationUnknown": "未知关系",
 };
 
 // 英文翻译
@@ -2106,6 +2145,18 @@ const enUS: TranslationDict = {
   "editor.highlightColor": "Highlight Color",
   "editor.clearColor": "Clear Color",
   "editor.clearHighlight": "Clear Highlight",
+  "editor.customColorInput": "Custom Color",
+  "editor.tableMenu": "Table Operations",
+  "editor.insertTable": "Insert Table",
+  "editor.addRowBefore": "Add Row Above",
+  "editor.addRowAfter": "Add Row Below",
+  "editor.addColumnBefore": "Add Column Left",
+  "editor.addColumnAfter": "Add Column Right",
+  "editor.deleteRow": "Delete Row",
+  "editor.deleteColumn": "Delete Column",
+  "editor.mergeCells": "Merge Cells",
+  "editor.splitCell": "Split Cell",
+  "editor.deleteTable": "Delete Table",
   "editor.link": "Link",
   "editor.insertLink": "Insert Link",
   "editor.aiAssistant": "AI Assistant",
@@ -2115,6 +2166,8 @@ const enUS: TranslationDict = {
   "editor.aiCharacterCheck": "Character Consistency Check",
   "editor.heading3": "Heading 3",
   "editor.heading4": "Heading 4",
+  "editor.heading5": "Heading 5",
+  "editor.heading6": "Heading 6",
   "editor.paragraph": "Paragraph",
   "editor.headingLevel": "Heading Level",
   "editor.findReplace": "Find & Replace",
@@ -2152,6 +2205,8 @@ const enUS: TranslationDict = {
 
   // ── Settings Dialog ──
   "settings.title": "Settings",
+  "settings.generalSection": "General",
+  "settings.aboutSection": "About",
   "settings.editorSection": "Editor",
   "settings.fontSize": "Font Size",
   "settings.fontPreview": "This is a preview text showing the current font size.",
@@ -2429,6 +2484,29 @@ const enUS: TranslationDict = {
   "ctxmenu.pathCopied": "Path copied to clipboard",
   "ctxmenu.nameCopied": "Name copied to clipboard",
   "ctxmenu.copyFailed": "Copy to clipboard failed",
+
+  // ── Edge Drawer (custom relation type form) ──
+  "edgeDrawer.customToggle": "Custom",
+  "edgeDrawer.customPlaceholder": "Relation name (e.g. Master/Apprentice, Nemesis, Ally)",
+  "edgeDrawer.colorLabel": "Color:",
+  "edgeDrawer.customAdd": "Add",
+  "edgeDrawer.customList": "Custom relation types:",
+  "edgeDrawer.customAddTitle": "Add custom relation type",
+  "edgeDrawer.customDeleteTitle": "Delete this custom relation type",
+  "edgeDrawer.colorAria": "Select color {color}",
+
+  // ── Timeline extensions (clear graph and status badges) ──
+  "timeline.clearGraphTitle": "Clear graph",
+  "timeline.statusPlanned": "Not started",
+  "timeline.statusWriting": "Writing",
+  "timeline.statusDone": "Done",
+
+  // ── Toast notifications ──
+  "toast.ariaLabel": "Notification",
+  "toast.closeAria": "Close notification",
+
+  // ── Character Graph extensions (fallback text) ──
+  "characterGraph.relationUnknown": "Unknown relation",
 };
 
 const translations: Record<Locale, TranslationDict> = {

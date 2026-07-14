@@ -1,0 +1,61 @@
+# 章节大纲模板
+# 单章大纲模板，用于规划具体章节内容
+
+id = "outline-chapter"
+name = "章节大纲"
+category = "outline"
+description = "单章大纲模板，用于规划具体章节内容"
+icon = "FileText"
+default_enabled_modules = ["plot_points"]
+
+# ===== 基础字段 =====
+[[base_fields]]
+key = "chapter_summary"
+label = "本章梗概"
+field_type = "text"
+required = true
+placeholder = "这一章发生了什么"
+
+# ===== 可选模块 =====
+[[optional_modules]]
+id = "characters_scenes"
+name = "人物与场景"
+description = "本章的出场角色与场景设定"
+icon = "Users"
+
+[[optional_modules.fields]]
+key = "appearing_characters"
+label = "出场人物"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "scenes"
+label = "场景"
+field_type = "text"
+
+[[optional_modules]]
+id = "plot_points"
+name = "情节要点"
+description = "本章的情节推进"
+icon = "List"
+
+[[optional_modules.fields]]
+key = "key_points"
+label = "情节要点"
+field_type = "richtext"
+
+[[optional_modules]]
+id = "target"
+name = "写作目标"
+description = "本章的字数与情感基调目标"
+icon = "Target"
+
+[[optional_modules.fields]]
+key = "word_target"
+label = "字数目标"
+field_type = "text"
+
+[[optional_modules.fields]]
+key = "emotional_tone"
+label = "情感基调"
+field_type = "text"

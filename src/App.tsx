@@ -23,6 +23,7 @@ import { useSettingsStore } from "./lib/settingsStore";
 import { ToastProvider } from "./lib/toast";
 import { I18nProvider, useI18n } from "./lib/i18n";
 import { useWindowCloseGuard } from "./hooks/useAutoSaveOnExit";
+import { logger } from "./lib/logger";
 
 // 内部组件：在 I18nProvider 内，负责向静态组件注入 t 函数
 function I18nWiring() {
@@ -49,7 +50,16 @@ function App() {
   useEffect(() => {
     const unlisten = setupCloseGuard();
     return () => {
-      unlisten?.then((fn) => fn());
+      // unlisten 为 Tauri 事件解绑函数的 Promise，reject 时记录警告但不阻断卸载流程
+      unlisten
+        ?.then((fn) => fn())
+        .catch((err: unknown) => {
+          logger.warn(
+            "卸载窗口关闭监听失败",
+            err instanceof Error ? err : String(err),
+            "App"
+          );
+        });
     };
   }, [setupCloseGuard]);
 

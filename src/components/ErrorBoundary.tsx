@@ -10,6 +10,7 @@
 // 3. 支持外部注入 i18n 函数，实现错误文案本地化
 
 import React from "react";
+import { logger } from "../lib/logger";
 
 /** 错误边界 i18n 上下文，由外部通过 setErrorBoundaryI18n 注入 */
 interface ErrorBoundaryContext {
@@ -61,7 +62,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("[ErrorBoundary]", error.message, info.componentStack);
+    logger.error(error.message, info.componentStack, "ErrorBoundary");
   }
 
   /** 重试按钮回调：重置错误状态，触发子组件重新渲染 */

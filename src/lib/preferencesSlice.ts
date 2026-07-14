@@ -14,12 +14,16 @@
 //    本 store 专注功能开关（Tab 补全/智能引号等）
 //
 // 设计说明：
-// 配置存储拆分——项目级配置存 .novelforge/config.json（阶段 2 启用），
+// 配置存储拆分——项目级配置存 .novelforge/config.json（由 projectConfigApi.ts 管理），
 // 用户级偏好存 AppData/preferences.json（本 store 管理）。
 // 前端优先读 localStorage 缓存（即时），后端 Tauri 命令用于持久化。
 
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+
+// 项目级配置 API(从 preferencesSlice 拆分, 保持向后兼容的 re-export)
+// 调用方仍可从本模块导入, 实际实现位于 src/lib/api/projectConfigApi.ts
+export { getProjectConfig, setProjectConfig, type ProjectConfig } from "./api/projectConfigApi";
 
 // 用户级编辑器偏好接口（与 Rust EditorPreferences 结构对应）
 export interface EditorPreferences {
@@ -35,14 +39,6 @@ export interface EditorPreferences {
   enableSceneBreakHelper: boolean;
   /** 实体名自动高亮（默认开启） */
   enableEntityHighlight: boolean;
-}
-
-// 项目级配置接口（与 Rust ProjectConfig 结构对应）
-export interface ProjectConfig {
-  /** 模板类型："novel" / "script" / "essay" */
-  templateType: string;
-  /** 创建时间（ISO 8601） */
-  createdAt: string;
 }
 
 // localStorage 缓存键
@@ -115,7 +111,7 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
   preferences: loadCachedPreferences(),
   loaded: false,
 
-  loadPreferences: async () => {
+  loadPreferences: async (): Promise<void> => {
     try {
       const prefs = await invoke<EditorPreferences>("get_user_preferences");
       cachePreferences(prefs);
@@ -126,7 +122,7 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
     }
   },
 
-  savePreferences: async (prefs: EditorPreferences) => {
+  savePreferences: async (prefs: EditorPreferences): Promise<void> => {
     // 先更新缓存与状态（即时反馈）
     cachePreferences(prefs);
     set({ preferences: prefs });
@@ -137,34 +133,15 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
     }
   },
 
-  updatePreference: async (key, value) => {
+  updatePreference: async (key, value): Promise<void> => {
     const current = get().preferences;
     const next = { ...current, [key]: value };
     await get().savePreferences(next);
   },
 }));
 
-// ===== 项目级配置 API（非 store，按需调用） =====
-
-/**
- * 读取项目级配置
- * 输入: projectRoot 项目根目录
- * 输出: Promise<ProjectConfig> 配置数据
- * 流程: 调用 get_project_config Tauri 命令
- */
-export async function getProjectConfig(projectRoot: string): Promise<ProjectConfig> {
-  return invoke<ProjectConfig>("get_project_config", { projectRoot });
-}
-
-/**
- * 保存项目级配置
- * 输入: projectRoot 项目根目录, config 配置数据
- * 输出: Promise<void>
- * 流程: 调用 set_project_config Tauri 命令
- */
-export async function setProjectConfig(projectRoot: string, config: ProjectConfig): Promise<void> {
-  await invoke("set_project_config", { projectRoot, config });
-}
+// ===== 项目级配置 API 已迁移至 src/lib/api/projectConfigApi.ts =====
+// 上述 getProjectConfig / setProjectConfig / ProjectConfig 通过文件顶部 re-export 保留入口
 
 /**
  * 根据模板类型生成默认偏好

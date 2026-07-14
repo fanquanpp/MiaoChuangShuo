@@ -23,10 +23,10 @@ export const createProjectSlice: StateCreator<ProjectSlice> = (set, get) => ({
   projectTree: [],
   loading: false,
 
-  setProjectTree: (tree) => set({ projectTree: tree }),
-  setLoading: (loading) => set({ loading }),
+  setProjectTree: (tree): void => set({ projectTree: tree }),
+  setLoading: (loading): void => set({ loading }),
 
-  refreshProjectTree: async (onError?: (error: unknown) => void) => {
+  refreshProjectTree: async (onError?: (error: unknown) => void): Promise<void> => {
     const { currentProject } = get();
     if (!currentProject) return;
     try {
