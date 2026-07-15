@@ -306,9 +306,9 @@ export default function AiSettingsSection() {
                       : "border-nf-border-light bg-nf-bg hover:bg-nf-bg-hover hover:border-nf-border"
                   }`}
                 >
-                  {/* 供应商图标 (渐变色背景 + 首字母) */}
+                  {/* 供应商图标 (纯色背景 + 首字母) */}
                   <div
-                    className={`flex-shrink-0 w-7 h-7 flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br ${provider.color}`}
+                    className="flex-shrink-0 w-7 h-7 flex items-center justify-center text-nf-text text-xs font-bold bg-nf-bg-hover border border-nf-border-light"
                   >
                     {provider.iconChar}
                   </div>
@@ -352,7 +352,7 @@ export default function AiSettingsSection() {
             <div className="flex items-center justify-between p-2 bg-nf-bg-hover/50 border border-nf-border-light">
               <div className="flex items-center gap-2">
                 <div
-                  className={`w-5 h-5 flex items-center justify-center text-white text-[10px] font-bold bg-gradient-to-br ${selectedProvider.color}`}
+                  className="w-5 h-5 flex items-center justify-center text-nf-text text-[10px] font-bold bg-nf-bg-hover border border-nf-border-light"
                 >
                   {selectedProvider.iconChar}
                 </div>

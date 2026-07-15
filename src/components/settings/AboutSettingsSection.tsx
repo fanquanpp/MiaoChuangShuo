@@ -350,15 +350,8 @@ export default function AboutSettingsSection() {
         {/* ===== 顶部应用图标 + 名称 + slogan + 大字版本号 ===== */}
         <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
           <div className="flex items-start gap-4">
-            {/* Logo 区：Wand2 图标 + 蓝紫渐变背景 + 小点装饰 */}
-            <div className="relative flex-shrink-0">
-              <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-fandex-primary via-purple-500 to-fandex-tertiary flex items-center justify-center shadow-lg shadow-fandex-primary/20">
-                <Wand2 className="w-8 h-8 text-white" strokeWidth={2} />
-              </div>
-              {/* 装饰小点 */}
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-fandex-secondary border border-nf-bg" />
-              <div className="absolute -bottom-1 -left-1 w-2 h-2 rounded-full bg-fandex-tertiary border border-nf-bg" />
-            </div>
+            {/* Logo 区：Wand2 图标直接渲染（与主页风格一致） */}
+            <Wand2 className="w-10 h-10 text-fandex-primary flex-shrink-0" strokeWidth={2} />
 
             {/* 名称 + slogan */}
             <div className="flex-1 min-w-0">
@@ -481,7 +474,7 @@ export default function AboutSettingsSection() {
             {t("about.author")}
           </h3>
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-fandex-primary to-fandex-tertiary flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-8 h-8 rounded-full bg-nf-bg-hover flex items-center justify-center text-fandex-primary text-xs font-bold">
               F
             </div>
             <span className="text-sm font-semibold text-nf-text">
