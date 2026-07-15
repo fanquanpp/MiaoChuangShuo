@@ -126,7 +126,7 @@ npm run build
 
 ### 版本号同步
 
-如提交涉及版本号变更，必须同步以下 6 处位置：
+如提交涉及版本号变更，必须同步以下 7 处位置：
 
 | 文件 | 字段 |
 |------|------|
@@ -136,8 +136,15 @@ npm run build
 | `src-tauri/tauri.conf.json` | `version` |
 | `src/lib/updateChecker.ts` | `FALLBACK_VERSION` |
 | `src/components/Launcher.tsx` | `appVersion` useState 初始值 |
+| `src/components/settings/SettingsDialog.tsx` | `currentVersion` useState 初始值 |
 
-版本号格式：`YY.MM.修改序号`（如 `26.8.0`）。
+版本号格式：`YY.MM.修改序号`（如 `26.7.32`）。
+
+可使用 `scripts/sync-version.mjs` 自动同步版本号：
+
+```bash
+node scripts/sync-version.mjs 26.7.32
+```
 
 ## 图标生成
 

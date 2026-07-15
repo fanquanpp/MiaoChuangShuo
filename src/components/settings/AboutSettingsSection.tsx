@@ -8,7 +8,7 @@
 // 模块职责：
 // 1. 顶部展示应用 Logo（Wand2 + 蓝紫渐变）+ 应用名 + slogan + 大字版本号
 // 2. 项目介绍区（2-3 句话简介 + 三大原则卡片化展示）
-// 3. 核心特性列表（5 大模块图标列表）
+// 3. 核心特性列表（4 大模块图标列表：编辑器 / 设定库 / 人物图谱 / 剧情时间线）
 // 4. 技术栈展示（Tauri / React / Rust / TypeScript / TipTap / React Flow / Tantivy）
 // 5. 作者信息区（fanquanpp + GitHub 仓库 / Issue / Release 链接按钮）
 // 6. 致谢区（折叠，列出核心依赖库）
@@ -58,10 +58,11 @@ import { openPath } from "../../lib/api";
 import UpdateNoticeDialog from "../UpdateNoticeDialog";
 
 // GitHub 仓库相关常量
+// 注: 仓库默认分支为 master, LICENSE / 源文件直链均使用 blob/master/ 路径
 const GITHUB_REPO_URL = "https://github.com/fanquanpp/MiaoChuangShuo";
 const GITHUB_ISSUES_URL = "https://github.com/fanquanpp/MiaoChuangShuo/issues";
 const GITHUB_LICENSE_URL =
-  "https://github.com/fanquanpp/MiaoChuangShuo/blob/main/LICENSE";
+  "https://github.com/fanquanpp/MiaoChuangShuo/blob/master/LICENSE";
 
 // 日志目录路径片段（Windows: %APPDATA%\MiaoChuangShuo\logs）
 const APP_DATA_DIR_NAME = "MiaoChuangShuo";
@@ -234,7 +235,7 @@ export default function AboutSettingsSection() {
   }, [showToast, t]);
 
   // ===== 静态数据 =====
-  // 核心特性列表（5 大模块）
+  // 核心特性列表（4 大模块：编辑器 / 设定库 / 人物图谱 / 剧情时间线）
   const features: FeatureItem[] = [
     {
       icon: BookOpen,
@@ -648,6 +649,21 @@ export default function AboutSettingsSection() {
                 <ExternalLink className="w-3 h-3" />
                 {t("about.licenseLink")}
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== 免责声明区 ===== */}
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
+          <div className="flex items-start gap-3">
+            <Shield className="w-4 h-4 text-fandex-tertiary mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-nf-text mb-1">
+                {t("about.disclaimer")}
+              </h3>
+              <p className="text-[11px] text-nf-text-tertiary leading-relaxed">
+                {t("about.disclaimerDesc")}
+              </p>
             </div>
           </div>
         </div>

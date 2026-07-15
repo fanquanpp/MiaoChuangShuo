@@ -4,8 +4,8 @@
 
 如果你发现喵创说存在安全漏洞，请**不要**通过公开 Issue 提交，而是通过以下渠道私下报告：
 
-- 发送邮件至：fanquanpp@example.com（请替换为维护者实际邮箱）
-- GitHub 私有安全公告：在仓库主页选择 `Security` - `Report a vulnerability`
+- **GitHub 私有安全公告（推荐）**：在仓库主页选择 `Security` - `Report a vulnerability`，填写漏洞详情
+- GitHub Issue 中标注 `security` 标签私下联系维护者（请勿在公开 Issue 中包含可利用细节）
 
 请在报告中包含以下信息：
 

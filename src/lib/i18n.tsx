@@ -1179,6 +1179,8 @@ const zhCN: TranslationDict = {
   "about.license": "开源协议",
   "about.licenseDesc": "本项目采用 CC-BY-NC-4.0 署名-非商用许可证",
   "about.licenseLink": "查看完整协议文本",
+  "about.disclaimer": "免责声明",
+  "about.disclaimerDesc": "本软件按「现状」提供, 不附带任何明示或默示的担保。在适用法律允许的最大范围内, 作者与贡献者不对因使用本软件而产生的任何直接或间接损失承担责任。AI 助手调用第三方 LLM 服务所产生的费用与合规风险由用户自行承担。",
   "about.copyVersion": "复制版本号",
   "about.openLogs": "打开日志目录",
   "about.versionCopied": "版本号已复制到剪贴板",
@@ -1210,6 +1212,7 @@ const zhCN: TranslationDict = {
   "settings.indentWidth2": "2 字",
   "settings.indentWidth3": "3 字",
   "settings.indentWidth4": "4 字",
+  "settings.indentCustom": "自定义",
 
   // ── 编辑器功能开关 ──
   "settings.featuresSection": "编辑器功能",
@@ -2593,6 +2596,8 @@ const enUS: TranslationDict = {
   "about.license": "License",
   "about.licenseDesc": "Licensed under CC-BY-NC-4.0 (Attribution-NonCommercial)",
   "about.licenseLink": "View full license text",
+  "about.disclaimer": "Disclaimer",
+  "about.disclaimerDesc": "This software is provided \"as is\", without any express or implied warranty. To the maximum extent permitted by applicable law, the authors and contributors shall not be liable for any direct or indirect damages arising from the use of this software. Users are solely responsible for the costs and compliance risks of calling third-party LLM services via the AI assistant.",
   "about.copyVersion": "Copy Version",
   "about.openLogs": "Open Logs Directory",
   "about.versionCopied": "Version copied to clipboard",
