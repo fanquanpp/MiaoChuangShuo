@@ -39,21 +39,21 @@
 - [x] sha256 哈希文件已生成(MSI: 97a4a12c..., NSIS: 4c4f0ba8...)
 - [x] MSI 安装包大小合理(10.4MB)
 - [x] NSIS 安装包大小合理(7.94MB)
-- [ ] git commit 已创建(Conventional Commits 规范)
-- [ ] tag `v26.7.32` 已创建并推送
-- [ ] 过往 GitHub Release 已删除(v26.7.28 / v26.7.29 / v26.7.30 / v26.8.0)
-- [ ] 过往远程 tag 已删除
-- [ ] 过往本地 tag 已删除
-- [ ] 新 GitHub Release `v26.7.32` 已创建
-- [ ] MSI + NSIS + sha256 文件已上传到 GitHub Release
+- [x] git commit 已创建(844d145, Conventional Commits 规范)
+- [x] tag `v26.7.32` 已创建并推送
+- [x] 过往 GitHub Release 已删除(v26.8.0, v26.7.29)
+- [x] 过往远程 tag 已删除(v26.7.18-v26.7.24, v26.7.29, v26.8.0 共 9 个)
+- [x] 过往本地 tag 已删除(仅剩 v26.7.32)
+- [x] 新 GitHub Release `v26.7.32` 已创建
+- [x] MSI + NSIS + sha256 文件已上传到 GitHub Release(4 个资产)
 
 ## 综合验收
 
-- [ ] 所有阶段任务已完成,tasks.md 中所有复选框已勾选
-- [ ] `npx tsc --noEmit` 通过
-- [ ] `cargo check` 通过
-- [ ] `cargo test` 通过
-- [ ] `npm run tauri build` 通过
-- [ ] 序章创建测试通过(.pmd 格式 + UUID front matter)
-- [ ] 设置页面视觉一致性验证通过
-- [ ] v26.7.32 作为唯一存在版本,GitHub Release 页面仅显示 v26.7.32
+- [x] 所有阶段任务已完成,tasks.md 中所有复选框已勾选
+- [x] `npx tsc --noEmit` 通过
+- [x] `cargo check` 通过
+- [x] `cargo test` 通过(69 passed)
+- [x] `npm run tauri build` 通过
+- [x] 序章创建测试通过(.pmd 格式 + UUID front matter)
+- [x] 设置页面视觉一致性验证通过
+- [x] v26.7.32 作为唯一存在版本,GitHub Release 页面仅显示 v26.7.32

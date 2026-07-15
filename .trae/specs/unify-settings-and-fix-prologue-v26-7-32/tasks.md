@@ -50,18 +50,18 @@
   - [x] 7.2: 生成 sha256 哈希文件(MSI: 97a4a12c..., NSIS: 4c4f0ba8...)
   - [x] 7.3: 验证安装包大小合理(MSI 10.4MB, NSIS 7.94MB)
 
-- [ ] Task 8: Git 提交与推送
-  - [ ] 8.1: `git add -A` 暂存所有变更
-  - [ ] 8.2: `git commit` 提交(Conventional Commits 规范)
-  - [ ] 8.3: 创建 annotated tag `v26.7.32`
-  - [ ] 8.4: `git push origin master` 推送提交
-  - [ ] 8.5: `git push origin v26.7.32` 推送 tag
+- [x] Task 8: Git 提交与推送
+  - [x] 8.1: `git add` 暂存所有变更(15 个修改文件 + spec 目录)
+  - [x] 8.2: `git commit` 提交(844d145, Conventional Commits 规范)
+  - [x] 8.3: 创建 annotated tag `v26.7.32`
+  - [x] 8.4: `git push origin master` 推送提交(20097a5..844d145)
+  - [x] 8.5: `git push origin v26.7.32` 推送 tag(new tag)
 
-- [ ] Task 9: 删除历史版本与创建新 Release
-  - [ ] 9.1: 使用 `gh release delete` 删除过往 GitHub Release(v26.7.28 / v26.7.29 / v26.7.30 / v26.8.0)
-  - [ ] 9.2: 使用 `git push origin --delete` 删除过往远程 tag
-  - [ ] 9.3: 使用 `git tag -d` 删除过往本地 tag
-  - [ ] 9.4: 使用 `gh release create v26.7.32` 创建新 Release 并上传 MSI + NSIS + sha256
+- [x] Task 9: 删除历史版本与创建新 Release
+  - [x] 9.1: 使用 `gh release delete --cleanup-tag` 删除过往 GitHub Release(v26.8.0, v26.7.29)
+  - [x] 9.2: 使用 `git push origin --delete` 删除过往远程 tag(v26.7.18-v26.7.24 共 7 个 + v26.8.0/v26.7.29 通过 --cleanup-tag 删除)
+  - [x] 9.3: 本地 tag 已清理(仅剩 v26.7.32)
+  - [x] 9.4: 使用 `gh release create v26.7.32` 创建新 Release 并上传 MSI + NSIS + sha256(4 个资产)
 
 # Task Dependencies
 - [Task 2] 依赖 [Task 1](可并行,文件无冲突)
