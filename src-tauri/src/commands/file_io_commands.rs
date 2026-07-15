@@ -83,13 +83,13 @@ fn read_dir_recursive(current: &Path, root: &Path) -> Result<Vec<FileNode>, AppE
             .map_err(|e| AppError::io_error(e, "读取元数据失败"))?;
         let is_dir = metadata.is_dir();
 
-        // 非目录文件仅允许 .txt 扩展名（应用仅支持 .txt 文件）
+        // 非目录文件仅允许 .txt / .pmd 扩展名（正文与设定文件统一使用 .pmd 格式）
         if !is_dir {
             let ext = path
                 .extension()
                 .and_then(|e| e.to_str())
                 .unwrap_or("");
-            if ext != "txt" {
+            if !matches!(ext.to_lowercase().as_str(), "txt" | "pmd") {
                 continue;
             }
         }

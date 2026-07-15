@@ -51,10 +51,10 @@ export default function AppearanceSettingsSection() {
   const { theme, toggleTheme } = useThemeStore();
 
   return (
-    <section>
+    <section className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
       <div className="flex items-center gap-2 mb-3">
         <Palette className="w-4 h-4 text-fandex-tertiary" />
-        <h3 className="text-sm font-bold font-display text-nf-text">
+        <h3 className="text-sm font-medium text-nf-text">
           {t("settings.appearanceSection")}
         </h3>
       </div>

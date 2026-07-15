@@ -162,8 +162,8 @@ const zhCN: TranslationDict = {
   "workspace.prologueHint": "以序章开篇，为故事铺设前奏",
   "workspace.createFirstChapter": "第一章",
   "workspace.firstChapterHint": "直接从第一章开始，编号从 1 开始",
-  "workspace.defaultIntroFileName": "序章.txt",
-  "workspace.defaultIntroContent": "序章",
+  "workspace.defaultIntroFileName": "序章.pmd",
+  "workspace.defaultIntroContent": "在此开始书写你的序章...",
   "workspace.introBadge": "序",
   "error.noCurrentProject": "无当前项目",
 
@@ -1599,8 +1599,8 @@ const enUS: TranslationDict = {
   "workspace.prologueHint": "Begin with a prologue to set the stage",
   "workspace.createFirstChapter": "Chapter 1",
   "workspace.firstChapterHint": "Start directly from Chapter 1, numbered from 1",
-  "workspace.defaultIntroFileName": "Prologue.txt",
-  "workspace.defaultIntroContent": "Prologue",
+  "workspace.defaultIntroFileName": "Prologue.pmd",
+  "workspace.defaultIntroContent": "Start writing your prologue here...",
   "workspace.introBadge": "P",
   "error.noCurrentProject": "No current project",
 

@@ -86,12 +86,12 @@ export default function GeneralSettingsSection() {
   }, [indentInput, indentWidth, setIndentWidth]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ===== 编辑器设置 ===== */}
-      <section>
+      <section className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
         <div className="flex items-center gap-2 mb-3">
           <Type className="w-4 h-4 text-fandex-primary" />
-          <h3 className="text-sm font-bold font-display text-nf-text">
+          <h3 className="text-sm font-medium text-nf-text">
             {t("settings.editorSection")}
           </h3>
         </div>
@@ -153,10 +153,10 @@ export default function GeneralSettingsSection() {
       </section>
 
       {/* ===== 章节标题设置 ===== */}
-      <section>
+      <section className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
         <div className="flex items-center gap-2 mb-3">
           <BookOpen className="w-4 h-4 text-fandex-secondary" />
-          <h3 className="text-sm font-bold font-display text-nf-text">
+          <h3 className="text-sm font-medium text-nf-text">
             {t("settings.chapterSection")}
           </h3>
         </div>
@@ -228,10 +228,10 @@ export default function GeneralSettingsSection() {
       </section>
 
       {/* ===== 自动化设置 ===== */}
-      <section>
+      <section className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
         <div className="flex items-center gap-2 mb-3">
           <Zap className="w-4 h-4 text-yellow-500" />
-          <h3 className="text-sm font-bold font-display text-nf-text">
+          <h3 className="text-sm font-medium text-nf-text">
             {t("settings.automationSection")}
           </h3>
         </div>
@@ -276,10 +276,10 @@ export default function GeneralSettingsSection() {
       </section>
 
       {/* ===== 首行缩进设置 ===== */}
-      <section>
+      <section className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
         <div className="flex items-center gap-2 mb-3">
           <FileText className="w-4 h-4 text-green-500" />
-          <h3 className="text-sm font-bold font-display text-nf-text">
+          <h3 className="text-sm font-medium text-nf-text">
             {t("settings.indentSection")}
           </h3>
         </div>
@@ -343,10 +343,10 @@ export default function GeneralSettingsSection() {
       </section>
 
       {/* ===== 编辑器功能开关设置 ===== */}
-      <section>
+      <section className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
         <div className="flex items-center gap-2 mb-3">
           <Zap className="w-4 h-4 text-fandex-tertiary" />
-          <h3 className="text-sm font-bold font-display text-nf-text">
+          <h3 className="text-sm font-medium text-nf-text">
             {t("settings.featuresSection")}
           </h3>
         </div>
@@ -463,7 +463,7 @@ export default function GeneralSettingsSection() {
       </section>
 
       {/* ===== 全文索引管理 ===== */}
-      <section>
+      <section className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
         <IndexManagerPanel />
       </section>
     </div>

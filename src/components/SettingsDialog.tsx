@@ -134,7 +134,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
         {/* 内容区：左侧导航 + 右侧内容 */}
         <div className="flex-1 min-h-0 flex">
           {/* 左侧分区导航 */}
-          <nav className="w-32 border-r border-nf-border-light flex-shrink-0 py-3 space-y-1">
+          <nav className="w-32 border-r border-nf-border-light flex-shrink-0 py-4 space-y-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;

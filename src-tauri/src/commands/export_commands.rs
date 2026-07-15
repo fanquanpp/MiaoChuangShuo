@@ -662,7 +662,7 @@ mod tests {
 
     #[test]
     fn test_extract_chapter_title_strips_leading_number() {
-        let path = Path::new("/project/正文/01.序章.txt");
+        let path = Path::new("/project/正文/01.序章.pmd");
         assert_eq!(extract_chapter_title(path), "序章");
     }
 

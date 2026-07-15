@@ -348,7 +348,7 @@ export default function AboutSettingsSection() {
     <>
       <section className="space-y-4">
         {/* ===== 顶部应用图标 + 名称 + slogan + 大字版本号 ===== */}
-        <div className="bg-zinc-900/40 rounded-lg p-4 border border-nf-border-light">
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
           <div className="flex items-start gap-4">
             {/* Logo 区：Wand2 图标 + 蓝紫渐变背景 + 小点装饰 */}
             <div className="relative flex-shrink-0">
@@ -398,7 +398,7 @@ export default function AboutSettingsSection() {
         </div>
 
         {/* ===== 项目介绍区 ===== */}
-        <div className="bg-zinc-900/40 rounded-lg p-4 border border-nf-border-light">
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
           <p className="text-xs leading-relaxed text-nf-text-secondary">
             {t("about.intro")}
           </p>
@@ -428,8 +428,8 @@ export default function AboutSettingsSection() {
         </div>
 
         {/* ===== 核心特性列表 ===== */}
-        <div className="bg-zinc-900/40 rounded-lg p-4 border border-nf-border-light">
-          <h3 className="text-sm font-bold font-display text-nf-text mb-3 flex items-center gap-1.5">
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
+          <h3 className="text-sm font-medium text-nf-text mb-3 flex items-center gap-2">
             <BookOpen className="w-3.5 h-3.5 text-fandex-primary" />
             {t("about.features")}
           </h3>
@@ -457,8 +457,8 @@ export default function AboutSettingsSection() {
         </div>
 
         {/* ===== 技术栈展示 ===== */}
-        <div className="bg-zinc-900/40 rounded-lg p-4 border border-nf-border-light">
-          <h3 className="text-sm font-bold font-display text-nf-text mb-3 flex items-center gap-1.5">
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
+          <h3 className="text-sm font-medium text-nf-text mb-3 flex items-center gap-2">
             <Boxes className="w-3.5 h-3.5 text-fandex-secondary" />
             {t("about.techStack")}
           </h3>
@@ -475,8 +475,8 @@ export default function AboutSettingsSection() {
         </div>
 
         {/* ===== 作者信息区 ===== */}
-        <div className="bg-zinc-900/40 rounded-lg p-4 border border-nf-border-light">
-          <h3 className="text-sm font-bold font-display text-nf-text mb-3 flex items-center gap-1.5">
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
+          <h3 className="text-sm font-medium text-nf-text mb-3 flex items-center gap-2">
             <Code className="w-3.5 h-3.5 text-nf-text-secondary" />
             {t("about.author")}
           </h3>
@@ -520,10 +520,10 @@ export default function AboutSettingsSection() {
         </div>
 
         {/* ===== 更新检查区（保留原有功能） ===== */}
-        <div className="bg-zinc-900/40 rounded-lg p-4 border border-nf-border-light">
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
           <div className="flex items-center gap-2 mb-3">
             <Info className="w-4 h-4 text-fandex-primary" />
-            <h3 className="text-sm font-bold font-display text-nf-text">
+            <h3 className="text-sm font-medium text-nf-text">
               {t("update.section")}
             </h3>
           </div>
@@ -613,8 +613,8 @@ export default function AboutSettingsSection() {
         </div>
 
         {/* ===== 致谢区（折叠） ===== */}
-        <details className="bg-zinc-900/40 rounded-lg p-4 border border-nf-border-light">
-          <summary className="cursor-pointer flex items-center gap-2 text-sm font-bold font-display text-nf-text select-none">
+        <details className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
+          <summary className="cursor-pointer flex items-center gap-2 text-sm font-medium text-nf-text select-none">
             <Heart className="w-3.5 h-3.5 text-fandex-tertiary" />
             {t("about.acknowledgments")}
             <span className="text-[10px] text-nf-text-tertiary font-normal ml-auto">
@@ -643,11 +643,11 @@ export default function AboutSettingsSection() {
         </details>
 
         {/* ===== 开源协议区 ===== */}
-        <div className="bg-zinc-900/40 rounded-lg p-4 border border-nf-border-light">
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
           <div className="flex items-start gap-3">
             <FileText className="w-4 h-4 text-fandex-secondary mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-bold font-display text-nf-text mb-1">
+              <h3 className="text-sm font-medium text-nf-text mb-1">
                 {t("about.license")}
               </h3>
               <p className="text-[11px] text-nf-text-tertiary leading-relaxed mb-2">

@@ -68,7 +68,7 @@ export function stripNumberPrefix(name: string): string {
  * 转换规则：
  *   - "1.开端.txt" → "开端"（去除数字前缀和扩展名）
  *   - "第一章 开端.txt" → "第一章 开端"（仅去除扩展名，保留章节号前缀）
- *   - "序章.txt" → "序章"
+ *   - "序章.pmd" → "序章"
  *   - "角色档案.txt" → "角色档案"
  *   - "亚瑟.pmd" → "亚瑟"（兼容 .pmd 设定文件扩展名）
  *
