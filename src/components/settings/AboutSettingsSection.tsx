@@ -55,6 +55,7 @@ import {
   FALLBACK_VERSION,
   type ReleaseInfo,
 } from "../../lib/updateChecker";
+import { openPath } from "../../lib/api";
 import UpdateNoticeDialog from "../UpdateNoticeDialog";
 
 // GitHub 仓库相关常量
@@ -213,19 +214,20 @@ export default function AboutSettingsSection() {
   /**
    * 打开日志目录
    * 动态加载 @tauri-apps/api/path 获取 appDataDir，
-   * 拼接 MiaoChuangShuo/logs 后调用 shell.open
+   * 拼接 MiaoChuangShuo/logs 后调用 openPath 命令打开本地路径
    * 失败时 toast 提示错误信息
+   * 设计说明: 使用 Rust 端 open_path 命令而非 shell plugin 的 open()，
+   *          因为后者默认 scope 仅允许 URL schemes，本地路径会被拒绝
    */
   const handleOpenLogs = useCallback(async () => {
     try {
       const pathApi = await import("@tauri-apps/api/path");
-      const shellApi = await import("@tauri-apps/plugin-shell");
       const appDataDir = await pathApi.appDataDir();
       // appDataDir 在 Windows 返回 %APPDATA%（如 C:\Users\<user>\AppData\Roaming）
       const sep = pathApi.sep();
       const logsPath = `${appDataDir}${sep}${APP_DATA_DIR_NAME}${sep}${LOGS_DIR_NAME}`;
-      // shell.open 会在目录不存在时由系统资源管理器提示
-      await shellApi.open(logsPath);
+      // 调用 Rust 端 open_path 命令打开本地路径（绕过 shell plugin 的 URL scope 限制）
+      await openPath(logsPath);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       showToast("error", t("about.openLogsFailed", { error: msg }), 5000);

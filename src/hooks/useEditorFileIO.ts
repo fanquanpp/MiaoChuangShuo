@@ -203,6 +203,45 @@ function plainTextToHtml(text: string): string {
     .join("");
 }
 
+/**
+ * 剥离 YAML front matter 并返回正文与 front matter 原文
+ * 输入: content 文件完整内容
+ * 输出: { frontMatter: string | null, body: string }
+ *       - frontMatter: 完整 front matter 块（含首尾 --- 分隔符与尾部换行），无 front matter 时为 null
+ *       - body: 剥离 front matter 后的正文
+ * 流程:
+ *   1. 检测首行是否为 `---`（允许首尾空白）
+ *   2. 查找下一个 `---` 结束标记
+ *   3. 返回完整 front matter 块（含分隔符）和正文
+ * 设计说明:
+ *   - 与 Rust 端 text_extractor::extract_front_matter 逻辑对齐
+ *   - frontMatter 保留完整原文（含 --- 分隔符），用于保存时重新注入
+ *   - body 去除前导换行符，保留正文内部格式
+ *   - 无 front matter 时返回 { frontMatter: null, body: content }
+ */
+export function stripFrontMatter(content: string): {
+  frontMatter: string | null;
+  body: string;
+} {
+  const lines = content.split(/\r?\n/);
+  if (lines.length === 0 || lines[0].trim() !== "---") {
+    return { frontMatter: null, body: content };
+  }
+  // 查找结束标记 ---（从第二行开始搜索）
+  const endIdx = lines.slice(1).findIndex((l) => l.trim() === "---");
+  if (endIdx === -1) {
+    // 只有起始 --- 没有结束 ---，视为无 front matter
+    return { frontMatter: null, body: content };
+  }
+  // frontMatter 包含从首行 --- 到结束 --- 的完整块（含尾部换行）
+  const frontMatterLines = lines.slice(0, endIdx + 2);
+  const frontMatter = frontMatterLines.join("\n") + "\n";
+  // 正文为结束 --- 之后的行，去除前导换行符
+  const bodyLines = lines.slice(endIdx + 2);
+  const body = bodyLines.join("\n").replace(/^[\r\n]+/, "");
+  return { frontMatter, body };
+}
+
 // ===== Hook 实现 =====
 
 /**
@@ -244,8 +283,14 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
   const savingRef = useRef(false);
   // 排队保存标记：保存期间触发的保存请求被排队，保存完成后重试
   const pendingSaveRef = useRef(false);
-  // 上次保存内容（JSON 字符串）：用于冲突检测
+  // 上次保存内容（完整磁盘内容，含 front matter）：用于冲突检测
+  // 设计说明: 比较的是磁盘原始内容（含 front matter），而非编辑器 JSON，
+  //          避免有/无 front matter 的文件混淆冲突检测
   const lastSavedContentRef = useRef("");
+  // 当前文件的 YAML front matter 原文（含首尾 --- 分隔符与尾部换行）
+  // 加载时剥离并保存，保存时重新注入到正文前，保证 front matter 不丢失
+  // null 表示当前文件无 front matter（旧文件或非章节文件）
+  const frontMatterRef = useRef<string | null>(null);
   // 上次自动创建快照的时间戳（毫秒），节流避免高频快照
   const lastSnapshotTimeRef = useRef(0);
 
@@ -346,30 +391,36 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
     loadPromise
       .then((content) => {
         if (cancelled) return;
-        // 智能识别内容格式（三层兼容读取）：
+        // 剥离 YAML front matter（若存在），保存原文用于保存时重新注入
+        // 修复 Bug: .pmd 文件含 front matter（---\nid:...\ntitle:...\n---）时，
+        //          不匹配 isPmdContent/isHtmlContent，被当纯文本显示在编辑器中
+        const { frontMatter, body } = stripFrontMatter(content);
+        frontMatterRef.current = frontMatter;
+        // 智能识别正文格式（三层兼容读取，基于剥离 front matter 后的 body）：
         // - .pmd 格式（ProseMirror JSON）：JSON.parse 后 setContent(json)
         // - HTML 格式（旧富文本存储）：直接 setContent(html)
         // - 纯文本（旧 .txt 兼容）：按行转 HTML 段落再 setContent
-        if (isPmdContent(content)) {
+        if (isPmdContent(body)) {
           // .pmd 格式：解析 ProseMirror JSON 并直接注入编辑器
           try {
-            const json = JSON.parse(content);
+            const json = JSON.parse(body);
             editor.commands.setContent(json);
           } catch {
             // JSON 解析失败，降级为纯文本处理
-            const html = plainTextToHtml(content);
+            const html = plainTextToHtml(body);
             editor.commands.setContent(html);
           }
-        } else if (isHtmlContent(content)) {
-          editor.commands.setContent(content);
+        } else if (isHtmlContent(body)) {
+          editor.commands.setContent(body);
         } else {
-          const html = plainTextToHtml(content);
+          const html = plainTextToHtml(body);
           editor.commands.setContent(html);
         }
         if (cancelled) return;
         setDirty(false);
-        // 记录上次保存内容（用于冲突检测，使用 JSON 字符串）
-        lastSavedContentRef.current = JSON.stringify(editor.getJSON());
+        // 记录上次保存内容（用于冲突检测，使用完整磁盘内容含 front matter）
+        // 设计说明: 比较磁盘原始内容而非编辑器 JSON，避免 front matter 有无导致误报
+        lastSavedContentRef.current = content;
         setWordCount(countWords(editor.getText()));
         // 记录最近文件
         const relativePath = filePath.replace(
@@ -490,10 +541,16 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
       //   1. 保留 sceneBreak/characterMentionNode 等自定义节点
       //   2. 便于 Tantivy 索引与 AI 上下文提取
       //   3. 避免 HTML 序列化/反序列化的信息丢失
+      // front matter 保留：保存时重新注入 front matter 到正文前，
+      //                  保证文件 id/title 元数据不丢失（与 create_file 注入一致）
       const json = editor.getJSON();
       const jsonStr = JSON.stringify(json);
-      await writeFile(pmdPath, jsonStr, projectPath);
-      lastSavedContentRef.current = jsonStr;
+      const finalContent = frontMatterRef.current
+        ? frontMatterRef.current + jsonStr
+        : jsonStr;
+      await writeFile(pmdPath, finalContent, projectPath);
+      // 冲突检测基准更新为完整写入内容（含 front matter），与磁盘内容一致
+      lastSavedContentRef.current = finalContent;
       setDirty(false);
       useAppStore.getState().setEditorDirty(false);
       showToast("success", t("editor.saved"));

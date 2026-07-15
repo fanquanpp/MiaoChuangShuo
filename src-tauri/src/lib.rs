@@ -68,8 +68,8 @@ pub fn run() {
             commands::project_commands::update_project_meta,
 
             // ============================================================
-            // 文件 IO 命令 (7 项) - commands::file_io_commands
-            // 职责: 项目树读取、文件读写、路径操作
+            // 文件 IO 命令 (8 项) - commands::file_io_commands
+            // 职责: 项目树读取、文件读写、路径操作、打开本地路径
             // ============================================================
             commands::file_io_commands::read_project_tree,
             commands::file_io_commands::read_file,
@@ -78,6 +78,7 @@ pub fn run() {
             commands::file_io_commands::delete_path,
             commands::file_io_commands::rename_path,
             commands::file_io_commands::copy_file,
+            commands::file_io_commands::open_path,
 
             // ============================================================
             // 搜索与统计命令 (4 项) - commands::search_replace_commands / writing_stats_commands

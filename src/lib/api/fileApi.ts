@@ -120,3 +120,13 @@ export async function copyFile(
     projectPath: projectPath,
   });
 }
+
+// 打开本地路径（目录或文件）使用系统默认程序
+// 输入: path 本地路径（目录或文件绝对路径）
+// 输出: Promise<void>
+// 流程: 调用 Rust 后端 open_path 命令（绕过 shell plugin 的 URL scope 限制）
+// 设计说明: Tauri 2.0 shell plugin 的 open() 默认仅允许 URL schemes，
+//          本封装调用 Rust 端命令直接打开本地路径
+export async function openPath(path: string): Promise<void> {
+  return invoke<void>("open_path", { path });
+}

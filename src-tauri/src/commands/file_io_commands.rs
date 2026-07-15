@@ -375,3 +375,34 @@ pub fn copy_file(
     try_sync_index_add(&project_path, &dest_abs);
     Ok(dest_abs.to_string_lossy().to_string())
 }
+
+/// 打开本地路径（目录或文件）使用系统默认程序
+/// 输入: path 本地路径（目录或文件绝对路径）
+/// 输出: Result<(), AppError> 成功或错误
+/// 流程: 跨平台调用系统资源管理器或默认程序打开路径
+/// 设计说明: Tauri 2.0 的 @tauri-apps/plugin-shell 的 open() 方法默认 scope
+///          仅允许 URL schemes (mailto/tel/http/https)，本地路径被拒绝。
+///          本命令绕过 shell plugin 的 URL scope 限制，直接调用系统命令打开本地路径。
+#[tauri::command]
+pub fn open_path(path: String) -> Result<(), AppError> {
+    #[cfg(target_os = "windows")]
+    let (program, args) = ("explorer", vec![path.as_str()]);
+    #[cfg(target_os = "macos")]
+    let (program, args) = ("open", vec![path.as_str()]);
+    #[cfg(target_os = "linux")]
+    let (program, args) = ("xdg-open", vec![path.as_str()]);
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        let _ = path;
+        return Err(AppError::path_validation_error("当前平台不支持打开路径"));
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    {
+        std::process::Command::new(program)
+            .args(&args)
+            .spawn()
+            .map_err(|e| AppError::io_error(e, "打开路径失败"))?;
+        Ok(())
+    }
+}
