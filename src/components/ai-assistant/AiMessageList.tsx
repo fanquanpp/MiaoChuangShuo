@@ -1,4 +1,4 @@
-// AI 消息列表展示组件 (SubTask 12.1)
+// AI 消息列表展示组件 (SubTask 12.1, AI-3.5 增强)
 //
 // 功能概述:
 //   抽取自 AiAssistantPanel 的消息列表渲染逻辑, 负责将多轮对话历史与流式
@@ -10,7 +10,8 @@
 //   2. 渲染 AI 消息气泡 (左对齐, 中性色, 含 Markdown 渲染)
 //   3. 显示流式生成中的脉冲光标
 //   4. 显示错误信息与消息操作按钮 (插入/复制)
-//   5. 自动滚动到最新消息
+//   5. AI-3.5: 失败消息显示重试按钮, 成功消息显示 Token 用量统计
+//   6. 自动滚动到最新消息
 //
 // 设计说明:
 //   - 消息组件为纯展示组件, 通过 props 接收数据与回调
@@ -24,8 +25,11 @@ import {
   Copy,
   Check,
   ClipboardPaste,
+  RotateCcw,
+  Coins,
 } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
+import type { UsageInfo } from "../../lib/aiService";
 import AiMarkdownRenderer from "./AiMarkdownRenderer";
 
 /**
@@ -40,6 +44,7 @@ export type MessageRole = "user" | "assistant";
  * - content:      消息内容 (assistant 流式更新时动态累加)
  * - isStreaming:   是否正在流式生成 (仅 assistant)
  * - error:        生成错误信息 (仅失败时)
+ * - usage:        Token 用量统计 (仅完成且供应商支持 include_usage 时填充)
  * - sceneSnapshot: 关联场景上下文快照 (用户消息携带)
  */
 export interface ChatMessageItem {
@@ -48,6 +53,7 @@ export interface ChatMessageItem {
   content: string;
   isStreaming?: boolean;
   error?: string;
+  usage?: UsageInfo | null;
   sceneSnapshot?: {
     sceneIndex: number;
     sceneTitle: string;
@@ -66,6 +72,8 @@ interface AiMessageListProps {
   onInsertToDoc: (content: string) => void;
   /** 复制消息内容回调 */
   onCopy: (msgId: string, content: string) => void;
+  /** 重试上一条失败的 AI 消息 (AI-3.5) */
+  onRetry?: () => void;
 }
 
 /**
@@ -75,19 +83,22 @@ interface AiMessageListProps {
  *   copiedId      - 已复制消息 ID
  *   onInsertToDoc - 插入到文档回调
  *   onCopy        - 复制回调
+ *   onRetry       - 重试回调 (可选, 失败消息显示)
  * 输出: JSX 消息列表区域
  * 流程:
  *   1. 空列表时渲染占位提示
  *   2. 非空时遍历消息, 渲染用户/AI 气泡
  *   3. AI 消息支持 Markdown 渲染与流式脉冲光标
  *   4. 非流式 AI 消息渲染操作按钮 (插入/复制)
- *   5. 自动滚动到最新消息
+ *   5. AI-3.5: 失败消息渲染重试按钮, 成功消息渲染 Token 用量统计
+ *   6. 自动滚动到最新消息
  */
 export default function AiMessageList({
   messages,
   copiedId,
   onInsertToDoc,
   onCopy,
+  onRetry,
 }: AiMessageListProps) {
   const { t } = useI18n();
   // 滚动锚点 ref (用于自动滚动到底部)
@@ -159,16 +170,30 @@ export default function AiMessageList({
                   <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-fandex-primary animate-pulse align-middle" />
                 )}
               </div>
-              {/* 错误信息 */}
+              {/* 错误信息 + 重试按钮 */}
               {msg.error && !msg.isStreaming && (
-                <p className="mt-1 text-[10px] text-fandex-tertiary flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {msg.error}
-                </p>
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  <p className="text-[10px] text-fandex-tertiary flex items-center gap-1 flex-1 min-w-0">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{msg.error}</span>
+                  </p>
+                  {onRetry && (
+                    <button
+                      type="button"
+                      onClick={onRetry}
+                      title={t("ai.panel.retryHint")}
+                      tabIndex={-1}
+                      className="nf-tool-btn flex items-center gap-1 h-6 px-2 text-[11px] text-nf-text-secondary hover:text-fandex-tertiary hover:bg-nf-bg-hover border border-nf-border-light/50 transition-colors duration-fast"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      {t("ai.panel.retry")}
+                    </button>
+                  )}
+                </div>
               )}
-              {/* 操作按钮 (非流式且非错误状态) */}
+              {/* 操作按钮 (非流式且非错误状态且有内容) */}
               {!msg.isStreaming && msg.content && !msg.error && (
-                <div className="flex items-center gap-1 mt-1.5">
+                <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => onInsertToDoc(msg.content)}
@@ -198,6 +223,26 @@ export default function AiMessageList({
                       </>
                     )}
                   </button>
+                  {/* Token 用量统计 (AI-3.5) */}
+                  {msg.usage && msg.usage.totalTokens > 0 && (
+                    <span
+                      className="flex items-center gap-1 h-6 px-2 text-[10px] text-nf-text-tertiary border border-nf-border-light/50 bg-nf-bg-hover/50 font-mono"
+                      title={t("ai.panel.tokenUsage")}
+                    >
+                      <Coins className="w-3 h-3" />
+                      <span title={t("ai.panel.tokenPrompt")}>
+                        {t("ai.panel.tokenPrompt")[0]}:{msg.usage.promptTokens}
+                      </span>
+                      <span className="text-nf-border">/</span>
+                      <span title={t("ai.panel.tokenCompletion")}>
+                        {t("ai.panel.tokenCompletion")[0]}:{msg.usage.completionTokens}
+                      </span>
+                      <span className="text-nf-border">/</span>
+                      <span title={t("ai.panel.tokenTotal")} className="text-fandex-secondary">
+                        {msg.usage.totalTokens}
+                      </span>
+                    </span>
+                  )}
                 </div>
               )}
             </div>

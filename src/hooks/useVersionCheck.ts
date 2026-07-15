@@ -18,7 +18,7 @@ import { useSettingsStore } from "../lib/settingsStore";
 
 // 默认版本号,与 updateChecker.ts 中 FALLBACK_VERSION 保持同步
 // 用于 package.json 读取失败时的回退显示
-const DEFAULT_APP_VERSION = "26.7.29";
+const DEFAULT_APP_VERSION = "26.7.30";
 
 // 24 小时常量(毫秒),用于限制自动检查频率
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;

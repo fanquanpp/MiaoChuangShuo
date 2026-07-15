@@ -25,6 +25,7 @@ import {
   generateRequestId,
   type ChatMessage,
   type AiConfig,
+  type UsageInfo,
 } from "../lib/aiService";
 
 /**
@@ -38,11 +39,15 @@ export type AccumulateCallback = (
 
 /**
  * 流式完成回调签名
- * 输入: assistantMsgId 当前流式消息 ID, error 错误信息 (可选, 表示异常或取消)
+ * 输入:
+ *   assistantMsgId 当前流式消息 ID
+ *   error         错误信息 (可选, 表示异常或取消)
+ *   usage         Token 用量统计 (可选, done 事件携带, 需供应商支持 stream_options.include_usage)
  */
 export type DoneCallback = (
   assistantMsgId: string,
-  error?: string
+  error?: string,
+  usage?: UsageInfo | null
 ) => void;
 
 /**
@@ -194,9 +199,9 @@ export function useAiStream({
             // 上抛累加结果给父组件更新消息 content
             onAccumulateRef.current(assistantMsgId, accumulated);
           },
-          onDone: (error) => {
-            // 上抛完成状态 (含错误信息)
-            onDoneRef.current(assistantMsgId, error);
+          onDone: (error, usage) => {
+            // 上抛完成状态 (含错误信息与 Token 用量统计)
+            onDoneRef.current(assistantMsgId, error, usage);
           },
         }, requestId);
       } catch (err) {

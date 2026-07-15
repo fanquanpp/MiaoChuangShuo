@@ -112,6 +112,7 @@ pub struct ChatMessage {
 /// - content: 增量文本内容（仅 ai:stream:chunk 事件填充）
 /// - done: 是否流结束（chunk 事件为 false，done/error 事件为 true）
 /// - error: 错误信息（仅 ai:stream:error 事件填充）
+/// - usage: Token 用量统计（可选，done 事件填充，需供应商支持 stream_options.include_usage）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StreamChunk {
@@ -121,6 +122,21 @@ pub struct StreamChunk {
     pub done: bool,
     /// 错误信息（可选）
     pub error: Option<String>,
+    /// Token 用量统计（可选，done 事件填充）
+    #[serde(default)]
+    pub usage: Option<UsageInfo>,
+}
+
+/// Token 用量统计信息（OpenAI 协议 usage 字段）
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageInfo {
+    /// Prompt Token 数（输入）
+    pub prompt_tokens: u32,
+    /// Completion Token 数（输出）
+    pub completion_tokens: u32,
+    /// 总 Token 数
+    pub total_tokens: u32,
 }
 
 /// 流式聊天补全命令
@@ -167,6 +183,7 @@ pub async fn chat_completion_stream(
     );
 
     // 构造请求体（OpenAI 兼容协议）
+    // stream_options.include_usage: true 请求供应商在流末尾推送 usage 统计
     let body = serde_json::json!({
         "model": config.model_name,
         "messages": messages.iter().map(|m| {
@@ -174,7 +191,8 @@ pub async fn chat_completion_stream(
         }).collect::<Vec<_>>(),
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,
-        "stream": true
+        "stream": true,
+        "stream_options": {"include_usage": true}
     });
 
     // 创建 HTTP 客户端并发起请求
@@ -194,6 +212,7 @@ pub async fn chat_completion_stream(
                 content: String::new(),
                 done: true,
                 error: Some(msg.clone()),
+                usage: None,
             });
             // 清理取消令牌，避免映射表残留
             remove_cancel_token(&request_id);
@@ -209,6 +228,7 @@ pub async fn chat_completion_stream(
             content: String::new(),
             done: true,
             error: Some(msg.clone()),
+            usage: None,
         });
         remove_cancel_token(&request_id);
         return Err(msg);
@@ -219,6 +239,8 @@ pub async fn chat_completion_stream(
     // SSE chunk 边界缓冲区：HTTP 流可能将一个 SSE 事件分割到多个 chunk
     // 使用 buffer 累积未解析完成的内容，仅在遇到换行符时处理完整行
     let mut buffer = String::new();
+    // 累积 usage 统计（部分供应商在流末尾单独推送 usage chunk）
+    let mut accumulated_usage: Option<UsageInfo> = None;
 
     // 逐块读取并解析 SSE
     while let Some(chunk_result) = stream.next().await {
@@ -228,6 +250,7 @@ pub async fn chat_completion_stream(
                 content: String::new(),
                 done: true,
                 error: Some("用户取消请求".to_string()),
+                usage: accumulated_usage.clone(),
             });
             remove_cancel_token(&request_id);
             return Ok(());
@@ -240,6 +263,7 @@ pub async fn chat_completion_stream(
                 content: String::new(),
                 done: true,
                 error: Some(msg.clone()),
+                usage: None,
             });
             // 清理取消令牌，避免映射表残留
             remove_cancel_token(&request_id);
@@ -273,6 +297,7 @@ pub async fn chat_completion_stream(
                         content: String::new(),
                         done: true,
                         error: None,
+                        usage: accumulated_usage.clone(),
                     });
                     remove_cancel_token(&request_id);
                     return Ok(());
@@ -286,7 +311,21 @@ pub async fn chat_completion_stream(
                             content: delta.to_string(),
                             done: false,
                             error: None,
+                            usage: None,
                         });
+                    }
+                    // 提取 usage 字段（部分供应商在流末尾单独推送 usage chunk）
+                    if let Some(usage) = json.get("usage") {
+                        if !usage.is_null() {
+                            let prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(0) as u32;
+                            let completion_tokens = usage["completion_tokens"].as_u64().unwrap_or(0) as u32;
+                            let total_tokens = usage["total_tokens"].as_u64().unwrap_or(0) as u32;
+                            accumulated_usage = Some(UsageInfo {
+                                prompt_tokens,
+                                completion_tokens,
+                                total_tokens,
+                            });
+                        }
                     }
                     // 注意：部分 chunk 可能只有 role 字段（首个 chunk），无 content，跳过即可
                 }
@@ -300,6 +339,7 @@ pub async fn chat_completion_stream(
         content: String::new(),
         done: true,
         error: None,
+        usage: accumulated_usage.clone(),
     });
     // 清理取消令牌，避免内存泄漏
     remove_cancel_token(&request_id);

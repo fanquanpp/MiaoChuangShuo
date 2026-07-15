@@ -1,9 +1,9 @@
-// AI 助手侧边栏面板组件 (重构版 SubTask 12.6)
+// AI 助手侧边栏面板组件 (重构版 SubTask 12.6, AI-3.5 交互增强)
 //
 // 功能概述:
 //   右侧滑出 AI 创作助手面板容器. 通过组合 AiMessageList / AiInputBar /
 //   AiTaskTypeSelector / AiMarkdownRenderer / useAiStream / usePromptBuilder
-//   等子模块, 仅保留面板容器职责与跨子组件状态协调, 行数控制在 300 以内.
+//   等子模块, 仅保留面板容器职责与跨子组件状态协调, 行数控制在 350 以内.
 //
 // 模块职责 (重构后):
 //   1. 渲染 Portal 容器与头部
@@ -11,26 +11,39 @@
 //   3. 协调外部注入指令 (pendingInstruction + EditorBubbleMenu 4 个命令)
 //   4. 委托 usePromptBuilder 构建 Prompt, useAiStream 处理流式请求
 //   5. 委托子组件渲染消息列表 / 输入栏 / 任务类型切换
+//   6. AI-3.5: 流式失败重试 / 插入文档 5 秒撤销条 / Token 用量透传
 //
 // 设计说明:
 //   - 子组件为纯展示/交互组件, 业务逻辑通过 hooks 沉淀
 //   - 所有 setTimeout 通过 useAiStream 跟踪, 卸载时统一清理 (Task 35.2)
 //   - handleSendRef 暴露给 pendingInstruction useEffect, 避免闭包过期
+//   - AI-3.5: lastInstructionRef 缓存最近一次发送指令, 供重试按钮复用
+//   - AI-3.5: undoBar 状态控制插入文档后的 5 秒撤销窗口, 基于 TipTap 原生 undo
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Sparkles, X, Trash2, AlertCircle } from "lucide-react";
+import { Sparkles, X, Trash2, AlertCircle, Undo2 } from "lucide-react";
 import type { Editor } from "@tiptap/react";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 import { usePreferencesStore } from "../lib/preferencesSlice";
-import { getAiConfig, type ChatMessage, type AiConfig } from "../lib/aiService";
+import {
+  getAiConfig,
+  type ChatMessage,
+  type AiConfig,
+  type UsageInfo,
+} from "../lib/aiService";
 import { type AiTaskType } from "../lib/promptBuilder";
 import { usePromptBuilder, locateScene } from "../hooks/usePromptBuilder";
 import { useAiStream } from "../hooks/useAiStream";
 import AiMessageList, { type ChatMessageItem } from "./ai-assistant/AiMessageList";
 import AiInputBar from "./ai-assistant/AiInputBar";
 import AiTaskTypeSelector from "./ai-assistant/AiTaskTypeSelector";
+
+/** 撤销窗口时长 (毫秒) */
+const UNDO_WINDOW_MS = 5000;
+/** 撤销条倒计时刷新间隔 (毫秒) */
+const UNDO_TICK_MS = 1000;
 
 /**
  * 面板属性 (与重构前兼容, 不破坏 NovelEditor 调用)
@@ -50,7 +63,17 @@ interface AiAssistantPanelProps {
 }
 
 /**
- * AI 助手侧边栏面板 (重构版)
+ * 撤销条状态
+ * - remaining: 剩余秒数 (用于显示倒计时)
+ * - canUndo:   编辑器是否支持撤销 (基于 TipTap can().undo() 判断)
+ */
+interface UndoBarState {
+  remaining: number;
+  canUndo: boolean;
+}
+
+/**
+ * AI 助手侧边栏面板 (重构版 + AI-3.5 增强)
  * 输入: 见 AiAssistantPanelProps
  * 输出: JSX 右侧滑出面板 (Portal 渲染到 body)
  */
@@ -80,10 +103,14 @@ export default function AiAssistantPanel({
   const [taskType, setTaskType] = useState<AiTaskType>("continuation");
   const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
   const [activeSelectedText, setActiveSelectedText] = useState<string | null>(null);
+  // AI-3.5: 插入文档撤销条状态 (null 表示隐藏)
+  const [undoBar, setUndoBar] = useState<UndoBarState | null>(null);
 
   // ── refs ──
   const aiConfigRef = useRef<AiConfig | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // AI-3.5: 最近一次发送的指令缓存 (供重试按钮复用, 避免重发时依赖 input 状态)
+  const lastInstructionRef = useRef<string>("");
 
   // ── Prompt 构建 hook ──
   const { buildPromptByTask } = usePromptBuilder({
@@ -109,11 +136,16 @@ export default function AiAssistantPanel({
       );
     }, []),
     onDone: useCallback(
-      (msgId: string, error?: string) => {
+      (msgId: string, error?: string, usage?: UsageInfo | null) => {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === msgId
-              ? { ...m, isStreaming: false, error: error || undefined }
+              ? {
+                  ...m,
+                  isStreaming: false,
+                  error: error || undefined,
+                  usage: usage ?? undefined,
+                }
               : m
           )
         );
@@ -192,6 +224,7 @@ export default function AiAssistantPanel({
    *   3. 调用 buildPromptByTask 构建 Prompt
    *   4. 组装 chatMessages (含最近 4 轮历史)
    *   5. 调用 startStream 流式生成
+   *   6. AI-3.5: 缓存最近一次指令到 lastInstructionRef, 供重试按钮复用
    */
   const handleSend = useCallback(
     async (overrideInstruction?: string) => {
@@ -248,6 +281,8 @@ export default function AiAssistantPanel({
       setInput("");
       setIsStreaming(true);
       setPanelError(null);
+      // AI-3.5: 缓存本次发送的指令, 供失败后重试按钮复用
+      lastInstructionRef.current = instruction;
 
       try {
         const builtPrompt = await buildPromptByTask(taskType, instruction, sceneLoc);
@@ -261,10 +296,11 @@ export default function AiAssistantPanel({
         }
 
         // 组装聊天消息 (含历史, 最近 4 轮避免 Token 爆炸)
+        // 注意: 此处历史需排除当前刚插入的 user 占位消息, 仅取之前的有效消息
+        const recentHistory = messages.slice(-8);
         const chatMessages: ChatMessage[] = [
           { role: "system", content: builtPrompt.system },
         ];
-        const recentHistory = messages.slice(-8);
         for (const msg of recentHistory) {
           if (msg.content && !msg.isStreaming) {
             chatMessages.push({ role: msg.role, content: msg.content });
@@ -312,6 +348,32 @@ export default function AiAssistantPanel({
   const handleSendRef = useRef(handleSend);
   handleSendRef.current = handleSend;
 
+  /**
+   * AI-3.5: 重试上一条失败的 AI 消息
+   * 流程:
+   *   1. 校验不在流式生成中
+   *   2. 读取 lastInstructionRef 缓存的最近指令
+   *   3. 移除最后一条失败的 assistant 消息 (保留 user 消息)
+   *   4. 重新调用 handleSend(缓存的指令) 触发新一轮生成
+   */
+  const handleRetry = useCallback(() => {
+    if (isStreaming) return;
+    const lastInstruction = lastInstructionRef.current;
+    if (!lastInstruction) return;
+    // 移除最后一条失败的 assistant 消息 (保留 user 消息)
+    setMessages((prev) => {
+      const lastAssistantIdx = [...prev].reverse().findIndex((m) => m.role === "assistant");
+      if (lastAssistantIdx === -1) return prev;
+      const actualIdx = prev.length - 1 - lastAssistantIdx;
+      const last = prev[actualIdx];
+      // 仅当最后一条 assistant 消息处于错误态时才移除
+      if (!last.error) return prev;
+      return prev.filter((_, idx) => idx !== actualIdx);
+    });
+    // 通过 handleSendRef 调用最新版 handleSend, 避免闭包过期
+    void handleSendRef.current?.(lastInstruction);
+  }, [isStreaming]);
+
   // ── 外部注入指令自动发送 (AI-3.4 / Sprint 6 任务触发) ──
   useEffect(() => {
     if (!open || !pendingInstruction) return;
@@ -339,11 +401,13 @@ export default function AiAssistantPanel({
     clearTrackedTimeout,
   ]);
 
-  /** 清空对话历史 */
+  /** 清空对话历史 (同时清空重试缓存) */
   const handleClear = useCallback(() => {
     if (isStreaming) return;
     setMessages([]);
     setPanelError(null);
+    lastInstructionRef.current = "";
+    setUndoBar(null);
   }, [isStreaming]);
 
   /** 复制消息内容到剪贴板 (Task 35.2: setTimeout 跟踪, 卸载时统一清理) */
@@ -362,8 +426,41 @@ export default function AiAssistantPanel({
   );
 
   /**
+   * AI-3.5: 执行 TipTap 撤销 (undo)
+   * 流程:
+   *   1. 校验编辑器就绪且支持撤销
+   *   2. 调用 editor.chain().focus().undo().run()
+   *   3. 隐藏撤销条, 显示成功 toast
+   *   4. 失败时显示错误 toast
+   */
+  const performUndo = useCallback(() => {
+    if (!editor || editor.isDestroyed) {
+      showToast("error", t("ai.panel.editorNotReady"));
+      setUndoBar(null);
+      return;
+    }
+    try {
+      if (!editor.can().undo()) {
+        showToast("warning", t("ai.panel.undoFailed"));
+        setUndoBar(null);
+        return;
+      }
+      editor.chain().focus().undo().run();
+      showToast("success", t("ai.panel.undoSucceeded"));
+    } catch (err) {
+      showToast("error", `${t("ai.panel.undoFailed")}: ${String(err)}`);
+    }
+    setUndoBar(null);
+  }, [editor, t, showToast]);
+
+  /**
    * 插入 AI 回复到编辑器当前光标位置
-   * 流程: 按 \n 分割为多个段落, 每段插入为 <p> 节点
+   * AI-3.5 增强: 插入后显示 5 秒撤销条, 用户可点击撤销
+   * 流程:
+   *   1. 按 \n 分割为多个段落, 每段插入为 <p> 节点
+   *   2. 插入后检测编辑器是否支持 undo
+   *   3. 若支持 undo, 显示撤销条并启动 5 秒倒计时
+   *   4. 倒计时结束自动隐藏撤销条
    */
   const handleInsertToDoc = useCallback(
     (content: string) => {
@@ -383,12 +480,42 @@ export default function AiAssistantPanel({
         }));
         editor.chain().focus().insertContent(contentNodes).run();
         showToast("success", t("ai.panel.inserted"));
+
+        // AI-3.5: 插入成功后显示 5 秒撤销条 (需编辑器支持 undo)
+        const canUndo = editor.can().undo();
+        if (canUndo) {
+          setUndoBar({ remaining: Math.floor(UNDO_WINDOW_MS / 1000), canUndo: true });
+        }
       } catch (err) {
         showToast("error", `${t("ai.panel.insertFailed")}: ${String(err)}`);
       }
     },
     [editor, t, showToast]
   );
+
+  /**
+   * AI-3.5: 撤销条倒计时 useEffect
+   * 流程:
+   *   1. undoBar 显示时启动 1 秒间隔的 tick 计时器
+   *   2. 每秒递减 remaining
+   *   3. remaining <= 0 时自动隐藏
+   *   4. 所有 setTimeout 通过 registerTimeout 跟踪, 卸载或重新触发时清理
+   */
+  useEffect(() => {
+    if (!undoBar) return;
+    if (undoBar.remaining <= 0) {
+      setUndoBar(null);
+      showToast("info", t("ai.panel.undoExpired"));
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setUndoBar((prev) =>
+        prev ? { ...prev, remaining: prev.remaining - 1 } : null
+      );
+    }, UNDO_TICK_MS);
+    registerTimeout(timer);
+    return () => clearTrackedTimeout(timer);
+  }, [undoBar, registerTimeout, clearTrackedTimeout, showToast, t]);
 
   /**
    * 任务类型切换回调: 同步本地任务类型并清理关联上下文
@@ -476,7 +603,27 @@ export default function AiAssistantPanel({
           copiedId={copiedId}
           onInsertToDoc={handleInsertToDoc}
           onCopy={handleCopy}
+          onRetry={handleRetry}
         />
+
+        {/* AI-3.5: 撤销条 (插入文档后 5 秒内显示) */}
+        {undoBar && undoBar.canUndo && (
+          <div className="px-3 py-2 border-t border-fandex-primary/30 bg-fandex-primary/10 flex items-center justify-between gap-2 animate-slide-in-right">
+            <div className="flex items-center gap-2 min-w-0">
+              <Undo2 className="w-3.5 h-3.5 text-fandex-primary flex-shrink-0" />
+              <span className="text-[11px] text-nf-text-secondary truncate">
+                {t("ai.panel.undoInsertHint", { seconds: undoBar.remaining })}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={performUndo}
+              className="flex-shrink-0 px-2 py-1 text-[11px] font-medium text-fandex-primary hover:bg-fandex-primary/15 border border-fandex-primary/40 transition-colors duration-fast"
+            >
+              {t("ai.panel.undoInsert")}
+            </button>
+          </div>
+        )}
 
         {/* 输入区 (委托 AiInputBar) */}
         <AiInputBar

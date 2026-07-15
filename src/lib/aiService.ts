@@ -35,7 +35,7 @@ export interface ChatMessage {
  * 与后端 ai_config.rs AiConfig 结构体字段对齐
  */
 export interface AiConfig {
-  /** Base64 编码的 API Key */
+  /** Base64 编码的 API Key（前端读写使用，后端透明处理钥匙串存储） */
   apiKey: string;
   /** LLM API 基础地址（OpenAI 兼容协议） */
   baseUrl: string;
@@ -47,6 +47,10 @@ export interface AiConfig {
   temperature: number;
   /** 单次生成最大 Token 数 */
   maxTokens: number;
+  /** 供应商标识（前端 providerRegistry.ts 中的 provider.id） */
+  providerId: string;
+  /** 是否使用系统钥匙串存储 API Key */
+  useSecureStorage: boolean;
 }
 
 /**
@@ -59,6 +63,51 @@ interface StreamChunk {
   done: boolean;
   /** 错误信息（可选） */
   error: string | null;
+  /** Token 用量统计（可选，done 事件填充） */
+  usage: UsageInfo | null;
+}
+
+/**
+ * Token 用量统计信息（OpenAI 协议 usage 字段）
+ * 与后端 ai_commands.rs UsageInfo 结构体字段对齐
+ */
+export interface UsageInfo {
+  /** Prompt Token 数（输入） */
+  promptTokens: number;
+  /** Completion Token 数（输出） */
+  completionTokens: number;
+  /** 总 Token 数 */
+  totalTokens: number;
+}
+
+/**
+ * 连通性测试结果（增强版，返回延迟与模型响应）
+ * 与后端 ai_config.rs ConnectionTestResult 结构体字段对齐
+ */
+export interface ConnectionTestResult {
+  /** 是否连通成功 */
+  success: boolean;
+  /** 结果消息 */
+  message: string;
+  /** 请求耗时（毫秒） */
+  latencyMs: number;
+  /** 模型返回的文本内容（成功时填充） */
+  modelResponse: string | null;
+}
+
+/**
+ * 模型信息（OpenAI /v1/models 端点返回）
+ * 与后端 ai_config.rs ModelInfo 结构体字段对齐
+ */
+export interface ModelInfo {
+  /** 模型 ID（如 deepseek-chat） */
+  id: string;
+  /** 模型所属对象（通常是 model） */
+  object: string;
+  /** 模型创建时间戳（Unix 秒） */
+  created: number | null;
+  /** 模型拥有者（如 deepseek、openai） */
+  ownedBy: string | null;
 }
 
 /**
@@ -67,8 +116,8 @@ interface StreamChunk {
 export interface StreamCallbacks {
   /** 增量内容回调（每个 chunk 触发一次） */
   onChunk: (content: string) => void;
-  /** 流结束回调（可选，error 字段表示取消或异常结束） */
-  onDone?: (error?: string) => void;
+  /** 流结束回调（可选，error 字段表示取消或异常结束，usage 包含 Token 统计） */
+  onDone?: (error?: string, usage?: UsageInfo | null) => void;
 }
 
 /**
@@ -138,12 +187,12 @@ export async function streamChatCompletion(
     }
   });
 
-  // 注册 done 事件监听（流结束，含正常结束与用户取消）
+  // 注册 done 事件监听（流结束，含正常结束与用户取消，附带 usage 统计）
   unlistenDone = await listen<StreamChunk>("ai:stream:done", (event) => {
     if (settled) return;
     settled = true;
     cleanup();
-    callbacks.onDone?.(event.payload.error ?? undefined);
+    callbacks.onDone?.(event.payload.error ?? undefined, event.payload.usage);
     resolvePromise();
   });
 
@@ -206,11 +255,22 @@ export async function setAiConfig(config: AiConfig): Promise<void> {
 }
 
 /**
- * 测试 AI 连通性
+ * 测试 AI 连通性（增强版，返回延迟与模型响应）
  *
  * 输入: config AI 配置
- * 输出: Promise<string> 成功返回提示信息，失败抛出错误
+ * 输出: Promise<ConnectionTestResult> 测试结果（含 success/message/latencyMs/modelResponse）
  */
-export async function testAiConnection(config: AiConfig): Promise<string> {
-  return invoke<string>("test_ai_connection", { config });
+export async function testAiConnection(config: AiConfig): Promise<ConnectionTestResult> {
+  return invoke<ConnectionTestResult>("test_ai_connection", { config });
+}
+
+/**
+ * 拉取可用模型列表
+ *
+ * 输入: config AI 配置（含 API Key 与 Base URL）
+ * 输出: Promise<ModelInfo[]> 模型列表（按 id 排序）
+ * 说明: 调用 OpenAI 兼容 /v1/models 端点，部分供应商可能不支持
+ */
+export async function listModels(config: AiConfig): Promise<ModelInfo[]> {
+  return invoke<ModelInfo[]>("list_models", { config });
 }

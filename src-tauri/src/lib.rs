@@ -184,12 +184,14 @@ pub fn run() {
             ai_context::get_project_context,
 
             // ============================================================
-            // AI 配置管理命令 (3 项) - ai_config
-            // 职责: BYOK 模式下的 API Key/Base URL/Model 持久化与连通性测试
+            // AI 配置管理命令 (4 项) - ai_config
+            // 职责: BYOK 模式下的 API Key/Base URL/Model 持久化、连通性测试与模型列表拉取
+            // 安全升级: API Key 优先存入系统钥匙串, 失败回退 Base64
             // ============================================================
             ai_config::get_ai_config,
             ai_config::set_ai_config,
             ai_config::test_ai_connection,
+            ai_config::list_models,
 
             // ============================================================
             // AI 流式聊天命令 (2 项) - ai_commands
@@ -198,7 +200,7 @@ pub fn run() {
             ai_commands::chat_completion_stream,
             ai_commands::cancel_chat_completion,
             // ============================================================
-            // 命令注册总计: 65 项,按 16 个业务模块分组
+            // 命令注册总计: 66 项,按 16 个业务模块分组
             // ============================================================
         ])
         .setup(|_app| {
