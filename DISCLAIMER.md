@@ -1,3 +1,5 @@
+> 最后更新：2026 年 7 月
+
 # 免责声明
 
 本免责声明是 [LICENSE](./LICENSE)（CC-BY-NC-4.0 协议第 5 节 Disclaimer of Warranties and Limitation of Liability）的中文补充说明, 与 LICENSE 文件具有同等法律效力。若中英文版本存在歧义, 以 LICENSE 英文原版为准。
@@ -53,3 +55,7 @@
 ---
 
 详细安全政策与 AI Key 安全说明见 [SECURITY.md](./SECURITY.md), 完整许可协议见 [LICENSE](./LICENSE)。
+
+---
+
+> 当前适用版本：v26.7.32

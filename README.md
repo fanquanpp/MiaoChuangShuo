@@ -64,6 +64,7 @@
 
 - **在线体验版 (Web 版, 无需下载)**: [https://fanquanpp.github.io/MiaoChuangShuo/](https://fanquanpp.github.io/MiaoChuangShuo/)
 - **在线展示 (报名网页)**: [https://fanquanpp.github.io/MiaoChuangShuo/docs/](https://fanquanpp.github.io/MiaoChuangShuo/docs/)
+- **TRAE 报名页 (GitHub 直链)**: [https://github.com/fanquanpp/MiaoChuangShuo/blob/master/docs/index.html](https://github.com/fanquanpp/MiaoChuangShuo/blob/master/docs/index.html)
 - **源码仓库**: [https://github.com/fanquanpp/MiaoChuangShuo](https://github.com/fanquanpp/MiaoChuangShuo)
 - **发布下载**: [https://github.com/fanquanpp/MiaoChuangShuo/releases](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 
@@ -569,7 +570,9 @@ npm run tauri build
 | `src-tauri/tauri.conf.json` | `version` |
 | `src/lib/updateChecker.ts` | `FALLBACK_VERSION` |
 | `src/components/Launcher.tsx` | `appVersion` useState 初始值 |
-| `src/components/settings/SettingsDialog.tsx` | `currentVersion` useState 初始值 |
+| `src/components/settings/AboutSettingsSection.tsx` | `currentVersion` useState 初始值 |
+
+> 注: `src/components/Launcher.tsx` 经 `useVersionCheck` hook 派生 `appVersion`（实际值来源于 `updateChecker.ts` 的 `FALLBACK_VERSION`）。
 
 可使用 `scripts/sync-version.mjs` 自动同步版本号:
 
@@ -658,7 +661,7 @@ Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
 Windows 平台采用 DPAPI (Data Protection API) 加密 API Key:
 
 - 旧版本使用 Base64 编码存储, 安全等级低
-- v26.8.0 起改用 DPAPI 加密, 绑定 Windows 用户账户, 仅当前账户可解密
+- v26.7.32 起改用 DPAPI 加密, 绑定 Windows 用户账户, 仅当前账户可解密
 - 旧 Base64 数据首次读取时自动迁移为 DPAPI 加密
 - macOS / Linux 平台使用 keychain / keyring 系统密钥存储
 
@@ -667,6 +670,17 @@ Windows 平台采用 DPAPI (Data Protection API) 加密 API Key:
 Tauri 2.0 的 `@tauri-apps/plugin-shell` 的 `open()` 方法默认 scope regex `^((mailto:\w+)|(tel:\w+)|(https?:\/\/\w+)).+` 仅允许 URL schemes, 本地路径被拒绝。
 
 解决方案: 在 Rust 端 `file_io_commands.rs` 新增 `open_path` 命令, 直接调用系统资源管理器 (`explorer`/`open`/`xdg-open`) 打开本地路径, 绕过 shell plugin 的 URL scope 限制。前端通过 `fileApi.ts` 的 `openPath` 封装调用, 用于"打开日志目录"等功能。
+
+### 8.10 Web 在线体验版与报名页
+
+项目通过 GitHub Pages 提供两个独立入口, 用途不同:
+
+- **Web 在线体验版**: `https://fanquanpp.github.io/MiaoChuangShuo/`（根路径）
+  - 由 `web/` 目录构建, 提供与桌面版近似的核心写作功能体验（富文本编辑、章节管理、字数统计、IndexedDB 持久化等）
+- **TRAE 报名展示页**: `https://fanquanpp.github.io/MiaoChuangShuo/docs/`（/docs/ 子路径）
+  - 由 `docs/index.html` 静态页面构建, 介绍项目特性、技术栈与路线图, 用于 TRAE 大赛报名展示
+
+两个入口由 `.github/workflows/deploy-web.yml` 工作流统一部署, 构建时会将 `docs/` 目录复制到 `dist-web/docs/`。
 
 </details>
 

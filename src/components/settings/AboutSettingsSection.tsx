@@ -63,6 +63,15 @@ const GITHUB_REPO_URL = "https://github.com/fanquanpp/MiaoChuangShuo";
 const GITHUB_ISSUES_URL = "https://github.com/fanquanpp/MiaoChuangShuo/issues";
 const GITHUB_LICENSE_URL =
   "https://github.com/fanquanpp/MiaoChuangShuo/blob/master/LICENSE";
+const GITHUB_RELEASES_URL = "https://github.com/fanquanpp/MiaoChuangShuo/releases";
+const GITHUB_DISCLAIMER_URL =
+  "https://github.com/fanquanpp/MiaoChuangShuo/blob/master/DISCLAIMER.md";
+const GITHUB_SECURITY_URL =
+  "https://github.com/fanquanpp/MiaoChuangShuo/blob/master/SECURITY.md";
+const GITHUB_CONTRIBUTING_URL =
+  "https://github.com/fanquanpp/MiaoChuangShuo/blob/master/CONTRIBUTING.md";
+const WEB_DEMO_URL = "https://fanquanpp.github.io/MiaoChuangShuo/";
+const TRAE_SHOWCASE_URL = "https://fanquanpp.github.io/MiaoChuangShuo/docs/";
 
 // 日志目录路径片段（Windows: %APPDATA%\MiaoChuangShuo\logs）
 const APP_DATA_DIR_NAME = "MiaoChuangShuo";
@@ -338,6 +347,31 @@ export default function AboutSettingsSection() {
       url: "https://tailwindcss.com/",
       desc: "原子化 CSS 框架",
     },
+    {
+      name: "@xyflow/react",
+      url: "https://github.com/xyflow/xyflow",
+      desc: "React Flow 官方 npm 包，提供受控的节点/边系统",
+    },
+    {
+      name: "cmdk",
+      url: "https://cmdk.paco.me/",
+      desc: "命令面板引擎，提供类 VS Code 的 Ctrl+K 体验",
+    },
+    {
+      name: "zundo",
+      url: "https://github.com/charkour/zundo",
+      desc: "Zustand 时间旅行中间件，用于撤销/重做历史管理",
+    },
+    {
+      name: "framer-motion",
+      url: "https://www.framer.com/motion/",
+      desc: "弹簧物理动画库，用于模板展开与卡片悬停动画",
+    },
+    {
+      name: "@dagrejs/dagre",
+      url: "https://github.com/dagrejs/dagre",
+      desc: "DAG 自动布局算法，用于图谱节点分层排列",
+    },
   ];
 
   return (
@@ -508,6 +542,48 @@ export default function AboutSettingsSection() {
           </div>
         </div>
 
+        {/* ===== 项目主页区 ===== */}
+        <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5 space-y-4">
+          <h3 className="text-sm font-medium text-nf-text flex items-center gap-2">
+            <ExternalLink className="w-3.5 h-3.5 text-fandex-primary" />
+            {t("about.projectHome")}
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            <button
+              onClick={() => openExternalUrl(WEB_DEMO_URL)}
+              className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] bg-nf-bg-hover hover:bg-fandex-primary/10 border border-nf-border-light hover:border-fandex-primary/40 text-nf-text-secondary hover:text-fandex-primary transition duration-fast rounded"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {t("about.webDemo")}
+              <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+            </button>
+            <button
+              onClick={() => openExternalUrl(TRAE_SHOWCASE_URL)}
+              className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] bg-nf-bg-hover hover:bg-fandex-primary/10 border border-nf-border-light hover:border-fandex-primary/40 text-nf-text-secondary hover:text-fandex-primary transition duration-fast rounded"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {t("about.trafeShowcase")}
+              <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+            </button>
+            <button
+              onClick={() => openExternalUrl(GITHUB_REPO_URL)}
+              className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] bg-nf-bg-hover hover:bg-fandex-primary/10 border border-nf-border-light hover:border-fandex-primary/40 text-nf-text-secondary hover:text-fandex-primary transition duration-fast rounded"
+            >
+              <Code className="w-3 h-3" />
+              {t("about.githubRepo")}
+              <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+            </button>
+            <button
+              onClick={() => openExternalUrl(GITHUB_RELEASES_URL)}
+              className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] bg-nf-bg-hover hover:bg-fandex-primary/10 border border-nf-border-light hover:border-fandex-primary/40 text-nf-text-secondary hover:text-fandex-primary transition duration-fast rounded"
+            >
+              <Tag className="w-3 h-3" />
+              {t("about.viewReleases")}
+              <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+            </button>
+          </div>
+        </div>
+
         {/* ===== 更新检查区（保留原有功能） ===== */}
         <div className="bg-zinc-900/40 rounded-lg p-4 border border-white/5">
           <div className="flex items-center gap-2 mb-3">
@@ -642,13 +718,29 @@ export default function AboutSettingsSection() {
               <p className="text-[11px] text-nf-text-tertiary leading-relaxed mb-2">
                 {t("about.licenseDesc")}
               </p>
-              <button
-                onClick={() => openExternalUrl(GITHUB_LICENSE_URL)}
-                className="flex items-center gap-1.5 text-[11px] text-fandex-primary hover:text-fandex-primary-hover transition duration-fast"
-              >
-                <ExternalLink className="w-3 h-3" />
-                {t("about.licenseLink")}
-              </button>
+              <div className="space-y-1.5">
+                <button
+                  onClick={() => openExternalUrl(GITHUB_LICENSE_URL)}
+                  className="flex items-center gap-1.5 text-[11px] text-fandex-primary hover:text-fandex-primary-hover transition duration-fast"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {t("about.licenseLink")}
+                </button>
+                <button
+                  onClick={() => openExternalUrl(GITHUB_SECURITY_URL)}
+                  className="flex items-center gap-1.5 text-[11px] text-fandex-primary hover:text-fandex-primary-hover transition duration-fast"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {t("about.viewSecurity")}
+                </button>
+                <button
+                  onClick={() => openExternalUrl(GITHUB_CONTRIBUTING_URL)}
+                  className="flex items-center gap-1.5 text-[11px] text-fandex-primary hover:text-fandex-primary-hover transition duration-fast"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {t("about.viewContributing")}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -664,6 +756,13 @@ export default function AboutSettingsSection() {
               <p className="text-[11px] text-nf-text-tertiary leading-relaxed">
                 {t("about.disclaimerDesc")}
               </p>
+              <button
+                onClick={() => openExternalUrl(GITHUB_DISCLAIMER_URL)}
+                className="mt-2 flex items-center gap-1.5 text-[11px] text-fandex-primary hover:text-fandex-primary-hover transition duration-fast"
+              >
+                <ExternalLink className="w-3 h-3" />
+                {t("about.viewDisclaimer")}
+              </button>
             </div>
           </div>
         </div>

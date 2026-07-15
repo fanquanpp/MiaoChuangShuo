@@ -1189,6 +1189,12 @@ const zhCN: TranslationDict = {
   "about.reportIssue": "报告问题",
   "about.viewReleases": "查看发布",
   "about.madeFor": "为独立与业余创作者而造",
+  "about.projectHome": "项目主页",
+  "about.webDemo": "Web 在线体验版",
+  "about.trafeShowcase": "TRAE 报名展示页",
+  "about.viewDisclaimer": "查看完整免责声明",
+  "about.viewSecurity": "查看安全政策",
+  "about.viewContributing": "查看贡献指南",
 
   // ── 启动器 - 项目目录 ──
   "launcher.projectDir": "项目存放目录",
@@ -2606,6 +2612,12 @@ const enUS: TranslationDict = {
   "about.reportIssue": "Report Issue",
   "about.viewReleases": "View Releases",
   "about.madeFor": "Made for independent and amateur writers",
+  "about.projectHome": "Project Home",
+  "about.webDemo": "Web Demo",
+  "about.trafeShowcase": "TRAE Showcase",
+  "about.viewDisclaimer": "View full disclaimer",
+  "about.viewSecurity": "View Security Policy",
+  "about.viewContributing": "View Contributing Guide",
 
   // ── Launcher - Project Directory ──
   "launcher.projectDir": "Project Directory",

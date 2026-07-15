@@ -13,7 +13,7 @@ body:
     attributes:
       label: 应用版本
       description: 在「设置 - 关于」中查看当前版本号（如 v26.8.0）
-      placeholder: "v26.8.0"
+      placeholder: "v26.7.32"
     validations:
       required: true
 

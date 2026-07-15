@@ -135,8 +135,8 @@ npm run build
 | `src-tauri/Cargo.lock` | `version`（miaochuangshuo 包条目） |
 | `src-tauri/tauri.conf.json` | `version` |
 | `src/lib/updateChecker.ts` | `FALLBACK_VERSION` |
-| `src/components/Launcher.tsx` | `appVersion` useState 初始值 |
-| `src/components/settings/SettingsDialog.tsx` | `currentVersion` useState 初始值 |
+| `src/components/Launcher.tsx` | 经 `useVersionCheck` hook 派生 `appVersion`，实际值来源于 `updateChecker.ts` 的 `FALLBACK_VERSION` |
+| `src/components/settings/AboutSettingsSection.tsx` | `currentVersion` useState 初始值 |
 
 版本号格式：`YY.MM.修改序号`（如 `26.7.32`）。
 

@@ -32,7 +32,7 @@ Closes #
 - [ ] 已通过 `cargo check --manifest-path src-tauri/Cargo.toml`
 - [ ] 已通过 `npm run build`
 - [ ] 新增 / 修改的文案已添加中英文 i18n 键
-- [ ] 涉及版本号变更已同步 6 处位置（package.json / Cargo.toml / Cargo.lock / tauri.conf.json / updateChecker.ts / Launcher.tsx）
+- [ ] 涉及版本号变更已同步 7 处位置（package.json / Cargo.toml / Cargo.lock / tauri.conf.json / updateChecker.ts / AboutSettingsSection.tsx / Launcher.tsx）
 - [ ] 未引入 `any` / `unknown` 类型（TypeScript 严格规则）
 - [ ] 未硬编码 Token / 密钥 / 敏感信息
 - [ ] 业务逻辑已添加中文工程级注释
