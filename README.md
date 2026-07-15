@@ -10,20 +10,13 @@
 
 ---
 
-## 截图预览
-
-<p align="center">
-  <img src="docs/screenshots/creation.png" alt="创作界面" width="45%" />
-  <img src="docs/screenshots/character-graph.png" alt="人物关系图谱" width="45%" />
-  <br/>
-  <img src="docs/screenshots/timeline.png" alt="剧情图谱" width="45%" />
-  <img src="docs/screenshots/writing-stats.png" alt="写作统计" width="45%" />
-  <br/>
-  <img src="docs/screenshots/foreshadowing.png" alt="伏笔追踪" width="45%" />
-  <img src="docs/screenshots/codex.png" alt="设定库" width="45%" />
-</p>
-
-> 截图占位：实际图片后续补充，存放于 `docs/screenshots/` 目录。
+[![Version](https://img.shields.io/github/v/release/fanquanpp/MiaoChuangShuo?style=flat-square&label=version&color=6EA8FE)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
+[![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
+[![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-CC--BY--NC--4.0-6EA8FE?style=flat-square)](./LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078d7?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 
 ---
 
@@ -77,20 +70,6 @@
 > 在线体验版提供核心创作功能（富文本编辑、章节管理、字数统计、IndexedDB 持久化），适合快速试用。
 > 桌面版提供完整功能（全文搜索、AI 助手、人物图谱、时间线、设定库、版本快照等）。
 > 访问在线展示链接可查看完整产品介绍与界面预览, 含 15 张功能截图与 8 大章节内容说明。
-
----
-
-<div align="center">
-
-[![Version](https://img.shields.io/github/v/release/fanquanpp/MiaoChuangShuo?style=flat-square&label=version&color=6EA8FE)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
-[![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
-[![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
-[![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/license-CC--BY--NC--4.0-6EA8FE?style=flat-square)](./LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078d7?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
-
-</div>
 
 ---
 
@@ -445,7 +424,7 @@ MiaoChuangShuo/
 │   │   │   ├── archive_commands.rs     # 项目归档命令
 │   │   │   ├── custom_template_commands.rs # 自定义模板命令
 │   │   │   ├── export_commands.rs      # TXT 导出命令 (4 种模式)
-│   │   │   ├── file_io_commands.rs     # 文件系统 IO (原子写入、目录扫描、manifest 同步)
+│   │   │   ├── file_io_commands.rs     # 文件系统 IO (原子写入、目录扫描、manifest 同步、本地路径打开)
 │   │   │   ├── project_commands.rs     # 项目管理命令
 │   │   │   ├── search_replace_commands.rs # 全局搜索与替换命令
 │   │   │   └── writing_stats_commands.rs  # 写作统计持久化命令
@@ -504,7 +483,7 @@ MiaoChuangShuo/
 │   ├── hooks/                          # 自定义 Hooks
 │   │   ├── useAutoSaveOnExit.ts        # 退出自动保存
 │   │   ├── useEditorAutoSave.ts        # 编辑器自动保存
-│   │   ├── useEditorFileIO.ts          # 编辑器文件 IO
+│   │   ├── useEditorFileIO.ts          # 编辑器文件 IO (含 front matter 剥离与注入)
 │   │   ├── useAiStream.ts              # AI 流式调用 (含 AbortController)
 │   │   ├── useCodexSync.ts             # 设定库同步
 │   │   ├── useFileDragSort.ts          # 文件拖拽排序
@@ -546,7 +525,6 @@ MiaoChuangShuo/
 │   │   └── feature_request.yml         # 功能建议模板
 │   └── PULL_REQUEST_TEMPLATE.md        # PR 模板
 ├── docs/                               # 文档
-│   ├── screenshots/                    # 截图
 │   └── research/                       # 调研文档
 ├── scripts/                            # 工具脚本
 │   └── sync-version.mjs                # 版本号同步脚本
@@ -592,7 +570,7 @@ npm run tauri build
 
 ### 7.3 版本号同步机制
 
-版本号采用 `YY.MM.修改序号` 格式 (如 `26.8.0`), 以下 6 个位置必须保持同步:
+版本号采用 `YY.MM.修改序号` 格式 (如 `26.7.32`), 以下 7 个位置必须保持同步:
 
 | 文件 | 字段 |
 |------|------|
@@ -602,11 +580,12 @@ npm run tauri build
 | `src-tauri/tauri.conf.json` | `version` |
 | `src/lib/updateChecker.ts` | `FALLBACK_VERSION` |
 | `src/components/Launcher.tsx` | `appVersion` useState 初始值 |
+| `src/components/settings/SettingsDialog.tsx` | `currentVersion` useState 初始值 |
 
 可使用 `scripts/sync-version.mjs` 自动同步版本号:
 
 ```bash
-node scripts/sync-version.mjs 26.8.0
+node scripts/sync-version.mjs 26.7.32
 ```
 
 ### 7.4 提交规范
@@ -663,11 +642,13 @@ Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
 
 剧情时间线支持分支结构, 但禁止循环依赖。Rust 后端 `timeline_commands.rs` 采用 DFS 三色标记法 (白/灰/黑) 在持久化前校验图谱无环, 检测到回边时拒绝写入并返回错误。
 
-### 8.6 .pmd 存储格式
+### 8.6 .pmd 存储格式与 front matter 管理
 
 正文文件采用 `.pmd` 扩展名存储 ProseMirror JSON 文档, 替代传统 `.txt` 纯文本格式:
 
-- **格式定义**: `.pmd` 文件内容为纯 JSON (`{"type":"doc","content":[...]}`), 无 `---` front matter 包裹
+- **格式定义**: `.pmd` 文件内容为 YAML front matter + ProseMirror JSON 正文, front matter 含 `id`/`title`/`chapterId` 字段, 由 Rust 端 `text_extractor` 模块统一管理
+- **加载时剥离**: 前端 `useEditorFileIO.ts` 的 `stripFrontMatter` 函数在加载时剥离 front matter, 仅将正文注入编辑器, 避免 front matter 显示为正文
+- **保存时注入**: 保存时重新注入 front matter 到正文前, 保证文件 id/title 元数据不丢失 (与 create_file 注入一致)
 - **设定文件区别**: 设定库文件使用 JSON front matter (`---\n{"id":"..."}\n---\n正文`), 由 codex 模块独立管理
 - **原子写入**: 写入采用临时文件 + rename 原子策略, 保证崩溃或断电时文件不会半写入损坏
 - **codex 内部转换**: 用户在设定库手动创建 .txt 文件时, `migrate_codex_txt_to_pmd` 命令自动转换为 .pmd 格式, 保证设定库格式一致性
@@ -691,6 +672,12 @@ Windows 平台采用 DPAPI (Data Protection API) 加密 API Key:
 - v26.8.0 起改用 DPAPI 加密, 绑定 Windows 用户账户, 仅当前账户可解密
 - 旧 Base64 数据首次读取时自动迁移为 DPAPI 加密
 - macOS / Linux 平台使用 keychain / keyring 系统密钥存储
+
+### 8.9 本地路径打开（绕过 shell scope 限制）
+
+Tauri 2.0 的 `@tauri-apps/plugin-shell` 的 `open()` 方法默认 scope regex `^((mailto:\w+)|(tel:\w+)|(https?:\/\/\w+)).+` 仅允许 URL schemes, 本地路径被拒绝。
+
+解决方案: 在 Rust 端 `file_io_commands.rs` 新增 `open_path` 命令, 直接调用系统资源管理器 (`explorer`/`open`/`xdg-open`) 打开本地路径, 绕过 shell plugin 的 URL scope 限制。前端通过 `fileApi.ts` 的 `openPath` 封装调用, 用于"打开日志目录"等功能。
 
 </details>
 
@@ -730,14 +717,15 @@ npm run tauri build
 
 桌面端发布通过 GitHub Actions 自动化，流程如下：
 
-1. 维护者更新版本号（同步 6 处位置，或执行 `node scripts/sync-version.mjs <version>`）
-2. 创建并推送 tag：`git tag v26.8.0 && git push origin v26.8.0`
+1. 维护者更新版本号（同步 7 处位置，或执行 `node scripts/sync-version.mjs <version>`）
+2. 创建并推送 tag：`git tag v26.7.32 && git push origin v26.7.32`
 3. GitHub Actions 自动触发 `release-desktop.yml` 工作流
 4. 工作流在 `windows-latest` runner 上执行 `npm ci` → `npm run build` → `npm run tauri build`
 5. 构建产物自动上传至 GitHub Release：
-   - `MiaoChuangShuo_<version>_x64.msi`（MSI 安装包）
+   - `MiaoChuangShuo_<version>_x64_en-US.msi`（MSI 安装包）
+   - `MiaoChuangShuo_<version>_x64_en-US.msi.sha256`（MSI 哈希校验）
    - `MiaoChuangShuo_<version>_x64-setup.exe`（NSIS 安装包）
-   - `MiaoChuangShuo_<version>_sha256.txt`（哈希校验文件）
+   - `MiaoChuangShuo_<version>_x64-setup.exe.sha256`（NSIS 哈希校验）
 6. Release 自动生成 changelog 并发布
 
 </details>
@@ -853,7 +841,7 @@ A: 仅以下两个功能需要联网：
 <details>
 <summary>点击展开路线图</summary>
 
-### 已完成（v26.8.0）
+### 已完成（v26.7.32）
 
 - [x] 存储类型分析与重构（manifest.json 索引、UUID front matter、WritingStats 持久化）
 - [x] 项目问题与漏洞修复（AppError 迁移、DPAPI 加密、虚拟化列表、AbortController）
@@ -862,6 +850,9 @@ A: 仅以下两个功能需要联网：
 - [x] 便捷操作增强（伏笔模块、批量操作、跨目录拖拽、增量索引）
 - [x] 废弃代码清理（死代码删除、重复代码抽取、文档迁移）
 - [x] README 与 About 栏目升级
+- [x] 设置面板尺寸固定与图标简洁化
+- [x] Shell scope 错误修复（添加 `open_path` Rust 命令绕过 URL scope 限制）
+- [x] Front matter 编辑器可见性修复（加载时剥离、保存时注入）
 
 ### 计划中（v26.9.x ~ v26.10.x）
 
