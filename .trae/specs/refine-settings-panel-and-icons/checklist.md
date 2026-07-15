@@ -21,22 +21,22 @@
 
 ## 阶段三:构建覆盖发布
 
-- [ ] `npm run tauri build` 成功生成 MSI + NSIS
-- [ ] sha256 哈希文件已生成
-- [ ] MSI 安装包大小合理(~10MB)
-- [ ] NSIS 安装包大小合理(~8MB)
-- [ ] 版本号保持 26.7.32 不变
-- [ ] git commit 已创建(Conventional Commits 规范)
-- [ ] git push origin master 成功
-- [ ] 现有 Release v26.7.32 旧资产已删除
-- [ ] 新构建的 4 个资产已上传到 Release v26.7.32
-- [ ] Release v26.7.32 资产已被替换(版本号标签不变)
+- [x] `npm run tauri build` 成功生成 MSI + NSIS
+- [x] sha256 哈希文件已生成(MSI: 98da4296..., NSIS: ec126bee...)
+- [x] MSI 安装包大小合理(10.4MB)
+- [x] NSIS 安装包大小合理(7.94MB)
+- [x] 版本号保持 26.7.32 不变
+- [x] git commit 已创建(6e0234f, Conventional Commits 规范)
+- [x] git push origin master 成功(457de38..6e0234f)
+- [x] 现有 Release v26.7.32 旧资产已通过 --clobber 覆盖
+- [x] 新构建的 4 个资产已上传到 Release v26.7.32
+- [x] Release v26.7.32 资产已被替换(版本号标签不变)
 
 ## 综合验收
 
-- [ ] 所有阶段任务已完成,tasks.md 中所有复选框已勾选
-- [ ] `npx tsc --noEmit` 通过
-- [ ] `npm run tauri build` 通过
-- [ ] 设置面板四分区切换零尺寸突变
-- [ ] 设置面板内无渐变背景装饰图标
-- [ ] Release v26.7.32 资产已覆盖,版本号不变
+- [x] 所有阶段任务已完成,tasks.md 中所有复选框已勾选
+- [x] `npx tsc --noEmit` 通过
+- [x] `npm run tauri build` 通过
+- [x] 设置面板四分区切换零尺寸突变
+- [x] 设置面板内无渐变背景装饰图标
+- [x] Release v26.7.32 资产已覆盖,版本号不变

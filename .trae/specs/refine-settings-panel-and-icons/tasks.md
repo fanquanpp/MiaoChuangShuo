@@ -30,15 +30,15 @@
   - [x] 5.2: 生成 sha256 哈希文件(MSI: 98da4296..., NSIS: ec126bee...)
   - [x] 5.3: 验证安装包大小合理(MSI 10.4MB, NSIS 7.94MB)
 
-- [ ] Task 6: Git 提交与推送(版本号不变,无需新 tag)
-  - [ ] 6.1: `git add` 暂存变更文件
-  - [ ] 6.2: `git commit` 提交(Conventional Commits 规范)
-  - [ ] 6.3: `git push origin master` 推送提交
+- [x] Task 6: Git 提交与推送(版本号不变,无需新 tag)
+  - [x] 6.1: `git add` 暂存 3 个源码文件 + spec 目录
+  - [x] 6.2: `git commit` 提交(6e0234f, Conventional Commits 规范)
+  - [x] 6.3: `git push origin master` 推送提交(457de38..6e0234f)
 
-- [ ] Task 7: 覆盖 GitHub Release v26.7.32 资产
-  - [ ] 7.1: 删除现有 Release v26.7.32 的 4 个旧资产
-  - [ ] 7.2: 上传新构建的 4 个资产(MSI + NSIS + 2 个 sha256)到现有 Release v26.7.32
-  - [ ] 7.3: 验证 Release v26.7.32 资产已被替换
+- [x] Task 7: 覆盖 GitHub Release v26.7.32 资产
+  - [x] 7.1: 使用 `gh release upload --clobber` 覆盖上传新构建的 4 个资产(MSI + NSIS + 2 个 sha256)
+  - [x] 7.2: 验证 Release v26.7.32 资产已被替换(版本号标签不变)
+  - [x] 7.3: 更新 Release notes 合并两次变更说明
 
 # Task Dependencies
 - [Task 2, Task 3] 可并行(文件无冲突)
