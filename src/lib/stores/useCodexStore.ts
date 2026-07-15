@@ -18,10 +18,12 @@
 // - Map 结构便于 O(1) 查找，避免数组遍历
 
 import { create } from "zustand";
+import { emit } from "@tauri-apps/api/event";
 import {
   listCodexEntities,
   toCodexCard,
   updateCodexEntity,
+  deleteCodexEntity,
   type CodexCard,
   type CodexEntityType,
   type CodexMetaPatch,
@@ -205,12 +207,22 @@ interface CodexState {
   setPendingEditMode: (mode: boolean) => void;
 
   /**
-   * 删除卡片
-   * 输入: id 待删除卡片 ID
-   * 流程: 从 Map 中移除条目
-   * 注: 失效检测（标记正文中相关 Mention 为失效）在 Sprint 2 实现
+   * 删除卡片（Task 4.4 升级：调用后端 + 联动清理 Mention + 刷新编辑器）
+   * 输入:
+   *   id 待删除卡片 ID
+   *   projectPath 项目根路径
+   * 输出: Promise<number> 实际清理的 Mention 节点总数（供 UI 提示）
+   * 流程:
+   *   1. 调用后端 delete_codex_entity 命令（联动清理 Mention + manifest 反向索引）
+   *   2. 后端删除文件（移至回收站）并清理 manifest 中的 codex 实体与反向索引
+   *   3. 从内存 Map 中移除该卡片
+   *   4. 触发 codex:card-deleted 事件，通知 NovelEditor 重新加载已打开的章节文件
+   * 设计说明:
+   *   - 后端已将引用该卡片的 characterMentionNode 替换为保留 name 的 text 节点
+   *   - 前端编辑器需重新加载文件以反映此变化，通过 Tauri 事件触发刷新
+   *   - 事件触发失败不阻断主流程，仅记录日志
    */
-  deleteCard: (id: string) => void;
+  deleteCard: (id: string, projectPath: string) => Promise<number>;
 
   /**
    * 重置 Store（项目切换时调用）
@@ -484,13 +496,38 @@ export const useCodexStore = create<CodexState>()((set, get) => ({
     set({ pendingEditMode: mode });
   },
 
-  deleteCard: (id): void => {
+  deleteCard: async (id, projectPath): Promise<number> => {
+    const existing = get().cards.get(id);
+    if (!existing) {
+      return 0;
+    }
+    // 调用后端 delete_codex_entity 命令（联动清理 Mention + manifest 反向索引）
+    const removedMentions = await deleteCodexEntity(
+      projectPath,
+      existing.sourceFile
+    );
+    // 从内存 Map 中移除该卡片（SSOT：Store 删除即 UI 更新）
     set((state) => {
-      if (!state.cards.has(id)) return state;
       const newCards = new Map(state.cards);
       newCards.delete(id);
       return { cards: newCards };
     });
+    // 触发编辑器刷新事件：通知 NovelEditor 重新加载已打开的章节文件
+    // 后端已将引用该卡片的 characterMentionNode 替换为 text 节点，
+    // 前端编辑器需重新加载文件以反映此变化
+    try {
+      await emit("codex:card-deleted", {
+        codexId: id,
+        removedMentions,
+      });
+    } catch (err) {
+      // 事件触发失败不阻断主流程，仅记录日志
+      console.error(
+        "[codex] 触发 codex:card-deleted 事件失败:",
+        err instanceof Error ? err : String(err)
+      );
+    }
+    return removedMentions;
   },
 
   reset: (): void => {

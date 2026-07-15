@@ -108,7 +108,10 @@ export default function EditProjectDialog({ project, onClose, onSuccess }: EditP
     }
   }, [name, genre, author, description, project.path, t, onSuccess]);
 
-  handleSaveRef.current = handleSave;
+  // Task 2.9: useRef.current 赋值移入 useEffect, 避免渲染期间副作用
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  });
 
   return (
     <div

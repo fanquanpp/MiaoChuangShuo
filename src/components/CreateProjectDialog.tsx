@@ -125,7 +125,10 @@ export default function CreateProjectDialog({
     }
   };
 
-  handleCreateRef.current = handleCreate;
+  // Task 2.9: useRef.current 赋值移入 useEffect, 避免渲染期间副作用
+  useEffect(() => {
+    handleCreateRef.current = handleCreate;
+  });
 
   return (
     <div

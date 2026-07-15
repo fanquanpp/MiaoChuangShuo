@@ -16,7 +16,9 @@
 // 作者只需关心"我想回到某个版本"——其余一切自动化
 // 恢复前自动备份当前内容，杜绝误操作丢稿
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { diffLines, type Change } from "diff";
 import {
   X,
   History,
@@ -36,6 +38,7 @@ import {
   deleteSnapshot,
   clearSnapshots,
   createSnapshot,
+  extractErrorMessage,
   type SnapshotInfo,
 } from "../lib/api";
 import { useToast } from "../lib/toast";
@@ -93,25 +96,105 @@ function formatTime(iso: string): string {
 }
 
 /**
- * 计算两个文本之间的简单行级差异统计
- * 输入: oldText 旧文本, newText 新文本
- * 输出: { added, removed, kept } 行数统计
+ * 行级差异结果
+ * - added: 新增行数(在新文本中存在,旧文本中不存在)
+ * - removed: 删除行数(在旧文本中存在,新文本中不存在)
+ * - kept: 未变化行数
+ * - changes: diffLines 返回的变更块数组,用于 UI 渲染增删行
  */
-function computeLineDiff(oldText: string, newText: string): { added: number; removed: number; kept: number } {
-  const oldLines = oldText.split(/\r?\n/);
-  const newLines = newText.split(/\r?\n/);
-  const oldSet = new Set(oldLines);
-  const newSet = new Set(newLines);
+interface LineDiffResult {
+  added: number;
+  removed: number;
+  kept: number;
+  changes: Change[];
+}
+
+/**
+ * 计算两个文本之间的行级差异统计(Task 2.8: 改用 diff.diffLines 替代 Set 比较)
+ *
+ * 旧实现的缺陷:
+ *   1. 使用 Set 比较行,无法识别行顺序变化(如 A/B → B/A 会被误判为无差异)
+ *   2. 无法准确统计增删行数(重复行会被错误抵消)
+ *   3. 不返回 changes 数组,无法在 UI 中渲染增删行
+ *
+ * 新实现使用 Myers 差异算法(diffLines),逐行比对并保留顺序信息,
+ * 准确统计增删行数,同时返回 changes 数组供 UI 渲染彩色差异行。
+ *
+ * 输入: oldText 旧文本, newText 新文本
+ * 输出: LineDiffResult 行数统计与变更块数组
+ * 流程:
+ *   1. 调用 diffLines 执行 Myers 行级差异算法
+ *   2. 遍历变更块,累计 added/removed/kept 行数
+ *   3. 返回统计结果与原始变更块
+ */
+function computeLineDiff(oldText: string, newText: string): LineDiffResult {
+  // diffLines 基于 Myers 算法,返回有序的变更块数组
+  // 每个变更块包含 added/removed 标记、value(文本内容)、count(行数)
+  const changes = diffLines(oldText, newText);
   let added = 0;
   let removed = 0;
-  for (const line of newLines) {
-    if (!oldSet.has(line)) added++;
+  let kept = 0;
+  for (const change of changes) {
+    // count 字段表示该变更块包含的行数,缺失时按 0 处理
+    const count = change.count ?? 0;
+    if (change.added) {
+      added += count;
+    } else if (change.removed) {
+      removed += count;
+    } else {
+      kept += count;
+    }
   }
-  for (const line of oldLines) {
-    if (!newSet.has(line)) removed++;
+  return { added, removed, kept, changes };
+}
+
+/**
+ * 渲染差异变更块为带颜色标记的行列表(Task 2.8: 在 diff 展示 UI 中渲染增删行)
+ *
+ * 颜色约定(与项目三色品牌体系对齐):
+ *   - added 行(新增): fandex-secondary 绿色背景
+ *   - removed 行(删除): fandex-tertiary 红色背景 + 删除线
+ *   - unchanged 行(未变化): nf-text-secondary 默认颜色
+ *
+ * 输入: changes diffLines 返回的变更块数组
+ * 输出: ReactNode 带颜色标记的行列表
+ * 流程:
+ *   1. 遍历每个变更块
+ *   2. 将变更块 value 按换行符拆分为独立行
+ *   3. 为每行添加前缀标记(+/-/空格)与对应颜色样式
+ */
+function renderDiffChanges(changes: Change[]): React.ReactNode {
+  const lines: React.ReactNode[] = [];
+  let lineIdx = 0;
+  for (const change of changes) {
+    // 根据变更类型确定颜色样式与前缀标记
+    const colorClass = change.added
+      ? "bg-fandex-secondary/10 text-fandex-secondary"
+      : change.removed
+        ? "bg-fandex-tertiary/10 text-fandex-tertiary"
+        : "text-nf-text-secondary";
+    const prefix = change.added ? "+" : change.removed ? "-" : " ";
+    // diffLines 返回的 value 末尾通常含换行符,拆分后移除末尾空字符串
+    const rawLines = change.value.split("\n");
+    if (rawLines.length > 0 && rawLines[rawLines.length - 1] === "") {
+      rawLines.pop();
+    }
+    for (const line of rawLines) {
+      lines.push(
+        <div
+          key={lineIdx}
+          className={`px-2 py-0.5 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed ${colorClass}`}
+        >
+          <span className="select-none mr-1.5 opacity-60 inline-block w-3">
+            {prefix}
+          </span>
+          {line || "\u00A0"}
+        </div>
+      );
+      lineIdx++;
+    }
   }
-  const kept = Math.min(oldLines.length, newLines.length) - Math.min(added, removed);
-  return { added, removed, kept: Math.max(0, kept) };
+  return <>{lines}</>;
 }
 
 // 触发方式徽章颜色映射
@@ -151,6 +234,18 @@ export default function SnapshotHistory({
   // 待确认操作状态(null 表示无待确认操作)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
+  // Task 2.4.2: 虚拟列表滚动容器引用,供 useVirtualizer 获取滚动元素
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  // Task 2.4.2: 快照列表虚拟化(预估 100+ 快照时受益)
+  // 使用动态测量(measureElement)适配选中项展开后的高度变化
+  const virtualizer = useVirtualizer({
+    count: snapshots.length,
+    getScrollElement: () => listScrollRef.current,
+    estimateSize: () => 72,
+    overscan: 5,
+    getItemKey: (index) => snapshots[index]?.snapshot_path ?? index,
+  });
+
   // 加载快照列表
   const loadSnapshots = useCallback(async () => {
     if (!filePath || !projectPath) return;
@@ -164,7 +259,7 @@ export default function SnapshotHistory({
         setSelectedPath(list[0].snapshot_path);
       }
     } catch (e) {
-      setError(String(e));
+      setError(extractErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -187,7 +282,7 @@ export default function SnapshotHistory({
       })
       .catch((e) => {
         setPreviewContent("");
-        setError(String(e));
+        setError(extractErrorMessage(e));
       })
       .finally(() => {
         setPreviewLoading(false);
@@ -232,7 +327,7 @@ export default function SnapshotHistory({
       onRestored();
       onClose();
     } catch (e) {
-      showToast("error", t("snapshot.restoreFailed", { error: String(e) }));
+      showToast("error", t("snapshot.restoreFailed", { error: extractErrorMessage(e) }));
     } finally {
       setActionLoading(false);
     }
@@ -256,7 +351,7 @@ export default function SnapshotHistory({
       }
       await loadSnapshots();
     } catch (e) {
-      showToast("error", t("snapshot.deleteFailed", { error: String(e) }));
+      showToast("error", t("snapshot.deleteFailed", { error: extractErrorMessage(e) }));
     } finally {
       setActionLoading(false);
     }
@@ -272,7 +367,7 @@ export default function SnapshotHistory({
       setSelectedPath(null);
       setSnapshots([]);
     } catch (e) {
-      showToast("error", t("snapshot.clearFailed", { error: String(e) }));
+      showToast("error", t("snapshot.clearFailed", { error: extractErrorMessage(e) }));
     } finally {
       setActionLoading(false);
     }
@@ -354,8 +449,13 @@ export default function SnapshotHistory({
         </div>
       )}
 
-      {/* 快照列表 */}
-      <div className="flex-1 overflow-y-auto">
+      {/* 快照列表(Task 2.4.2: 改造为虚拟列表,预估 100+ 快照时受益) */}
+      <div
+        ref={listScrollRef}
+        className="flex-1 overflow-y-auto"
+        role="list"
+        aria-label={t("snapshot.title")}
+      >
         {loading ? (
           <div className="flex items-center justify-center h-full text-nf-text-tertiary text-xs">
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -374,12 +474,29 @@ export default function SnapshotHistory({
             <p className="text-nf-text-tertiary/60 text-[10px]">{t("snapshot.emptyHint")}</p>
           </div>
         ) : (
-          <ul className="divide-y divide-nf-border-light/40">
-            {snapshots.map((snapshot) => {
+          // 虚拟列表容器:高度等于所有项总高度,内部项使用绝对定位偏移
+          <div
+            style={{ height: virtualizer.getTotalSize(), position: "relative" }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const snapshot = snapshots[virtualItem.index];
               const isSelected = selectedPath === snapshot.snapshot_path;
               const triggerColor = TRIGGER_COLORS[snapshot.meta.trigger] || TRIGGER_COLORS.auto;
               return (
-                <li key={snapshot.snapshot_path}>
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={virtualizer.measureElement}
+                  role="listitem"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                  className="border-b border-nf-border-light/40"
+                >
                   <button
                     onClick={() => setSelectedPath(snapshot.snapshot_path)}
                     className={`w-full text-left px-4 py-3 transition-all duration-fast ease-fandex border-l-2 ${
@@ -429,10 +546,10 @@ export default function SnapshotHistory({
                       </button>
                     </div>
                   )}
-                </li>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
       </div>
 
@@ -464,6 +581,11 @@ export default function SnapshotHistory({
               <div className="flex items-center justify-center h-full text-nf-text-tertiary text-xs">
                 <Loader2 className="w-3 h-3 animate-spin mr-2" />
                 {t("common.loading")}
+              </div>
+            ) : diffStats && (diffStats.added > 0 || diffStats.removed > 0) ? (
+              // Task 2.8: 有差异时渲染彩色差异行(绿色=added,红色=removed)
+              <div className="border border-nf-border-light/40">
+                {renderDiffChanges(diffStats.changes)}
               </div>
             ) : (
               <pre className="text-xs text-nf-text-secondary font-mono whitespace-pre-wrap break-all leading-relaxed">

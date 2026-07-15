@@ -12,8 +12,8 @@
 //   4. saveTimer 移入 store state, 避免模块级单例风险(每个 store 实例独立 timer)
 //
 // 设计要点:
-//   - TNode / TEdge 通过最小约束接口 GraphNodeLike / GraphEdgeLike 兼容业务类型,
-//     不依赖 @xyflow/react 的 Node/Edge(避免 unknown 索引签名)
+//   - TNode / TEdge 同时约束为 @xyflow/react 的 Node/Edge 子类型与 GraphNodeLike/GraphEdgeLike,
+//     既满足 applyNodeChanges/applyEdgeChanges 的泛型约束, 又保留业务 data 类型链接
 //   - zundo partialize 仅追踪 nodes/edges, saveTimer/loading/saving 等瞬态字段不入历史
 //   - undo/redo 通过延迟绑定 temporalStore 引用调用, 避免循环依赖
 //   - 返回类型不显式声明, 让 TypeScript 自动推断以保留 zundo 的 .temporal 属性
@@ -25,20 +25,15 @@ import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
 import type { NodeChange, EdgeChange, Connection, Node, Edge } from "@xyflow/react";
 import type { GraphApi, PersistedGraphFields } from "../api/graphApiFactory";
 
-/*
- * 【Skill 偏差报备】
- * 原 Skill 任务要求使用 `as TNode[]` 单层断言处理 applyNodeChanges 返回值。
- * 偏差原因: tsc 验证报 TS2352, @xyflow/react v12 的 applyNodeChanges 泛型约束为
- *   `NodeType extends Node`, 而 Node 强制 `data: Record<string, unknown>`。
- *   业务类型为遵守禁用 unknown 规则, 用 Omit 重建节点类型,
- *   导致节点 data 无索引签名, 与 Node 双向不兼容, 单层 as 断言不充分。
- * 偏差调整: 改用 `as unknown as` 双重断言(TypeScript 编译器官方建议方案),
- *   仅用于 xyflow 变更应用函数的入参与返回值类型转换, 不影响运行时逻辑。
- * 验证依据: 与原 characterGraphStore / timelineStore 同源方案, tsc --noEmit 通过。
- */
+// ============================================================
+// 常量定义
+// ============================================================
 
 /** 防抖保存间隔(毫秒), 500ms 内多次操作合并为一次磁盘写入 */
 const SAVE_DEBOUNCE_MS = 500;
+
+/** zundo 历史记录上限(步数), 超过后丢弃最旧的历史快照 */
+const HISTORY_LIMIT = 100;
 
 /**
  * Graph store 节点最小约束
@@ -144,8 +139,8 @@ type GetStateFn<T> = () => T;
  */
 export interface CreateGraphStoreOptions<
   TGraph extends PersistedGraphFields<TNode, TEdge>,
-  TNode extends GraphNodeLike<TNodeData>,
-  TEdge extends GraphEdgeLike,
+  TNode extends Node & GraphNodeLike<TNodeData>,
+  TEdge extends Edge & GraphEdgeLike,
   TNodeData extends { updatedAt: string },
   TExtra extends object = object
 > {
@@ -190,15 +185,15 @@ export interface CreateGraphStoreOptions<
  *   6. store 创建后立即绑定 temporalStore, 使 undo/redo 可访问。
  *
  * @template TGraph 业务图谱类型, 必须满足 PersistedGraphFields 约束
- * @template TNode  业务节点类型, 必须满足 GraphNodeLike 约束
- * @template TEdge  业务边类型, 必须满足 GraphEdgeLike 约束
+ * @template TNode  业务节点类型, 必须同时满足 Node 与 GraphNodeLike 约束
+ * @template TEdge  业务边类型, 必须同时满足 Edge 与 GraphEdgeLike 约束
  * @template TNodeData 节点 data 类型, 必须含 updatedAt 字段
  * @template TExtra 业务扩展 state 类型, 默认为空对象
  */
 export function createGraphStore<
   TGraph extends PersistedGraphFields<TNode, TEdge>,
-  TNode extends GraphNodeLike<TNodeData>,
-  TEdge extends GraphEdgeLike,
+  TNode extends Node & GraphNodeLike<TNodeData>,
+  TEdge extends Edge & GraphEdgeLike,
   TNodeData extends { updatedAt: string },
   TExtra extends object = object
 >(options: CreateGraphStoreOptions<TGraph, TNode, TEdge, TNodeData, TExtra>) {
@@ -309,33 +304,37 @@ export function createGraphStore<
 
           /**
            * 应用 React Flow 节点变更
-           * 输入: changes React Flow 节点变更数组
+           * 输入: changes React Flow 节点变更数组(由 React Flow 回调传入, 类型为 NodeChange[])
            * 输出: void
-           * 流程: 调用 applyNodeChanges 应用变更到 nodes
-           *       类型断言见文件顶部偏差报备(xyflow Node 约束冲突)
+           * 流程: 调用 applyNodeChanges<TNode> 应用变更到 nodes
+           *
+           * 类型说明: changes 参数类型为 NodeChange[](React Flow 回调签名约束),
+           *   applyNodeChanges<TNode> 期望 NodeChange<TNode>[]。
+           *   因 NodeChange<TNode>[] 可赋值给 NodeChange[](协变), 使用单重 as 断言转换,
+           *   不再需要 `as unknown as` 双重断言(Task 2.6)。
+           *   运行期 changes 仅引用 state.nodes 中已有的 TNode 实例, 类型安全由数据源保证。
            */
           onNodesChange: (changes): void => {
             setBase((state) => ({
-              nodes: applyNodeChanges(
-                changes,
-                state.nodes as unknown as Node[]
-              ) as unknown as TNode[],
+              nodes: applyNodeChanges<TNode>(changes as NodeChange<TNode>[], state.nodes),
             }));
           },
 
           /**
            * 应用 React Flow 边变更
-           * 输入: changes React Flow 边变更数组
+           * 输入: changes React Flow 边变更数组(由 React Flow 回调传入, 类型为 EdgeChange[])
            * 输出: void
-           * 流程: 调用 applyEdgeChanges 应用变更到 edges
-           *       类型断言见文件顶部偏差报备(xyflow Edge 约束冲突)
+           * 流程: 调用 applyEdgeChanges<TEdge> 应用变更到 edges
+           *
+           * 类型说明: changes 参数类型为 EdgeChange[](React Flow 回调签名约束),
+           *   applyEdgeChanges<TEdge> 期望 EdgeChange<TEdge>[]。
+           *   因 EdgeChange<TEdge>[] 可赋值给 EdgeChange[](协变), 使用单重 as 断言转换,
+           *   不再需要 `as unknown as` 双重断言(Task 2.6)。
+           *   运行期 changes 仅引用 state.edges 中已有的 TEdge 实例, 类型安全由数据源保证。
            */
           onEdgesChange: (changes): void => {
             setBase((state) => ({
-              edges: applyEdgeChanges(
-                changes,
-                state.edges as unknown as Edge[]
-              ) as unknown as TEdge[],
+              edges: applyEdgeChanges<TEdge>(changes as EdgeChange<TEdge>[], state.edges),
             }));
           },
 
@@ -462,8 +461,8 @@ export function createGraphStore<
       {
         // zundo 配置: 仅追踪 nodes 与 edges 变化(不追踪 loading/saving/saveTimer 等瞬态)
         partialize: (state) => ({ nodes: state.nodes, edges: state.edges }),
-        // 历史记录上限 100 步
-        limit: 100,
+        // 历史记录上限(步数)
+        limit: HISTORY_LIMIT,
       }
     )
   );

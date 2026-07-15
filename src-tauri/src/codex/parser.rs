@@ -94,6 +94,11 @@ pub struct CodexMetaPatch {
 ///
 /// 标准目录为"设定"，兼容旧版的 角色/人物/世界观/术语/名词/素材/资料。
 /// 迁移专项完成后旧目录名将不再出现。
+///
+/// Task 1.8: 此常量作为 codex_dirs 配置的回退默认值
+/// - 新建项目: ProjectMeta.codex_dirs 由 default_codex_dirs() 填充本表所有目录
+/// - 旧项目: ProjectMeta.codex_dirs 为空,扫描时回退到本表
+/// - 自定义项目: 用户可指定任意目录,未知目录的 fallback_type 为 "unknown"
 pub(super) const CODEX_DIRS: &[(&str, &str)] = &[
     ("设定", "unknown"),       // 标准目录，类型由 front matter 决定
     ("角色", "character"),     // 旧版兼容
@@ -104,6 +109,48 @@ pub(super) const CODEX_DIRS: &[(&str, &str)] = &[
     ("素材", "material"),      // 旧版兼容
     ("资料", "material"),      // 旧版兼容
 ];
+
+/// 查询设定目录对应的 fallback_type(Task 1.8)
+///
+/// 输入: dir_name 目录名
+/// 输出: &'static str fallback 类型字符串(unknown/character/worldview/glossary/material)
+/// 流程: 在 CODEX_DIRS 中查找同名目录,未找到时返回 "unknown"
+/// 设计说明: 自定义 codex_dirs 中的新目录(如 "Characters")未在 CODEX_DIRS 中,
+///           统一回退为 "unknown",由 front matter 决定具体类型
+pub fn codex_dir_fallback_type(dir_name: &str) -> &'static str {
+    CODEX_DIRS
+        .iter()
+        .find(|(name, _)| *name == dir_name)
+        .map(|(_, ty)| *ty)
+        .unwrap_or("unknown")
+}
+
+/// 构建有效的 codex 扫描目录列表(Task 1.8)
+///
+/// 输入:
+///   codex_dirs_from_meta - ProjectMeta.codex_dirs 字段(可能为空)
+/// 输出: Vec<(String, &'static str)> 目录名 + fallback_type 列表
+/// 流程:
+///   1. codex_dirs_from_meta 非空:对每个目录名查询 fallback_type,构建 Vec
+///   2. codex_dirs_from_meta 为空:回退到 CODEX_DIRS 常量(旧项目兼容)
+/// 设计说明: 此函数解耦 ProjectMeta 配置与 CODEX_DIRS 常量,供 crud.rs 复用
+pub fn build_effective_codex_dirs(
+    codex_dirs_from_meta: &[String],
+) -> Vec<(String, &'static str)> {
+    if codex_dirs_from_meta.is_empty() {
+        // 旧项目无 codex_dirs 配置,回退到 CODEX_DIRS 常量
+        CODEX_DIRS
+            .iter()
+            .map(|(name, ty)| (name.to_string(), *ty))
+            .collect()
+    } else {
+        // 新项目或自定义项目:使用 ProjectMeta 配置
+        codex_dirs_from_meta
+            .iter()
+            .map(|name| (name.clone(), codex_dir_fallback_type(name)))
+            .collect()
+    }
+}
 
 /// 解析设定文件内容，提取 JSON front matter 元数据与正文
 ///

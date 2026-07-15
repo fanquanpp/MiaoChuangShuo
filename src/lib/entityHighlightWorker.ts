@@ -345,6 +345,15 @@ function buildAutomaton(patterns: EntityPattern[]): void {
 
 /**
  * 发送响应消息给主线程
+ *
+ * 类型断言保留说明(Task 2.6):
+ *   此处 `(self as unknown as Worker)` 断言非 @xyflow/react 相关, 而是 Web Worker 上下文类型转换。
+ *   在 Worker 线程中 self 的 TypeScript lib 类型(DedicatedWorkerGlobalScope)与主线程 Worker 类的
+ *   postMessage 签名存在差异(参数重载与 targetOrigin 要求不同),
+ *   直接调用 self.postMessage(msg) 会触发类型不匹配。
+ *   断言为 Worker 类型以使用其 postMessage(message) 单参重载签名, 保证类型安全。
+ *   替代方案(改用 DedicatedWorkerGlobalScope 声明)需调整 tsconfig lib 配置, 影响范围超出本任务,
+ *   故按 Task 2.6 替代方案要求保留断言并注释说明原因。
  */
 function postResponse(msg: WorkerResponse): void {
   (self as unknown as Worker).postMessage(msg);

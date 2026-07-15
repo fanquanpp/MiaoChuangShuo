@@ -10,7 +10,7 @@
 // 3. 提供设定库目录扫描辅助函数
 
 import { invoke } from "@tauri-apps/api/core";
-import { readProjectTree, createFile, deletePath, readFile } from "./api";
+import { readProjectTree, createFile, readFile } from "./api";
 import type { FileNode } from "./api";
 
 // ===== 类型定义 =====
@@ -274,21 +274,52 @@ export async function createCodexEntity(
 }
 
 /**
- * 删除 Codex 实体文件
+ * 删除 Codex 实体文件（Task 4.4 升级：联动清理 Mention + manifest 反向索引）
  * 输入:
  *   projectPath 项目根路径
  *   sourceFile 待删除实体的来源文件相对路径（CodexCard.sourceFile 或 CodexEntity.sourceFile）
- * 输出: Promise<void>
- * 流程: 调用 deletePath 删除源文件（后端会移至回收站）
+ * 输出: Promise<number> 实际清理的 Mention 节点总数（供前端提示）
+ * 流程:
+ *   1. 调用后端 delete_codex_entity 命令
+ *   2. 后端流程：读取卡片 codex_id → 查找关联章节 → 清理 Mention → 删除文件 → 清理 manifest
+ *   3. 返回清理的 Mention 节点总数
+ * 设计说明:
+ *   - 文件删除使用 trash::delete 移至回收站，可恢复
+ *   - 通过 manifest 反向索引精准定位引用章节，避免全量扫描
+ *   - Mention 节点清理后保留 name 文本，不丢正文语义
  */
 export async function deleteCodexEntity(
   projectPath: string,
   sourceFile: string
-): Promise<void> {
-  // 源文件为相对路径，需拼接为绝对路径
-  const sep = navigator.platform.toLowerCase().includes("win") ? "\\" : "/";
-  const absPath = `${projectPath}${sep}${sourceFile.replace(/[\\/]/g, sep)}`;
-  return deletePath(absPath, projectPath);
+): Promise<number> {
+  return invoke<number>("delete_codex_entity", {
+    projectPath,
+    sourceFile,
+  });
+}
+
+/**
+ * 移除正文章节中引用指定 codexId 的 Mention 节点（Task 4.4.2 API 封装）
+ * 输入:
+ *   projectPath 项目根路径
+ *   chapterPaths 待清理的章节文件相对路径列表（正斜杠格式）
+ *   codexId 设定库卡片 UUID
+ * 输出: Promise<number> 实际清理的 Mention 节点总数
+ * 流程: 调用后端 remove_mentions_from_chapters 命令
+ * 设计说明:
+ *   - 通常由 delete_codex_entity 内部调用，前端无需直接调用
+ *   - 暴露为独立 API 以支持未来批量清理场景
+ */
+export async function removeMentionsFromChapters(
+  projectPath: string,
+  chapterPaths: string[],
+  codexId: string
+): Promise<number> {
+  return invoke<number>("remove_mentions_from_chapters", {
+    projectPath,
+    chapterPaths,
+    codexId,
+  });
 }
 
 // ===== 结构化设定实体（阶段 1：JSON front matter） =====

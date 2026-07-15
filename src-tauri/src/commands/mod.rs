@@ -38,13 +38,13 @@ pub mod search_replace_commands;
 pub mod writing_stats_commands;
 pub mod custom_template_commands;
 pub mod archive_commands;
+pub mod export_commands;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::error::AppError;
 use crate::project_template::ProjectMeta;
-use crate::text_extractor;
 
 // ===== 路径沙箱校验工具 =====
 
@@ -168,14 +168,15 @@ pub(crate) fn validate_project_path(project_path: &str) -> Result<PathBuf, AppEr
 // ===== 共享结构体 =====
 
 /// 项目信息结构（包含路径与元数据）
+///
+/// Task 4.5.2: 删除 word_count 缓存字段,字数 SSOT 收敛到 WritingStats
+/// 前端获取字数时改为调用 get_writing_stats 命令读取 WritingStats.total_words
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ProjectInfo {
     /// 项目根目录绝对路径
     pub path: String,
     /// 项目元数据
     pub meta: ProjectMeta,
-    /// 项目总字数
-    pub word_count: u64,
     /// 正文章节总数（正文目录下的支持文档数）
     pub chapter_count: u64,
 }
@@ -191,20 +192,6 @@ pub(crate) fn read_project_meta(project_root: &Path) -> Result<ProjectMeta, AppE
     let content = fs::read_to_string(&meta_path)
         .map_err(|e| AppError::io_error(e, "读取元数据失败"))?;
     serde_json::from_str(&content).map_err(|e| AppError::serialize_error(e, "解析元数据失败"))
-}
-
-/// 统计项目总字数
-/// 输入: project_root 项目根目录
-/// 输出: u64 总字数
-/// 流程: 遍历正文目录下的所有支持文档，统计字符数
-pub(crate) fn count_project_words(project_root: &Path) -> u64 {
-    let content_dir = project_root.join("正文");
-    if !content_dir.exists() {
-        return 0;
-    }
-    let mut total: u64 = 0;
-    count_words_recursive(&content_dir, &mut total);
-    total
 }
 
 /// 统计项目正文章节数
@@ -231,58 +218,18 @@ fn count_chapters_recursive(dir: &Path, total: &mut u64) {
             let path = entry.path();
             if path.is_dir() {
                 count_chapters_recursive(&path, total);
-            } else if is_supported_doc(&path) {
+            } else if is_indexable_file(&path) {
                 *total += 1;
             }
         }
     }
 }
 
-/// 递归统计目录下文件字数
-/// 输入: dir 目录路径, total 累计字数
-/// 输出: 无
-/// 流程: 遍历目录，对支持的文档文件提取纯文本后统计字数
-///       接入 text_extractor 统一层，避免 HTML 标签字符被计入字数
-fn count_words_recursive(dir: &Path, total: &mut u64) {
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                count_words_recursive(&path, total);
-            } else if is_supported_doc(&path) {
-                if let Ok(content) = fs::read_to_string(&path) {
-                    // 通过 text_extractor 提取纯文本，剥离 HTML 标签/ProseMirror JSON 结构
-                    let file_name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    let format = text_extractor::detect_format(&file_name, &content);
-                    let plain = text_extractor::extract_plain_text(&content, format);
-                    // 中文字符按 1 字计算，英文单词按 1 字计算
-                    *total += count_chinese_and_words(&plain);
-                }
-            }
-        }
-    }
-}
-
-/// 判断文件是否为支持的文档格式（.txt/.pmd/.html/.htm）
-/// 输入: path 文件路径
-/// 输出: 是否为支持的文档
-pub(crate) fn is_supported_doc(path: &Path) -> bool {
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    matches!(ext.to_lowercase().as_str(), "txt" | "pmd" | "html" | "htm")
-}
-
-/// 统计中文字符与英文单词数（委托至共享 word_count 模块）
-/// 输入: text 文本内容
-/// 输出: u64 字数
-/// 说明: 原重复实现已迁移至 word_count::count_words，此处保留包装函数避免大量调用点改动
-pub(crate) fn count_chinese_and_words(text: &str) -> u64 {
-    crate::word_count::count_words(text)
-}
-
 /// 判断文件是否为可索引格式（.txt/.pmd/.html/.htm）
+///
+/// Task 6.1.3 合并: 原 is_supported_doc 与 is_indexable_file 功能完全重复,
+/// 统一保留 is_indexable_file 作为单一函数,消除重复定义。
+///
 /// 输入: path 文件路径
 /// 输出: 是否为可索引格式
 pub(crate) fn is_indexable_file(path: &Path) -> bool {

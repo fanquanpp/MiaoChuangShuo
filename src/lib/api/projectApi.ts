@@ -21,6 +21,7 @@ import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialo
 export type ProjectType = "novel" | "script" | "essay";
 
 // 项目元数据接口
+// Task 1.8: 新增 codexDirs/outlineDir/manuscriptDir/draftDir 字段统一目录扫描配置
 export interface ProjectMeta {
   name: string;
   projectType: string;
@@ -31,13 +32,25 @@ export interface ProjectMeta {
   author: string;
   description: string;
   wordCount: number;
+  /** 设定库扫描目录列表(Task 1.8)
+   * 旧项目反序列化时缺失此字段,前端视为空数组,后端扫描时回退到内置默认列表
+   * 新建项目由后端填充默认 codex_dirs(8 个标准+兼容目录)
+   */
+  codexDirs?: string[];
+  /** 大纲目录名(Task 1.8),默认 "大纲",缺失时由后端 #[serde(default)] 填充 */
+  outlineDir?: string;
+  /** 正文目录名(Task 1.8),默认 "正文",缺失时由后端 #[serde(default)] 填充 */
+  manuscriptDir?: string;
+  /** 草稿箱目录名(Task 1.8),默认 "草稿箱",缺失时由后端 #[serde(default)] 填充 */
+  draftDir?: string;
 }
 
 // 项目信息接口(包含路径与元数据)
+// Task 4.5.2: 移除 word_count 缓存字段,字数 SSOT 收敛到 WritingStats
+// 前端获取字数时调用 getWritingStats(projectPath) 读取 WritingStats.total_words
 export interface ProjectInfo {
   path: string;
   meta: ProjectMeta;
-  word_count: number;
   // 正文章节总数
   chapter_count: number;
 }
@@ -253,19 +266,30 @@ export async function countCharacterAppearances(
   });
 }
 
-// 在项目所有 .txt 文件中全局替换角色名
-// 输入: projectPath 项目路径, oldName 旧角色名, newName 新角色名
+// 在项目所有支持文档中全局替换角色名(Task 4.6.2 升级为 UUID 关联优先)
+// 输入:
+//   projectPath 项目路径
+//   oldName 旧角色名
+//   newName 新角色名
+//   codexId 设定库卡片 UUID(Task 4.6.2)
+//     - 非空时优先通过 UUID 关联更新 characterMentionNode.attrs.name,避免子串误伤
+//     - 为空时回退到字符串替换(词边界检测),仅作为兜底策略
 // 输出: Promise<RenameResult> 修改文件数与替换次数
-// 注意: 简单字符串替换，存在子串误伤风险，建议改名前先创建快照
+// 流程:
+//   1. 后端按 ProjectMeta 配置扫描"设定/大纲/草稿箱/正文"目录
+//   2. codexId 非空时,通过 manifest 反向索引找到引用章节,精确更新 Mention 节点
+//   3. 对未通过 UUID 处理的文件,使用词边界检测的字符串替换作为回退
 export async function renameCharacterInProject(
   projectPath: string,
   oldName: string,
-  newName: string
+  newName: string,
+  codexId: string
 ): Promise<RenameResult> {
   return invoke<RenameResult>("rename_character_in_project", {
     projectPath,
     oldName,
     newName,
+    codexId,
   });
 }
 
@@ -363,4 +387,59 @@ export async function pickOpenArchive(): Promise<string | null> {
   });
   // open 返回 string | string[] | null，单选模式下为 string | null
   return typeof result === "string" ? result : null;
+}
+
+// ===== TXT 导出 API (Task 3.3.1) =====
+
+// TXT 导出模式
+// single: 单章导出 / merged: 整项目合并 / per_chapter: 每章一个文件 / per_volume: 按分卷导出
+export type TxtExportMode = "single" | "merged" | "per_chapter" | "per_volume";
+
+// TXT 导出选项接口
+// 与后端 TxtExportOptions 结构体一一对应（camelCase 序列化）
+export interface TxtExportOptions {
+  /** 导出模式 */
+  mode: TxtExportMode;
+  /** 是否在每章前插入标题行 */
+  includeChapterTitle: boolean;
+  /** 是否写入 UTF-8 BOM（Windows 记事本兼容） */
+  bom: boolean;
+  /** 是否使用 CRLF 换行符（Windows 风格） */
+  crlf: boolean;
+  /** 用户选择的导出目录绝对路径 */
+  outputPath: string;
+  /** 单章导出模式下的章节文件相对路径（相对项目根目录），仅 mode="single" 时使用 */
+  chapterPath?: string;
+}
+
+// TXT 导出结果统计接口
+// 与后端 TxtExportResult 结构体一一对应（camelCase 序列化）
+// 注意：命名为 TxtExportResult 以避免与归档导出的 ExportResult 冲突
+export interface TxtExportResult {
+  /** 是否导出成功 */
+  success: boolean;
+  /** 生成的文件绝对路径列表 */
+  files: string[];
+  /** 导出的章节总数 */
+  totalChapters: number;
+  /** 导出的总字数 */
+  totalWords: number;
+  /** 结果消息（成功/失败描述） */
+  message: string;
+}
+
+// 导出项目正文章节为 TXT 文件
+// 输入:
+//   projectPath 项目根目录绝对路径
+//   options 导出选项（模式/标题/BOM/CRLF/输出目录/单章路径）
+// 输出: Promise<TxtExportResult> 导出结果统计
+// 流程: 调用 Rust 后端 export_project_to_txt 命令，按模式分派到对应的导出逻辑
+export async function exportProjectToTxt(
+  projectPath: string,
+  options: TxtExportOptions
+): Promise<TxtExportResult> {
+  return invoke<TxtExportResult>("export_project_to_txt", {
+    projectPath,
+    options,
+  });
 }

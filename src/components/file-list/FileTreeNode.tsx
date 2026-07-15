@@ -146,8 +146,8 @@ interface FileTreeNodeProps {
   depth: number;
   /** 当前选中文件的相对路径 */
   selectedPath: string | null;
-  /** 文件选择回调 */
-  onSelect: (node: FileNode) => void;
+  /** 文件选择回调（可选 event 参数用于 Ctrl/Shift 多选检测，Task 5.2.1） */
+  onSelect: (node: FileNode, e?: React.MouseEvent) => void;
   /** 重命名按钮点击回调 */
   onRename: (node: FileNode, e: React.MouseEvent) => void;
   /** 删除按钮点击回调 */
@@ -156,8 +156,6 @@ interface FileTreeNodeProps {
   onContextMenu: (node: FileNode, e: React.MouseEvent) => void;
   /** i18n 翻译函数 */
   t: TranslateFn;
-  /** 当前选中文件的字数（仅用于在文件名旁显示） */
-  activeFileWordCount?: number;
   /** 是否可拖拽（仅正文分类文件节点为 true） */
   isDraggable?: boolean;
   /** 当前节点是否为拖拽悬停目标 */
@@ -174,6 +172,15 @@ interface FileTreeNodeProps {
   onDragLeave?: (e: React.DragEvent) => void;
   /** 拖拽放置事件回调 */
   onDrop?: (e: React.DragEvent) => void;
+  /** Task 5.2.1: 多选模式下是否被选中（用于多选高亮显示，与单选 selectedPath 区分） */
+  isMultiSelected?: boolean;
+  /** Task 5.3.1: 目录节点的 drop 属性（用于跨目录拖拽，仅正文分类卷目录有效） */
+  dirDropProps?: Partial<{
+    isDragOver: boolean;
+    onDragOver: (e: React.DragEvent) => void;
+    onDragLeave: (e: React.DragEvent) => void;
+    onDrop: (e: React.DragEvent) => void;
+  }>;
 }
 
 /**
@@ -194,7 +201,6 @@ export function TreeNodeList({
   onDelete,
   onContextMenu,
   t,
-  activeFileWordCount,
   isDraggable,
   isDragOver,
   isDragging,
@@ -203,6 +209,7 @@ export function TreeNodeList({
   onDragOver,
   onDragLeave,
   onDrop,
+  isMultiSelected,
 }: FileTreeNodeProps) {
   const [expanded, setExpanded] = useState(false);
   // 正文分类：读取章节格式设置，用于显示"第N章 标题"
@@ -271,7 +278,6 @@ export function TreeNodeList({
               onDelete={onDelete}
               onContextMenu={onContextMenu}
               t={t}
-              activeFileWordCount={activeFileWordCount}
               isManuscript={isManuscript}
             />
           ))
@@ -287,7 +293,7 @@ export function TreeNodeList({
     : getDisplayTitle(node.name);
   return (
     <div
-      onClick={() => onSelect(node)}
+      onClick={(e) => onSelect(node, e)}
       onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
       style={{ paddingLeft: `${8 + depth * 12}px` }}
       draggable={isDraggable}
@@ -300,9 +306,11 @@ export function TreeNodeList({
           ? "opacity-40 border-fandex-primary/40"
           : isDragOver
             ? "border-t-2 border-t-fandex-primary"
-            : isSelected
-              ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
-              : "text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text border-transparent"
+            : isMultiSelected
+              ? "bg-fandex-tertiary/15 text-fandex-tertiary border-fandex-tertiary/50"
+              : isSelected
+                ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
+                : "text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text border-transparent"
       }`}
     >
       {isDraggable && (
@@ -321,11 +329,6 @@ export function TreeNodeList({
       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-opacity duration-fast bg-nf-bg/85 backdrop-blur-sm pl-3">
         <span className="text-[10px] text-nf-text-tertiary whitespace-nowrap">
           {formatSize(node.size)}
-          {isSelected && activeFileWordCount !== undefined && activeFileWordCount > 0 && (
-            <span className="ml-1 text-fandex-primary">
-              {t("filelist.wordCount", { count: activeFileWordCount })}
-            </span>
-          )}
         </span>
         <button
           onClick={(e) => onRename(node, e)}
@@ -361,7 +364,6 @@ export function TreeNodeGrid({
   onRename,
   onDelete,
   onContextMenu,
-  activeFileWordCount,
   t,
   isDraggable,
   isDragOver,
@@ -371,6 +373,8 @@ export function TreeNodeGrid({
   onDragOver,
   onDragLeave,
   onDrop,
+  isMultiSelected,
+  dirDropProps,
 }: FileTreeNodeProps) {
   const [expanded, setExpanded] = useState(false);
   // 正文分类：读取章节格式设置，用于显示"第N章 标题"
@@ -383,9 +387,16 @@ export function TreeNodeGrid({
     return (
       <div className="col-span-2">
         <div
-          className="group flex items-center gap-2 p-2 cursor-pointer hover:bg-nf-bg-hover transition duration-fast border-b border-nf-border-light"
+          className={`group flex items-center gap-2 p-2 cursor-pointer hover:bg-nf-bg-hover transition duration-fast border-b ${
+            dirDropProps?.isDragOver
+              ? "bg-fandex-tertiary/10 border-fandex-tertiary/60 ring-1 ring-fandex-tertiary/40"
+              : "border-nf-border-light"
+          }`}
           onClick={() => hasChildren && setExpanded(!expanded)}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
+          onDragOver={dirDropProps?.onDragOver}
+          onDragLeave={dirDropProps?.onDragLeave}
+          onDrop={dirDropProps?.onDrop}
         >
           {hasChildren ? (
             expanded ? (
@@ -438,7 +449,6 @@ export function TreeNodeGrid({
                 onRename={onRename}
                 onDelete={onDelete}
                 onContextMenu={onContextMenu}
-                activeFileWordCount={activeFileWordCount}
                 t={t}
                 isManuscript={isManuscript}
               />
@@ -453,7 +463,7 @@ export function TreeNodeGrid({
   const isSelected = selectedPath === node.relative_path;
   return (
     <div
-      onClick={() => onSelect(node)}
+      onClick={(e) => onSelect(node, e)}
       onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
       draggable={isDraggable}
       onDragStart={onDragStart}
@@ -465,11 +475,13 @@ export function TreeNodeGrid({
           ? "opacity-40 ring-1 ring-fandex-primary/40"
           : isDragOver
             ? "ring-2 ring-fandex-primary ring-inset"
-            : isSelected
-              ? "bg-fandex-primary/10 border-fandex-primary/60 shadow-lg shadow-fandex-primary/10"
-              : "bg-nf-bg-card hover:border-fandex-primary/40 hover:shadow-md hover:shadow-black/30 hover:-translate-y-0.5"
+            : isMultiSelected
+              ? "bg-fandex-tertiary/15 border-fandex-tertiary/60 shadow-lg shadow-fandex-tertiary/10"
+              : isSelected
+                ? "bg-fandex-primary/10 border-fandex-primary/60 shadow-lg shadow-fandex-primary/10"
+                : "bg-nf-bg-card hover:border-fandex-primary/40 hover:shadow-md hover:shadow-black/30 hover:-translate-y-0.5"
       }`}
-      style={!isSelected && !isDragging && !isDragOver ? { backgroundColor: 'var(--fandex-bg-card)' } : undefined}
+      style={!isSelected && !isDragging && !isDragOver && !isMultiSelected ? { backgroundColor: 'var(--fandex-bg-card)' } : undefined}
     >
       {/* 背景点阵装饰：呼应项目卡片质感，极低透明度不影响文字 */}
       <div
@@ -491,11 +503,6 @@ export function TreeNodeGrid({
       </div>
       <div className="text-[10px] text-nf-text-tertiary mt-1 relative z-[1]">
         {formatSize(node.size)}
-        {isSelected && activeFileWordCount !== undefined && activeFileWordCount > 0 && (
-          <span className="ml-1 text-fandex-primary">
-            {t("filelist.wordCount", { count: activeFileWordCount })}
-          </span>
-        )}
       </div>
       <button
         onClick={(e) => onRename(node, e)}
@@ -511,6 +518,261 @@ export function TreeNodeGrid({
       </button>
       {/* 底部进度条装饰：悬停时显现，呼应项目卡片美术 */}
       <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-fandex-primary via-fandex-secondary to-fandex-tertiary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    </div>
+  );
+}
+
+// ===== Task 2.4.3: 虚拟化扁平树节点 =====
+
+/**
+ * 扁平化树节点结构
+ * 将递归树形结构展开为线性数组,供 useVirtualizer 使用
+ * - node: 原始文件节点
+ * - depth: 递归深度(用于缩进计算)
+ * - topLevelIndex: 在顶层 children 数组中的索引(仅 depth=0 节点有效,用于拖拽排序)
+ */
+export interface FlatNode {
+  node: FileNode;
+  depth: number;
+  topLevelIndex: number;
+}
+
+/**
+ * 扁平化可见树节点(Task 2.4.3: 树形结构虚拟化前置步骤)
+ *
+ * 将递归的文件树按可见性(展开的节点 + 其子节点)展开为线性数组。
+ * 仅展开的目录的子节点会被包含,折叠的目录的子节点被跳过。
+ *
+ * 输入:
+ *   nodes 文件节点数组(当前层级)
+ *   expandedPaths 已展开目录的 relative_path 集合
+ *   isManuscript 是否为正文分类(影响子节点排序)
+ *   depth 当前递归深度
+ * 输出: FlatNode[] 扁平化后的可见节点数组
+ * 流程:
+ *   1. 正文分类按章节序号排序,非正文保持原始顺序
+ *   2. 遍历节点,将当前节点加入结果数组
+ *   3. 若当前节点为已展开目录,递归扁平化其子节点
+ */
+export function flattenVisibleNodes(
+  nodes: FileNode[],
+  expandedPaths: Set<string>,
+  isManuscript: boolean,
+  depth: number = 0
+): FlatNode[] {
+  const result: FlatNode[] = [];
+  // 正文分类:按 extractChapterNumber 排序(卷首语 → 正文章节 → 卷尾语)
+  const sortedNodes = isManuscript
+    ? [...nodes].sort((a, b) => extractChapterNumber(a.name) - extractChapterNumber(b.name))
+    : nodes;
+  for (let i = 0; i < sortedNodes.length; i++) {
+    const node = sortedNodes[i];
+    // topLevelIndex 仅在顶层(depth=0)有意义,用于拖拽排序回调
+    result.push({ node, depth, topLevelIndex: depth === 0 ? i : -1 });
+    // 目录已展开时递归扁平化子节点
+    if (node.is_dir && node.children.length > 0 && expandedPaths.has(node.relative_path)) {
+      result.push(...flattenVisibleNodes(node.children, expandedPaths, isManuscript, depth + 1));
+    }
+  }
+  return result;
+}
+
+/**
+ * 扁平化文件树节点行组件(列表视图,Task 2.4.3)
+ *
+ * 与 TreeNodeList 的区别:
+ *   - 不递归渲染子节点(由父组件通过 flattenVisibleNodes 统一扁平化)
+ *   - 展开状态由父组件管理(isExpanded + onToggleExpand)
+ *   - 缩进通过 depth 计算,适配虚拟列表的绝对定位布局
+ *
+ * 视觉样式与 TreeNodeList 保持一致,确保用户体验无缝迁移。
+ *
+ * 输入: FlatFileTreeNodeProps 节点数据、展开状态与回调
+ * 输出: JSX 单行节点(文件夹或文件)
+ */
+interface FlatFileTreeNodeProps {
+  /** 当前节点数据 */
+  node: FileNode;
+  /** 递归深度(用于缩进计算) */
+  depth: number;
+  /** 是否展开(仅文件夹节点有效) */
+  isExpanded: boolean;
+  /** 切换展开/折叠回调 */
+  onToggleExpand: (relativePath: string) => void;
+  /** 当前选中文件的相对路径 */
+  selectedPath: string | null;
+  /** 文件选择回调(可选 event 参数用于 Ctrl/Shift 多选检测,Task 5.2.1) */
+  onSelect: (node: FileNode, e?: React.MouseEvent) => void;
+  /** 重命名按钮点击回调 */
+  onRename: (node: FileNode, e: React.MouseEvent) => void;
+  /** 删除按钮点击回调 */
+  onDelete: (node: FileNode, e: React.MouseEvent) => void;
+  /** 右键菜单触发回调 */
+  onContextMenu: (node: FileNode, e: React.MouseEvent) => void;
+  /** i18n 翻译函数 */
+  t: TranslateFn;
+  /** 是否为正文分类 */
+  isManuscript?: boolean;
+  /** Task 5.2.1: 多选模式下是否被选中(用于多选高亮显示) */
+  isMultiSelected?: boolean;
+  /** 拖拽属性(仅正文分类顶层文件节点注入) */
+  dragProps?: Partial<{
+    isDraggable: boolean;
+    isDragOver: boolean;
+    isDragging: boolean;
+    onDragStart: (e: React.DragEvent) => void;
+    onDragOver: (e: React.DragEvent) => void;
+    onDragLeave: (e: React.DragEvent) => void;
+    onDrop: (e: React.DragEvent) => void;
+  }>;
+  /** Task 5.3.1: 目录节点的 drop 属性(用于跨目录拖拽,仅正文分类卷目录有效) */
+  dirDropProps?: Partial<{
+    isDragOver: boolean;
+    onDragOver: (e: React.DragEvent) => void;
+    onDragLeave: (e: React.DragEvent) => void;
+    onDrop: (e: React.DragEvent) => void;
+  }>;
+}
+
+/**
+ * 扁平化文件树节点行组件实现(列表视图)
+ * 渲染逻辑与 TreeNodeList 一致,但移除了递归子节点渲染
+ */
+export function FlatFileTreeNode({
+  node,
+  depth,
+  isExpanded,
+  onToggleExpand,
+  selectedPath,
+  onSelect,
+  onRename,
+  onDelete,
+  onContextMenu,
+  t,
+  isManuscript,
+  isMultiSelected,
+  dragProps,
+  dirDropProps,
+}: FlatFileTreeNodeProps) {
+  // 正文分类:读取章节格式设置,用于显示"第N章 标题"
+  const chapterFormat = useSettingsStore((s) => s.chapterFormat);
+  const autoNumbering = useSettingsStore((s) => s.autoNumbering);
+
+  // 文件夹节点:渲染展开/折叠控制(无子节点递归)
+  if (node.is_dir) {
+    const hasChildren = node.children && node.children.length > 0;
+    return (
+      <div
+        className={`group flex items-center gap-1.5 pr-2 py-1.5 cursor-pointer transition duration-fast border ${
+          dirDropProps?.isDragOver
+            ? "bg-fandex-tertiary/10 border-fandex-tertiary/60 ring-1 ring-fandex-tertiary/40"
+            : "border-transparent hover:bg-nf-bg-hover hover:text-nf-text text-nf-text-secondary"
+        }`}
+        style={{ paddingLeft: `${8 + depth * 12}px` }}
+        onClick={() => hasChildren && onToggleExpand(node.relative_path)}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
+        onDragOver={dirDropProps?.onDragOver}
+        onDragLeave={dirDropProps?.onDragLeave}
+        onDrop={dirDropProps?.onDrop}
+        role="treeitem"
+        aria-expanded={hasChildren ? isExpanded : undefined}
+        aria-label={getDisplayTitle(node.name)}
+      >
+        {hasChildren ? (
+          isExpanded ? (
+            <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-nf-text-tertiary" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-nf-text-tertiary" />
+          )
+        ) : (
+          <span className="w-3.5 flex-shrink-0" />
+        )}
+        {isExpanded ? (
+          <FolderOpen className="w-4 h-4 flex-shrink-0 text-fandex-secondary" />
+        ) : (
+          <Folder className="w-4 h-4 flex-shrink-0 text-fandex-secondary" />
+        )}
+        {/* 章节名称使用 break-all 确保长名称完整显示 */}
+        <span className="flex-1 text-sm break-all">{getDisplayTitle(node.name)}</span>
+        <span className="text-[10px] text-nf-text-tertiary">
+          {node.children?.length || 0} {t("filelist.itemUnit")}
+        </span>
+        <button
+          onClick={(e) => onRename(node, e)}
+          className="opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
+        >
+          <PenLine className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => onDelete(node, e)}
+          className="opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-1 text-nf-text-tertiary hover:text-red-400 transition duration-fast"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  // 文件节点
+  const isSelected = selectedPath === node.relative_path;
+  const displayTitle = isManuscript
+    ? formatManuscriptTitle(node.name, chapterFormat, autoNumbering)
+    : getDisplayTitle(node.name);
+  return (
+    <div
+      onClick={(e) => onSelect(node, e)}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(node, e); }}
+      style={{ paddingLeft: `${8 + depth * 12}px` }}
+      draggable={dragProps?.isDraggable}
+      onDragStart={dragProps?.onDragStart}
+      onDragOver={dragProps?.onDragOver}
+      onDragLeave={dragProps?.onDragLeave}
+      onDrop={dragProps?.onDrop}
+      className={`group relative flex items-center gap-1.5 pr-2 py-1.5 cursor-pointer transition duration-fast border ${
+        dragProps?.isDragging
+          ? "opacity-40 border-fandex-primary/40"
+          : dragProps?.isDragOver
+            ? "border-t-2 border-t-fandex-primary"
+            : isMultiSelected
+              ? "bg-fandex-tertiary/15 text-fandex-tertiary border-fandex-tertiary/50"
+              : isSelected
+                ? "bg-fandex-primary/10 text-fandex-primary border-fandex-primary"
+                : "text-nf-text-secondary hover:bg-nf-bg-hover hover:text-nf-text border-transparent"
+      }`}
+      role="treeitem"
+      aria-selected={isSelected || isMultiSelected}
+      aria-label={displayTitle}
+    >
+      {dragProps?.isDraggable && (
+        <GripVertical className="w-3.5 h-3.5 flex-shrink-0 text-nf-text-tertiary opacity-0 group-hover:opacity-60 cursor-grab" />
+      )}
+      {!dragProps?.isDraggable && <span className="w-3 flex-shrink-0" />}
+      <FileText className="w-4 h-4 flex-shrink-0" />
+      {/* 章节名称:单行显示,超出用省略号截断 */}
+      <span
+        className="flex-1 min-w-0 text-sm break-all leading-snug"
+        title={displayTitle}
+      >
+        {displayTitle}
+      </span>
+      {/* 右侧悬浮层:尺寸+操作按钮,默认隐藏,悬浮时覆盖显示 */}
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-opacity duration-fast bg-nf-bg/85 backdrop-blur-sm pl-3">
+        <span className="text-[10px] text-nf-text-tertiary whitespace-nowrap">
+          {formatSize(node.size)}
+        </span>
+        <button
+          onClick={(e) => onRename(node, e)}
+          className="p-1 text-nf-text-tertiary hover:text-fandex-primary transition duration-fast"
+        >
+          <PenLine className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => onDelete(node, e)}
+          className="p-1 text-nf-text-tertiary hover:text-red-400 transition duration-fast"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

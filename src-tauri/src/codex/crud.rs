@@ -16,15 +16,20 @@
 use std::fs;
 use std::path::PathBuf;
 
-use super::parser::{CodexEntity, CodexMeta, CodexMetaPatch, CODEX_DIRS, parse_codex_file};
+use serde_json::Value;
+
+use super::parser::{CodexEntity, CodexMeta, CodexMetaPatch, parse_codex_file, build_effective_codex_dirs};
 use super::migration::{atomic_write_codex, migrate_codex_txt_to_pmd};
+use crate::commands::read_project_meta;
+use crate::error::AppError;
+use crate::manifest::{find_chapter_paths_by_codex_id, purge_codex_from_manifest};
 
 /// 扫描设定目录，返回所有结构化设定实体（支持 .pmd 与 .txt 自动迁移）
 ///
 /// 输入: project_path 项目根目录绝对路径
 /// 输出: Result<Vec<CodexEntity>, String> 实体列表（按类型分组后按名称排序）
 /// 流程:
-///   1. 遍历 CODEX_DIRS 中定义的标准目录与兼容目录
+///   1. 读取 ProjectMeta.codex_dirs(Task 1.8),空时回退到 CODEX_DIRS 常量
 ///   2. 对每个存在的目录，扫描其下 .pmd 与 .txt 文件
 ///   3. .txt 文件自动迁移为 .pmd（一次性、透明、用户无感）
 ///   4. 解析每个 .pmd 文件的 front matter + ProseMirror JSON 正文
@@ -34,7 +39,13 @@ pub fn list_codex_entities(project_path: String) -> Result<Vec<CodexEntity>, Str
     let root = PathBuf::from(&project_path);
     let mut entities = Vec::new();
 
-    for (dir_name, fallback_type) in CODEX_DIRS {
+    // Task 1.8: 优先使用 ProjectMeta.codex_dirs 配置,ProjectMeta 读取失败或字段为空时回退到默认 CODEX_DIRS
+    let codex_dirs_from_meta = read_project_meta(&root)
+        .map(|meta| meta.codex_dirs)
+        .unwrap_or_default();
+    let effective_dirs = build_effective_codex_dirs(&codex_dirs_from_meta);
+
+    for (dir_name, fallback_type) in &effective_dirs {
         let dir = root.join(dir_name);
         if !dir.exists() {
             continue;
@@ -155,15 +166,22 @@ pub fn list_codex_entities(project_path: String) -> Result<Vec<CodexEntity>, Str
 /// 输入: project_path 项目根目录
 /// 输出: Result<u32, String> 迁移的文件数量
 /// 流程:
-///   1. 扫描所有兼容目录下的 .txt 文件
-///   2. 对无 front matter 的文件，解析旧格式并注入 front matter
-///   3. 原子写入（先写 .tmp 再 rename）
+///   1. 读取 ProjectMeta.codex_dirs(Task 1.8),空时回退到默认 CODEX_DIRS
+///   2. 扫描所有兼容目录下的 .txt 文件
+///   3. 对无 front matter 的文件，解析旧格式并注入 front matter
+///   4. 原子写入（先写 .tmp 再 rename）
 #[tauri::command]
 pub fn inject_codex_front_matter(project_path: String) -> Result<u32, String> {
     let root = PathBuf::from(&project_path);
     let mut count = 0u32;
 
-    for (dir_name, fallback_type) in CODEX_DIRS {
+    // Task 1.8: 优先使用 ProjectMeta.codex_dirs 配置
+    let codex_dirs_from_meta = read_project_meta(&root)
+        .map(|meta| meta.codex_dirs)
+        .unwrap_or_default();
+    let effective_dirs = build_effective_codex_dirs(&codex_dirs_from_meta);
+
+    for (dir_name, fallback_type) in &effective_dirs {
         let dir = root.join(dir_name);
         if !dir.exists() {
             continue;
@@ -349,4 +367,286 @@ pub fn update_codex_entity(
     }
 
     Ok(meta)
+}
+
+// ===== Task 4.4: 设定库删除卡片时自动清理 Mention =====
+
+/// 分离 .pmd 文件的 JSON front matter 与 ProseMirror JSON 正文(Task 4.4 内部辅助)
+///
+/// 输入: content .pmd 文件完整内容
+/// 输出: Option<(front_matter_block, body)> 返回 (front matter 完整块含首尾 ---, ProseMirror JSON 正文)
+///       无 front matter 时返回 None
+/// 流程:
+///   1. 检测首行是否为 "---"
+///   2. 查找下一个 "---" 作为结束标记
+///   3. 返回从首行到结束标记(含)的完整块 与 结束标记后的正文
+/// 设计说明:
+///   - 保留 front matter 原始文本(而非解析为 CodexMeta 后重新序列化),
+///     避免因 CodexMeta 字段缺失导致 front matter 信息丢失
+///   - body 部分按原格式返回,不进行 trim_start 以保留可能的格式约定
+fn separate_pmd_front_matter(content: &str) -> Option<(String, String)> {
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.len() < 3 || lines[0].trim() != "---" {
+        return None;
+    }
+    // 查找结束标记 ---
+    let end_idx = lines[1..]
+        .iter()
+        .position(|l| l.trim() == "---")
+        .map(|i| i + 1)?;
+    let front_matter = lines[..=end_idx].join("\n");
+    let body = lines[end_idx + 1..].join("\n");
+    Some((front_matter, body))
+}
+
+/// 递归移除 ProseMirror JSON 中匹配 codexId 的 characterMentionNode(Task 4.4 内部辅助)
+///
+/// 输入:
+///   node - ProseMirror 节点的 JSON Value(可变引用)
+///   codex_id - 待移除的设定卡片 UUID
+/// 输出: u64 本次调用替换的 Mention 节点数量(递归累加)
+/// 流程:
+///   1. 若 node 是 characterMentionNode 且 attrs.characterId == codex_id:
+///      - 将节点替换为包含 attrs.name 文本的 text 节点
+///      - 返回 1 表示替换了一处
+///   2. 若 node 含 content 数组,递归处理每个子节点
+///   3. 替换策略:保留 mention 的文本内容(name 字段),避免正文语义丢失
+/// 设计说明:
+///   - 使用 Value::Object 可变引用直接修改节点字段,实现就地替换
+///   - content 数组中的元素替换通过索引赋值完成
+fn remove_mentions_in_node(node: &mut Value, codex_id: &str) -> u64 {
+    let mut count: u64 = 0;
+
+    // 检查当前节点是否为匹配的 characterMentionNode
+    if let Some(obj) = node.as_object() {
+        let node_type = obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        if node_type == "characterMentionNode" {
+            let attrs_match = obj
+                .get("attrs")
+                .and_then(|a| a.get("characterId"))
+                .and_then(|c| c.as_str())
+                .map(|id| id == codex_id)
+                .unwrap_or(false);
+            if attrs_match {
+                // 提取 mention 的 name 字段作为保留文本
+                let name = obj
+                    .get("attrs")
+                    .and_then(|a| a.get("name"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                // 替换为 text 节点,保留原文不丢内容
+                *node = serde_json::json!({
+                    "type": "text",
+                    "text": name
+                });
+                count += 1;
+                return count;
+            }
+        }
+    }
+
+    // 递归处理 content 数组中的子节点
+    if let Some(content) = node.get_mut("content").and_then(|c| c.as_array_mut()) {
+        for child in content.iter_mut() {
+            count += remove_mentions_in_node(child, codex_id);
+        }
+    }
+
+    count
+}
+
+/// 移除正文章节中引用指定 codexId 的 Mention 节点(Task 4.4.2)
+///
+/// 输入:
+///   project_path - 项目根目录路径
+///   chapter_paths - 待清理的章节文件相对路径列表(相对项目根,正斜杠格式)
+///   codex_id - 设定库卡片 UUID
+/// 输出: Result<u32, AppError> 实际清理的 Mention 节点总数
+/// 流程:
+///   1. 校验项目路径
+///   2. 遍历每个 chapter_path:
+///      a. 拼接绝对路径并校验存在性
+///      b. 读取 .pmd 文件内容
+///      c. 分离 front matter 与 ProseMirror JSON 正文
+///      d. 解析正文为 JSON Value,递归移除匹配的 characterMentionNode
+///      e. 重新序列化 JSON,组合 front matter + 新正文,原子写入
+///   3. 累加返回清理总数
+/// 设计说明:
+///   - 无 front matter 的章节文件(旧版 .txt)直接跳过,不进行 Mention 清理
+///   - body 部分非合法 JSON 时跳过该文件,记录日志不阻断整体流程
+///   - 原子写入保证清理过程中断不会损坏文件
+#[tauri::command]
+pub fn remove_mentions_from_chapters(
+    project_path: String,
+    chapter_paths: Vec<String>,
+    codex_id: String,
+) -> Result<u32, AppError> {
+    let root = crate::commands::validate_project_path(&project_path)?;
+
+    let mut total_removed: u32 = 0;
+    for chapter_rel in &chapter_paths {
+        // 路径穿越校验:禁止 .. 与绝对路径
+        if chapter_rel.contains("..") || chapter_rel.starts_with('/') {
+            return Err(AppError::path_validation_error(format!(
+                "非法的章节路径: {}",
+                chapter_rel
+            )));
+        }
+        let chapter_abs = root.join(chapter_rel);
+        if !chapter_abs.exists() {
+            // 章节文件不存在(可能已被删除),跳过不阻断
+            continue;
+        }
+
+        let content = match fs::read_to_string(&chapter_abs) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!(
+                    "[codex] 警告: 读取章节文件失败 {}: {}",
+                    chapter_abs.display(),
+                    e
+                );
+                continue;
+            }
+        };
+
+        // 分离 front matter 与 ProseMirror JSON 正文
+        let (front_matter, body) = match separate_pmd_front_matter(&content) {
+            Some(parts) => parts,
+            None => {
+                // 无 front matter,可能是旧版 .txt 或纯 JSON,跳过 front matter 保留
+                // 直接将整个内容作为 body 处理
+                (String::new(), content.clone())
+            }
+        };
+
+        // 解析 body 为 JSON Value
+        let mut doc: Value = match serde_json::from_str(&body) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!(
+                    "[codex] 警告: 章节 {} 正文非合法 ProseMirror JSON,跳过: {}",
+                    chapter_rel,
+                    e
+                );
+                continue;
+            }
+        };
+
+        // 递归移除匹配的 characterMentionNode
+        let removed = remove_mentions_in_node(&mut doc, &codex_id);
+        if removed == 0 {
+            // 该章节无匹配 Mention,跳过写回避免无谓 IO
+            continue;
+        }
+        total_removed += removed as u32;
+
+        // 重新序列化为 JSON 字符串(紧凑格式,与项目其他 .pmd 文件保持一致)
+        let new_body = serde_json::to_string(&doc)
+            .map_err(|e| AppError::serialize_error(e, "序列化 ProseMirror JSON 失败"))?;
+
+        // 组合 front matter + 新正文,原子写入
+        let new_content = if front_matter.is_empty() {
+            new_body
+        } else {
+            format!("{}\n{}", front_matter, new_body)
+        };
+
+        atomic_write_codex(&chapter_abs, &new_content).map_err(AppError::from)?;
+    }
+
+    Ok(total_removed)
+}
+
+/// 删除设定库卡片并联动清理 Mention 引用(Task 4.4.1)
+///
+/// 输入:
+///   project_path - 项目根目录路径
+///   source_file - 卡片文件相对路径(如 "角色/亚瑟.pmd")
+/// 输出: Result<u32, AppError> 实际清理的 Mention 节点总数(供前端提示)
+/// 流程:
+///   1. 校验项目路径与 source_file 合法性
+///   2. 拼接卡片绝对路径并校验存在性
+///   3. 读取 .pmd 文件 front matter 获取 codex_id(UUID)
+///   4. 通过 manifest 反向索引查找引用该 codexId 的章节文件路径列表
+///   5. 调用 remove_mentions_from_chapters 清理这些章节的 Mention 节点
+///   6. 删除卡片文件(移至系统回收站,可恢复)
+///   7. 调用 purge_codex_from_manifest 清理 manifest 中的 codex 实体与反向索引
+/// 设计说明:
+///   - 文件删除使用 trash::delete 移至回收站,与 delete_path 命令保持一致策略
+///   - codex_id 缺失时仅清理 source_file 匹配的 manifest 记录,跳过 Mention 清理
+///   - 任一步骤失败立即返回错误,保证数据一致性
+#[tauri::command]
+pub fn delete_codex_entity(
+    project_path: String,
+    source_file: String,
+) -> Result<u32, AppError> {
+    let root = crate::commands::validate_project_path(&project_path)?;
+
+    // 安全校验:source_file 必须为相对路径,禁止路径穿越
+    if source_file.contains("..") || source_file.starts_with('/') || source_file.contains(':') {
+        return Err(AppError::path_validation_error("非法的来源文件路径"));
+    }
+
+    let card_abs = root.join(&source_file);
+    if !card_abs.exists() {
+        return Err(AppError::path_validation_error(format!(
+            "设定文件不存在: {}",
+            source_file
+        )));
+    }
+
+    // 读取卡片 front matter 获取 codex_id
+    let content = fs::read_to_string(&card_abs)
+        .map_err(|e| AppError::io_error(e, "读取设定文件失败"))?;
+    let file_name = card_abs
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+    let (meta, _body) = parse_codex_file(&content, &file_name, "unknown");
+    let codex_id = meta.id.clone();
+
+    // 通过 manifest 反向索引查找引用该 codexId 的章节路径列表
+    let chapter_paths = if codex_id.is_empty() {
+        Vec::new()
+    } else {
+        find_chapter_paths_by_codex_id(&root, &codex_id).unwrap_or_default()
+    };
+
+    // 清理章节中的 Mention 节点
+    let mut removed_mentions: u32 = 0;
+    if !chapter_paths.is_empty() && !codex_id.is_empty() {
+        removed_mentions = remove_mentions_from_chapters(
+            project_path.clone(),
+            chapter_paths.clone(),
+            codex_id.clone(),
+        )?;
+    }
+
+    // 删除卡片文件(优先 trash 移至回收站,失败时回退到永久删除)
+    if let Err(e) = trash::delete(&card_abs) {
+        eprintln!(
+            "[codex] 警告: 移至回收站失败 {}: {},回退到永久删除",
+            card_abs.display(),
+            e
+        );
+        fs::remove_file(&card_abs)
+            .map_err(|err| AppError::io_error(err, "删除设定文件失败"))?;
+    }
+
+    // 清理 manifest 中的 codex 实体记录与反向索引
+    if !codex_id.is_empty() {
+        purge_codex_from_manifest(&root, &codex_id, &source_file)?;
+    }
+
+    Ok(removed_mentions)
+}
+
+/// AppError 与 String 错误的转换trait(供 atomic_write_codex 的 String 错误转换)
+impl From<String> for AppError {
+    fn from(err: String) -> Self {
+        AppError::config_error(err)
+    }
 }

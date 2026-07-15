@@ -15,6 +15,7 @@
 // 7. 支持点击结果跳转到文件编辑
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Search,
   Loader2,
@@ -37,43 +38,41 @@ import {
   type SearchResult,
   type ReplaceResult,
   type TantivySearchResult,
+  type ProjectMeta,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { logger } from "../lib/logger";
 import { useToast } from "../lib/toast";
 
 /**
- * 从相对路径推断分类
- * 输入: relativePath 文件相对路径
+ * 从相对路径推断分类(Task 1.8: 改为从 ProjectMeta 读取目录配置)
+ * 输入:
+ *   relativePath 文件相对路径
+ *   meta 项目元数据(提供 codexDirs/outlineDir/manuscriptDir/draftDir 配置,缺失时使用默认值)
  * 输出: SidebarCategory 分类字符串
  * 流程:
  *   1. 提取路径首段目录名
- *   2. 优先匹配 4 个标准目录（正文/设定/大纲/草稿箱）
- *   3. 降级匹配设定库兼容目录名（与 CODEX_TYPE_DIRS 对齐）
- *   4. 默认归入正文类
+ *   2. 从 ProjectMeta 提取目录配置(缺失字段回退到默认值,兼容旧项目)
+ *   3. 匹配正文/草稿箱目录 → manuscript
+ *   4. 匹配大纲目录 → outline
+ *   5. 匹配设定库目录列表 → codex
+ *   6. 默认归入正文类
  */
-function detectCategoryFromPath(relativePath: string): string {
+function detectCategoryFromPath(relativePath: string, meta?: ProjectMeta): string {
   const firstDir = relativePath.split(/[\\/]/)[0] || "";
-  // 4 个标准一级目录映射（统一目录结构）
-  const standardMap: Record<string, string> = {
-    "正文": "manuscript",
-    "设定": "codex",
-    "大纲": "outline",
-    "草稿箱": "manuscript",
-  };
-  // 设定库兼容目录映射（与 CODEX_TYPE_DIRS 对齐，用于识别散落的设定子目录）
-  const codexDirMap: Record<string, string> = {
-    "草稿": "manuscript",
-    "角色": "codex",
-    "人物": "codex",
-    "世界观": "codex",
-    "术语": "codex",
-    "名词": "codex",
-    "素材": "codex",
-    "资料": "codex",
-    "时间线": "codex",
-  };
-  return standardMap[firstDir] || codexDirMap[firstDir] || "manuscript";
+  // Task 1.8: 从 ProjectMeta 读取目录配置,缺失时回退到默认值(兼容旧项目)
+  const manuscriptDir = meta?.manuscriptDir || "正文";
+  const outlineDir = meta?.outlineDir || "大纲";
+  const draftDir = meta?.draftDir || "草稿箱";
+  // codexDirs 为空或缺失时回退到默认设定库目录列表(与后端 CODEX_DIRS 对齐)
+  const codexDirs = meta?.codexDirs && meta.codexDirs.length > 0
+    ? meta.codexDirs
+    : ["设定", "角色", "人物", "世界观", "术语", "名词", "素材", "资料", "时间线"];
+
+  if (firstDir === manuscriptDir || firstDir === draftDir) return "manuscript";
+  if (firstDir === outlineDir) return "outline";
+  if (codexDirs.includes(firstDir)) return "codex";
+  return "manuscript";
 }
 
 export default function GlobalSearch() {
@@ -107,6 +106,25 @@ export default function GlobalSearch() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [replaceResult, setReplaceResult] = useState<ReplaceResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Task 2.4.4: 搜索结果滚动容器引用,供虚拟列表使用
+  const searchScrollRef = useRef<HTMLDivElement>(null);
+  // Task 2.4.4: 精确搜索结果虚拟化(预估 1000+ 结果时受益)
+  // 使用动态测量(measureElement)适配替换预览导致的行高差异
+  const exactVirtualizer = useVirtualizer({
+    count: results.length,
+    getScrollElement: () => searchScrollRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+    getItemKey: (index) => `${results[index]?.relative_path}-${results[index]?.line_number}-${index}`,
+  });
+  // Task 2.4.4: 语义搜索结果虚拟化
+  const semanticVirtualizer = useVirtualizer({
+    count: semanticResults.length,
+    getScrollElement: () => searchScrollRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+    getItemKey: (index) => `${semanticResults[index]?.file_path}-${semanticResults[index]?.chunk_index}-${index}`,
+  });
 
   /**
    * 执行搜索
@@ -236,7 +254,8 @@ export default function GlobalSearch() {
    * 流程: 设置待定位行号，导航到对应分类与文件，编辑器加载后自动滚动到匹配行
    */
   const handleJumpToResult = (result: SearchResult) => {
-    const category = detectCategoryFromPath(result.relative_path);
+    // Task 1.8: 传入 ProjectMeta 以读取自定义目录配置
+    const category = detectCategoryFromPath(result.relative_path, currentProject?.meta);
     // 设置待定位行号，NovelEditor 加载文件后消费并自动滚动
     setPendingScrollLine(result.line_number);
     navigateToFile(
@@ -257,7 +276,8 @@ export default function GlobalSearch() {
    * 流程: 语义搜索无行号信息，仅导航到文件，不设置滚动行号
    */
   const handleJumpToSemanticResult = (result: TantivySearchResult) => {
-    const category = detectCategoryFromPath(result.file_path);
+    // Task 1.8: 传入 ProjectMeta 以读取自定义目录配置
+    const category = detectCategoryFromPath(result.file_path, currentProject?.meta);
     navigateToFile(
       {
         name: result.file_name,
@@ -492,8 +512,13 @@ export default function GlobalSearch() {
         </div>
       )}
 
-      {/* 结果列表区 */}
-      <div className="flex-1 overflow-y-auto p-6">
+      {/* 结果列表区(Task 2.4.4: 搜索结果虚拟化,预估 1000+ 结果时受益) */}
+      <div
+        ref={searchScrollRef}
+        className="flex-1 overflow-y-auto p-6"
+        role="list"
+        aria-label={t("search.title")}
+      >
         {loading || replacing ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-6 h-6 animate-spin text-fandex-primary" />
@@ -527,31 +552,52 @@ export default function GlobalSearch() {
               </p>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto space-y-1">
-              {semanticResults.map((result, idx) => (
-                <div
-                  key={`${result.file_path}-${result.chunk_index}-${idx}`}
-                  onClick={() => handleJumpToSemanticResult(result)}
-                  className="fandex-bar-left bg-nf-bg-card border border-nf-border-light hover:border-fandex-secondary/40 p-3 transition duration-fast cursor-pointer group"
-                >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <FileText className="w-3.5 h-3.5 text-fandex-secondary flex-shrink-0" />
-                    <span className="text-xs font-medium font-display text-nf-text group-hover:text-fandex-secondary transition duration-fast truncate">
-                      {result.file_name}
-                    </span>
-                    <span className="text-[10px] text-nf-text-tertiary truncate">
-                      {result.file_path}
-                    </span>
-                    <span className="text-[10px] text-nf-text-tertiary flex-shrink-0">
-                      #{result.chunk_index + 1}
-                    </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary ml-auto group-hover:text-fandex-secondary transition duration-fast flex-shrink-0" />
+            // Task 2.4.4: 语义搜索结果虚拟列表
+            <div
+              className="max-w-3xl mx-auto"
+              style={{ height: semanticVirtualizer.getTotalSize(), position: "relative" }}
+            >
+              {semanticVirtualizer.getVirtualItems().map((virtualItem) => {
+                const result = semanticResults[virtualItem.index];
+                return (
+                  <div
+                    key={virtualItem.key}
+                    data-index={virtualItem.index}
+                    ref={semanticVirtualizer.measureElement}
+                    role="listitem"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualItem.start}px)`,
+                      paddingBottom: "4px",
+                    }}
+                  >
+                    <div
+                      onClick={() => handleJumpToSemanticResult(result)}
+                      className="fandex-bar-left bg-nf-bg-card border border-nf-border-light hover:border-fandex-secondary/40 p-3 transition duration-fast cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <FileText className="w-3.5 h-3.5 text-fandex-secondary flex-shrink-0" />
+                        <span className="text-xs font-medium font-display text-nf-text group-hover:text-fandex-secondary transition duration-fast truncate">
+                          {result.file_name}
+                        </span>
+                        <span className="text-[10px] text-nf-text-tertiary truncate">
+                          {result.file_path}
+                        </span>
+                        <span className="text-[10px] text-nf-text-tertiary flex-shrink-0">
+                          #{result.chunk_index + 1}
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary ml-auto group-hover:text-fandex-secondary transition duration-fast flex-shrink-0" />
+                      </div>
+                      <div className="text-xs text-nf-text-secondary leading-relaxed pl-5 line-clamp-3">
+                        {highlightKeyword(result.text.trim(), query.trim())}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-xs text-nf-text-secondary leading-relaxed pl-5 line-clamp-3">
-                    {highlightKeyword(result.text.trim(), query.trim())}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )
         ) : results.length === 0 ? (
@@ -562,50 +608,71 @@ export default function GlobalSearch() {
             </p>
           </div>
         ) : (
-          <div className="max-w-3xl mx-auto space-y-1">
-            {results.map((result, idx) => (
-              <div
-                key={`${result.relative_path}-${result.line_number}-${idx}`}
-                onClick={() => handleJumpToResult(result)}
-                className="fandex-bar-left bg-nf-bg-card border border-nf-border-light hover:border-fandex-primary/40 p-3 transition duration-fast cursor-pointer group"
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <FileText className="w-3.5 h-3.5 text-fandex-primary flex-shrink-0" />
-                  <span className="text-xs font-medium font-display text-nf-text group-hover:text-fandex-primary transition duration-fast truncate">
-                    {result.file_name}
-                  </span>
-                  <span className="text-[10px] text-nf-text-tertiary flex-shrink-0">
-                    {t("search.lineNum", { line: result.line_number })}
-                  </span>
-                  <span className="text-[10px] text-nf-text-tertiary truncate">
-                    {result.relative_path}
-                  </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary ml-auto group-hover:text-fandex-primary transition duration-fast flex-shrink-0" />
-                </div>
-                <div className="text-xs text-nf-text-secondary leading-relaxed font-mono pl-5">
-                  {highlightKeyword(result.line_content.trim(), query.trim())}
-                </div>
-                {/* 替换模式下展示替换预览 */}
-                {mode === "replace" && replacement !== query && (
-                  <div className="mt-1.5 pl-5 flex items-center gap-2 text-xs">
-                    <ArrowRight className="w-3 h-3 text-fandex-tertiary flex-shrink-0" />
-                    <span className="text-nf-text-tertiary line-through">
+          // Task 2.4.4: 精确搜索结果虚拟列表
+          <div
+            className="max-w-3xl mx-auto"
+            style={{ height: exactVirtualizer.getTotalSize(), position: "relative" }}
+          >
+            {exactVirtualizer.getVirtualItems().map((virtualItem) => {
+              const result = results[virtualItem.index];
+              return (
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={exactVirtualizer.measureElement}
+                  role="listitem"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${virtualItem.start}px)`,
+                    paddingBottom: "4px",
+                  }}
+                >
+                  <div
+                    onClick={() => handleJumpToResult(result)}
+                    className="fandex-bar-left bg-nf-bg-card border border-nf-border-light hover:border-fandex-primary/40 p-3 transition duration-fast cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <FileText className="w-3.5 h-3.5 text-fandex-primary flex-shrink-0" />
+                      <span className="text-xs font-medium font-display text-nf-text group-hover:text-fandex-primary transition duration-fast truncate">
+                        {result.file_name}
+                      </span>
+                      <span className="text-[10px] text-nf-text-tertiary flex-shrink-0">
+                        {t("search.lineNum", { line: result.line_number })}
+                      </span>
+                      <span className="text-[10px] text-nf-text-tertiary truncate">
+                        {result.relative_path}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-nf-text-tertiary ml-auto group-hover:text-fandex-primary transition duration-fast flex-shrink-0" />
+                    </div>
+                    <div className="text-xs text-nf-text-secondary leading-relaxed font-mono pl-5">
                       {highlightKeyword(result.line_content.trim(), query.trim())}
-                    </span>
-                    <ArrowRight className="w-3 h-3 text-fandex-secondary flex-shrink-0" />
-                    <span className="text-fandex-secondary">
-                      {result.line_content.replace(
-                        new RegExp(
-                          caseSensitive ? query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-                          caseSensitive ? "g" : "gi"
-                        ),
-                        replacement
-                      ).trim()}
-                    </span>
+                    </div>
+                    {/* 替换模式下展示替换预览 */}
+                    {mode === "replace" && replacement !== query && (
+                      <div className="mt-1.5 pl-5 flex items-center gap-2 text-xs">
+                        <ArrowRight className="w-3 h-3 text-fandex-tertiary flex-shrink-0" />
+                        <span className="text-nf-text-tertiary line-through">
+                          {highlightKeyword(result.line_content.trim(), query.trim())}
+                        </span>
+                        <ArrowRight className="w-3 h-3 text-fandex-secondary flex-shrink-0" />
+                        <span className="text-fandex-secondary">
+                          {result.line_content.replace(
+                            new RegExp(
+                              caseSensitive ? query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+                              caseSensitive ? "g" : "gi"
+                            ),
+                            replacement
+                          ).trim()}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

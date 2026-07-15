@@ -12,6 +12,7 @@
 // 4. 提供模板变量渲染能力
 
 use serde::{Deserialize, Serialize};
+use schemars::JsonSchema;
 
 // ===== 模板变量系统 =====
 // 模板内支持以下变量占位符，在创建项目时由 render_template 统一替换：
@@ -61,7 +62,8 @@ pub fn render_template(content: &str, vars: &TemplateVars) -> String {
 
 /// 项目元数据结构
 /// 存储在项目根目录的 .novelforge/project.json 中
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectMeta {
     /// 项目名称
@@ -91,6 +93,69 @@ pub struct ProjectMeta {
     /// 注：通过 alias 兼容旧 meta.json 中的 snake_case 字段名
     #[serde(alias = "word_count")]
     pub word_count: u64,
+    /// 设定库扫描目录列表(Task 1.8)
+    /// 标准目录为 ["设定"],兼容旧版可附加 ["角色","人物","世界观","术语","名词","素材","资料"]
+    /// 后端 codex 扫描时读取此字段决定扫描范围,空时回退到 CODEX_DIRS 默认值
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub codex_dirs: Vec<String>,
+    /// 大纲目录名(Task 1.8)
+    /// 默认 "大纲",旧项目反序列化时此字段缺失则取默认值
+    #[serde(default = "default_outline_dir", skip_serializing_if = "is_default_outline_dir")]
+    pub outline_dir: String,
+    /// 正文目录名(Task 1.8)
+    /// 默认 "正文",旧项目反序列化时此字段缺失则取默认值
+    #[serde(default = "default_manuscript_dir", skip_serializing_if = "is_default_manuscript_dir")]
+    pub manuscript_dir: String,
+    /// 草稿箱目录名(Task 1.8)
+    /// 默认 "草稿箱",旧项目反序列化时此字段缺失则取默认值
+    #[serde(default = "default_draft_dir", skip_serializing_if = "is_default_draft_dir")]
+    pub draft_dir: String,
+}
+
+/// Task 1.8: ProjectMeta 默认目录名常量与判断函数
+/// 通过 serde(default = "...") 实现旧项目反序列化时自动填充默认值,保证向后兼容
+
+fn default_outline_dir() -> String {
+    "大纲".to_string()
+}
+
+fn default_manuscript_dir() -> String {
+    "正文".to_string()
+}
+
+fn default_draft_dir() -> String {
+    "草稿箱".to_string()
+}
+
+fn is_default_outline_dir(s: &str) -> bool {
+    s == "大纲"
+}
+
+fn is_default_manuscript_dir(s: &str) -> bool {
+    s == "正文"
+}
+
+fn is_default_draft_dir(s: &str) -> bool {
+    s == "草稿箱"
+}
+
+/// Task 1.8: 默认 codex_dirs 列表(用于新建项目时填充)
+///
+/// 设计说明:
+///   标准目录为"设定",向后兼容旧版的 角色/人物/世界观/术语/名词/素材/资料 7 个目录
+///   旧项目反序列化时此字段缺失,通过 #[serde(default)] 取空 Vec
+///   后端扫描时若 codex_dirs 为空,回退到 CODEX_DIRS 常量,保证旧项目行为不变
+pub fn default_codex_dirs() -> Vec<String> {
+    vec![
+        "设定".to_string(),
+        "角色".to_string(),
+        "人物".to_string(),
+        "世界观".to_string(),
+        "术语".to_string(),
+        "名词".to_string(),
+        "素材".to_string(),
+        "资料".to_string(),
+    ]
 }
 
 /// 获取当前本地时间的 ISO 8601 字符串
@@ -154,18 +219,20 @@ impl StandardProjectType {
 
 /// 统一一级目录列表（所有文体共享）
 ///
-/// 4 个标准目录 + 1 个隐藏元数据目录：
+/// 5 个标准目录 + 1 个隐藏元数据目录：
 /// - 正文：所有正文内容
 /// - 设定：所有设定文件（角色/世界观/术语/素材统一存放，通过 front matter 区分类型）
 /// - 大纲：大纲与构思
 /// - 草稿箱：废弃章节与草稿
-/// - .novelforge：应用元数据目录（config.json、index/ 等）
+/// - 伏笔：伏笔追踪数据（与正文/设定/大纲/草稿箱并列）
+/// - .novelforge：应用元数据目录（config.json、manifest.json、index/ 等）
 pub fn universal_directories() -> Vec<&'static str> {
     vec![
         "正文",
         "设定",
         "大纲",
         "草稿箱",
+        "伏笔",
         ".novelforge",
     ]
 }
@@ -190,6 +257,7 @@ pub fn standard_template_files(_project_type: &StandardProjectType) -> Vec<(&'st
 ///   description - 描述
 /// 输出: ProjectMeta 项目元数据
 /// 流程: 用 StandardProjectType::to_str() 写入 project_type 字段
+/// Task 1.8: 同时填充 codexDirs/outlineDir/manuscriptDir/draftDir 默认目录扫描配置
 pub fn create_project_meta_v2(
     name: &str,
     standard_type: &StandardProjectType,
@@ -208,6 +276,11 @@ pub fn create_project_meta_v2(
         author: author.to_string(),
         description: description.to_string(),
         word_count: 0,
+        // Task 1.8: 填充默认目录扫描配置,新建项目默认包含标准目录+所有兼容目录
+        codex_dirs: default_codex_dirs(),
+        outline_dir: default_outline_dir(),
+        manuscript_dir: default_manuscript_dir(),
+        draft_dir: default_draft_dir(),
     }
 }
 
@@ -223,6 +296,8 @@ mod tests {
     /// - 旧 meta.json 使用 "type" 字段名，新版本通过 #[serde(alias = "type")] 兼容读取
     /// - 旧 meta.json 使用 snake_case 字段名（created_at/updated_at/word_count），
     ///   新版本通过 #[serde(alias = "...")] 兼容读取
+    /// - Task 1.8: 旧 meta.json 无 codexDirs/outlineDir/manuscriptDir/draftDir 字段,
+    ///   通过 #[serde(default = "...")] 自动填充默认值
     #[test]
     fn test_deserialize_old_meta_with_type_field() {
         let old_json = r#"{
@@ -248,6 +323,11 @@ mod tests {
         assert_eq!(meta.version, "1.0.0");
         assert_eq!(meta.description, "测试描述");
         assert_eq!(meta.word_count, 0);
+        // Task 1.8: 旧 meta.json 缺失目录字段时,反序列化应填充默认值
+        assert!(meta.codex_dirs.is_empty(), "旧 meta 无 codexDirs 应回退为空 Vec");
+        assert_eq!(meta.outline_dir, "大纲", "旧 meta 缺 outlineDir 应默认为 大纲");
+        assert_eq!(meta.manuscript_dir, "正文", "旧 meta 缺 manuscriptDir 应默认为 正文");
+        assert_eq!(meta.draft_dir, "草稿箱", "旧 meta 缺 draftDir 应默认为 草稿箱");
     }
 
     /// 测试新 meta.json 序列化为 "projectType" 字段名（camelCase）
@@ -255,6 +335,7 @@ mod tests {
     /// 验证 BREAKING 变更的正向行为：
     /// - 新写入的 meta.json 使用 "projectType" 字段名（camelCase）
     /// - 不再输出旧版的 "type" 字段名
+    /// - Task 1.8: 默认目录字段在序列化时通过 skip_serializing_if 跳过(避免污染 JSON)
     #[test]
     fn test_serialize_new_meta_with_project_type_field() {
         let meta = ProjectMeta {
@@ -267,6 +348,10 @@ mod tests {
             author: "新作者".to_string(),
             description: "新描述".to_string(),
             word_count: 0,
+            codex_dirs: default_codex_dirs(),
+            outline_dir: default_outline_dir(),
+            manuscript_dir: default_manuscript_dir(),
+            draft_dir: default_draft_dir(),
         };
 
         let json = serde_json::to_string(&meta).expect("序列化应成功");
@@ -288,6 +373,27 @@ mod tests {
         assert!(
             json.contains("\"wordCount\""),
             "序列化结果应包含 wordCount 字段: {}",
+            json
+        );
+        // Task 1.8: codexDirs 非默认值应被序列化,而 outlineDir/manuscriptDir/draftDir 为默认值时应被跳过
+        assert!(
+            json.contains("\"codexDirs\""),
+            "序列化结果应包含 codexDirs 字段(非空时不应跳过): {}",
+            json
+        );
+        assert!(
+            !json.contains("\"outlineDir\""),
+            "默认 outlineDir 应被 skip_serializing_if 跳过: {}",
+            json
+        );
+        assert!(
+            !json.contains("\"manuscriptDir\""),
+            "默认 manuscriptDir 应被 skip_serializing_if 跳过: {}",
+            json
+        );
+        assert!(
+            !json.contains("\"draftDir\""),
+            "默认 draftDir 应被 skip_serializing_if 跳过: {}",
             json
         );
     }
@@ -315,5 +421,45 @@ mod tests {
         assert_eq!(meta.project_type, "散文");
         assert_eq!(meta.genre, "随笔");
         assert_eq!(meta.word_count, 100);
+        // Task 1.8: 缺失目录字段时也应填充默认值
+        assert_eq!(meta.outline_dir, "大纲");
+        assert_eq!(meta.manuscript_dir, "正文");
+        assert_eq!(meta.draft_dir, "草稿箱");
+    }
+
+    /// Task 1.8: 测试自定义目录扫描配置的序列化与反序列化往返一致性
+    ///
+    /// 验证场景: 用户通过自定义目录配置(如多语言项目使用 "Characters" 替代 "角色"),
+    /// 非默认值应被序列化到 JSON,反序列化后能完整恢复
+    #[test]
+    fn test_custom_dir_config_roundtrip() {
+        let meta = ProjectMeta {
+            name: "自定义目录项目".to_string(),
+            project_type: "novel".to_string(),
+            genre: String::new(),
+            created_at: "2026-03-01T00:00:00Z".to_string(),
+            updated_at: "2026-03-01T00:00:00Z".to_string(),
+            version: "1.0.0".to_string(),
+            author: "测试".to_string(),
+            description: String::new(),
+            word_count: 0,
+            codex_dirs: vec!["Characters".to_string(), "Worldbuilding".to_string()],
+            outline_dir: "Outlines".to_string(),
+            manuscript_dir: "Chapters".to_string(),
+            draft_dir: "Drafts".to_string(),
+        };
+
+        let json = serde_json::to_string(&meta).expect("序列化应成功");
+        // 非默认值应被序列化
+        assert!(json.contains("\"codexDirs\""), "codexDirs 应被序列化: {}", json);
+        assert!(json.contains("\"outlineDir\""), "outlineDir 应被序列化: {}", json);
+        assert!(json.contains("\"manuscriptDir\""), "manuscriptDir 应被序列化: {}", json);
+        assert!(json.contains("\"draftDir\""), "draftDir 应被序列化: {}", json);
+
+        let restored: ProjectMeta = serde_json::from_str(&json).expect("反序列化应成功");
+        assert_eq!(restored.codex_dirs, vec!["Characters".to_string(), "Worldbuilding".to_string()]);
+        assert_eq!(restored.outline_dir, "Outlines");
+        assert_eq!(restored.manuscript_dir, "Chapters");
+        assert_eq!(restored.draft_dir, "Drafts");
     }
 }

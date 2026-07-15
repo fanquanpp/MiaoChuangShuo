@@ -5,17 +5,25 @@
 // 当文件被删除或重命名时，需要同步：
 //   1. Codex Store（设定库卡片列表）- 通过 loadAll 重新加载
 //   2. Tantivy 全文索引 - 通过 removeFileIndex / updateFileIndex 增删条目
+//   3. manifest 反向索引 + 关联模块数据(Task 4.3):
+//      - 调用 clean_chapter_reverse_indices 清理 manifest 层残留
+//      - 据返回的 timeline_node_ids 联动清理时间线 chapterId 引用
+//      - 据返回的 graph_node_ids 联动清理人物图谱 sourceFile 引用
 //
 // 模块职责：
 // 1. 提供文件删除后的索引清理（含 .txt 与 .pmd 双路径清理）
 // 2. 提供文件重命名后的索引迁移（清理旧路径 + 构建新路径）
 // 3. 提供 Codex Store 刷新方法（避免设定卡片残留旧路径）
 // 4. 提供 buildProjectIndex 触发入口（全量重建索引）
+// 5. 章节删除时联动清理 manifest 反向索引 + timeline / graph 引用(Task 4.3)
 //
 // 设计说明：
 // - 索引同步均为静默执行（catch 错误但不阻断主流程），避免索引故障影响文件操作
 // - .txt 与 .pmd 路径同时清理，防止历史 .pmd 残留索引
 // - 所有异步操作必须 try-catch 包裹，错误通过 logger.error 记录
+// - 联动清理采用"manifest 数据层 + 模块数据层"两阶段:
+//   后端 clean_chapter_reverse_indices 清理 manifest 残留并返回关联节点 ID,
+//   前端据返回值更新 timeline.json / graph.json 中的对应字段
 
 import { useCallback } from "react";
 import {
@@ -24,6 +32,9 @@ import {
   updateFileIndex,
 } from "../lib/api";
 import type { FileNode } from "../lib/api";
+import { cleanChapterReverseIndices } from "../lib/api/manifestApi";
+import { readTimeline, saveTimeline } from "../lib/timelineApi";
+import { readCharacterGraph, saveCharacterGraph } from "../lib/characterGraphApi";
 import { logger } from "../lib/logger";
 import { useCodexStore } from "../lib/stores/useCodexStore";
 
@@ -96,29 +107,117 @@ export function useCodexSync(): UseCodexSyncReturn {
   }, []);
 
   /**
+   * 联动清理章节删除后的 manifest 反向索引与关联模块数据(Task 4.3)
+   * 输入:
+   *   projectPath 项目根路径
+   *   chapterRelPath 被删章节的相对路径(正斜杠格式)
+   * 流程:
+   *   1. 调用后端 clean_chapter_reverse_indices 清理 manifest 残留
+   *   2. 据返回的 timeline_node_ids 联动清理时间线 chapterId 引用
+   *   3. 据返回的 graph_node_ids 联动清理人物图谱 sourceFile 引用
+   * 异常处理: 任一步骤失败均静默记录,不阻断主流程
+   */
+  const cleanupChapterReferences = useCallback(
+    async (projectPath: string, chapterRelPath: string): Promise<void> => {
+      try {
+        const result = await cleanChapterReverseIndices(projectPath, chapterRelPath);
+        // 联动清理时间线 chapterId 引用
+        if (result.timeline_node_ids.length > 0) {
+          try {
+            const timeline = await readTimeline(projectPath);
+            let modified = false;
+            for (const node of timeline.nodes) {
+              if (result.timeline_node_ids.includes(node.id)) {
+                if (node.data.chapterId !== null) {
+                  node.data.chapterId = null;
+                  modified = true;
+                }
+              }
+            }
+            if (modified) {
+              await saveTimeline(projectPath, timeline);
+            }
+          } catch (err) {
+            logger.error(
+              "清理时间线 chapterId 引用失败:",
+              err instanceof Error ? err : String(err)
+            );
+          }
+        }
+        // 联动清理人物图谱 sourceFile 引用
+        if (result.graph_node_ids.length > 0) {
+          try {
+            const graph = await readCharacterGraph(projectPath);
+            let modified = false;
+            for (const node of graph.nodes) {
+              if (result.graph_node_ids.includes(node.id)) {
+                if (node.data.sourceFile !== "") {
+                  node.data.sourceFile = "";
+                  modified = true;
+                }
+              }
+            }
+            if (modified) {
+              await saveCharacterGraph(projectPath, graph);
+            }
+          } catch (err) {
+            logger.error(
+              "清理人物图谱 sourceFile 引用失败:",
+              err instanceof Error ? err : String(err)
+            );
+          }
+        }
+      } catch (err) {
+        logger.error(
+          "清理 manifest 反向索引失败:",
+          err instanceof Error ? err : String(err)
+        );
+      }
+    },
+    []
+  );
+
+  /**
    * 文件删除后同步索引与设定库
    * 异常处理：索引清理失败静默处理，避免影响删除主流程
    */
-  const syncOnDelete = useCallback((projectPath: string, node: FileNode) => {
-    // 目录节点不索引，跳过清理
-    if (!node.is_dir) {
-      // 清理原路径索引（.txt）
-      removeFileIndex(projectPath, node.relative_path).catch((err) => {
-        logger.error("清理索引失败:", err instanceof Error ? err : String(err));
-      });
-      // 若为 .txt 文件，同时清理可能存在的 .pmd 路径索引
-      if (node.relative_path.toLowerCase().endsWith(".txt")) {
-        const pmdRelPath = node.relative_path.replace(/\.txt$/i, ".pmd");
-        if (pmdRelPath !== node.relative_path) {
-          removeFileIndex(projectPath, pmdRelPath).catch((err) => {
-            logger.error("清理 .pmd 索引失败:", err instanceof Error ? err : String(err));
+  const syncOnDelete = useCallback(
+    (projectPath: string, node: FileNode) => {
+      // 目录节点不索引，跳过清理
+      if (!node.is_dir) {
+        // 清理原路径索引（.txt）
+        removeFileIndex(projectPath, node.relative_path).catch((err) => {
+          logger.error("清理索引失败:", err instanceof Error ? err : String(err));
+        });
+        // 若为 .txt 文件，同时清理可能存在的 .pmd 路径索引
+        if (node.relative_path.toLowerCase().endsWith(".txt")) {
+          const pmdRelPath = node.relative_path.replace(/\.txt$/i, ".pmd");
+          if (pmdRelPath !== node.relative_path) {
+            removeFileIndex(projectPath, pmdRelPath).catch((err) => {
+              logger.error("清理 .pmd 索引失败:", err instanceof Error ? err : String(err));
+            });
+          }
+        }
+        // Task 4.3: 章节文件删除时联动清理 manifest 反向索引 + timeline / graph 引用
+        // 仅对正文目录下的章节文件触发,避免对设定库/大纲等文件产生无效调用
+        const normalizedRelPath = node.relative_path.replace(/\\/g, "/");
+        if (
+          normalizedRelPath.startsWith("正文/") &&
+          /\.(txt|pmd)$/i.test(normalizedRelPath)
+        ) {
+          cleanupChapterReferences(projectPath, normalizedRelPath).catch((err) => {
+            logger.error(
+              "章节删除联动清理失败:",
+              err instanceof Error ? err : String(err)
+            );
           });
         }
       }
-    }
-    // 同步刷新 Codex Store：删除的文件若属于设定库目录，需更新卡片列表
-    refreshCodex(projectPath);
-  }, [refreshCodex]);
+      // 同步刷新 Codex Store：删除的文件若属于设定库目录，需更新卡片列表
+      refreshCodex(projectPath);
+    },
+    [refreshCodex, cleanupChapterReferences]
+  );
 
   /**
    * 文件重命名后同步索引与设定库

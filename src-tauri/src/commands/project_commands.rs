@@ -19,8 +19,7 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::commands::{
-    count_project_chapters, count_project_words, read_project_meta, validate_project_path,
-    ProjectInfo,
+    count_project_chapters, read_project_meta, validate_project_path, ProjectInfo,
 };
 use crate::error::AppError;
 use crate::project_template::{
@@ -126,6 +125,19 @@ pub fn create_project(
         .map_err(|e| AppError::serialize_error(e, "序列化元数据失败"))?;
     fs::write(&meta_path, meta_json).map_err(|e| AppError::io_error(e, "写入元数据失败"))?;
 
+    // 初始化空 manifest(项目级统一索引,生成新 projectId)
+    // 存储位置：<project>/.novelforge/manifest.json
+    // 后续文件 IO 命令(create_file/delete_path/rename_path)会自动同步实体记录
+    let mut manifest = crate::manifest::Manifest::default();
+    crate::manifest::save_manifest(&project_root, &mut manifest)?;
+
+    // Task 5.1.3: 初始化空 foreshadowings.json
+    // 存储位置：<project>/伏笔/foreshadowings.json
+    // 内容为空数组,供伏笔追踪模块 CRUD 命令读写
+    let foreshadowings_path = project_root.join("伏笔").join("foreshadowings.json");
+    fs::write(&foreshadowings_path, "[]")
+        .map_err(|e| AppError::io_error(e, "初始化伏笔数据文件失败"))?;
+
     Ok(project_root.to_string_lossy().to_string())
 }
 
@@ -165,12 +177,12 @@ pub fn scan_projects(parent_path: String) -> Result<Vec<ProjectInfo>, AppError> 
         }
         match read_project_meta(&path) {
             Ok(meta) => {
-                let word_count = count_project_words(&path);
+                // Task 4.5.2: word_count 已从 ProjectInfo 移除,字数 SSOT 收敛到 WritingStats
+                // 前端获取字数时调用 get_writing_stats 命令读取 WritingStats.total_words
                 let chapter_count = count_project_chapters(&path);
                 projects.push(ProjectInfo {
                     path: path.to_string_lossy().to_string(),
                     meta,
-                    word_count,
                     chapter_count,
                 });
             }
@@ -217,12 +229,11 @@ pub fn import_project(project_path: String) -> Result<ProjectInfo, AppError> {
         ));
     }
     let meta = read_project_meta(&path)?;
-    let word_count = count_project_words(&path);
+    // Task 4.5.2: word_count 已从 ProjectInfo 移除,字数 SSOT 收敛到 WritingStats
     let chapter_count = count_project_chapters(&path);
     Ok(ProjectInfo {
         path: path.to_string_lossy().to_string(),
         meta,
-        word_count,
         chapter_count,
     })
 }
@@ -302,10 +313,10 @@ pub fn update_project_meta(
     // 更新最后修改时间（ISO 8601）
     meta.updated_at = chrono::Local::now().to_rfc3339();
 
-    // 重新统计字数与章节数，同步到 meta 内嵌字段
-    let word_count = count_project_words(&path);
+    // Task 4.5.2: 字数 SSOT 收敛到 WritingStats,不再同步 meta.word_count
+    // ProjectMeta.word_count 字段保留用于旧版兼容读取,但不再主动更新
+    // 前端获取字数时调用 get_writing_stats 命令读取 WritingStats.total_words
     let chapter_count = count_project_chapters(&path);
-    meta.word_count = word_count;
 
     // 原子写入元数据文件：先写入临时文件，再 rename 替换
     // 防止写入中途崩溃导致 project.json 损坏
@@ -322,7 +333,6 @@ pub fn update_project_meta(
     Ok(ProjectInfo {
         path: path.to_string_lossy().to_string(),
         meta,
-        word_count,
         chapter_count,
     })
 }

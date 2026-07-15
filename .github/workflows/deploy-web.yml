@@ -42,13 +42,13 @@ jobs:
     steps:
       # 步骤1: 检出仓库代码
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
-      # 步骤2: 配置 Node.js 运行环境（与本地开发版本一致）
+      # 步骤2: 配置 Node.js 运行环境（与本地开发版本一致,统一为 Node 20）
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       # 步骤3: 安装项目依赖（基于 package-lock.json）

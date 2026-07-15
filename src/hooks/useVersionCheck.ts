@@ -12,13 +12,9 @@
 // 4. 维护 hasUpdate/latestVersion/autoCheckRelease 状态供 UI 渲染
 
 import { useState, useEffect, useCallback } from "react";
-import { checkForUpdates, type ReleaseInfo } from "../lib/updateChecker";
+import { checkForUpdates, FALLBACK_VERSION, type ReleaseInfo } from "../lib/updateChecker";
 import { logger } from "../lib/logger";
 import { useSettingsStore } from "../lib/settingsStore";
-
-// 默认版本号,与 updateChecker.ts 中 FALLBACK_VERSION 保持同步
-// 用于 package.json 读取失败时的回退显示
-const DEFAULT_APP_VERSION = "26.7.30";
 
 // 24 小时常量(毫秒),用于限制自动检查频率
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -27,7 +23,7 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
  * 版本检查 Hook
  * 输入: 无
  * 输出:
- *   - appVersion: 当前应用版本号(来源 package.json,失败时回退到 DEFAULT_APP_VERSION)
+ *   - appVersion: 当前应用版本号(来源 package.json,失败时回退到 FALLBACK_VERSION)
  *   - latestVersion: 最新版本号(检查后才有值,未检查时为空字符串)
  *   - hasUpdate: 是否检测到新版本
  *   - autoCheckRelease: 自动检查发现的 Release 信息(用于 UpdateNoticeDialog 渲染)
@@ -42,8 +38,8 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
  *   4. 检测到新版本时设置 autoCheckRelease 并打开对话框
  */
 export function useVersionCheck() {
-  // 当前应用版本号(由 package.json 注入,失败时回退到默认值)
-  const [appVersion, setAppVersion] = useState(DEFAULT_APP_VERSION);
+  // 当前应用版本号(由 package.json 注入,失败时回退到 FALLBACK_VERSION)
+  const [appVersion, setAppVersion] = useState(FALLBACK_VERSION);
   // 最新版本号(执行检查后才有值)
   const [latestVersion, setLatestVersion] = useState("");
   // 是否检测到新版本

@@ -1,12 +1,23 @@
 name: Release Desktop
 
+# 触发条件:
+# 1. 推送 v* 形式的 tag 时自动触发(常规发版)
+# 2. 支持在 Actions 页面手动触发,可选传入版本号参数(用于核对发版目标)
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号(如 26.8.0)'
+        required: false
 
 jobs:
-  build-on-windows:
+  # 预检 job:在构建之前执行 TypeScript 类型检查与 Rust 静态检查
+  # 任一检查失败即中止后续构建 job,避免无效构建消耗资源
+  pre-check:
+    name: Pre-check (tsc + cargo check)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,18 +25,89 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - name: TypeScript 类型检查 (tsc --noEmit)
+        run: npx tsc --noEmit
+      - name: Rust 静态检查 (cargo check)
+        working-directory: src-tauri
+        run: cargo check
+
+  # 版本号一致性校验 job:校验 package.json / Cargo.toml / tauri.conf.json 三处版本号一致
+  # 不一致则失败,避免发布版本错乱
+  version-check:
+    name: Version consistency check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 校验三处版本号一致
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -n1 | sed 's/.*"\(.*\)".*/\1/')
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "::notice::package.json=${PKG_VERSION}, Cargo.toml=${CARGO_VERSION}, tauri.conf.json=${TAURI_VERSION}"
+          if [ "${PKG_VERSION}" != "${CARGO_VERSION}" ] || [ "${PKG_VERSION}" != "${TAURI_VERSION}" ]; then
+            echo "::error::版本号不一致: package.json=${PKG_VERSION}, Cargo.toml=${CARGO_VERSION}, tauri.conf.json=${TAURI_VERSION}"
+            exit 1
+          fi
+          echo "版本号一致: ${PKG_VERSION}"
+
+  # 构建 job:依赖预检与版本校验通过后执行 Tauri 桌面应用打包
+  build-on-windows:
+    name: Build Windows installer (MSI + NSIS)
+    needs: [pre-check, version-check]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - run: npm ci
       - run: npm run build
       - run: npm run tauri build
+      # 构建完成后为 MSI 与 NSIS 安装包生成 sha256 哈希文件
+      # 哈希文件与安装包同名,扩展名为 .sha256,便于用户校验下载完整性
+      - name: 生成 sha256 哈希文件
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUNDLE_DIR="src-tauri/target/release/bundle"
+          # 为 MSI 安装包生成 sha256
+          if [ -d "${BUNDLE_DIR}/msi" ]; then
+            for f in "${BUNDLE_DIR}/msi"/*.msi; do
+              if [ -f "$f" ]; then
+                sha256sum "$f" > "$f.sha256"
+                echo "已生成: $f.sha256"
+              fi
+            done
+          fi
+          # 为 NSIS 安装包生成 sha256
+          if [ -d "${BUNDLE_DIR}/nsis" ]; then
+            for f in "${BUNDLE_DIR}/nsis"/*.exe; do
+              if [ -f "$f" ]; then
+                sha256sum "$f" > "$f.sha256"
+                echo "已生成: $f.sha256"
+              fi
+            done
+          fi
+      # 上传 MSI / NSIS 安装包及其 sha256 哈希文件到 GitHub Release
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/msi/*.msi.sha256
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe.sha256
           generate_release_notes: true
           draft: false
           prerelease: false

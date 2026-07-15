@@ -7,7 +7,7 @@
 //
 // 架构复用: 通过 createGraphStore 工厂生成基础 store(loadGraph/debouncedSave/saveNow/
 // onNodesChange/onEdgesChange/addEdge/updateNodeData/selectNode/deleteNode/clearGraph/undo/redo),
-// 业务扩展(selectedEdgeId/updateEdgeData/selectEdge)通过 extend 回调注入。
+// 业务扩展(selectedEdgeId/updateEdgeData/selectEdge/createNodeFromCodexCard)通过 extend 回调注入。
 
 import type { Connection } from "@xyflow/react";
 import type {
@@ -16,6 +16,7 @@ import type {
   CharacterGraphEdge,
   CharacterGraphNodeData,
 } from "./characterGraphTypes";
+import { DEFAULT_NODE_ACCENT } from "./characterGraphTypes";
 import {
   readCharacterGraph,
   saveCharacterGraph,
@@ -39,6 +40,29 @@ interface CharacterGraphExtra {
   ) => void;
   /** 选中边(用于连线抽屉联动) */
   selectEdge: (id: string | null) => void;
+  /**
+   * 从设定库卡片创建图谱节点(Task 4.1.3)
+   * 输入: codexId 设定库卡片 UUID, name 卡片名称, sourceFile 卡片来源文件路径,
+   *       identity 身份(可选), tags 标签数组(可选), brief 简介(可选)
+   * 输出: string 新创建的节点 ID(node_<uuid>)
+   * 流程:
+   *   1. 幂等检查: 若已有节点的 codexId 与传入相同, 直接返回该节点 ID, 不重复创建
+   *   2. 构造 CharacterGraphNode(codexId/sourceFile 从入参注入, 其他业务字段填默认值或入参)
+   *   3. 通过 setState 追加到 nodes 数组
+   *   4. 返回新节点 ID 供调用方做后续跳转/选中
+   * 设计说明:
+   *   - 幂等机制避免同一卡片被重复添加到图谱, 维持数据一致性
+   *   - 节点 position 默认 (0,0), 由 CharacterGraphPanel 的自动布局或用户拖拽调整
+   *   - 此方法不触发 debouncedSave, 由 store 工厂的 onNodesChange 监听机制自动触发保存
+   */
+  createNodeFromCodexCard: (params: {
+    codexId: string;
+    name: string;
+    sourceFile: string;
+    identity?: string;
+    tags?: string[];
+    brief?: string;
+  }) => string;
 }
 
 /**
@@ -99,7 +123,7 @@ export const useCharacterGraphStore = createGraphStore<
   storeName: "CharacterGraphStore",
   api: characterGraphApiInstance,
   createEdge: createCharacterEdge,
-  extend: (set) => ({
+  extend: (set, get) => ({
     selectedEdgeId: null,
 
     /**
@@ -135,5 +159,45 @@ export const useCharacterGraphStore = createGraphStore<
      * 输出: void
      */
     selectEdge: (id): void => set({ selectedEdgeId: id }),
+
+    /**
+     * 从设定库卡片创建图谱节点(Task 4.1.3)
+     * 输入: params { codexId, name, sourceFile, identity?, tags?, brief? }
+     * 输出: string 新建或已存在的节点 ID
+     * 流程:
+     *   1. 幂等检查: 若已有节点 codexId 匹配, 直接返回该节点 ID
+     *   2. 否则构造 CharacterGraphNode 并追加到 nodes 数组
+     * 设计说明:
+     *   - 节点 position 默认 (0,0), 由 CharacterGraphPanel 的自动布局或用户拖拽调整
+     *   - 此方法不直接触发 debouncedSave, 由 store 工厂的 onNodesChange 监听机制自动触发保存
+     */
+    createNodeFromCodexCard: (params): string => {
+      const { codexId, name, sourceFile, identity, tags, brief } = params;
+      // 幂等检查: 同一 codexId 不重复创建
+      const existing = get().nodes.find((n) => n.data.codexId === codexId);
+      if (existing) {
+        return existing.id;
+      }
+      const now = new Date().toISOString();
+      const newNodeId = `node_${crypto.randomUUID()}`;
+      const newNode: CharacterGraphNode = {
+        id: newNodeId,
+        type: "characterNode",
+        position: { x: 0, y: 0 },
+        data: {
+          name,
+          identity: identity ?? "",
+          tags: tags ?? [],
+          brief: brief ?? "",
+          accentColor: DEFAULT_NODE_ACCENT,
+          sourceFile,
+          codexId,
+          createdAt: now,
+          updatedAt: now,
+        },
+      };
+      set((state) => ({ nodes: [...state.nodes, newNode] }));
+      return newNodeId;
+    },
   }),
 });

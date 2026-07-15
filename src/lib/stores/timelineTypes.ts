@@ -21,8 +21,14 @@ export type NodeStatus = "planned" | "writing" | "done";
 /**
  * 剧情节点业务数据载荷
  * 与 React Flow Node.data 字段对接, 承载所有业务字段
+ *
+ * 类型形式说明:
+ *   使用 type 别名(而非 interface)声明, TypeScript 会为 type 别名对象类型
+ *   推导隐式索引签名, 使本类型满足 `Record<string, unknown>` 约束,
+ *   从而兼容 @xyflow/react v12 的 `Node<NodeData extends Record<string, unknown>>` 泛型,
+ *   无需显式声明 `[key: string]: unknown` 索引签名(遵守项目禁用 unknown 规则)。
  */
-export interface TimelineNodeData {
+export type TimelineNodeData = {
   /** 节点标题(必填, 显示在卡片顶部) */
   title: string;
   /** 节点类型(必填, 决定视觉样式与布局位置) */
@@ -43,12 +49,20 @@ export interface TimelineNodeData {
   createdAt: string;
   /** 最后修改时间 ISO 8601 */
   updatedAt: string;
-}
+  /**
+   * 关联章节 ID(章节 front matter 中的 UUID)
+   * null 表示未关联任何章节, 非空时支持跨模块跳转到正文
+   * Task 4.2.1: 新增字段, 实现时间线事件与正文章节的联动
+   */
+  chapterId: string | null;
+};
 
 /**
  * React Flow 节点基类型(去掉 data/type, 用业务类型替换)
- * 使用 Omit 模式避免 @xyflow/react v12 的 NodeData extends Record<string, unknown> 约束,
- * 该约束要求添加 [key: string]: unknown 索引签名, 与项目禁用 unknown 规则冲突。
+ * 使用 Omit 模式将 data 字段替换为业务类型 TimelineNodeData,
+ * 将 type 字段收窄为字面量 "storyNode", 保留 React Flow 节点其他属性。
+ * TimelineNodeData 使用 type 别名声明, 具备隐式索引签名,
+ * 满足 Node<NodeData extends Record<string, unknown>> 泛型约束。
  */
 type RFNodeBase = Omit<RFNode, "data" | "type">;
 

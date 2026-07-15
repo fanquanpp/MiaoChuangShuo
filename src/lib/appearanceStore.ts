@@ -2,20 +2,23 @@
 //
 // 功能概述：
 // 使用 Zustand 管理外观相关设置（背景预设、质感模式、毛玻璃透明度等），
-// 支持 localStorage 持久化。设置变更即时生效到 DOM（CSS 变量与质感类名）。
+// 通过 zustand persist 中间件实现 localStorage 自动持久化，设置变更即时生效到 DOM（CSS 变量与质感类名）。
 //
 // 模块职责：
 // 1. 管理背景预设 ID、自定义背景色、毛玻璃透明度、质感模式
-// 2. 持久化外观设置到 localStorage（与编辑器设置共享 STORAGE_KEY，采用读-改-写模式避免覆盖）
+// 2. 通过 persist 中间件自动持久化到 localStorage（独立 key，避免与编辑器设置共享造成数据污染）
 // 3. 应用背景主题到 DOM（注入 CSS 变量、切换质感类名）
 // 4. 提供背景预设数据与主题默认预设查询函数
 //
 // 设计说明：
-// - localStorage 采用共享键 `novelforge-settings`，写入时先读取已有数据再合并，避免覆盖编辑器设置
+// - 采用 zustand persist 中间件，替代原手工 read-modify-write 持久化模式
+// - STORAGE_KEY 独立为 `miaochuangshuo-appearance`，与 editorSettingsStore 彻底分离，消除数据污染风险
+// - 模块顶层执行一次性迁移：从旧共享 key `novelforge-settings` 提取外观字段到新独立 key
 // - DOM 副作用 applyBackgroundTheme 操作 document.documentElement.style 与 classList，属于外观应用的必要副作用
 // - 背景预设数据为静态常量，可在模块顶层直接导出供组件渲染色板
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 // 质感模式类型
 // solid=纯色面板，无模糊无纹理
@@ -24,8 +27,12 @@ import { create } from "zustand";
 // blur=高斯模糊，更强的 backdrop-blur，面板呈现深度模糊蒙纱感
 export type TextureMode = "solid" | "frosted" | "paper" | "blur";
 
-// 共享 localStorage 键（与 editorSettingsStore 共用，保证向后兼容）
-const STORAGE_KEY = "novelforge-settings";
+// 独立 localStorage 键（消除与 editorSettingsStore 的共享）
+const STORAGE_KEY = "miaochuangshuo-appearance";
+// 旧共享 localStorage 键（用于一次性迁移，与 editorSettingsStore 共用）
+const LEGACY_STORAGE_KEY = "novelforge-settings";
+// 当前 schema 版本（用于未来字段变更时的迁移）
+const SCHEMA_VERSION = 1;
 
 // 背景色预设方案：每套方案包含主背景色与对应面板色（略亮于主背景）
 // mode 字段标识预设所属主题：dark=暗色主题预设 / light=亮色主题预设
@@ -87,7 +94,7 @@ export interface AppearanceSettingsState extends AppearanceSettingsData {
   setGlassOpacity: (opacity: number) => void;
   /** 设置质感模式（solid/frosted/paper/blur） */
   setTextureMode: (mode: TextureMode) => void;
-  /** 从 localStorage 加载外观设置并应用到 DOM */
+  /** 初始化外观设置：应用 DOM 副作用（persist 中间件已自动加载状态） */
   initAppearanceSettings: () => void;
 }
 
@@ -99,48 +106,58 @@ const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettingsData = {
   textureMode: "frosted",
 };
 
+// 外观数据字段白名单（迁移时从旧共享 key 仅提取这些字段）
+const APPEARANCE_DATA_KEYS = [
+  "backgroundPreset", "customBackgroundColor", "glassOpacity", "textureMode",
+] as const;
+
 /**
- * 从 localStorage 加载外观设置
- * 输出: AppearanceSettingsData 外观设置数据
- * 流程:
- *   1. 读取共享 STORAGE_KEY 的完整数据
- *   2. 与默认值合并，仅提取外观相关字段
- *   3. 解析失败时返回默认值
+ * 从完整状态中提取需持久化的数据字段（排除 actions）
+ * 输入: state 完整状态（含数据与 actions）
+ * 输出: 仅含数据字段的纯对象
  */
-function loadAppearanceSettings(): AppearanceSettingsData {
-  if (typeof localStorage === "undefined") return DEFAULT_APPEARANCE_SETTINGS;
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...DEFAULT_APPEARANCE_SETTINGS, ...parsed };
-    }
-  } catch {
-    // JSON 解析失败，返回默认值
-  }
-  return DEFAULT_APPEARANCE_SETTINGS;
+function pickAppearanceData(state: AppearanceSettingsState): AppearanceSettingsData {
+  return {
+    backgroundPreset: state.backgroundPreset,
+    customBackgroundColor: state.customBackgroundColor,
+    glassOpacity: state.glassOpacity,
+    textureMode: state.textureMode,
+  };
 }
 
 /**
- * 持久化外观设置到 localStorage（读-改-写模式）
- * 输入: data 待写入的外观设置数据
+ * 一次性迁移：从旧共享 key 提取外观字段到新独立 key
+ * 仅在新 key 不存在且旧 key 存在时执行
  * 流程:
- *   1. 读取共享键的现有完整数据（包含编辑器设置）
- *   2. 合并外观设置字段
- *   3. 写回 localStorage，避免覆盖编辑器设置
- * 说明: 与 editorSettingsStore 共享 STORAGE_KEY，必须采用读-改-写避免数据丢失
+ *   1. 检测新 key 是否已有数据（已有则跳过，避免覆盖）
+ *   2. 读取旧共享 key 的完整数据（包含编辑器与外观字段）
+ *   3. 按字段白名单提取外观相关字段
+ *   4. 写入新独立 key
+ * 说明: 旧 key `novelforge-settings` 与 editorSettingsStore 共享，此处仅提取外观字段，不删除旧 key
+ *       （editorSettingsStore 迁移时也会读取同一旧 key 提取编辑器字段）
  */
-function persistAppearanceSettings(data: Partial<AppearanceSettingsData>): void {
+function migrateLegacyAppearanceSettings(): void {
   if (typeof localStorage === "undefined") return;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const existing = stored ? JSON.parse(stored) : {};
-    const merged = { ...existing, ...data };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    // 新 key 已有数据，跳过迁移
+    if (localStorage.getItem(STORAGE_KEY)) return;
+    const oldRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!oldRaw) return;
+    const parsed = JSON.parse(oldRaw) as Record<string, unknown>;
+    const extracted: Record<string, unknown> = {};
+    for (const key of APPEARANCE_DATA_KEYS) {
+      if (key in parsed) {
+        extracted[key] = parsed[key];
+      }
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(extracted));
   } catch {
-    // 写入失败，静默处理
+    // 迁移失败静默处理，persist 将使用默认值
   }
 }
+
+// 模块顶层执行迁移（store 创建前立即执行，非 React 组件内）
+migrateLegacyAppearanceSettings();
 
 /**
  * 将 hex 颜色转为 "r, g, b" 字符串（用于 rgba 拼接）
@@ -224,49 +241,76 @@ function applyBackgroundTheme(
   root.classList.add(`nf-tex-${textureMode}`);
 }
 
-export const useAppearanceSettingsStore = create<AppearanceSettingsState>((set, get) => ({
-  ...DEFAULT_APPEARANCE_SETTINGS,
+// 创建外观设置 store，使用 persist 中间件自动持久化
+// 泛型 <AppearanceSettingsState, [], [], AppearanceSettingsData> 分别指定完整状态类型、空 middleware mutators、持久化数据类型
+export const useAppearanceSettingsStore = create<AppearanceSettingsState>()(
+  persist<AppearanceSettingsState, [], [], AppearanceSettingsData>(
+    (set, get) => ({
+      ...DEFAULT_APPEARANCE_SETTINGS,
 
-  setBackgroundPreset: (preset): void => {
-    persistAppearanceSettings({ backgroundPreset: preset });
-    const data = get();
-    applyBackgroundTheme(preset, data.customBackgroundColor, data.glassOpacity, data.textureMode);
-    set({ backgroundPreset: preset });
-  },
+      setBackgroundPreset: (preset): void => {
+        const data = get();
+        applyBackgroundTheme(preset, data.customBackgroundColor, data.glassOpacity, data.textureMode);
+        set({ backgroundPreset: preset });
+      },
 
-  setCustomBackgroundColor: (color): void => {
-    persistAppearanceSettings({ customBackgroundColor: color });
-    const data = get();
-    // 仅当当前为 custom 预设时才立即应用，避免修改自定义色但未切换预设时产生视觉跳变
-    if (data.backgroundPreset === "custom") {
-      applyBackgroundTheme("custom", color, data.glassOpacity, data.textureMode);
+      setCustomBackgroundColor: (color): void => {
+        const data = get();
+        // 仅当当前为 custom 预设时才立即应用，避免修改自定义色但未切换预设时产生视觉跳变
+        if (data.backgroundPreset === "custom") {
+          applyBackgroundTheme("custom", color, data.glassOpacity, data.textureMode);
+        }
+        set({ customBackgroundColor: color });
+      },
+
+      setGlassOpacity: (opacity): void => {
+        const clamped = Math.max(0, Math.min(1, opacity));
+        const data = get();
+        applyBackgroundTheme(data.backgroundPreset, data.customBackgroundColor, clamped, data.textureMode);
+        set({ glassOpacity: clamped });
+      },
+
+      setTextureMode: (mode): void => {
+        const data = get();
+        applyBackgroundTheme(data.backgroundPreset, data.customBackgroundColor, data.glassOpacity, mode);
+        set({ textureMode: mode });
+      },
+
+      initAppearanceSettings: (): void => {
+        // persist 中间件已自动 rehydrate 状态，此处仅应用 DOM 副作用
+        const data = get();
+        applyBackgroundTheme(
+          data.backgroundPreset,
+          data.customBackgroundColor,
+          data.glassOpacity,
+          data.textureMode
+        );
+      },
+    }),
+    {
+      name: STORAGE_KEY,
+      storage: createJSONStorage(() => localStorage),
+      version: SCHEMA_VERSION,
+      partialize: (state) => pickAppearanceData(state),
+      migrate: (persistedState, version) => {
+        // 版本兼容处理：未知或格式异常的数据回退默认值
+        if (version < SCHEMA_VERSION && persistedState && typeof persistedState === "object") {
+          const data = persistedState as Partial<AppearanceSettingsData>;
+          return { ...DEFAULT_APPEARANCE_SETTINGS, ...data };
+        }
+        return DEFAULT_APPEARANCE_SETTINGS;
+      },
+      onRehydrateStorage: () => (state) => {
+        // rehydrate 完成后应用背景主题到 DOM
+        if (state) {
+          applyBackgroundTheme(
+            state.backgroundPreset,
+            state.customBackgroundColor,
+            state.glassOpacity,
+            state.textureMode
+          );
+        }
+      },
     }
-    set({ customBackgroundColor: color });
-  },
-
-  setGlassOpacity: (opacity): void => {
-    const clamped = Math.max(0, Math.min(1, opacity));
-    persistAppearanceSettings({ glassOpacity: clamped });
-    const data = get();
-    applyBackgroundTheme(data.backgroundPreset, data.customBackgroundColor, clamped, data.textureMode);
-    set({ glassOpacity: clamped });
-  },
-
-  setTextureMode: (mode): void => {
-    persistAppearanceSettings({ textureMode: mode });
-    const data = get();
-    applyBackgroundTheme(data.backgroundPreset, data.customBackgroundColor, data.glassOpacity, mode);
-    set({ textureMode: mode });
-  },
-
-  initAppearanceSettings: (): void => {
-    const stored = loadAppearanceSettings();
-    applyBackgroundTheme(
-      stored.backgroundPreset,
-      stored.customBackgroundColor,
-      stored.glassOpacity,
-      stored.textureMode
-    );
-    set(stored);
-  },
-}));
+  )
+);

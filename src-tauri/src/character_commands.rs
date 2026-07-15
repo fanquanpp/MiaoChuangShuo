@@ -13,10 +13,15 @@
 // 4. 全程路径沙箱内操作，确保不越界
 
 use serde::Serialize;
+use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::text_extractor;
+use crate::error::AppError;
+use crate::commands::{read_project_meta, validate_project_path};
+use crate::manifest::find_chapter_paths_by_codex_id;
+use crate::codex::build_effective_codex_dirs;
 
 /// 单个文件中角色出场统计
 #[derive(Debug, Clone, Serialize)]
@@ -102,7 +107,7 @@ fn is_manuscript_file(relative_path: &str) -> bool {
 /**
  * 统计角色在项目所有支持文档中的出场情况
  * 输入: project_path 项目根路径, names 待统计的角色名列表
- * 输出: Result<Vec<CharacterAppearance>, String> 每个角色的出场统计
+ * 输出: Result<Vec<CharacterAppearance>, AppError> 每个角色的出场统计
  * 流程:
  *   1. canonicalize 项目根路径
  *   2. 递归收集所有支持文档(.txt/.pmd/.html/.htm)
@@ -113,13 +118,13 @@ fn is_manuscript_file(relative_path: &str) -> bool {
 pub fn count_character_appearances(
     project_path: String,
     names: Vec<String>,
-) -> Result<Vec<CharacterAppearance>, String> {
+) -> Result<Vec<CharacterAppearance>, AppError> {
     let root = PathBuf::from(&project_path)
         .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "无法解析项目路径"))?;
 
     if !root.exists() || !root.is_dir() {
-        return Err("项目路径不存在或不是目录".to_string());
+        return Err(AppError::path_validation_error("项目路径不存在或不是目录"));
     }
 
     // 过滤空角色名，避免误匹配
@@ -253,57 +258,306 @@ fn replace_name_with_boundary(content: &str, old_name: &str, new_name: &str) -> 
     (result, count)
 }
 
+// ===== Task 4.6.2: UUID 关联改名辅助函数 =====
+
+/// 原子写入文件（临时文件 + 重命名，保证写入原子性）
+/// 输入: path 目标文件路径, content 文件内容
+/// 输出: Result<(), AppError> 写入结果
+/// 流程:
+///   1. 写入 .tmp 临时文件（同目录，保证同一文件系统以支持原子重命名）
+///   2. 重命名为目标文件
+///   3. 失败时清理临时文件
+fn atomic_write_file(path: &Path, content: &str) -> Result<(), AppError> {
+    let tmp_path = PathBuf::from(format!("{}.tmp", path.to_string_lossy()));
+    fs::write(&tmp_path, content)
+        .map_err(|e| AppError::io_error(e, "写入临时文件失败"))?;
+    match fs::rename(&tmp_path, path) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            let _ = fs::remove_file(&tmp_path);
+            Err(AppError::io_error(e, "重命名临时文件失败"))
+        }
+    }
+}
+
+/// 分离 .pmd 文件的 JSON front matter 与 ProseMirror JSON 正文（Task 4.6 内部辅助）
+/// 输入: content .pmd 文件完整内容
+/// 输出: Option<(front_matter_block, body)> 返回 (front matter 完整块含首尾 ---, ProseMirror JSON 正文)
+///       无 front matter 时返回 None
+fn separate_pmd_front_matter_for_rename(content: &str) -> Option<(String, String)> {
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.len() < 3 || lines[0].trim() != "---" {
+        return None;
+    }
+    let end_idx = lines[1..]
+        .iter()
+        .position(|l| l.trim() == "---")
+        .map(|i| i + 1)?;
+    let front_matter = lines[..=end_idx].join("\n");
+    let body = lines[end_idx + 1..].join("\n");
+    Some((front_matter, body))
+}
+
+/// 递归更新 ProseMirror JSON 中匹配 codexId 的 characterMentionNode 的 name 字段（Task 4.6.2 内部辅助）
+///
+/// 输入:
+///   node - ProseMirror 节点的 JSON Value（可变引用）
+///   codex_id - 设定库卡片 UUID
+///   new_name - 新角色名（写入 mention 节点的 attrs.name）
+/// 输出: u64 本次调用更新的 Mention 节点数量（递归累加）
+/// 流程:
+///   1. 若 node 是 characterMentionNode 且 attrs.characterId == codex_id:
+///      - 更新 attrs.name 为 new_name
+///      - 返回 1 表示更新了一处
+///   2. 若 node 含 content 数组，递归处理每个子节点
+/// 设计说明:
+///   - 仅更新 attrs.name，不修改 characterId，保持 UUID 关联不变
+///   - 替代字符串替换策略，避免子串误伤（如"小明" vs "小明明"）
+fn rename_mentions_in_node(node: &mut Value, codex_id: &str, new_name: &str) -> u64 {
+    let mut count: u64 = 0;
+
+    // 检查当前节点是否为匹配的 characterMentionNode
+    if let Some(obj) = node.as_object() {
+        let node_type = obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        if node_type == "characterMentionNode" {
+            let attrs_match = obj
+                .get("attrs")
+                .and_then(|a| a.get("characterId"))
+                .and_then(|c| c.as_str())
+                .map(|id| id == codex_id)
+                .unwrap_or(false);
+            if attrs_match {
+                // 更新 attrs.name 为新角色名，保留 characterId 不变
+                if let Some(attrs) = node.get_mut("attrs").and_then(|a| a.as_object_mut()) {
+                    attrs.insert(
+                        "name".to_string(),
+                        serde_json::Value::String(new_name.to_string()),
+                    );
+                    count += 1;
+                }
+                return count;
+            }
+        }
+    }
+
+    // 递归处理 content 数组中的子节点
+    if let Some(content) = node.get_mut("content").and_then(|c| c.as_array_mut()) {
+        for child in content.iter_mut() {
+            count += rename_mentions_in_node(child, codex_id, new_name);
+        }
+    }
+
+    count
+}
+
+/// 处理单个 .pmd 文件：更新其中匹配 codexId 的 characterMentionNode 的 name 字段（Task 4.6.2 内部辅助）
+///
+/// 输入:
+///   file_path - .pmd 文件绝对路径
+///   codex_id - 设定库卡片 UUID
+///   new_name - 新角色名
+/// 输出: Result<u64, AppError> 更新的 Mention 节点数量
+/// 流程:
+///   1. 读取 .pmd 文件内容
+///   2. 分离 front matter 与 ProseMirror JSON 正文
+///   3. 解析正文为 JSON Value，递归更新匹配的 mention 节点 name
+///   4. 重新序列化 JSON，组合 front matter + 新正文，原子写入
+///   5. 无更新时跳过写回避免无谓 IO
+fn rename_mentions_in_pmd_file(
+    file_path: &Path,
+    codex_id: &str,
+    new_name: &str,
+) -> Result<u64, AppError> {
+    let content = fs::read_to_string(file_path)
+        .map_err(|e| AppError::io_error(e, "读取章节文件失败"))?;
+
+    // 分离 front matter 与 ProseMirror JSON 正文
+    let (front_matter, body) = match separate_pmd_front_matter_for_rename(&content) {
+        Some(parts) => parts,
+        None => {
+            // 无 front matter，可能是旧版 .txt 或纯 JSON，直接将整个内容作为 body 处理
+            (String::new(), content.clone())
+        }
+    };
+
+    // 解析 body 为 JSON Value
+    let mut doc: Value = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(_) => {
+            // 正文非合法 ProseMirror JSON，跳过该文件（可能是纯文本 .txt）
+            return Ok(0);
+        }
+    };
+
+    // 递归更新匹配的 characterMentionNode 的 name 字段
+    let updated = rename_mentions_in_node(&mut doc, codex_id, new_name);
+    if updated == 0 {
+        // 无匹配 Mention，跳过写回
+        return Ok(0);
+    }
+
+    // 重新序列化为 JSON 字符串（紧凑格式，与项目其他 .pmd 文件保持一致）
+    let new_body = serde_json::to_string(&doc)
+        .map_err(|e| AppError::serialize_error(e, "序列化 ProseMirror JSON 失败"))?;
+
+    // 组合 front matter + 新正文，原子写入
+    let new_content = if front_matter.is_empty() {
+        new_body
+    } else {
+        format!("{}\n{}", front_matter, new_body)
+    };
+
+    atomic_write_file(file_path, &new_content)?;
+    Ok(updated)
+}
+
 /**
- * 在项目所有支持文档中全局替换角色名
- * 输入: project_path 项目根路径, old_name 旧角色名, new_name 新角色名
- * 输出: Result<RenameResult, String> 修改文件数与替换次数
+ * 在项目所有支持文档中全局替换角色名（Task 4.6 重构版）
+ *
+ * 输入:
+ *   project_path - 项目根路径
+ *   old_name - 旧角色名
+ *   new_name - 新角色名
+ *   codex_id - 设定库卡片 UUID（空字符串时回退到纯字符串替换模式）
+ * 输出: Result<RenameResult, AppError> 修改文件数与替换次数
  * 流程:
  *   1. 校验新旧名称非空且不同
- *   2. canonicalize 项目根路径
- *   3. 递归收集所有支持文档(.txt/.pmd/.html/.htm)
- *   4. 逐文件读取、带词边界检测替换、写回（仅在有变更时写入）
- *   5. 返回修改的文件列表与替换总次数
- * 安全说明: 采用词边界检测, 避免子串误伤(如"林"不会误伤"林中漫步"),
- *   对 .pmd/HTML 文件的替换在原始内容上进行，词边界检测保证不误伤 JSON/HTML 结构
- *   （角色名通常为中文，不会与 JSON 键名/HTML 标签名冲突）
- *   建议前端提示作者改名前先保存以创建版本快照, 便于回滚
+ *   2. canonicalize 项目根路径并读取 ProjectMeta 配置
+ *   3. 构建扫描目录列表（codex_dirs + outline_dir + draft_dir + manuscript_dir）
+ *   4. 收集这些目录下的所有支持文档(.txt/.pmd/.html/.htm)
+ *   5. 阶段1 - UUID 关联更新（codex_id 非空时）:
+ *   - 通过 manifest 反向索引找到引用该 codexId 的章节
+ *   - 对这些章节 .pmd 文件调用 rename_mentions_in_pmd_file,仅更新 characterMentionNode.attrs.name,不触碰正文纯文本
+ *   - 已处理文件加入 processed_files 集合,避免阶段2重复处理
+ *   6. 阶段2 - 字符串替换回退（对未通过 UUID 处理的文件）:
+ *   - 读取文件内容
+ *   - 带词边界检测替换（replace_name_with_boundary）
+ *   - 仅在有变更时写回
+ *   7. 返回修改的文件列表与替换总次数
+ * 安全说明:
+ *   - UUID 关联更新精确匹配 characterId，彻底避免子串误伤（如"小明" vs "小明明"）
+ *   - 字符串替换采用词边界检测，前后为中文汉字时跳过，作为兜底策略
+ *   - .txt 文件无 characterMentionNode 结构，仅能依赖字符串替换
+ *   - 建议前端提示作者改名前先保存以创建版本快照，便于回滚
  */
 #[tauri::command]
 pub fn rename_character_in_project(
     project_path: String,
     old_name: String,
     new_name: String,
-) -> Result<RenameResult, String> {
+    codex_id: String,
+) -> Result<RenameResult, AppError> {
     let old_name = old_name.trim().to_string();
     let new_name = new_name.trim().to_string();
+    let codex_id = codex_id.trim().to_string();
 
     if old_name.is_empty() {
-        return Err("原角色名不能为空".to_string());
+        return Err(AppError::config_error("原角色名不能为空"));
     }
     if new_name.is_empty() {
-        return Err("新角色名不能为空".to_string());
+        return Err(AppError::config_error("新角色名不能为空"));
     }
     if old_name == new_name {
-        return Err("新旧角色名相同，无需修改".to_string());
+        return Err(AppError::config_error("新旧角色名相同，无需修改"));
     }
 
-    let root = PathBuf::from(&project_path)
-        .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+    let root = validate_project_path(&project_path)?;
 
-    if !root.exists() || !root.is_dir() {
-        return Err("项目路径不存在或不是目录".to_string());
-    }
+    // 读取 ProjectMeta 获取目录配置（Task 4.6.1）
+    // 旧项目无 project.json 时 read_project_meta 返回错误，回退到扫描整个项目根
+    let scan_dirs: Vec<String> = match read_project_meta(&root) {
+        Ok(meta) => {
+            let mut dirs: Vec<String> = Vec::new();
+            // 设定库目录（通过 build_effective_codex_dirs 兼容空 codex_dirs 回退到 CODEX_DIRS）
+            let effective_codex_dirs = build_effective_codex_dirs(&meta.codex_dirs);
+            for (dir_name, _) in effective_codex_dirs {
+                dirs.push(dir_name);
+            }
+            // 大纲目录
+            dirs.push(meta.outline_dir.clone());
+            // 草稿箱目录
+            dirs.push(meta.draft_dir.clone());
+            // 正文目录
+            dirs.push(meta.manuscript_dir.clone());
+            dirs
+        }
+        Err(_) => {
+            // 旧项目无 ProjectMeta，回退到扫描整个项目根（向后兼容）
+            Vec::new()
+        }
+    };
 
     // 收集所有支持文档文件
+    // scan_dirs 为空时扫描整个项目根（向后兼容旧项目）
     let mut doc_files: Vec<PathBuf> = Vec::new();
-    collect_supported_files(&root, &mut doc_files);
+    if scan_dirs.is_empty() {
+        collect_supported_files(&root, &mut doc_files);
+    } else {
+        for dir_name in &scan_dirs {
+            let dir = root.join(dir_name);
+            if dir.exists() {
+                collect_supported_files(&dir, &mut doc_files);
+            }
+        }
+    }
 
     let mut files_modified: u64 = 0;
     let mut occurrences: u64 = 0;
     let mut renamed_files: Vec<String> = Vec::new();
+    // 已通过 UUID 关联更新的文件集合，避免阶段2重复处理
+    let mut processed_files: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
 
+    // ===== 阶段1: UUID 关联更新（Task 4.6.2）=====
+    // 仅对 codex_id 非空且 manifest 反向索引中引用该 codexId 的章节 .pmd 文件
+    // 调用 rename_mentions_in_pmd_file 更新 characterMentionNode.attrs.name
+    // 此方式精确匹配 characterId，彻底避免子串误伤
+    if !codex_id.is_empty() {
+        let chapter_paths = match find_chapter_paths_by_codex_id(&root, &codex_id) {
+            Ok(paths) => paths,
+            Err(_) => Vec::new(), // manifest 读取失败时跳过 UUID 更新，回退到字符串替换
+        };
+
+        for chapter_rel_path in &chapter_paths {
+            let chapter_abs = root.join(chapter_rel_path);
+            if !chapter_abs.exists() {
+                continue;
+            }
+            // UUID 关联更新仅适用于 .pmd 文件（含 ProseMirror JSON 结构）
+            let ext = chapter_abs.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if !ext.eq_ignore_ascii_case("pmd") {
+                continue;
+            }
+
+            match rename_mentions_in_pmd_file(&chapter_abs, &codex_id, &new_name) {
+                Ok(updated) => {
+                    if updated > 0 {
+                        files_modified += 1;
+                        occurrences += updated;
+                        let relative = chapter_abs
+                            .strip_prefix(&root)
+                            .map(|p| p.to_string_lossy().replace('\\', "/"))
+                            .unwrap_or_default();
+                        renamed_files.push(relative);
+                    }
+                    // 无论是否有更新，该文件已被 UUID 处理，加入 processed_files
+                    // 避免阶段2字符串替换破坏 characterMentionNode 的精确更新
+                    processed_files.insert(chapter_abs);
+                }
+                Err(_) => {
+                    // UUID 更新失败时不阻断流程，该文件仍可由阶段2字符串替换处理
+                }
+            }
+        }
+    }
+
+    // ===== 阶段2: 字符串替换回退（对未通过 UUID 处理的文件）=====
+    // 对 .txt/.html 文件及未被 manifest 反向索引覆盖的 .pmd 文件
+    // 使用带词边界检测的字符串替换作为兜底策略
     for file_path in &doc_files {
+        if processed_files.contains(file_path) {
+            continue;
+        }
+
         let content = match fs::read_to_string(file_path) {
             Ok(c) => c,
             Err(_) => continue,
@@ -322,7 +576,7 @@ pub fn rename_character_in_project(
                 .strip_prefix(&root)
                 .map(|p| p.to_string_lossy().replace('\\', "/"))
                 .unwrap_or_default();
-            return Err(format!("写入文件失败 {}: {}", relative, e));
+            return Err(AppError::io_error(e, format!("写入文件失败 {}", relative)));
         }
 
         let relative = file_path
@@ -365,7 +619,7 @@ pub struct CharacterSummary {
 /**
  * 读取指定角色的摘要信息
  * 输入: project_path 项目根路径, character_name 角色名
- * 输出: Result<CharacterSummary, String> 角色摘要
+ * 输出: Result<CharacterSummary, AppError> 角色摘要
  * 流程:
  *   1. 校验项目路径与角色名非空
  *   2. 优先扫描角色目录下 .pmd 文件, 检查首行是否匹配角色名
@@ -378,18 +632,18 @@ pub struct CharacterSummary {
 pub fn read_character_summary(
     project_path: String,
     character_name: String,
-) -> Result<CharacterSummary, String> {
+) -> Result<CharacterSummary, AppError> {
     let root = PathBuf::from(&project_path)
         .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "无法解析项目路径"))?;
 
     if !root.exists() || !root.is_dir() {
-        return Err("项目路径不存在或不是目录".to_string());
+        return Err(AppError::path_validation_error("项目路径不存在或不是目录"));
     }
 
     let name = character_name.trim().to_string();
     if name.is_empty() {
-        return Err("角色名不能为空".to_string());
+        return Err(AppError::config_error("角色名不能为空"));
     }
 
     let char_dir = root.join("角色");
@@ -430,7 +684,7 @@ pub fn read_character_summary(
  *   root - 项目根路径 (用于计算相对路径)
  *   name - 角色名 (需与文件首行一致)
  *   target_ext - 目标扩展名 (pmd 或 txt, 大小写不敏感)
- * 输出: Result<Option<CharacterSummary>, String>
+ * 输出: Result<Option<CharacterSummary>, AppError>
  *   - Some(summary) 命中并解析成功
  *   - None 未命中
  * 流程:
@@ -446,9 +700,9 @@ fn try_find_character_summary(
     root: &Path,
     name: &str,
     target_ext: &str,
-) -> Result<Option<CharacterSummary>, String> {
+) -> Result<Option<CharacterSummary>, AppError> {
     let entries = fs::read_dir(char_dir)
-        .map_err(|e| format!("读取角色目录失败: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "读取角色目录失败"))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -592,4 +846,242 @@ fn extract_brief(content: &str, _name: &str) -> String {
     }
 
     brief_parts.join(" ")
+}
+
+// ===== Task 4.6.3: 单元测试 - 覆盖子串误伤场景 =====
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// 测试词边界检测替换: "小明" 不应误伤 "小明明"
+    /// 场景: 文本中同时存在 "小明明" 和 "小明!"，替换 "小明" 时
+    ///       "小明明" 中的 "小明" 子串因后跟中文字符"明"应被跳过
+    ///       "小明!" 中的 "小明" 因后跟非中文字符"!"应被替换
+    /// 说明: 边界检测策略为前后字符均为非中文时才视为完整词匹配,
+    ///       常见中文字符（如'走'/'也'/'说'）会被判定为中文上下文从而跳过替换,
+    ///       这是保守安全策略, 可能漏替换但避免误伤
+    #[test]
+    fn test_replace_name_with_boundary_no_substring_injury() {
+        let content = "小明明，小明!";
+        let (result, count) = replace_name_with_boundary(content, "小明", "小红");
+        // "小明明" 中的 "小明" 不应被替换(后跟中文字符"明")
+        // "小明!" 中的 "小明" 应被替换(前为非中文逗号，后为非中文叹号)
+        assert_eq!(count, 1);
+        assert_eq!(result, "小明明，小红!");
+    }
+
+    /// 测试词边界检测替换: 独立出现的角色名应被替换
+    /// 场景: "小明" 前后均为非中文字符时，应被正确替换
+    #[test]
+    fn test_replace_name_with_boundary_standalone_name() {
+        let content = "小明!小明!小明!";
+        let (result, count) = replace_name_with_boundary(content, "小明", "小红");
+        assert_eq!(count, 3);
+        assert_eq!(result, "小红!小红!小红!");
+    }
+
+    /// 测试词边界检测替换: 前后均为中文字符时不替换
+    /// 场景: "林中漫步" 中 "林" 不应被替换为独立角色名
+    #[test]
+    fn test_replace_name_with_boundary_chinese_context() {
+        let content = "林黛玉走在林中漫步";
+        let (result, count) = replace_name_with_boundary(content, "林", "林总");
+        // "林黛玉" 中的 "林" 后跟中文字符"黛"，应跳过
+        // "林中漫步" 中的 "林" 前后均为中文，应跳过
+        assert_eq!(count, 0);
+        assert_eq!(result, content);
+    }
+
+    /// 测试 UUID 关联改名: 仅更新匹配 codexId 的 mention 节点 name
+    /// 场景: 文档中有一个 characterMentionNode，characterId 匹配时更新 name
+    #[test]
+    fn test_rename_mentions_in_node_uuid_match() {
+        let mut doc = json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "characterMentionNode",
+                    "attrs": {
+                        "characterId": "char-001",
+                        "name": "小明"
+                    }
+                }]
+            }]
+        });
+        let count = rename_mentions_in_node(&mut doc, "char-001", "小红");
+        assert_eq!(count, 1);
+        assert_eq!(doc["content"][0]["content"][0]["attrs"]["name"], "小红");
+        // characterId 不应被修改
+        assert_eq!(doc["content"][0]["content"][0]["attrs"]["characterId"], "char-001");
+    }
+
+    /// 测试 UUID 关联改名: 不匹配的 codexId 不应被更新
+    /// 场景: 文档中 characterId 为 char-002，请求更新 char-001，不应有任何变化
+    #[test]
+    fn test_rename_mentions_in_node_uuid_no_match() {
+        let mut doc = json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "characterMentionNode",
+                    "attrs": {
+                        "characterId": "char-002",
+                        "name": "小明"
+                    }
+                }]
+            }]
+        });
+        let count = rename_mentions_in_node(&mut doc, "char-001", "小红");
+        assert_eq!(count, 0);
+        // name 不应变
+        assert_eq!(doc["content"][0]["content"][0]["attrs"]["name"], "小明");
+    }
+
+    /// 测试 UUID 关联改名: 同一文档中多个 mention 节点，仅更新匹配的
+    /// 场景: 文档中有 char-001(小明) 和 char-002(小明明) 两个角色
+    ///       改名 char-001 → "小红" 时，char-002 的 mention 不应受影响
+    #[test]
+    fn test_rename_mentions_in_node_multiple_mentions() {
+        let mut doc = json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "characterMentionNode",
+                        "attrs": { "characterId": "char-001", "name": "小明" }
+                    },
+                    {
+                        "type": "text",
+                        "text": "走在路上，遇到"
+                    },
+                    {
+                        "type": "characterMentionNode",
+                        "attrs": { "characterId": "char-002", "name": "小明明" }
+                    }
+                ]
+            }]
+        });
+        let count = rename_mentions_in_node(&mut doc, "char-001", "小红");
+        // 仅 char-001 的 mention 被更新
+        assert_eq!(count, 1);
+        assert_eq!(doc["content"][0]["content"][0]["attrs"]["name"], "小红");
+        // char-002 的 mention 不变
+        assert_eq!(doc["content"][0]["content"][2]["attrs"]["name"], "小明明");
+    }
+
+    /// 测试子串误伤核心场景: UUID 关联 vs 字符串替换对比
+    /// 场景: 同一文档中有 "小明"(char-001) 和 "小明明"(char-002) 两个角色
+    ///       UUID 关联改名 char-001 → "小红" 时:
+    ///         - char-001 的 mention name 更新为 "小红"
+    ///         - char-002 的 mention name 仍为 "小明明"，未受影响
+    ///       字符串替换方式则可能误伤 "小明明" 中的 "小明" 子串
+    #[test]
+    fn test_substring_injury_uuid_vs_string() {
+        // 构建 ProseMirror JSON 文档: 两个角色的 mention 节点
+        let mut doc = json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "characterMentionNode",
+                        "attrs": { "characterId": "char-001", "name": "小明" }
+                    },
+                    {
+                        "type": "characterMentionNode",
+                        "attrs": { "characterId": "char-002", "name": "小明明" }
+                    }
+                ]
+            }]
+        });
+
+        // UUID 关联改名 char-001 → "小红"
+        let count = rename_mentions_in_node(&mut doc, "char-001", "小红");
+
+        // 验证: 仅 char-001 被更新
+        assert_eq!(count, 1);
+        assert_eq!(doc["content"][0]["content"][0]["attrs"]["name"], "小红");
+        // char-002 的 name 仍为 "小明明"，未受影响
+        assert_eq!(doc["content"][0]["content"][1]["attrs"]["name"], "小明明");
+
+        // 对比: 字符串替换方式（在纯文本 "小明小明明" 中替换 "小明" → "小红"）
+        let plain_text = "小明小明明";
+        let (_replaced, str_count) = replace_name_with_boundary(plain_text, "小明", "小红");
+        // 词边界检测策略说明:
+        //   - 第一个 "小明" 前为空(边界)、后跟 "小"(中文, U+5C0F) → 跳过(后字符为中文)
+        //   - "小明明" 中的 "小明" 前为 "明"(中文)、后为 "明"(中文) → 跳过(前后均为中文)
+        //   故 str_count = 0, 所有匹配均被边界检测跳过
+        // 此结果恰好凸显 UUID 关联的精确性优势:
+        //   - 字符串替换在密集中文上下文中可能完全无法替换(str_count=0)
+        //   - UUID 关联通过 characterId 精确匹配,不受字符边界影响(count=1)
+        assert_eq!(str_count, 0);
+        // 关键验证: UUID 方式不会误伤 char-002 的 mention name
+        // 即使字符串替换在边界检测下完全无法替换,
+        // UUID 关联直接通过 characterId 精确匹配,无需依赖边界启发式
+    }
+
+    /// 测试 UUID 关联改名: 嵌套结构中的 mention 节点
+    /// 场景: mention 节点位于嵌套的段落/列表结构中，递归遍历应正确找到
+    #[test]
+    fn test_rename_mentions_in_node_nested_structure() {
+        let mut doc = json!({
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{
+                        "type": "text",
+                        "text": "前文"
+                    }]
+                },
+                {
+                    "type": "bulletList",
+                    "content": [{
+                        "type": "listItem",
+                        "content": [{
+                            "type": "paragraph",
+                            "content": [{
+                                "type": "characterMentionNode",
+                                "attrs": { "characterId": "char-001", "name": "小明" }
+                            }]
+                        }]
+                    }]
+                }
+            ]
+        });
+        let count = rename_mentions_in_node(&mut doc, "char-001", "小红");
+        assert_eq!(count, 1);
+        // 验证嵌套结构中的 mention name 已更新
+        // 路径: doc → content[1](bulletList) → content[0](listItem) → content[0](paragraph)
+        //       → content[0](characterMentionNode) → attrs.name
+        assert_eq!(
+            doc["content"][1]["content"][0]["content"][0]["content"][0]["attrs"]["name"],
+            "小红"
+        );
+    }
+
+    /// 测试空 codex_id 不触发 UUID 更新
+    /// 场景: codex_id 为空字符串时，rename_mentions_in_node 不应更新任何节点
+    #[test]
+    fn test_rename_mentions_in_node_empty_codex_id() {
+        let mut doc = json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "characterMentionNode",
+                    "attrs": { "characterId": "char-001", "name": "小明" }
+                }]
+            }]
+        });
+        let count = rename_mentions_in_node(&mut doc, "", "小红");
+        // 空 codex_id 不匹配任何节点
+        assert_eq!(count, 0);
+        assert_eq!(doc["content"][0]["content"][0]["attrs"]["name"], "小明");
+    }
 }

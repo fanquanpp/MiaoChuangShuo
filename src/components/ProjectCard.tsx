@@ -9,8 +9,10 @@ import { memo, useCallback, useState, useEffect } from "react";
 import { Clock, BarChart3, BookOpen, Trash2, Calendar, User, Tag, Pencil, FolderOpen } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import type { ProjectInfo } from "../lib/api";
+import { getWritingStats } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useAutoSaveOnExit } from "../hooks/useAutoSaveOnExit";
+import { formatWordCount } from "../lib/formatters";
 
 /** 项目卡片展示数据（由上层从 ProjectInfo 转换而来） */
 export interface ProjectData {
@@ -66,6 +68,44 @@ function ProjectCardImpl({ project, projectInfo, onDelete, onEdit }: ProjectCard
   const { t } = useI18n();
   // 右键菜单位置，null 表示未显示
   const [ctxMenu, setCtxMenu] = useState<ContextMenuPos | null>(null);
+
+  // Task 4.5.4: 字数 SSOT 收敛到 WritingStats,卡片内部异步获取实时字数
+  // liveWordCount: -1 表示加载中, >= 0 表示已加载的字数
+  const [liveWordCount, setLiveWordCount] = useState<number>(-1);
+
+  /**
+   * 从 WritingStats 获取项目总字数(Task 4.5.4)
+   * 流程: 调用 getWritingStats 读取 WritingStats.total_words,失败时回退到 project.words 占位
+   */
+  const fetchWordCount = useCallback(async () => {
+    if (!projectInfo) return;
+    try {
+      const stats = await getWritingStats(projectInfo.path);
+      setLiveWordCount(stats.total_words);
+    } catch {
+      // 获取失败时保持 -1(加载中),显示占位符
+    }
+  }, [projectInfo]);
+
+  // 挂载及 projectInfo 变化时获取字数
+  useEffect(() => {
+    fetchWordCount();
+  }, [fetchWordCount]);
+
+  // Task 4.5.4: 监听章节保存事件,实时刷新字数
+  // 事件由 useEditorFileIO.handleSave 保存成功后派发,携带 projectPath 标识触发源
+  useEffect(() => {
+    const handleStatsUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ projectPath: string }>;
+      if (projectInfo && customEvent.detail?.projectPath === projectInfo.path) {
+        fetchWordCount();
+      }
+    };
+    window.addEventListener("nf:writing-stats-updated", handleStatsUpdated);
+    return () => {
+      window.removeEventListener("nf:writing-stats-updated", handleStatsUpdated);
+    };
+  }, [projectInfo, fetchWordCount]);
 
   /** 打开项目（卡片点击或右键菜单"打开"） */
   const openProject = useCallback(() => {
@@ -265,7 +305,10 @@ function ProjectCardImpl({ project, projectInfo, onDelete, onEdit }: ProjectCard
         <div className="flex items-center gap-4 text-xs text-nf-text-tertiary">
           <div className="flex items-center gap-1.5" title={t("projectcard.totalWords")}>
             <BarChart3 className="w-3.5 h-3.5 text-fandex-primary/70 transition-transform duration-fast" />
-            <span className="tabular-nums">{project.words}</span>
+            <span className="tabular-nums">
+              {/* Task 4.5.4: 字数从 WritingStats 实时读取,加载中显示占位符 */}
+              {liveWordCount >= 0 ? formatWordCount(liveWordCount, t) : "—"}
+            </span>
           </div>
           <div className="flex items-center gap-1.5" title={t("projectcard.chapters")}>
             <BookOpen className="w-3.5 h-3.5 text-fandex-secondary/70 transition-transform duration-fast" />

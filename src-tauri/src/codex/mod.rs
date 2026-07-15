@@ -32,7 +32,11 @@ pub mod scan;
 //     以下项在 crate 内部可能无直接引用（lib.rs 走子模块路径），故抑制 unused_imports。
 #[allow(unused_imports)]
 // 解析层：元数据结构与解析函数
-pub use parser::{CodexMeta, CodexEntity, CodexMetaPatch, parse_codex_file};
+// Task 1.8: 新增 build_effective_codex_dirs / codex_dir_fallback_type 用于按 ProjectMeta 配置扫描
+pub use parser::{
+    CodexMeta, CodexEntity, CodexMetaPatch, parse_codex_file,
+    build_effective_codex_dirs, codex_dir_fallback_type,
+};
 
 #[allow(unused_imports)]
 // CRUD 层：设定实体增删改查命令

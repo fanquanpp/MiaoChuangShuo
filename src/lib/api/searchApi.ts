@@ -167,6 +167,25 @@ export async function getWritingStats(projectPath: string): Promise<WritingStats
   return invoke<WritingStats>("get_writing_stats", { projectPath });
 }
 
+// 增量更新单章字数(Task 4.5.3: 章节保存时调用)
+// 输入:
+//   projectPath 项目根目录路径
+//   chapterId 章节标识(相对路径,如 "正文/第一章.pmd")
+//   wordCount 章节字数
+// 输出: Promise<void>
+// 流程: 调用 Rust 后端 update_chapter_word_count 命令,增量更新 WritingStats 快照
+export async function updateChapterWordCount(
+  projectPath: string,
+  chapterId: string,
+  wordCount: number
+): Promise<void> {
+  return invoke<void>("update_chapter_word_count", {
+    projectPath,
+    chapterId,
+    wordCount,
+  });
+}
+
 // 全文搜索项目内容（基于 Tantivy 索引）
 // 输入: request 搜索请求参数（项目路径、关键词、可选过滤条件）
 // 输出: Promise<TantivySearchResponse> 搜索响应

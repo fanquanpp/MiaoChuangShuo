@@ -1,7 +1,7 @@
 {
   "name": "miaochuangshuo",
   "private": true,
-  "version": "26.7.30",
+  "version": "26.8.0",
   "type": "module",
   "description": "喵创说 - 离线小说创作工作站",
   "scripts": {
@@ -9,10 +9,15 @@
     "build": "tsc && vite build",
     "build:web": "vite build --config web/vite.config.ts",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "sync-version": "node scripts/sync-version.mjs"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.8",
+    "@tanstack/react-virtual": "^3.14.6",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0",
@@ -46,8 +51,10 @@
     "@tiptap/extension-typography": "^2.27.2",
     "@tiptap/extension-underline": "^2.27.2",
     "@tiptap/react": "^2.27.2",
+    "@types/diff": "^7.0.2",
     "@xyflow/react": "^12.11.1",
     "cmdk": "^1.1.1",
+    "diff": "^9.0.0",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.22.0",
     "react": "^18.3.1",

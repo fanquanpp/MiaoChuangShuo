@@ -2,15 +2,20 @@
 //
 // 剧情时间线编辑器 Data 层 Rust 命令实现模块
 // 提供 read_timeline / save_timeline / clear_timeline 三个 Tauri 命令,
-// 实现原子写入、崩溃恢复、schema 迁移、数据完整性校验、txt 摘要生成。
+// 实现原子写入、崩溃恢复、schema 迁移、数据完整性校验。
+// Task 6.4: 摘要不再随保存硬编码写入 .txt 文件, 改由 generate_graph_summary 命令按需生成。
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use chrono::Local;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::error::AppError;
+
 /// 剧情节点类型枚举(与前端 TimelineNodeType 一一对应)
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum TimelineNodeType {
     Main,
@@ -34,7 +39,8 @@ impl TimelineNodeType {
 }
 
 /// 节点状态枚举
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NodeStatus {
     Planned,
@@ -45,7 +51,8 @@ pub enum NodeStatus {
 /// 剧情节点业务数据载荷(与前端 TimelineNodeData 字段一致)
 /// serde rename_all = "camelCase": 前端 TS 接口使用驼峰命名(nodeType/coreConflict/childCount/createdAt/updatedAt),
 ///   Rust 端字段使用 snake_case, 通过此属性自动双向转换, 保证反序列化不报 "missing field" 错误。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineNodeData {
     pub title: String,
@@ -64,10 +71,16 @@ pub struct TimelineNodeData {
     pub created_at: String,
     #[serde(default)]
     pub updated_at: String,
+    /// 关联章节 ID(章节 front matter 中的 UUID, None 表示未关联)
+    /// Task 4.2.1: 新增字段, 实现时间线事件与正文章节的跨模块联动
+    /// serde(default): 旧版数据(无此字段)反序列化时默认为 None, 保证向后兼容
+    #[serde(default)]
+    pub chapter_id: Option<String>,
 }
 
 /// 节点坐标(React Flow position 字段)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct NodePosition {
     pub x: f64,
     pub y: f64,
@@ -75,7 +88,8 @@ pub struct NodePosition {
 
 /// 持久化节点结构(包含位置与业务数据)
 /// rename_all = "camelCase" 与前端 React Flow Node 结构对齐
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedNode {
     pub id: String,
@@ -88,7 +102,8 @@ pub struct PersistedNode {
 
 /// 边业务数据载荷(与前端 Edge.data 字段一致, 必须包裹在 data 内)
 /// rename_all = "camelCase": edge_kind ↔ edgeKind 双向匹配
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedEdgeData {
     pub edge_kind: TimelineNodeType,
@@ -100,7 +115,8 @@ pub struct PersistedEdgeData {
 /// source_handle/target_handle: Handle 唯一标识(如 "left-target"/"right-source"),
 ///   用于精确追踪连线参与的具体 Handle, 支持同向端点连接的渲染。
 ///   使用 #[serde(default)] 保证旧版数据(无此字段)可正常反序列化。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedEdge {
     pub id: String,
@@ -119,7 +135,8 @@ pub struct PersistedEdge {
 /// 剧情图谱根结构(对应 timeline.json 文件)
 /// rename_all = "camelCase": 前端 TimelineGraph 接口使用 schemaVersion/projectId/projectName/updatedAt,
 ///   Rust 端字段使用 snake_case, 通过此属性自动双向转换。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineGraph {
     pub schema_version: i32,
@@ -160,23 +177,16 @@ fn timeline_json_path(project_root: &str) -> PathBuf {
     timeline_dir(project_root).join("timeline.json")
 }
 
-/// 构建 _剧情时间线摘要.txt 文件路径
-/// 输入: project_root 项目根路径
-/// 输出: 摘要文件完整路径
-fn timeline_summary_path(project_root: &str) -> PathBuf {
-    timeline_dir(project_root).join("_剧情时间线摘要.txt")
-}
-
 /// 读取剧情图谱(含崩溃恢复与 schema 迁移)
 /// 输入: project_root 项目根路径
-/// 输出: Result<TimelineGraph, String> 图谱数据或错误信息
+/// 输出: Result<TimelineGraph, AppError> 图谱数据或错误信息
 /// 流程:
 ///   1. 检查并清理 timeline.json.tmp 残留(上次写入崩溃)
 ///   2. 文件不存在时返回空图谱(兼容新项目)
 ///   3. 读取并反序列化 JSON
 ///   4. 自动迁移到最新 schema 版本(当前为 1)
 #[tauri::command]
-pub fn read_timeline(project_root: String) -> Result<TimelineGraph, String> {
+pub fn read_timeline(project_root: String) -> Result<TimelineGraph, AppError> {
     let json_path = timeline_json_path(&project_root);
     let tmp_path = json_path.with_extension("json.tmp");
 
@@ -192,19 +202,19 @@ pub fn read_timeline(project_root: String) -> Result<TimelineGraph, String> {
 
     // 步骤3: 读取并反序列化
     let content = fs::read_to_string(&json_path)
-        .map_err(|e| format!("读取时间线失败: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "读取时间线失败"))?;
 
     let graph: TimelineGraph = serde_json::from_str(&content)
-        .map_err(|e| format!("解析时间线 JSON 失败: {}", e))?;
+        .map_err(|e| AppError::serialize_error(e, "解析时间线 JSON 失败"))?;
 
     // 步骤4: 自动 schema 迁移
     let graph = if graph.schema_version < LATEST_SCHEMA_VERSION {
         migrate_schema(graph, LATEST_SCHEMA_VERSION)?
     } else if graph.schema_version > LATEST_SCHEMA_VERSION {
-        return Err(format!(
+        return Err(AppError::config_error(format!(
             "不支持的 schema 版本: {}(当前最高支持版本 {})",
             graph.schema_version, LATEST_SCHEMA_VERSION
-        ));
+        )));
     } else {
         graph
     };
@@ -212,58 +222,58 @@ pub fn read_timeline(project_root: String) -> Result<TimelineGraph, String> {
     Ok(graph)
 }
 
-/// 保存剧情图谱(原子写入 + 自动生成 txt 摘要)
+/// 保存剧情图谱(原子写入)
 /// 输入: project_root 项目根路径, graph 图谱数据
-/// 输出: Result<(), String> 成功或错误信息
+/// 输出: Result<(), AppError> 成功或错误信息
 /// 流程:
 ///   1. 校验数据完整性(节点 ID 唯一性 / 边引用 / 环检测)
 ///   2. 确保"剧情图谱"目录存在
 ///   3. 更新 updatedAt 时间戳
 ///   4. 写入 timeline.json.tmp 临时文件
 ///   5. 原子 rename 到 timeline.json
-///   6. 调用 generate_summary 生成 txt 摘要(失败不阻塞)
+/// Task 1.9.2: 保存时强制写入 LATEST_SCHEMA_VERSION,确保后续 load 可正确识别版本
+/// Task 6.4: 删除保存时自动写入 _剧情时间线摘要.txt 的逻辑, 摘要改由 generate_graph_summary 命令按需生成
 #[tauri::command]
-pub fn save_timeline(project_root: String, mut graph: TimelineGraph) -> Result<(), String> {
+pub fn save_timeline(project_root: String, mut graph: TimelineGraph) -> Result<(), AppError> {
     // 步骤1: 保存前校验数据完整性(含环检测)
     validate_graph(&graph)?;
 
     // 步骤2: 确保目录存在
     let dir = timeline_dir(&project_root);
-    fs::create_dir_all(&dir).map_err(|e| format!("创建剧情图谱目录失败: {}", e))?;
+    fs::create_dir_all(&dir).map_err(|e| AppError::io_error(e, "创建剧情图谱目录失败"))?;
 
-    // 步骤3: 更新时间戳
+    // 步骤3: 更新时间戳与 schema 版本号
+    // Task 1.9.2: 强制写入最新 schema_version,保证文件落盘时即标记为当前版本,
+    //            后续 read_timeline 加载时无需再触发迁移路径
     graph.updated_at = Local::now().to_rfc3339();
+    graph.schema_version = LATEST_SCHEMA_VERSION;
 
     // 步骤4: 序列化 JSON
     let json = serde_json::to_string_pretty(&graph)
-        .map_err(|e| format!("序列化时间线失败: {}", e))?;
+        .map_err(|e| AppError::serialize_error(e, "序列化时间线失败"))?;
 
     let json_path = timeline_json_path(&project_root);
     let tmp_path = json_path.with_extension("json.tmp");
 
     // 步骤5: 写入临时文件
     fs::write(&tmp_path, &json)
-        .map_err(|e| format!("写入临时文件失败: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "写入临时文件失败"))?;
 
     // 步骤6: 原子 rename(Windows NTFS 与 Linux ext4 均支持原子 rename)
     fs::rename(&tmp_path, &json_path)
-        .map_err(|e| format!("原子重命名失败: {}", e))?;
-
-    // 步骤7: 生成 txt 摘要(失败不影响主流程)
-    let summary = generate_summary(&graph);
-    let _ = fs::write(timeline_summary_path(&project_root), summary);
+        .map_err(|e| AppError::io_error(e, "原子重命名失败"))?;
 
     Ok(())
 }
 
 /// 删除整个剧情图谱(清空操作, 需前端二次确认)
 /// 输入: project_root 项目根路径
-/// 输出: Result<(), String> 成功或错误信息
+/// 输出: Result<(), AppError> 成功或错误信息
 #[tauri::command]
-pub fn clear_timeline(project_root: String) -> Result<(), String> {
+pub fn clear_timeline(project_root: String) -> Result<(), AppError> {
     let dir = timeline_dir(&project_root);
     if dir.exists() {
-        fs::remove_dir_all(&dir).map_err(|e| format!("删除剧情图谱目录失败: {}", e))?;
+        fs::remove_dir_all(&dir).map_err(|e| AppError::io_error(e, "删除剧情图谱目录失败"))?;
     }
     Ok(())
 }
@@ -272,7 +282,8 @@ pub fn clear_timeline(project_root: String) -> Result<(), String> {
 /// 输入: graph 图谱数据
 /// 输出: String 格式化的摘要文本
 /// 流程: 按 main/branch/event/ending 分类汇总, 输出可读文本
-fn generate_summary(graph: &TimelineGraph) -> String {
+/// Task 6.4: 改为 pub 供 generate_graph_summary 命令按需调用, 不再随 save_timeline 硬写文件
+pub fn generate_summary(graph: &TimelineGraph) -> String {
     let mut out = String::new();
     out.push_str(&format!(
         "# 剧情时间线摘要 (schema v{})\n\n项目:{}\n生成时间:{}\n节点总数:{}  连线数:{}\n\n",
@@ -338,29 +349,35 @@ fn generate_summary(graph: &TimelineGraph) -> String {
 
 /// 校验图谱数据完整性
 /// 输入: graph 待校验图谱
-/// 输出: Result<(), String> 校验通过或错误信息
+/// 输出: Result<(), AppError> 校验通过或错误信息
 /// 流程:
 ///   1. 检查节点 ID 唯一性
 ///   2. 检查边引用的节点 ID 是否存在
 ///   3. 检查是否存在环(DFS 三色标记法)
-pub fn validate_graph(graph: &TimelineGraph) -> Result<(), String> {
+pub fn validate_graph(graph: &TimelineGraph) -> Result<(), AppError> {
     use std::collections::{HashMap, HashSet};
 
     // 1. 节点 ID 唯一性
     let mut node_ids: HashSet<&str> = HashSet::new();
     for node in &graph.nodes {
         if !node_ids.insert(node.id.as_str()) {
-            return Err(format!("重复的节点 ID: {}", node.id));
+            return Err(AppError::config_error(format!("重复的节点 ID: {}", node.id)));
         }
     }
 
     // 2. 边引用有效性
     for edge in &graph.edges {
         if !node_ids.contains(edge.source.as_str()) {
-            return Err(format!("边 {} 的 source 节点 {} 不存在", edge.id, edge.source));
+            return Err(AppError::config_error(format!(
+                "边 {} 的 source 节点 {} 不存在",
+                edge.id, edge.source
+            )));
         }
         if !node_ids.contains(edge.target.as_str()) {
-            return Err(format!("边 {} 的 target 节点 {} 不存在", edge.id, edge.target));
+            return Err(AppError::config_error(format!(
+                "边 {} 的 target 节点 {} 不存在",
+                edge.id, edge.target
+            )));
         }
     }
 
@@ -403,7 +420,7 @@ pub fn validate_graph(graph: &TimelineGraph) -> Result<(), String> {
     for node in &graph.nodes {
         if colors.get(node.id.as_str()) == Some(&Color::White) {
             if dfs(&node.id, &adj, &mut colors) {
-                return Err("图谱中存在环形依赖, 请检查连线".to_string());
+                return Err(AppError::config_error("图谱中存在环形依赖, 请检查连线"));
             }
         }
     }
@@ -413,14 +430,14 @@ pub fn validate_graph(graph: &TimelineGraph) -> Result<(), String> {
 
 /// schema 版本迁移函数
 /// 输入: graph 原始图谱, target_version 目标版本
-/// 输出: Result<TimelineGraph, String> 迁移后的图谱
+/// 输出: Result<TimelineGraph, AppError> 迁移后的图谱
 /// 流程:
 ///   1. 若当前版本 >= 目标版本, 无需迁移直接返回
 ///   2. 若当前版本 < 目标版本, 按版本号匹配迁移函数
 ///   3. 当前仅支持 schema v1, 无更低版本迁移路径, 低版本数据返回错误
 /// 注: 未来新增版本时, 在 match 中补充对应的 migrate_vN_to_vN+1 函数
 ///     多步迁移可改造为 while 循环 + match 结构迭代应用
-pub fn migrate_schema(graph: TimelineGraph, target_version: i32) -> Result<TimelineGraph, String> {
+pub fn migrate_schema(graph: TimelineGraph, target_version: i32) -> Result<TimelineGraph, AppError> {
     let current = graph;
 
     // 当前版本已达目标, 无需迁移
@@ -432,9 +449,9 @@ pub fn migrate_schema(graph: TimelineGraph, target_version: i32) -> Result<Timel
     // 当前仅支持 schema v1, 无更低版本的迁移路径
     match current.schema_version {
         // 0 => return Ok(migrate_v0_to_v1(current)?),  // 未来迁移示例(预留)
-        v => Err(format!(
+        v => Err(AppError::config_error(format!(
             "无法从版本 {} 迁移到 {}（无可用迁移路径）",
             v, target_version
-        )),
+        ))),
     }
 }

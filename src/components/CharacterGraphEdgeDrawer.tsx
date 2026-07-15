@@ -18,6 +18,7 @@ import {
   getRelationMeta,
   addCustomRelationType,
   deleteCustomRelationType,
+  subscribeCustomRelationTypes,
   type RelationTypeMeta,
 } from "../lib/stores/characterGraphTypes";
 import { useI18n } from "../lib/i18n";
@@ -75,8 +76,18 @@ export default function CharacterGraphEdgeDrawer({
     description: string;
   }>({ relationType: "other", description: "" });
 
-  // 关系类型选项列表(内置 + 自定义), 每次渲染时从 localStorage 读取, 保证新增后立即显示
+  // 关系类型选项列表(内置 + 自定义), 从内存缓存读取
+  // Task 1.5: 后端数据异步加载完成后,通过订阅机制刷新此 state
   const [relationOptions, setRelationOptions] = useState<RelationTypeMeta[]>(getAllRelationTypes());
+
+  // 订阅自定义关系类型缓存变化(Task 1.5)
+  // 应用启动时 initCustomRelationTypes 异步从后端加载,完成后通知订阅者刷新下拉列表
+  useEffect(() => {
+    const unsubscribe = subscribeCustomRelationTypes(() => {
+      setRelationOptions(getAllRelationTypes());
+    });
+    return unsubscribe;
+  }, []);
 
   // 新增自定义关系类型的内联表单状态
   const [showAddForm, setShowAddForm] = useState(false);
@@ -128,8 +139,8 @@ export default function CharacterGraphEdgeDrawer({
    * 提交新增自定义关系类型
    * 流程:
    *   1. 校验 label 非空
-   *   2. 调用 addCustomRelationType 持久化到 localStorage
-   *   3. 刷新关系类型选项列表
+   *   2. 调用 addCustomRelationType 同步更新缓存并异步持久化到后端
+   *   3. 刷新关系类型选项列表(订阅通知也会触发,此处为即时刷新)
    *   4. 自动选中新添加的类型
    *   5. 清空表单并关闭
    */
@@ -149,7 +160,7 @@ export default function CharacterGraphEdgeDrawer({
   /**
    * 删除自定义关系类型
    * 输入: id 关系类型 id
-   * 流程: 从 localStorage 删除并刷新列表, 不修改已使用该类型的边
+   * 流程: 从缓存删除并异步持久化到后端, 不修改已使用该类型的边
    */
   const handleDeleteCustomRelation = (id: string) => {
     deleteCustomRelationType(id);
@@ -232,8 +243,8 @@ export default function CharacterGraphEdgeDrawer({
             >
               {relationOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
-                  {!option.builtin ? " (自定义)" : ""}
+                  {t(option.label)}
+                  {!option.builtin ? ` (${t("edgeDrawer.customBadge")})` : ""}
                 </option>
               ))}
             </select>

@@ -20,8 +20,8 @@
 //   无默认导出, 默认导入形式导致 TS2786。
 // 偏差调整: GraphPanelShell 已改用命名导入 `import { ReactFlow, ... }`,
 //   本组件不再直接导入 ReactFlow, 由 GraphPanelShell 代理画布渲染。
-// 同源偏差: 传递给 ReactFlow 的 nodes/edges 属性需 `as unknown as Node[]` /
-//   `as unknown as Edge[]` 双重断言, 由 GraphPanelShell 内部处理。
+// Task 2.6 更新: GraphPanelShell 已通过 TNode extends Node / TEdge extends Edge 泛型约束
+//   直接传递 nodes/edges, 不再需要 `as unknown as Node[]` / `as unknown as Edge[]` 双重断言。
 // 验证依据: tsc --noEmit 通过。
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -35,6 +35,7 @@ import type {
 import { useAppStore } from "../lib/store";
 import { useTimelineStore, filterCollapsed } from "../lib/stores/timelineStore";
 import { autoLayout } from "../lib/dagreLayout";
+import { findFileByPath } from "../lib/fileTreeUtils";
 import { EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
 import type {
   TimelineNodeType,
@@ -154,6 +155,8 @@ const timelineStoreAdapter: StoreAdapter<
 export default function TimelinePanel() {
   const currentProject = useAppStore((s) => s.currentProject);
   const activeCategory = useAppStore((s) => s.activeCategory);
+  const projectTree = useAppStore((s) => s.projectTree);
+  const navigateToFile = useAppStore((s) => s.navigateToFile);
 
   const allNodes = useTimelineStore((s) => s.nodes);
   const allEdges = useTimelineStore((s) => s.edges);
@@ -211,6 +214,24 @@ export default function TimelinePanel() {
   }, [showToast, t]);
 
   /**
+   * Task 4.2.3: 跳转到关联章节
+   * 输入: sourceFile 章节相对路径(来自 manifest 实体的 sourceFile 字段)
+   * 输出: void
+   * 流程:
+   *   1. 通过 findFileByPath 在项目目录树中查找对应 FileNode
+   *   2. 找到后调用 navigateToFile(fileNode, "manuscript") 切换到正文分类并打开文件
+   *   3. 未找到时显示错误 toast(可能章节文件已被删除或移动)
+   */
+  const handleJumpToChapter = useCallback((sourceFile: string) => {
+    const fileNode = findFileByPath(projectTree, sourceFile);
+    if (!fileNode) {
+      showToast("error", t("timeline.linkChapter.jumpFailed"));
+      return;
+    }
+    navigateToFile(fileNode, "manuscript");
+  }, [projectTree, navigateToFile, showToast, t]);
+
+  /**
    * 创建新节点并可选地连线到父节点
    * 输入: type 节点类型, flowPosition 画布坐标(已由 screenToFlowPosition 转换),
    *       parentId 父节点 ID(可选, 用于右键节点时连线到新节点)
@@ -237,12 +258,12 @@ export default function TimelinePanel() {
         data: {
           title:
             type === "main"
-              ? "新主线节点"
+              ? t("timeline.defaultTitleMain")
               : type === "branch"
-                ? "新分支"
+                ? t("timeline.defaultTitleBranch")
                 : type === "event"
-                  ? "新事件"
-                  : "新结局",
+                  ? t("timeline.defaultTitleEvent")
+                  : t("timeline.defaultTitleEnding"),
           nodeType: type,
           summary: "",
           coreConflict: "",
@@ -252,6 +273,7 @@ export default function TimelinePanel() {
           childCount: 0,
           createdAt: now,
           updatedAt: now,
+          chapterId: null,
         },
       };
 
@@ -269,7 +291,7 @@ export default function TimelinePanel() {
         useTimelineStore.setState((state) => ({ edges: [...state.edges, newEdge] }));
       }
     },
-    []
+    [t]
   );
 
   /**
@@ -421,6 +443,7 @@ export default function TimelinePanel() {
           <TimelineDrawer
             nodeId={selectedNodeId}
             onClose={() => selectNode(null)}
+            onJumpToChapter={handleJumpToChapter}
           />
         ) : null
       }

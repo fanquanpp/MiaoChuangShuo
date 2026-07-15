@@ -16,7 +16,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::commands::{is_indexable_file, is_supported_doc, validate_project_path};
+use crate::commands::{is_indexable_file, validate_project_path};
 use crate::error::AppError;
 use crate::index_sync::sync_index_add;
 use crate::text_extractor;
@@ -271,7 +271,7 @@ fn replace_recursive(current: &Path, ctx: &mut ReplaceContext) {
             }
             if path.is_dir() {
                 replace_recursive(&path, ctx);
-            } else if is_supported_doc(&path) {
+            } else if is_indexable_file(&path) {
                 // P1-6: 扩展为支持 .txt/.pmd/.html/.htm 四种格式
                 // replace_in_file 内部根据 detect_format 分派到结构感知替换函数
                 let count = replace_in_file(&path, ctx);

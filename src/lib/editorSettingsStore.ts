@@ -2,26 +2,33 @@
 //
 // 功能概述：
 // 使用 Zustand 管理编辑器相关设置（字号、自动保存、章节格式、缩进、音效、快照等），
-// 支持 localStorage 持久化。设置变更即时生效到 DOM 和编辑器。
+// 通过 zustand persist 中间件实现 localStorage 自动持久化，设置变更即时生效到 DOM 和编辑器。
 //
 // 模块职责：
 // 1. 管理编辑器字号、自动保存间隔、章节标题格式、缩进、音效、快照等设置
-// 2. 持久化编辑器设置到 localStorage（与外观设置共享 STORAGE_KEY，采用读-改-写模式避免覆盖）
+// 2. 通过 persist 中间件自动持久化到 localStorage（独立 key，避免与外观设置共享造成数据污染）
 // 3. 应用字号到 DOM（CSS 变量 --fandex-editor-font-size）
 // 4. 提供章节标题格式化工具函数（toChineseNumber、formatChapterHeading 等）
 //
 // 设计说明：
-// - localStorage 采用共享键 `novelforge-settings`，写入时先读取已有数据再合并，避免覆盖外观设置
+// - 采用 zustand persist 中间件，替代原手工 read-modify-write 持久化模式
+// - STORAGE_KEY 独立为 `miaochuangshuo-editor-settings`，与 appearanceStore 彻底分离，消除数据污染风险
+// - 模块顶层执行一次性迁移：从旧共享 key `novelforge-settings` 提取编辑器字段到新独立 key
 // - DOM 副作用 applyFontSize 直接操作 document.documentElement.style，属于设置应用的必要副作用
 // - 章节工具函数为纯函数，无副作用，可独立测试
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 // 章节标题格式类型
 export type ChapterFormat = "chinese" | "arabic" | "english";
 
-// 共享 localStorage 键（与 appearanceStore 共用，保证向后兼容）
-const STORAGE_KEY = "novelforge-settings";
+// 独立 localStorage 键（消除与 appearanceStore 的共享）
+const STORAGE_KEY = "miaochuangshuo-editor-settings";
+// 旧共享 localStorage 键（用于一次性迁移，与 appearanceStore 共用）
+const LEGACY_STORAGE_KEY = "novelforge-settings";
+// 当前 schema 版本（用于未来字段变更时的迁移）
+const SCHEMA_VERSION = 1;
 
 // 编辑器设置数据接口（序列化用）
 interface EditorSettingsData {
@@ -63,7 +70,7 @@ export interface EditorSettingsState extends EditorSettingsData {
   setCheckUpdateOnStartup: (enabled: boolean) => void;
   setLastUpdateCheckTime: (timestamp: number) => void;
   setSkipUpdateVersion: (version: string) => void;
-  /** 从 localStorage 加载编辑器设置并应用到 DOM */
+  /** 初始化编辑器设置：应用 DOM 副作用（persist 中间件已自动加载状态） */
   initEditorSettings: () => void;
 }
 
@@ -88,48 +95,75 @@ const DEFAULT_EDITOR_SETTINGS: EditorSettingsData = {
   skipUpdateVersion: "",
 };
 
+// 编辑器数据字段白名单（迁移时从旧共享 key 仅提取这些字段）
+const EDITOR_DATA_KEYS = [
+  "fontSize", "autoSaveInterval", "chapterFormat", "autoFillBookTitle",
+  "autoOutlineSkeleton", "autoNumbering", "autoTemplateFill", "indentEnabled",
+  "indentWidth", "typingSound", "sessionWordTarget", "snapshotEnabled",
+  "snapshotMinInterval", "lastProjectPath", "checkUpdateOnStartup",
+  "lastUpdateCheckTime", "skipUpdateVersion",
+] as const;
+
 /**
- * 从 localStorage 加载编辑器设置
- * 输出: EditorSettingsData 编辑器设置数据
- * 流程:
- *   1. 读取共享 STORAGE_KEY 的完整数据
- *   2. 与默认值合并，仅提取编辑器相关字段
- *   3. 解析失败时返回默认值
+ * 从完整状态中提取需持久化的数据字段（排除 actions）
+ * 输入: state 完整状态（含数据与 actions）
+ * 输出: 仅含数据字段的纯对象
  */
-function loadEditorSettings(): EditorSettingsData {
-  if (typeof localStorage === "undefined") return DEFAULT_EDITOR_SETTINGS;
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...DEFAULT_EDITOR_SETTINGS, ...parsed };
-    }
-  } catch {
-    // JSON 解析失败，返回默认值
-  }
-  return DEFAULT_EDITOR_SETTINGS;
+function pickEditorData(state: EditorSettingsState): EditorSettingsData {
+  return {
+    fontSize: state.fontSize,
+    autoSaveInterval: state.autoSaveInterval,
+    chapterFormat: state.chapterFormat,
+    autoFillBookTitle: state.autoFillBookTitle,
+    autoOutlineSkeleton: state.autoOutlineSkeleton,
+    autoNumbering: state.autoNumbering,
+    autoTemplateFill: state.autoTemplateFill,
+    indentEnabled: state.indentEnabled,
+    indentWidth: state.indentWidth,
+    typingSound: state.typingSound,
+    sessionWordTarget: state.sessionWordTarget,
+    snapshotEnabled: state.snapshotEnabled,
+    snapshotMinInterval: state.snapshotMinInterval,
+    lastProjectPath: state.lastProjectPath,
+    checkUpdateOnStartup: state.checkUpdateOnStartup,
+    lastUpdateCheckTime: state.lastUpdateCheckTime,
+    skipUpdateVersion: state.skipUpdateVersion,
+  };
 }
 
 /**
- * 持久化编辑器设置到 localStorage（读-改-写模式）
- * 输入: data 待写入的编辑器设置数据
+ * 一次性迁移：从旧共享 key 提取编辑器字段到新独立 key
+ * 仅在新 key 不存在且旧 key 存在时执行
  * 流程:
- *   1. 读取共享键的现有完整数据（包含外观设置）
- *   2. 合并编辑器设置字段
- *   3. 写回 localStorage，避免覆盖外观设置
- * 说明: 与 appearanceStore 共享 STORAGE_KEY，必须采用读-改-写避免数据丢失
+ *   1. 检测新 key 是否已有数据（已有则跳过，避免覆盖）
+ *   2. 读取旧共享 key 的完整数据（包含编辑器与外观字段）
+ *   3. 按字段白名单提取编辑器相关字段
+ *   4. 写入新独立 key
+ * 说明: 旧 key `novelforge-settings` 与 appearanceStore 共享，此处仅提取编辑器字段，不删除旧 key
+ *       （appearanceStore 迁移时也会读取同一旧 key 提取外观字段）
  */
-function persistEditorSettings(data: Partial<EditorSettingsData>): void {
+function migrateLegacyEditorSettings(): void {
   if (typeof localStorage === "undefined") return;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const existing = stored ? JSON.parse(stored) : {};
-    const merged = { ...existing, ...data };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    // 新 key 已有数据，跳过迁移
+    if (localStorage.getItem(STORAGE_KEY)) return;
+    const oldRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!oldRaw) return;
+    const parsed = JSON.parse(oldRaw) as Record<string, unknown>;
+    const extracted: Record<string, unknown> = {};
+    for (const key of EDITOR_DATA_KEYS) {
+      if (key in parsed) {
+        extracted[key] = parsed[key];
+      }
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(extracted));
   } catch {
-    // 写入失败，静默处理
+    // 迁移失败静默处理，persist 将使用默认值
   }
 }
+
+// 模块顶层执行迁移（store 创建前立即执行，非 React 组件内）
+migrateLegacyEditorSettings();
 
 /**
  * 应用字体大小到 DOM（CSS 变量注入）
@@ -141,107 +175,116 @@ function applyFontSize(size: number): void {
   document.documentElement.style.setProperty("--fandex-editor-font-size", `${size}px`);
 }
 
-export const useEditorSettingsStore = create<EditorSettingsState>((set) => ({
-  ...DEFAULT_EDITOR_SETTINGS,
+// 创建编辑器设置 store，使用 persist 中间件自动持久化
+// 泛型 <EditorSettingsState, [], [], EditorSettingsData> 分别指定完整状态类型、空 middleware mutators、持久化数据类型
+export const useEditorSettingsStore = create<EditorSettingsState>()(
+  persist<EditorSettingsState, [], [], EditorSettingsData>(
+    (set, get) => ({
+      ...DEFAULT_EDITOR_SETTINGS,
 
-  setFontSize: (size): void => {
-    const clamped = Math.max(12, Math.min(28, size));
-    applyFontSize(clamped);
-    persistEditorSettings({ fontSize: clamped });
-    set({ fontSize: clamped });
-  },
+      setFontSize: (size): void => {
+        const clamped = Math.max(12, Math.min(28, size));
+        applyFontSize(clamped);
+        set({ fontSize: clamped });
+      },
 
-  setAutoSaveInterval: (seconds): void => {
-    const clamped = Math.max(0, Math.min(600, seconds));
-    persistEditorSettings({ autoSaveInterval: clamped });
-    set({ autoSaveInterval: clamped });
-  },
+      setAutoSaveInterval: (seconds): void => {
+        const clamped = Math.max(0, Math.min(600, seconds));
+        set({ autoSaveInterval: clamped });
+      },
 
-  setChapterFormat: (format): void => {
-    persistEditorSettings({ chapterFormat: format });
-    set({ chapterFormat: format });
-  },
+      setChapterFormat: (format): void => {
+        set({ chapterFormat: format });
+      },
 
-  setAutoFillBookTitle: (enabled): void => {
-    persistEditorSettings({ autoFillBookTitle: enabled });
-    set({ autoFillBookTitle: enabled });
-  },
+      setAutoFillBookTitle: (enabled): void => {
+        set({ autoFillBookTitle: enabled });
+      },
 
-  setAutoOutlineSkeleton: (enabled): void => {
-    persistEditorSettings({ autoOutlineSkeleton: enabled });
-    set({ autoOutlineSkeleton: enabled });
-  },
+      setAutoOutlineSkeleton: (enabled): void => {
+        set({ autoOutlineSkeleton: enabled });
+      },
 
-  setAutoNumbering: (enabled): void => {
-    persistEditorSettings({ autoNumbering: enabled });
-    set({ autoNumbering: enabled });
-  },
+      setAutoNumbering: (enabled): void => {
+        set({ autoNumbering: enabled });
+      },
 
-  setAutoTemplateFill: (enabled): void => {
-    persistEditorSettings({ autoTemplateFill: enabled });
-    set({ autoTemplateFill: enabled });
-  },
+      setAutoTemplateFill: (enabled): void => {
+        set({ autoTemplateFill: enabled });
+      },
 
-  setIndentEnabled: (enabled): void => {
-    persistEditorSettings({ indentEnabled: enabled });
-    set({ indentEnabled: enabled });
-  },
+      setIndentEnabled: (enabled): void => {
+        set({ indentEnabled: enabled });
+      },
 
-  setIndentWidth: (width): void => {
-    // 上限放宽至 8,既支持标准 1-4 全角空格快捷选择,也允许高级用户自定义更宽缩进
-    const clamped = Math.max(1, Math.min(8, Math.floor(width)));
-    persistEditorSettings({ indentWidth: clamped });
-    set({ indentWidth: clamped });
-  },
+      setIndentWidth: (width): void => {
+        // 上限放宽至 8，既支持标准 1-4 全角空格快捷选择，也允许高级用户自定义更宽缩进
+        const clamped = Math.max(1, Math.min(8, Math.floor(width)));
+        set({ indentWidth: clamped });
+      },
 
-  setTypingSound: (enabled): void => {
-    persistEditorSettings({ typingSound: enabled });
-    set({ typingSound: enabled });
-  },
+      setTypingSound: (enabled): void => {
+        set({ typingSound: enabled });
+      },
 
-  setSessionWordTarget: (target): void => {
-    const clamped = Math.max(0, Math.floor(target));
-    persistEditorSettings({ sessionWordTarget: clamped });
-    set({ sessionWordTarget: clamped });
-  },
+      setSessionWordTarget: (target): void => {
+        const clamped = Math.max(0, Math.floor(target));
+        set({ sessionWordTarget: clamped });
+      },
 
-  setSnapshotEnabled: (enabled): void => {
-    persistEditorSettings({ snapshotEnabled: enabled });
-    set({ snapshotEnabled: enabled });
-  },
+      setSnapshotEnabled: (enabled): void => {
+        set({ snapshotEnabled: enabled });
+      },
 
-  setSnapshotMinInterval: (seconds): void => {
-    const clamped = Math.max(0, Math.min(3600, Math.floor(seconds)));
-    persistEditorSettings({ snapshotMinInterval: clamped });
-    set({ snapshotMinInterval: clamped });
-  },
+      setSnapshotMinInterval: (seconds): void => {
+        const clamped = Math.max(0, Math.min(3600, Math.floor(seconds)));
+        set({ snapshotMinInterval: clamped });
+      },
 
-  setLastProjectPath: (path): void => {
-    persistEditorSettings({ lastProjectPath: path });
-    set({ lastProjectPath: path });
-  },
+      setLastProjectPath: (path): void => {
+        set({ lastProjectPath: path });
+      },
 
-  setCheckUpdateOnStartup: (enabled): void => {
-    persistEditorSettings({ checkUpdateOnStartup: enabled });
-    set({ checkUpdateOnStartup: enabled });
-  },
+      setCheckUpdateOnStartup: (enabled): void => {
+        set({ checkUpdateOnStartup: enabled });
+      },
 
-  setLastUpdateCheckTime: (timestamp): void => {
-    persistEditorSettings({ lastUpdateCheckTime: timestamp });
-    set({ lastUpdateCheckTime: timestamp });
-  },
+      setLastUpdateCheckTime: (timestamp): void => {
+        set({ lastUpdateCheckTime: timestamp });
+      },
 
-  setSkipUpdateVersion: (version): void => {
-    persistEditorSettings({ skipUpdateVersion: version });
-    set({ skipUpdateVersion: version });
-  },
+      setSkipUpdateVersion: (version): void => {
+        set({ skipUpdateVersion: version });
+      },
 
-  initEditorSettings: (): void => {
-    const stored = loadEditorSettings();
-    applyFontSize(stored.fontSize);
-    set(stored);
-  },
-}));
+      initEditorSettings: (): void => {
+        // persist 中间件已自动 rehydrate 状态，此处仅应用 DOM 副作用
+        applyFontSize(get().fontSize);
+      },
+    }),
+    {
+      name: STORAGE_KEY,
+      storage: createJSONStorage(() => localStorage),
+      version: SCHEMA_VERSION,
+      partialize: (state) => pickEditorData(state),
+      migrate: (persistedState, version) => {
+        // 版本兼容处理：未知或格式异常的数据回退默认值
+        // persistedState 类型由 zustand 库推断，此处用类型守卫保证安全
+        if (version < SCHEMA_VERSION && persistedState && typeof persistedState === "object") {
+          const data = persistedState as Partial<EditorSettingsData>;
+          return { ...DEFAULT_EDITOR_SETTINGS, ...data };
+        }
+        return DEFAULT_EDITOR_SETTINGS;
+      },
+      onRehydrateStorage: () => (state) => {
+        // rehydrate 完成后应用字号到 DOM
+        if (state) {
+          applyFontSize(state.fontSize);
+        }
+      },
+    }
+  )
+);
 
 // ===== 章节标题格式化工具函数 =====
 

@@ -26,6 +26,7 @@
 // 根据 kind 字段进行差异化处理与 i18n 本地化映射。
 
 use crate::error::AppError;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -37,7 +38,8 @@ use tauri::command;
 ///
 /// 存储位置：AppData/MiaoChuangShuo/preferences.json
 /// 跨项目共享，新建项目时作为默认值
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EditorPreferences {
     /// Tab 键角色名补全（原 CharacterMention 扩展，默认关闭）
@@ -81,7 +83,8 @@ impl EditorPreferences {
 /// 项目级配置（存储于 .novelforge/config.json）
 ///
 /// 仅包含项目固有属性，功能开关存用户级偏好
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectConfig {
     /// 模板类型："novel" / "script" / "essay"
@@ -104,7 +107,7 @@ impl Default for ProjectConfig {
 /// 获取用户级偏好文件路径
 /// 输入: 无
 /// 输出: Result<PathBuf, AppError> 偏好文件路径
-/// 流程: 定位 AppData/novelforge/preferences.json，必要时创建偏好目录
+/// 流程: 定位 AppData/MiaoChuangShuo/preferences.json，必要时创建偏好目录
 /// 错误:
 ///   - ConfigError: 系统无法提供配置目录（如环境变量缺失）
 ///   - IoError: 创建偏好目录失败
@@ -112,7 +115,7 @@ fn get_preferences_path() -> Result<PathBuf, AppError> {
     let config_dir = dirs::config_dir().ok_or_else(|| {
         AppError::ConfigError("无法获取配置目录".to_string())
     })?;
-    let prefs_dir = config_dir.join("novelforge");
+    let prefs_dir = config_dir.join("MiaoChuangShuo");
     if !prefs_dir.exists() {
         fs::create_dir_all(&prefs_dir).map_err(|e| AppError::IoError {
             source: e,
@@ -262,6 +265,218 @@ pub fn set_project_config(project_root: String, config: ProjectConfig) -> Result
         AppError::SerializeError {
             source: e,
             context: "序列化项目配置失败".to_string(),
+        }
+    })?;
+    atomic_write(&path, &content)
+}
+
+// ===== AppData 目录迁移(历史 novelforge → MiaoChuangShuo) =====
+
+/// 迁移旧版 novelforge AppData 目录到 MiaoChuangShuo
+///
+/// 功能说明:
+///   检测 %APPDATA%/novelforge 是否存在,存在则迁移到 %APPDATA%/MiaoChuangShuo。
+///   实现历史数据自动迁移,确保用户从 novelforge 命名时代升级后不丢失偏好/模板等数据。
+///
+/// 输入: 无
+/// 输出: Result<(), AppError> 迁移结果
+/// 流程:
+///   1. 获取 config_dir(系统配置目录)
+///   2. 检查 config_dir/novelforge 是否存在(旧版应用数据目录)
+///   3. 若不存在,无需迁移,直接返回 Ok
+///   4. 若存在,检查 config_dir/MiaoChuangShuo 是否已存在
+///      - 若都已存在,合并策略:递归复制 novelforge 下文件到 MiaoChuangShuo
+///        (不覆盖已存在文件),最后将 novelforge 重命名为 novelforge.bak
+///      - 若只有 novelforge,直接 rename 为 MiaoChuangShuo
+///   5. 返回结果
+///
+/// 错误处理:
+///   - ConfigError: 系统无法提供配置目录
+///   - IoError: 目录创建/复制/重命名失败
+pub fn migrate_appdata_directory() -> Result<(), AppError> {
+    let config_dir = dirs::config_dir().ok_or_else(|| {
+        AppError::ConfigError("无法获取配置目录".to_string())
+    })?;
+
+    let old_dir = config_dir.join("novelforge");
+    let new_dir = config_dir.join("MiaoChuangShuo");
+
+    // 旧目录不存在,无需迁移
+    if !old_dir.exists() {
+        return Ok(());
+    }
+
+    if new_dir.exists() {
+        // 合并策略: 两个目录都存在,递归复制旧目录文件到新目录(不覆盖已存在文件)
+        copy_dir_recursive(&old_dir, &new_dir, false)?;
+
+        // 将旧目录重命名为 novelforge.bak 作为备份,避免迁移失败导致数据丢失
+        let backup_dir = config_dir.join("novelforge.bak");
+        // 若 .bak 已存在(历史迁移残留),先删除
+        if backup_dir.exists() {
+            fs::remove_dir_all(&backup_dir).map_err(|e| AppError::IoError {
+                source: e,
+                context: "清理历史 novelforge.bak 目录失败".to_string(),
+            })?;
+        }
+        fs::rename(&old_dir, &backup_dir).map_err(|e| AppError::IoError {
+            source: e,
+            context: "重命名 novelforge 为 novelforge.bak 失败".to_string(),
+        })?;
+    } else {
+        // 直接迁移策略: 只有旧目录,直接重命名为新目录
+        fs::rename(&old_dir, &new_dir).map_err(|e| AppError::IoError {
+            source: e,
+            context: "重命名 novelforge 为 MiaoChuangShuo 失败".to_string(),
+        })?;
+    }
+
+    Ok(())
+}
+
+/// 递归复制目录内容
+///
+/// 输入:
+///   src - 源目录路径
+///   dst - 目标目录路径
+///   overwrite - 是否覆盖已存在文件(true 覆盖, false 跳过已存在)
+/// 输出: Result<(), AppError> 复制结果
+/// 流程:
+///   1. 确保目标目录存在
+///   2. 遍历源目录所有条目
+///   3. 子目录: 递归复制
+///   4. 文件: 检查目标是否存在(根据 overwrite 决定复制或跳过)
+///
+/// 错误处理:
+///   - IoError: 目录创建/文件复制失败
+fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf, overwrite: bool) -> Result<(), AppError> {
+    if !dst.exists() {
+        fs::create_dir_all(dst).map_err(|e| AppError::IoError {
+            source: e,
+            context: format!("创建目标目录失败: {}", dst.display()),
+        })?;
+    }
+
+    let entries = fs::read_dir(src).map_err(|e| AppError::IoError {
+        source: e,
+        context: format!("读取源目录失败: {}", src.display()),
+    })?;
+
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        let file_name = entry.file_name();
+        let target_path = dst.join(&file_name);
+
+        if entry_path.is_dir() {
+            // 递归复制子目录
+            copy_dir_recursive(&entry_path, &target_path, overwrite)?;
+        } else if entry_path.is_file() {
+            // 文件: 检查目标是否存在
+            if !overwrite && target_path.exists() {
+                // 不覆盖且目标已存在,跳过
+                continue;
+            }
+            fs::copy(&entry_path, &target_path).map_err(|e| AppError::IoError {
+                source: e,
+                context: format!(
+                    "复制文件失败: {} -> {}",
+                    entry_path.display(),
+                    target_path.display()
+                ),
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+// ===== 自定义关系类型后端持久化(Task 1.5) =====
+
+/// 用户自定义关系类型结构体
+///
+/// 用于人物关系图谱中用户自定义的关系类型(如师徒/敌对/亲属等内置类型之外的关系)
+/// 持久化位置: %APPDATA%/MiaoChuangShuo/custom_relation_types.json
+/// 跨项目共享,所有项目共用同一份自定义关系类型配置
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomRelationType {
+    /// 唯一标识(用作 edge.data.relationType 的值,格式如 "custom_xxx")
+    pub id: String,
+    /// 中文显示名称(如"宿敌""挚友")
+    pub label: String,
+    /// 边 stroke 颜色(HEX 格式,如 "#6EA8FE")
+    pub color: String,
+}
+
+/// 获取自定义关系类型持久化文件路径
+///
+/// 输入: 无
+/// 输出: Result<PathBuf, AppError> 文件路径
+/// 流程: 定位 %APPDATA%/MiaoChuangShuo/custom_relation_types.json,必要时创建目录
+/// 错误:
+///   - ConfigError: 系统无法提供配置目录
+///   - IoError: 创建目录失败
+fn get_custom_relation_types_path() -> Result<PathBuf, AppError> {
+    let config_dir = dirs::config_dir().ok_or_else(|| {
+        AppError::ConfigError("无法获取配置目录".to_string())
+    })?;
+    let app_dir = config_dir.join("MiaoChuangShuo");
+    if !app_dir.exists() {
+        fs::create_dir_all(&app_dir).map_err(|e| AppError::IoError {
+            source: e,
+            context: "创建应用数据目录失败".to_string(),
+        })?;
+    }
+    Ok(app_dir.join("custom_relation_types.json"))
+}
+
+/// 加载自定义关系类型列表
+///
+/// 输入: 无
+/// 输出: Result<Vec<CustomRelationType>, AppError> 关系类型列表
+/// 流程:
+///   1. 获取持久化文件路径
+///   2. 文件不存在时返回空列表(用户从未添加自定义类型)
+///   3. 读取并反序列化 JSON
+///   4. 反序列化失败时返回空列表(容错,避免历史脏数据阻塞)
+/// 错误:
+///   - IoError: 读取文件失败
+///   - SerializeError: 反序列化失败已容错为空列表(不返回错误)
+#[command]
+pub fn load_custom_relation_types() -> Result<Vec<CustomRelationType>, AppError> {
+    let path = get_custom_relation_types_path()?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(&path).map_err(|e| AppError::IoError {
+        source: e,
+        context: "读取 custom_relation_types.json 失败".to_string(),
+    })?;
+    // 反序列化失败容错为空列表,避免历史脏数据阻塞前端 UI
+    let types: Vec<CustomRelationType> = serde_json::from_str(&content)
+        .unwrap_or_else(|_| Vec::new());
+    Ok(types)
+}
+
+/// 保存自定义关系类型列表
+///
+/// 输入: types 关系类型数组
+/// 输出: Result<(), AppError> 保存结果
+/// 流程:
+///   1. 获取持久化文件路径
+///   2. 序列化为 pretty JSON
+///   3. 原子写入(先写 .tmp 再 rename)避免写入中途崩溃损坏 JSON
+/// 错误:
+///   - SerializeError: 序列化失败
+///   - IoError: 原子写入失败
+#[command]
+pub fn save_custom_relation_types(types: Vec<CustomRelationType>) -> Result<(), AppError> {
+    let path = get_custom_relation_types_path()?;
+    let content = serde_json::to_string_pretty(&types).map_err(|e| {
+        AppError::SerializeError {
+            source: e,
+            context: "序列化 custom_relation_types.json 失败".to_string(),
         }
     })?;
     atomic_write(&path, &content)

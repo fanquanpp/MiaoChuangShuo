@@ -39,6 +39,7 @@ import { isNovelType } from "../lib/projectType";
 import CodexPanel from "./CodexPanel";
 import TimelinePanel from "./TimelinePanel";
 import CharacterGraphPanel from "./CharacterGraphPanel";
+import ForeshadowingPanel from "./ForeshadowingPanel";
 
 /** Alt+数字键 → 侧边栏分类映射 */
 const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
@@ -49,6 +50,7 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "5": "search",
   "6": "characterGraph",
   "7": "timeline",
+  "8": "foreshadowing",
 };
 
 /**
@@ -81,6 +83,8 @@ export default function Workspace() {
   // 设置对话框打开时定位的分区:外观入口按钮传入 appearance,普通设置入口为 undefined
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection | undefined>(undefined);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  // TXT 导出对话框打开状态（Task 3.3.3，与"导出项目归档"并列）
+  const [txtExportDialogOpen, setTxtExportDialogOpen] = useState(false);
   const { showToast } = useToast();
   const { t } = useI18n();
   const projectTree = useAppStore((s) => s.projectTree);
@@ -384,6 +388,8 @@ export default function Workspace() {
         return <TimelinePanel />;
       case "characterGraph":
         return <CharacterGraphPanel />;
+      case "foreshadowing":
+        return <ForeshadowingPanel />;
       default:
         return (
           <NovelEditor
@@ -461,6 +467,7 @@ export default function Workspace() {
         onCreateFile={handleCommandCreateFile}
         onSwitchCategory={handleSwitchCategory}
         onExportProject={() => setExportDialogOpen(true)}
+        onExportTxt={() => setTxtExportDialogOpen(true)}
       />
 
       <SettingsDialog
@@ -469,13 +476,22 @@ export default function Workspace() {
         initialSection={settingsInitialSection}
       />
 
-      {/* 项目导出对话框 */}
+      {/* 项目导出对话框（归档模式） */}
       <ProjectArchiveDialog
         open={exportDialogOpen}
         mode="export"
         projectPath={currentProject?.path}
         projectName={currentProject?.meta?.name}
         onClose={() => setExportDialogOpen(false)}
+      />
+
+      {/* 项目导出对话框（TXT 模式，Task 3.3.3） */}
+      <ProjectArchiveDialog
+        open={txtExportDialogOpen}
+        mode="export-txt"
+        projectPath={currentProject?.path}
+        projectName={currentProject?.meta?.name}
+        onClose={() => setTxtExportDialogOpen(false)}
       />
 
       {/* 首次创建文件选择对话框 */}

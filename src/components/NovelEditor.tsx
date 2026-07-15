@@ -48,6 +48,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useAppStore } from "../lib/store";
 import { useCodexStore } from "../lib/stores/useCodexStore";
 import { useSettingsStore } from "../lib/settingsStore";
@@ -64,6 +65,7 @@ import { EntityHighlight } from "../lib/entityHighlightPlugin";
 import { countWords } from "../lib/wordCounter";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
+import { pickDirectory, exportProjectToTxt } from "../lib/api";
 import { isScriptType, isEssayType } from "../lib/projectType";
 import { useWritingSession } from "../hooks/useWritingSession";
 import { useEntityHighlightAutomaton } from "../hooks/useEntityHighlightAutomaton";
@@ -228,9 +230,10 @@ export default function NovelEditor({
       setDirty(true);
       useAppStore.getState().setEditorDirty(true);
       if (editor) {
+        // Task 4.5.1: 字数本地 state 维护,不再写入 categorySlice 缓存
+        // 实时字数显示在编辑器顶部,WritingStats 通过章节保存时 update_chapter_word_count 同步
         const wc = countWords(editor.getText());
         setWordCount(wc);
-        useAppStore.getState().setActiveFileWordCount(wc);
       }
     },
   });
@@ -259,6 +262,31 @@ export default function NovelEditor({
     handleSave,
     savingRef,
   });
+
+  // ===== 监听设定库卡片删除事件，触发当前文件重新加载（Task 4.4.3） =====
+  // 后端 delete_codex_entity 已将引用该卡片的 characterMentionNode 替换为 text 节点，
+  // 前端编辑器需重新加载文件以反映此变化（递增 reloadKey 触发 useEditorFileIO 重载）
+  useEffect(() => {
+    if (!filePath) return;
+    let unlisten: UnlistenFn | undefined;
+    const handler = (): void => {
+      setReloadKey((n) => n + 1);
+    };
+    listen("codex:card-deleted", handler)
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch((err) => {
+        // 事件监听注册失败不阻断编辑器主流程，仅记录日志
+        console.error(
+          "[editor] 注册 codex:card-deleted 重载监听失败:",
+          err instanceof Error ? err : String(err)
+        );
+      });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [filePath]);
 
   // ===== 角色提及/悬停/右键菜单 =====
   const {
@@ -314,30 +342,58 @@ export default function NovelEditor({
     useAppStore.getState().setEditorDirty(true);
   }, [renameQueue, editor, consumeRenameQueue]);
 
-  // ===== TXT 导出 =====
+  // ===== TXT 导出（Task 3.3.4：改用 Tauri dialog 选择保存目录 + 后端命令导出） =====
+  // 原 Blob 浏览器下载方式在 Tauri 环境下用户体验不佳（无法控制 BOM/CRLF），
+  // 改为调用 Tauri 原生目录选择对话框 + 后端 export_project_to_txt 命令，
+  // 单章导出模式下后端会读取章节文件、提取纯文本、按选项写入用户选择的目录。
   const handleExportTxt = useCallback(async () => {
     if (!editor) return;
+    if (!currentProject) {
+      showToast("error", t("error.noCurrentProject"));
+      return;
+    }
+    if (!filePath) {
+      showToast("error", t("editor.exportFailed", { error: t("editor.selectFile") }));
+      return;
+    }
     try {
-      const text = editor.getText();
-      let txtName = t("editor.defaultExportName");
-      if (filePath) {
-        const baseName = filePath.split(/[\\/]/).pop() || "export";
-        txtName = baseName.replace(/\.txt$/i, "") + ".txt";
+      // 弹出 Tauri 原生目录选择对话框
+      const dir = await pickDirectory();
+      if (!dir) {
+        // 用户取消，静默返回
+        return;
       }
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = txtName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast("success", t("editor.exported", { name: txtName }));
+      // 计算章节文件相对项目根目录的路径（后端 chapterPath 参数要求相对路径）
+      // filePath 可能用 / 或 \ 分隔，统一处理
+      const projectPath = currentProject.path;
+      const normalizedProject = projectPath.replace(/\\/g, "/");
+      const normalizedFile = filePath.replace(/\\/g, "/");
+      let chapterPath: string;
+      if (normalizedFile.startsWith(normalizedProject + "/")) {
+        chapterPath = normalizedFile.slice(normalizedProject.length + 1);
+      } else {
+        // 兜底：取文件名作为相对路径
+        chapterPath = normalizedFile.split("/").pop() || "";
+      }
+      // 调用后端单章导出命令
+      const res = await exportProjectToTxt(projectPath, {
+        mode: "single",
+        includeChapterTitle: true,
+        bom: false,
+        crlf: false,
+        outputPath: dir,
+        chapterPath,
+      });
+      if (res.success) {
+        const fileName = res.files[0]?.split(/[\\/]/).pop() || "export.txt";
+        showToast("success", t("editor.exported", { name: fileName }));
+      } else {
+        showToast("error", res.message || t("editor.exportFailed", { error: "" }));
+      }
     } catch (e) {
       showToast("error", t("editor.exportFailed", { error: String(e) }));
     }
-  }, [editor, filePath, showToast, t]);
+  }, [editor, currentProject, filePath, showToast, t]);
 
   // ===== 全局快捷键：Ctrl+S/Q/F/H/Shift+A / Esc =====
   useEffect(() => {

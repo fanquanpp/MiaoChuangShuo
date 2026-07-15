@@ -1,51 +1,37 @@
 // src/components/TimelineNode.tsx
 //
 // 时间线编辑器自定义节点组件
-// 基于 React Flow NodeProps, 使用 useNodesData 选择性订阅按节点 ID 订阅,
+// 基于 React Flow NodeProps<TimelineNode>, 使用 useNodesData<TimelineNode> 按节点 ID 选择性订阅,
 // 避免全量重渲染。渲染标题、类型标签、状态徽章、摘要预览、折叠角标、Handle 锚点。
 //
-// 【Skill 偏差报备】
-// 原 Skill/计划要求使用 NodeProps<TimelineNode> 和 useNodesData<TimelineNode> 泛型形式,
-// 因 @xyflow/react v12.11.1 的 NodeProps 泛型约束要求 Node.data: Record<string, unknown>,
-// 而 TimelineNodeData 接口未声明 index signature(项目禁用 unknown 规则),
-// 触发 TS2344 错误。Task 3.3 的 EdgeProps<TimelineEdge> 未触发此错误,
-// 说明 Node 与 Edge 的泛型约束不对称(Node.data 强制 Record 约束, Edge.data 无此约束)。
-// 经 tsc 验证,改用 NodeProps 不带泛型参数(默认 Node 类型),
-// 内部通过 `as unknown as TimelineNodeData` 双重断言恢复业务字段类型安全。
-// 偏差依据: 实际 tsc 报错 TS2344, 与 Skill 指引不符, 按工具验证结果调整。
-//
-// 【微调建议 1 验证记录】
-// Task 4.4 尝试 useNodesData<TimelineNode>(id) 泛型(认为 useNodesData 可能不强制 Record 约束)。
-// 验证结果: 失败。useNodesData 的签名同样为 `useNodesData<NodeType extends Node>`,
-//   与 NodeProps 同源约束, 触发同一 TS2344 错误:
-//   "Type 'TimelineNodeData' is not assignable to type 'Record<string, unknown>'.
-//    Index signature for type 'string' is missing in type 'TimelineNodeData'."
-// 结论: 保留无泛型方案(useNodesData(id) + 双重断言), 微调建议 1 不采纳。
+// 类型策略说明(Task 2.6):
+//   早期因 TimelineNodeData 声明为 interface, 缺乏隐式索引签名,
+//   无法满足 @xyflow/react v12 的 Node<NodeData extends Record<string, unknown>> 约束,
+//   被迫使用 `as unknown as TimelineNodeData` 双重断言。
+//   现已将 TimelineNodeData 改为 type 别名(见 timelineTypes.ts),
+//   TypeScript 会为 type 别名对象类型推导隐式索引签名, 满足 Record<string, unknown> 约束,
+//   故可直接使用 NodeProps<TimelineNode> / useNodesData<TimelineNode> 泛型形式, 无需断言。
 
 import { useState } from "react";
 import { Handle, Position, useNodesData, type NodeProps } from "@xyflow/react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { NODE_TYPE_COLORS, NODE_STATUS_MAP, EDGE_TYPE_COLORS } from "../lib/stores/timelineTypes";
-import type { TimelineNodeData } from "../lib/stores/timelineTypes";
+import type { TimelineNode, TimelineNodeData } from "../lib/stores/timelineTypes";
 import { useI18n } from "../lib/i18n";
 
 /**
  * 自定义节点组件(性能优化版)
- * 输入: NodeProps (默认 Node 类型, 因泛型约束冲突无法使用 NodeProps<TimelineNode>)
+ * 输入: NodeProps<TimelineNode> 业务节点泛型, data 直接为 TimelineNodeData
  * 输出: JSX 节点卡片
  * 流程:
- *   1. 通过 useNodesData 按 ID 订阅, 避免全量重渲染
- *   2. 双重断言将 Record<string, unknown> 还原为 TimelineNodeData
+ *   1. 通过 useNodesData<TimelineNode> 按 ID 订阅, 避免全量重渲染
+ *   2. 直接读取 nodeData.data 作为 TimelineNodeData(无需断言)
  *   3. 读取节点类型对应的颜色配置
  *   4. 渲染卡片边框、背景、标题、状态徽章
  *   5. 渲染折叠角标(仅 main 节点且 collapsed=true)
  *   6. 渲染 Handle 锚点(左侧 target, 右侧 source)
- *
- * 关键: 因 NodeProps/useNodesData 泛型约束与项目禁用 unknown 规则冲突,
- *       此处使用默认 Node 类型, 通过双重断言恢复业务字段类型
- *       (Node.data: Record<string, unknown> -> TimelineNodeData)
  */
-export default function TimelineNode({ id, selected }: NodeProps) {
+export default function TimelineNode({ id, selected }: NodeProps<TimelineNode>) {
   // 本地折叠状态 (视图级操作, 与 CharacterGraphNode 保持一致, 不持久化)
   // 折叠时仅显示标题行, 展开时显示类型标签/状态徽章/摘要 (向下展开为长卡片)
   const [collapsed, setCollapsed] = useState(false);
@@ -53,12 +39,12 @@ export default function TimelineNode({ id, selected }: NodeProps) {
   const { t } = useI18n();
 
   // 仅订阅当前节点的 data 字段变化(避免其他节点变化触发重渲染)
-  // 不带泛型时返回 Node | undefined, data 为 Record<string, unknown>
-  const nodeData = useNodesData(id);
+  // 带泛型<TimelineNode>时返回 { id, type, data: TimelineNodeData } | null, 类型安全
+  const nodeData = useNodesData<TimelineNode>(id);
   if (!nodeData) return null;
 
-  // 双重断言: 将 Record<string, unknown> 还原为 TimelineNodeData(类型安全由数据源保证)
-  const data = nodeData.data as unknown as TimelineNodeData;
+  // nodeData.data 已是 TimelineNodeData 类型, 无需双重断言
+  const data: TimelineNodeData = nodeData.data;
   const colors = NODE_TYPE_COLORS[data.nodeType];
   const statusInfo = NODE_STATUS_MAP[data.status];
   const showFoldBadge = data.nodeType === "main" && data.collapsed && (data.childCount ?? 0) > 0;

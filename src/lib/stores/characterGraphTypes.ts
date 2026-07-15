@@ -60,8 +60,18 @@ export interface RelationTypeMeta {
 /**
  * 角色节点业务数据载荷
  * 与 React Flow Node.data 字段对接, 承载所有业务字段
+ *
+ * 类型形式说明:
+ *   使用 type 别名(而非 interface)声明, TypeScript 会为 type 别名对象类型
+ *   推导隐式索引签名, 使本类型满足 `Record<string, unknown>` 约束,
+ *   从而兼容 @xyflow/react v12 的 `Node<NodeData extends Record<string, unknown>>` 泛型,
+ *   无需显式声明 `[key: string]: unknown` 索引签名(遵守项目禁用 unknown 规则)。
+ *
+ * Task 4.1.1: 新增 codexId 字段(UUID), 作为节点与设定库卡片的强关联主键,
+ *             替代旧版仅依赖 sourceFile 字符串路径的弱关联方式, 解决数据孤岛问题。
+ *             保留 sourceFile 用于抽屉中的只读显示, codexId 为业务联动主键。
  */
-export interface CharacterGraphNodeData {
+export type CharacterGraphNodeData = {
   /** 角色姓名(必填, 显示在卡片顶部) */
   name: string;
   /** 身份/职业(从角色设定文件提取或手动填写, 如"剑客"/"尚书") */
@@ -72,18 +82,29 @@ export interface CharacterGraphNodeData {
   brief: string;
   /** 节点强调色(HEX 格式, 用于卡片装饰条与 Handle 颜色, 默认主色蓝) */
   accentColor: string;
-  /** 关联的角色设定文件相对路径(可选, 用于双向联动) */
+  /**
+   * 关联的角色设定文件相对路径(可选, 用于抽屉只读显示)
+   * 注: 业务联动主键已迁移至 codexId, 此字段仅保留用于 UI 展示与旧数据兼容
+   */
   sourceFile: string;
+  /**
+   * 关联的设定库卡片 UUID(Task 4.1.1 新增)
+   * 作为节点与设定库卡片的强关联主键, 通过 manifest 反向索引实现双向联动。
+   * 空字符串表示未关联(旧数据迁移时由后端通过 sourceFile 反查 manifest 填充)。
+   */
+  codexId: string;
   /** 创建时间 ISO 8601 */
   createdAt: string;
   /** 最后修改时间 ISO 8601 */
   updatedAt: string;
-}
+};
 
 /**
  * React Flow 节点基类型(去掉 data/type, 用业务类型替换)
- * 使用 Omit 模式避免 @xyflow/react v12 的 NodeData extends Record<string, unknown> 约束,
- * 该约束要求添加 [key: string]: unknown 索引签名, 与项目禁用 unknown 规则冲突。
+ * 使用 Omit 模式将 data 字段替换为业务类型 CharacterGraphNodeData,
+ * 将 type 字段收窄为字面量 "characterNode", 保留 React Flow 节点其他属性。
+ * CharacterGraphNodeData 使用 type 别名声明, 具备隐式索引签名,
+ * 满足 Node<NodeData extends Record<string, unknown>> 泛型约束。
  */
 type RFNodeBase = Omit<RFNode, "data" | "type">;
 
@@ -126,17 +147,20 @@ export interface CharacterGraph {
 }
 
 /**
- * 关系类型对应的中文标签(用于 UI 显示)
+ * 关系类型对应的 i18n key(用于 UI 显示,由消费方调用 t() 转换为本地化文案)
+ * 参照 timelineTypes.ts::NODE_STATUS_MAP 的 i18n key 模式,
+ * 消费方需通过 t(label) 渲染;自定义关系类型的 label 为用户输入文本,
+ * t() 找不到 key 时原样返回,兼容两种场景。
  */
 export const RELATION_TYPE_LABELS: Record<RelationType, string> = {
-  master: "师徒",
-  enemy: "敌对",
-  family: "亲属",
-  friend: "朋友",
-  lover: "恋人",
-  subordinate: "上下级",
-  fellow: "同门",
-  other: "其他",
+  master: "characterGraph.relation.master",
+  enemy: "characterGraph.relation.enemy",
+  family: "characterGraph.relation.family",
+  friend: "characterGraph.relation.friend",
+  lover: "characterGraph.relation.lover",
+  subordinate: "characterGraph.relation.subordinate",
+  fellow: "characterGraph.relation.fellow",
+  other: "characterGraph.relation.other",
 };
 
 /**
@@ -183,11 +207,14 @@ export const BUILTIN_RELATION_TYPES: RelationTypeMeta[] = (
 // ===== 自定义关系类型 CRUD 已迁移至 src/lib/stores/customRelationStore.ts =====
 // 此处通过 re-export 保留入口, 保持向后兼容, 调用方可继续从本模块导入
 // 真正实现在 customRelationStore.ts, 不再混入类型定义文件
+// Task 1.5: 后端持久化改造,新增 initCustomRelationTypes(异步初始化) 与 subscribeCustomRelationTypes(订阅缓存变化)
 export {
   loadCustomRelationTypes,
   addCustomRelationType,
   deleteCustomRelationType,
   getAllRelationTypes,
   getRelationMeta,
+  initCustomRelationTypes,
+  subscribeCustomRelationTypes,
 } from "./customRelationStore";
 

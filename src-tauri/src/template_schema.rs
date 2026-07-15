@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
 
+use crate::error::AppError;
+
 // ===== 字段类型系统 =====
 
 /// 字段类型枚举
@@ -144,17 +146,17 @@ const PRESET_TEMPLATES: &[(&str, &str)] = &[
 /// 2. 逐个解析每个 TOML 字符串，确认格式合法
 /// 3. 任何解析失败返回错误信息，便于开发者定位遗漏
 /// 输入: 无
-/// 输出: 成功返回 Ok(()), 失败返回错误描述字符串
+/// 输出: 成功返回 Ok(()), 失败返回错误描述
 /// 流程: 遍历 PRESET_TEMPLATES, 逐个 toml::from_str 解析校验
-fn verify_template_integrity() -> Result<(), String> {
+fn verify_template_integrity() -> Result<(), AppError> {
     // 完整性约束 1: 预设模板数量必须为 10
     const EXPECTED_PRESET_COUNT: usize = 10;
     if PRESET_TEMPLATES.len() != EXPECTED_PRESET_COUNT {
-        return Err(format!(
+        return Err(AppError::config_error(format!(
             "预设模板数量异常：期望 {} 个，实际 {} 个",
             EXPECTED_PRESET_COUNT,
             PRESET_TEMPLATES.len()
-        ));
+        )));
     }
 
     // 完整性约束 2: 逐个解析 TOML 内容，确认格式合法且能反序列化为 TemplateSchema
@@ -162,10 +164,10 @@ fn verify_template_integrity() -> Result<(), String> {
         match toml::from_str::<TemplateSchema>(toml_content) {
             Ok(_) => continue,
             Err(e) => {
-                return Err(format!(
+                return Err(AppError::config_error(format!(
                     "预设模板 [{}] 解析失败: {}",
                     file_name, e
-                ));
+                )));
             }
         }
     }
@@ -219,11 +221,11 @@ pub fn get_all_templates() -> Vec<TemplateSchema> {
 /// 输入: 无
 /// 输出: 自定义模板目录路径，目录不存在时自动创建
 /// 流程: 拼接用户主目录 + .novelforge/templates，若不存在则创建
-fn get_custom_templates_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or_else(|| "无法获取用户主目录".to_string())?;
+fn get_custom_templates_dir() -> Result<PathBuf, AppError> {
+    let home = dirs::home_dir().ok_or_else(|| AppError::config_error("无法获取用户主目录"))?;
     let dir = home.join(".novelforge").join("templates");
     if !dir.exists() {
-        fs::create_dir_all(&dir).map_err(|e| format!("创建模板目录失败: {}", e))?;
+        fs::create_dir_all(&dir).map_err(|e| AppError::io_error(e, "创建模板目录失败"))?;
     }
     Ok(dir)
 }
@@ -298,9 +300,9 @@ pub fn render_template(
     template_id: String,
     enabled_module_ids: Vec<String>,
     file_name: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let template = get_template_by_id_merged(&template_id)
-        .ok_or_else(|| format!("未找到模板: {}", template_id))?;
+        .ok_or_else(|| AppError::config_error(format!("未找到模板: {}", template_id)))?;
     render_template_with_modules_from_schema(&template, &enabled_module_ids, &file_name)
 }
 
@@ -314,7 +316,7 @@ fn render_template_with_modules_from_schema(
     template: &TemplateSchema,
     enabled_module_ids: &[String],
     file_name: &str,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let title = file_name.trim_end_matches(".txt").trim();
 
     let mut sections: Vec<(String, Vec<&FieldDef>)> = Vec::new();
@@ -361,12 +363,12 @@ fn render_template_with_modules_from_schema(
 ///   2. 确保 id 以 custom- 前缀标记
 ///   3. 序列化为 JSON 写入 ~/.novelforge/templates/{id}.json
 #[tauri::command]
-pub fn save_custom_file_template(mut template: TemplateSchema) -> Result<String, String> {
+pub fn save_custom_file_template(mut template: TemplateSchema) -> Result<String, AppError> {
     if template.id.trim().is_empty() {
-        return Err("模板 ID 不能为空".to_string());
+        return Err(AppError::config_error("模板 ID 不能为空"));
     }
     if template.name.trim().is_empty() {
-        return Err("模板名称不能为空".to_string());
+        return Err(AppError::config_error("模板名称不能为空"));
     }
 
     // 确保自定义模板 id 以 custom- 前缀标记
@@ -385,9 +387,9 @@ pub fn save_custom_file_template(mut template: TemplateSchema) -> Result<String,
     let file_path = dir.join(format!("{}.json", safe_name));
 
     let json = serde_json::to_string_pretty(&template)
-        .map_err(|e| format!("序列化模板失败: {}", e))?;
+        .map_err(|e| AppError::serialize_error(e, "序列化模板失败"))?;
 
-    fs::write(&file_path, json).map_err(|e| format!("写入模板文件失败: {}", e))?;
+    fs::write(&file_path, json).map_err(|e| AppError::io_error(e, "写入模板文件失败"))?;
 
     Ok(template.id)
 }
@@ -400,9 +402,9 @@ pub fn save_custom_file_template(mut template: TemplateSchema) -> Result<String,
 ///   1. 校验 id 以 custom- 开头（禁止删除内置模板）
 ///   2. 拼接文件路径并删除
 #[tauri::command]
-pub fn delete_custom_file_template(template_id: String) -> Result<String, String> {
+pub fn delete_custom_file_template(template_id: String) -> Result<String, AppError> {
     if !template_id.starts_with("custom-") {
-        return Err("只能删除自定义模板（ID 必须以 custom- 开头）".to_string());
+        return Err(AppError::config_error("只能删除自定义模板（ID 必须以 custom- 开头）"));
     }
 
     let dir = get_custom_templates_dir()?;
@@ -415,10 +417,10 @@ pub fn delete_custom_file_template(template_id: String) -> Result<String, String
     let file_path = dir.join(format!("{}.json", safe_name));
 
     if !file_path.exists() {
-        return Err(format!("模板文件不存在: {}", template_id));
+        return Err(AppError::config_error(format!("模板文件不存在: {}", template_id)));
     }
 
-    fs::remove_file(&file_path).map_err(|e| format!("删除模板文件失败: {}", e))?;
+    fs::remove_file(&file_path).map_err(|e| AppError::io_error(e, "删除模板文件失败"))?;
 
     Ok(template_id)
 }

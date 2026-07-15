@@ -25,8 +25,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use chrono::{Duration, Local};
+use schemars::JsonSchema;
 
 use crate::commands::validate_path_in_project;
+use crate::error::AppError;
 
 /// 单文件快照数量上限（含 manual/pre-restore，超过后优先淘汰 auto）
 const MAX_SNAPSHOTS: usize = 50;
@@ -36,7 +38,8 @@ const MAX_SNAPSHOTS: usize = 50;
 const MAX_AUTO_SNAPSHOT_AGE_DAYS: i64 = 30;
 
 /// 单条快照元数据
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SnapshotMeta {
     /// 快照时间戳（Unix 毫秒，用作文件名）
     pub timestamp: i64,
@@ -81,44 +84,44 @@ fn encode_relative_path(relative_path: &str) -> String {
 
 /// 获取快照存储根目录（.novelforge/snapshots/）
 /// 输入: project_root 项目根目录
-/// 输出: Result<PathBuf, String> 快照根目录路径
+/// 输出: Result<PathBuf, AppError> 快照根目录路径
 /// 流程: 拼接路径并确保目录存在
-fn get_snapshots_root(project_root: &Path) -> Result<PathBuf, String> {
+fn get_snapshots_root(project_root: &Path) -> Result<PathBuf, AppError> {
     let root = project_root.join(".novelforge").join("snapshots");
     if !root.exists() {
-        fs::create_dir_all(&root).map_err(|e| format!("创建快照根目录失败: {}", e))?;
+        fs::create_dir_all(&root).map_err(|e| AppError::io_error(e, "创建快照根目录失败"))?;
     }
     Ok(root)
 }
 
 /// 获取某文件的快照目录
 /// 输入: project_root 项目根, relative_path 源文件相对路径
-/// 输出: Result<PathBuf, String> 该文件的快照目录路径
+/// 输出: Result<PathBuf, AppError> 该文件的快照目录路径
 /// 流程: 拼接快照根目录与编码后的相对路径，确保存在
 fn get_file_snapshot_dir(
     project_root: &Path,
     relative_path: &str,
-) -> Result<PathBuf, String> {
+) -> Result<PathBuf, AppError> {
     let root = get_snapshots_root(project_root)?;
     let encoded = encode_relative_path(relative_path);
     let dir = root.join(encoded);
     if !dir.exists() {
-        fs::create_dir_all(&dir).map_err(|e| format!("创建文件快照目录失败: {}", e))?;
+        fs::create_dir_all(&dir).map_err(|e| AppError::io_error(e, "创建文件快照目录失败"))?;
     }
     Ok(dir)
 }
 
 /// 读取快照索引文件
 /// 输入: file_snapshot_dir 文件快照目录
-/// 输出: Result<Vec<SnapshotMeta>, String> 快照元数据列表（按时间倒序）
+/// 输出: Result<Vec<SnapshotMeta>, AppError> 快照元数据列表（按时间倒序）
 /// 流程: 读取 meta.json，不存在则返回空列表
-fn read_snapshot_index(file_snapshot_dir: &Path) -> Result<Vec<SnapshotMeta>, String> {
+fn read_snapshot_index(file_snapshot_dir: &Path) -> Result<Vec<SnapshotMeta>, AppError> {
     let index_path = file_snapshot_dir.join("meta.json");
     if !index_path.exists() {
         return Ok(Vec::new());
     }
     let content = fs::read_to_string(&index_path)
-        .map_err(|e| format!("读取快照索引失败: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "读取快照索引失败"))?;
     let mut entries: Vec<SnapshotMeta> = serde_json::from_str(&content)
         .unwrap_or_default();
     // 按时间戳倒序
@@ -128,16 +131,16 @@ fn read_snapshot_index(file_snapshot_dir: &Path) -> Result<Vec<SnapshotMeta>, St
 
 /// 写入快照索引文件（覆盖式）
 /// 输入: file_snapshot_dir 文件快照目录, entries 快照列表
-/// 输出: Result<(), String>
+/// 输出: Result<(), AppError>
 fn write_snapshot_index(
     file_snapshot_dir: &Path,
     entries: &[SnapshotMeta],
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let index_path = file_snapshot_dir.join("meta.json");
     let json = serde_json::to_string_pretty(entries)
-        .map_err(|e| format!("序列化快照索引失败: {}", e))?;
+        .map_err(|e| AppError::serialize_error(e, "序列化快照索引失败"))?;
     fs::write(&index_path, json)
-        .map_err(|e| format!("写入快照索引失败: {}", e))
+        .map_err(|e| AppError::io_error(e, "写入快照索引失败"))
 }
 
 /// 简单中文字数统计（委托至共享 word_count 模块）
@@ -150,17 +153,17 @@ fn count_words_simple(text: &str) -> u64 {
 
 /// 计算文件相对路径
 /// 输入: file_path 文件绝对路径, project_root 项目根路径
-/// 输出: Result<String, String> 相对路径字符串
-fn get_relative_path(file_path: &Path, project_root: &Path) -> Result<String, String> {
+/// 输出: Result<String, AppError> 相对路径字符串
+fn get_relative_path(file_path: &Path, project_root: &Path) -> Result<String, AppError> {
     file_path
         .strip_prefix(project_root)
         .map(|p| p.to_string_lossy().to_string())
         .map_err(|_| {
-            format!(
+            AppError::path_validation_error(format!(
                 "无法计算相对路径: {} 不在项目 {} 内",
                 file_path.display(),
                 project_root.display()
-            )
+            ))
         })
 }
 
@@ -170,7 +173,7 @@ fn get_relative_path(file_path: &Path, project_root: &Path) -> Result<String, St
 ///   project_path 项目根路径
 ///   content 要快照的内容（前端传入，避免重复读取磁盘）
 ///   trigger 触发方式 "auto" | "manual"
-/// 输出: Result<SnapshotMeta, String> 创建的快照元数据
+/// 输出: Result<SnapshotMeta, AppError> 创建的快照元数据
 /// 流程:
 ///   1. 校验路径在项目内
 ///   2. 计算快照存储目录
@@ -184,12 +187,12 @@ pub fn create_snapshot(
     project_path: String,
     content: String,
     trigger: String,
-) -> Result<SnapshotMeta, String> {
+) -> Result<SnapshotMeta, AppError> {
     // 校验源文件路径在项目内（仅校验路径合法性，不要求文件存在）
-    let validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
+    let validated = validate_path_in_project(&file_path, &project_path)?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "无法解析项目路径"))?;
 
     // 计算相对路径
     let relative_path = get_relative_path(&validated, &project_root)?;
@@ -211,7 +214,7 @@ pub fn create_snapshot(
     // 写入快照内容文件（时间戳命名）
     let snapshot_file = snapshot_dir.join(format!("{}.txt", timestamp));
     fs::write(&snapshot_file, &content)
-        .map_err(|e| format!("写入快照文件失败: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "写入快照文件失败"))?;
 
     // 更新索引（追加）
     let mut entries = read_snapshot_index(&snapshot_dir)?;
@@ -228,16 +231,16 @@ pub fn create_snapshot(
 /// 输入:
 ///   file_path 源文件绝对路径
 ///   project_path 项目根路径
-/// 输出: Result<Vec<SnapshotInfo>, String> 快照列表（按时间倒序）
+/// 输出: Result<Vec<SnapshotInfo>, AppError> 快照列表（按时间倒序）
 #[tauri::command]
 pub fn list_snapshots(
     file_path: String,
     project_path: String,
-) -> Result<Vec<SnapshotInfo>, String> {
-    let validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
+) -> Result<Vec<SnapshotInfo>, AppError> {
+    let validated = validate_path_in_project(&file_path, &project_path)?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "无法解析项目路径"))?;
 
     let relative_path = get_relative_path(&validated, &project_root)?;
     let snapshot_dir = get_file_snapshot_dir(&project_root, &relative_path)?;
@@ -265,15 +268,15 @@ pub fn list_snapshots(
 /// 输入:
 ///   snapshot_path 快照文件绝对路径
 ///   project_path 项目根路径（用于沙箱校验）
-/// 输出: Result<String, String> 快照内容
+/// 输出: Result<String, AppError> 快照内容
 #[tauri::command]
 pub fn read_snapshot(
     snapshot_path: String,
     project_path: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     // 快照路径必须在项目内（.novelforge/snapshots/ 下）
-    let validated = validate_path_in_project(&snapshot_path, &project_path).map_err(|e| e.to_string())?;
-    fs::read_to_string(&validated).map_err(|e| format!("读取快照失败: {}", e))
+    let validated = validate_path_in_project(&snapshot_path, &project_path)?;
+    fs::read_to_string(&validated).map_err(|e| AppError::io_error(e, "读取快照失败"))
 }
 
 /// 恢复快照到源文件
@@ -281,7 +284,7 @@ pub fn read_snapshot(
 ///   snapshot_path 快照文件绝对路径
 ///   file_path 源文件绝对路径
 ///   project_path 项目根路径
-/// 输出: Result<(), String>
+/// 输出: Result<(), AppError>
 /// 流程:
 ///   1. 校验快照路径在项目内
 ///   2. 校验源文件路径在项目内
@@ -293,16 +296,16 @@ pub fn restore_snapshot(
     snapshot_path: String,
     file_path: String,
     project_path: String,
-) -> Result<(), String> {
-    let snapshot_validated = validate_path_in_project(&snapshot_path, &project_path).map_err(|e| e.to_string())?;
-    let file_validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let snapshot_validated = validate_path_in_project(&snapshot_path, &project_path)?;
+    let file_validated = validate_path_in_project(&file_path, &project_path)?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "无法解析项目路径"))?;
 
     // 读取快照内容
     let snapshot_content = fs::read_to_string(&snapshot_validated)
-        .map_err(|e| format!("读取快照内容失败: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "读取快照内容失败"))?;
 
     // 恢复前为当前文件内容创建一个安全快照（如果源文件存在）
     if file_validated.exists() {
@@ -318,11 +321,11 @@ pub fn restore_snapshot(
 
     // 确保源文件父目录存在
     if let Some(parent) = file_validated.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| AppError::io_error(e, "创建父目录失败"))?;
     }
 
     fs::write(&file_validated, &snapshot_content)
-        .map_err(|e| format!("恢复快照失败: {}", e))
+        .map_err(|e| AppError::io_error(e, "恢复快照失败"))
 }
 
 /// 删除单个快照
@@ -331,24 +334,24 @@ pub fn restore_snapshot(
 ///   timestamp 快照时间戳（用于同步删除索引项）
 ///   file_path 源文件路径（用于定位索引）
 ///   project_path 项目根路径
-/// 输出: Result<(), String>
+/// 输出: Result<(), AppError>
 #[tauri::command]
 pub fn delete_snapshot(
     snapshot_path: String,
     timestamp: i64,
     file_path: String,
     project_path: String,
-) -> Result<(), String> {
-    let snapshot_validated = validate_path_in_project(&snapshot_path, &project_path).map_err(|e| e.to_string())?;
-    let file_validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let snapshot_validated = validate_path_in_project(&snapshot_path, &project_path)?;
+    let file_validated = validate_path_in_project(&file_path, &project_path)?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "无法解析项目路径"))?;
 
     // 删除快照文件
     if snapshot_validated.exists() {
         fs::remove_file(&snapshot_validated)
-            .map_err(|e| format!("删除快照文件失败: {}", e))?;
+            .map_err(|e| AppError::io_error(e, "删除快照文件失败"))?;
     }
 
     // 更新索引：移除对应时间戳的条目
@@ -365,16 +368,16 @@ pub fn delete_snapshot(
 /// 输入:
 ///   file_path 源文件绝对路径
 ///   project_path 项目根路径
-/// 输出: Result<u64, String> 删除的快照数量
+/// 输出: Result<u64, AppError> 删除的快照数量
 #[tauri::command]
 pub fn clear_snapshots(
     file_path: String,
     project_path: String,
-) -> Result<u64, String> {
-    let file_validated = validate_path_in_project(&file_path, &project_path).map_err(|e| e.to_string())?;
+) -> Result<u64, AppError> {
+    let file_validated = validate_path_in_project(&file_path, &project_path)?;
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "无法解析项目路径"))?;
 
     let relative_path = get_relative_path(&file_validated, &project_root)?;
     let snapshot_dir = get_file_snapshot_dir(&project_root, &relative_path)?;
@@ -399,7 +402,7 @@ pub fn clear_snapshots(
 
 /// 获取快照存储统计信息
 /// 输入: project_path 项目根路径
-/// 输出: Result<SnapshotStats, String> 统计信息
+/// 输出: Result<SnapshotStats, AppError> 统计信息
 #[derive(Debug, Clone, Serialize)]
 pub struct SnapshotStats {
     /// 快照文件总数
@@ -412,12 +415,12 @@ pub struct SnapshotStats {
 
 /// 获取项目快照统计
 /// 输入: project_path 项目根路径
-/// 输出: Result<SnapshotStats, String>
+/// 输出: Result<SnapshotStats, AppError>
 #[tauri::command]
-pub fn get_snapshot_stats(project_path: String) -> Result<SnapshotStats, String> {
+pub fn get_snapshot_stats(project_path: String) -> Result<SnapshotStats, AppError> {
     let project_root = PathBuf::from(&project_path)
         .canonicalize()
-        .map_err(|e| format!("无法解析项目路径: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "无法解析项目路径"))?;
     let snapshots_root = project_root.join(".novelforge").join("snapshots");
 
     if !snapshots_root.exists() {
@@ -463,13 +466,13 @@ pub fn get_snapshot_stats(project_path: String) -> Result<SnapshotStats, String>
 ///   project_root 项目根路径（已 canonicalize）
 ///   content 快照内容
 ///   trigger 触发方式
-/// 输出: Result<SnapshotMeta, String>
+/// 输出: Result<SnapshotMeta, AppError>
 fn create_snapshot_inner(
     file_path: &Path,
     project_root: &Path,
     content: &str,
     trigger: &str,
-) -> Result<SnapshotMeta, String> {
+) -> Result<SnapshotMeta, AppError> {
     let relative_path = get_relative_path(file_path, project_root)?;
     let snapshot_dir = get_file_snapshot_dir(project_root, &relative_path)?;
 
@@ -487,7 +490,7 @@ fn create_snapshot_inner(
 
     let snapshot_file = snapshot_dir.join(format!("{}.txt", timestamp));
     fs::write(&snapshot_file, content)
-        .map_err(|e| format!("写入快照文件失败: {}", e))?;
+        .map_err(|e| AppError::io_error(e, "写入快照文件失败"))?;
 
     let mut entries = read_snapshot_index(&snapshot_dir)?;
     entries.insert(0, meta.clone());

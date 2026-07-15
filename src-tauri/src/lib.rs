@@ -28,6 +28,9 @@ mod ai_context;
 mod prosemirror_parser;
 mod ai_config;
 mod ai_commands;
+mod manifest;
+mod schema_commands;
+mod foreshadowing_commands;
 mod error;
 pub use error::AppError;
 
@@ -77,12 +80,13 @@ pub fn run() {
             commands::file_io_commands::copy_file,
 
             // ============================================================
-            // 搜索与统计命令 (3 项) - commands::search_replace_commands / writing_stats_commands
-            // 职责: 全文搜索、批量替换、字数统计
+            // 搜索与统计命令 (4 项) - commands::search_replace_commands / writing_stats_commands
+            // 职责: 全文搜索、批量替换、字数统计(含持久化增量更新)
             // ============================================================
             commands::search_replace_commands::search_in_project,
             commands::search_replace_commands::replace_in_project,
             commands::writing_stats_commands::get_writing_stats,
+            commands::writing_stats_commands::update_chapter_word_count,
 
             // ============================================================
             // 项目导入导出命令 (2 项) - commands::archive_commands
@@ -90,6 +94,12 @@ pub fn run() {
             // ============================================================
             commands::archive_commands::export_project,
             commands::archive_commands::import_archive,
+
+            // ============================================================
+            // TXT 导出命令 (1 项) - commands::export_commands (Task 3.2)
+            // 职责: 项目正文章节导出为 TXT（单章/合并/按章/按卷四种模式）
+            // ============================================================
+            commands::export_commands::export_project_to_txt,
 
             // ============================================================
             // 自定义模板管理命令 (3 项) - commands::custom_template_commands
@@ -130,8 +140,9 @@ pub fn run() {
             template_schema::list_custom_file_templates,
 
             // ============================================================
-            // 智能设定库 (Codex) 命令 (6 项) - codex::scan / codex::crud
-            // 职责: 实体提及扫描、CRUD、front matter 注入、无效提及检测
+            // 智能设定库 (Codex) 命令 (8 项) - codex::scan / codex::crud
+            // 职责: 实体提及扫描、CRUD、front matter 注入、无效提及检测;
+            //       卡片删除时联动清理正文 Mention 节点(Task 4.4)
             // ============================================================
             codex::scan::scan_entity_mentions,
             codex::scan::batch_scan_entities,
@@ -139,6 +150,8 @@ pub fn run() {
             codex::crud::inject_codex_front_matter,
             codex::crud::update_codex_entity,
             codex::scan::scan_invalid_mentions,
+            codex::crud::delete_codex_entity,
+            codex::crud::remove_mentions_from_chapters,
 
             // ============================================================
             // 剧情时间线编辑器命令 (3 项) - timeline_commands
@@ -149,21 +162,24 @@ pub fn run() {
             timeline_commands::clear_timeline,
 
             // ============================================================
-            // 人物关系图编辑器命令 (3 项) - character_graph_commands
-            // 职责: 人物关系图的读取、保存、清空
+            // 人物关系图编辑器命令 (4 项) - character_graph_commands
+            // 职责: 人物关系图的读取、保存、清空, 以及按需生成图谱摘要文本(Task 6.4)
             // ============================================================
             character_graph_commands::read_character_graph,
             character_graph_commands::save_character_graph,
             character_graph_commands::clear_character_graph,
+            character_graph_commands::generate_graph_summary,
 
             // ============================================================
-            // 编辑器偏好配置命令 (4 项) - editor_preferences
-            // 职责: 用户级偏好与项目级配置的读写
+            // 编辑器偏好配置命令 (6 项) - editor_preferences
+            // 职责: 用户级偏好与项目级配置的读写 + 自定义关系类型持久化(Task 1.5)
             // ============================================================
             editor_preferences::get_user_preferences,
             editor_preferences::set_user_preferences,
             editor_preferences::get_project_config,
             editor_preferences::set_project_config,
+            editor_preferences::load_custom_relation_types,
+            editor_preferences::save_custom_relation_types,
 
             // ============================================================
             // 全文索引与搜索命令 (5 项) - tantivy_search
@@ -199,13 +215,72 @@ pub fn run() {
             // ============================================================
             ai_commands::chat_completion_stream,
             ai_commands::cancel_chat_completion,
+
             // ============================================================
-            // 命令注册总计: 66 项,按 16 个业务模块分组
+            // 项目级 manifest 统一索引命令 (5 项) - manifest
+            // 职责: 项目实体索引读取与增删改,支撑数据孤岛联动清理;
+            //       旧项目数据格式迁移(Task 1.3.3 / Task 1.9);
+            //       大纲标题同步到关联章节(Task 4.8.2);
+            //       章节删除时清理 manifest 残留索引(Task 4.3)
+            // ============================================================
+            manifest::get_manifest,
+            manifest::update_manifest_entity,
+            manifest::migrate_project_data,
+            manifest::sync_outline_title_to_chapter,
+            manifest::clean_chapter_reverse_indices,
+
+            // ============================================================
+            // JSON Schema 生成命令 (1 项) - schema_commands (Task 1.7.3)
+            // 职责: 为核心数据结构自动生成 JSON Schema 文件,供前端 TS 类型生成与 CI 校验
+            // ============================================================
+            schema_commands::generate_schemas,
+
+            // ============================================================
+            // 伏笔追踪命令 (4 项) - foreshadowing_commands (Task 5.1)
+            // 职责: 伏笔 CRUD,持久化到 <project>/伏笔/foreshadowings.json
+            // ============================================================
+            foreshadowing_commands::list_foreshadowings,
+            foreshadowing_commands::create_foreshadowing,
+            foreshadowing_commands::update_foreshadowing,
+            foreshadowing_commands::delete_foreshadowing,
+            // ============================================================
+            // 命令注册总计: 82 项,按 20 个业务模块分组
             // ============================================================
         ])
         .setup(|_app| {
+            // 启动时执行 AppData 目录迁移(历史 novelforge → MiaoChuangShuo)
+            // 失败时仅 eprintln 记录,不阻止应用启动
+            if let Err(e) = editor_preferences::migrate_appdata_directory() {
+                eprintln!("[启动] AppData 目录迁移失败(不阻止启动): {}", e);
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("运行 喵创说 应用时发生错误");
+        .unwrap_or_else(|e| {
+            // 应用启动失败处理 (Task 2.3)
+            // 替代 .expect() 避免 panic 输出不友好且无错误对话框的问题
+            // 流程: 打印错误到 stderr → Windows 平台弹出 MessageBox → 退出进程
+            let msg = format!("运行 喵创说 应用时发生错误: {}", e);
+            eprintln!("{}", msg);
+
+            #[cfg(windows)]
+            {
+                // 在 Windows 平台使用 MessageBox 显示友好错误对话框
+                // 应用主循环尚未启动,Tauri 对话框 API 不可用,故使用 Win32 原生 API
+                use windows::core::HSTRING;
+                use windows::Win32::UI::WindowsAndMessaging::{
+                    MessageBoxW, MB_ICONERROR, MB_OK,
+                };
+
+                let title = HSTRING::from("喵创说 启动失败");
+                let body = HSTRING::from(msg);
+                // SAFETY: MessageBoxW 为纯 UI 调用,无并发副作用
+                // 传入 None 作为父窗口句柄(无所有者),字符串均通过 HSTRING 安全构造
+                unsafe {
+                    let _ = MessageBoxW(None, &body, &title, MB_OK | MB_ICONERROR);
+                }
+            }
+
+            std::process::exit(1);
+        });
 }

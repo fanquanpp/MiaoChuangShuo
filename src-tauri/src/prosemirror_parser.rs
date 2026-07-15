@@ -80,22 +80,6 @@ pub fn extract_text_from_nodes(nodes: &[Value]) -> String {
     text.trim().to_string()
 }
 
-/// 从节点列表递归提取纯文本与场景 ID
-///
-/// 输入: nodes ProseMirror 节点 JSON 数组
-/// 输出: (String, Option<String>) (纯文本, 最后一个 sceneBreak 的 scene_id)
-/// 流程: 遍历节点调用 collect_text_from_node 递归收集文本与场景 ID，最后 trim 文本
-/// 设计说明: 当调用方需要同时获取文本与 scene_id 时使用此函数，避免重复遍历节点树
-#[allow(dead_code)]
-pub fn extract_text_and_scene_id_from_nodes(nodes: &[Value]) -> (String, Option<String>) {
-    let mut text = String::new();
-    let mut current_scene_id: Option<String> = None;
-    for node in nodes {
-        collect_text_from_node(node, &mut text, &mut current_scene_id);
-    }
-    (text.trim().to_string(), current_scene_id)
-}
-
 /// 从 ProseMirror JSON 文档提取首个场景 ID
 ///
 /// 输入: doc_json ProseMirror JSON 文档（顶层 type=="doc"）
@@ -135,22 +119,31 @@ fn extract_scene_id_recursive(node: &Value) -> Option<String> {
     None
 }
 
-/// 递归从单个节点收集文本，同时跟踪当前场景 ID
+/// 递归从单个节点收集文本的公共核心函数
+///
+/// Task 6.2.1 抽取: 统一 prosemirror_parser 与 text_extractor 的节点遍历逻辑,
+/// 消除两处重复的 match 分派实现,通过 collect_scene_id 参数控制是否收集场景 ID。
 ///
 /// 输入:
 ///   node - ProseMirror 节点 JSON
 ///   out - 输出文本缓冲区（可变引用）
-///   current_scene_id - 当前场景 ID（可变引用，遇到 sceneBreak 时更新为 attrs.id）
+///   collect_scene_id - 是否收集 scene_id（为 true 时遇到 sceneBreak 更新 scene_id）
+///   scene_id - 当前场景 ID（可变引用，仅在 collect_scene_id=true 时被更新）
 /// 流程: 按节点 type 分派处理
 ///   - text: 追加 text 属性
-///   - sceneBreak: 提取 attrs.id 更新 current_scene_id，追加场景分隔占位符
+///   - sceneBreak: collect_scene_id=true 时提取 attrs.id 更新 scene_id,追加场景分隔占位符
 ///   - horizontalRule: 追加场景分隔占位符（不更新 scene_id）
 ///   - characterMentionNode: 追加 attrs.name
 ///   - hardBreak: 追加换行
 ///   - paragraph / heading 等块级节点: 递归子节点后追加换行
 ///   - 列表节点: 递归子节点后追加换行
 ///   - 其他节点: 递归 content 数组
-fn collect_text_from_node(node: &Value, out: &mut String, current_scene_id: &mut Option<String>) {
+pub(crate) fn collect_text_from_node_core(
+    node: &Value,
+    out: &mut String,
+    collect_scene_id: bool,
+    scene_id: &mut Option<String>,
+) {
     let node_type = node.get("type").and_then(|t| t.as_str()).unwrap_or("");
     match node_type {
         "text" => {
@@ -159,14 +152,16 @@ fn collect_text_from_node(node: &Value, out: &mut String, current_scene_id: &mut
             }
         }
         "sceneBreak" => {
-            // 提取 attrs.id 作为 scene_id，更新当前场景标识
+            // 仅当 collect_scene_id 为 true 时提取 attrs.id 更新场景标识
             // ProseMirror sceneBreak 节点结构: { "type": "sceneBreak", "attrs": { "id": "scene_xxx" } }
-            if let Some(id) = node
-                .get("attrs")
-                .and_then(|a| a.get("id"))
-                .and_then(|i| i.as_str())
-            {
-                *current_scene_id = Some(id.to_string());
+            if collect_scene_id {
+                if let Some(id) = node
+                    .get("attrs")
+                    .and_then(|a| a.get("id"))
+                    .and_then(|i| i.as_str())
+                {
+                    *scene_id = Some(id.to_string());
+                }
             }
             out.push_str("\n* * *\n");
         }
@@ -189,7 +184,7 @@ fn collect_text_from_node(node: &Value, out: &mut String, current_scene_id: &mut
         "paragraph" | "heading" | "blockquote" | "codeBlock" => {
             if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
                 for child in content {
-                    collect_text_from_node(child, out, current_scene_id);
+                    collect_text_from_node_core(child, out, collect_scene_id, scene_id);
                 }
             }
             out.push('\n');
@@ -197,7 +192,7 @@ fn collect_text_from_node(node: &Value, out: &mut String, current_scene_id: &mut
         "bulletList" | "orderedList" | "taskList" | "listItem" | "taskItem" => {
             if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
                 for child in content {
-                    collect_text_from_node(child, out, current_scene_id);
+                    collect_text_from_node_core(child, out, collect_scene_id, scene_id);
                 }
             }
             out.push('\n');
@@ -206,11 +201,22 @@ fn collect_text_from_node(node: &Value, out: &mut String, current_scene_id: &mut
             // 其他节点: 递归处理 content 数组
             if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
                 for child in content {
-                    collect_text_from_node(child, out, current_scene_id);
+                    collect_text_from_node_core(child, out, collect_scene_id, scene_id);
                 }
             }
         }
     }
+}
+
+/// 递归从单个节点收集文本，同时跟踪当前场景 ID
+///
+/// 输入:
+///   node - ProseMirror 节点 JSON
+///   out - 输出文本缓冲区（可变引用）
+///   current_scene_id - 当前场景 ID（可变引用，遇到 sceneBreak 时更新为 attrs.id）
+/// 流程: 委托给 collect_text_from_node_core,开启 scene_id 收集
+fn collect_text_from_node(node: &Value, out: &mut String, current_scene_id: &mut Option<String>) {
+    collect_text_from_node_core(node, out, true, current_scene_id);
 }
 
 /// 从节点列表中提取角色 ID（characterMentionNode 的 attrs.characterId）
@@ -319,29 +325,6 @@ mod tests {
         assert_eq!(scene_id, None);
     }
 
-    /// 测试: extract_text_and_scene_id_from_nodes 同时返回文本与 scene_id
-    #[test]
-    fn test_extract_text_and_scene_id_from_nodes() {
-        let nodes = vec![
-            json!({
-                "type": "paragraph",
-                "content": [{"type": "text", "text": "前半段"}]
-            }),
-            json!({
-                "type": "sceneBreak",
-                "attrs": { "id": "scene_abc" }
-            }),
-            json!({
-                "type": "paragraph",
-                "content": [{"type": "text", "text": "后半段"}]
-            }),
-        ];
-        let (text, scene_id) = extract_text_and_scene_id_from_nodes(&nodes);
-        assert!(text.contains("前半段"));
-        assert!(text.contains("后半段"));
-        assert_eq!(scene_id, Some("scene_abc".to_string()));
-    }
-
     /// 测试: extract_text_from_nodes 保持向后兼容（仅返回文本）
     #[test]
     fn test_extract_text_from_nodes_backward_compatible() {
@@ -353,27 +336,5 @@ mod tests {
         ];
         let text = extract_text_from_nodes(&nodes);
         assert_eq!(text, "测试文本");
-    }
-
-    /// 测试: 多个 sceneBreak 时 extract_text_and_scene_id 返回最后一个 scene_id
-    #[test]
-    fn test_extract_text_and_scene_id_multiple_scene_breaks() {
-        let nodes = vec![
-            json!({
-                "type": "sceneBreak",
-                "attrs": { "id": "scene_first" }
-            }),
-            json!({
-                "type": "paragraph",
-                "content": [{"type": "text", "text": "中间文本"}]
-            }),
-            json!({
-                "type": "sceneBreak",
-                "attrs": { "id": "scene_last" }
-            }),
-        ];
-        let (_text, scene_id) = extract_text_and_scene_id_from_nodes(&nodes);
-        // collect_text_from_node 逐个更新 current_scene_id，最终保留最后一个
-        assert_eq!(scene_id, Some("scene_last".to_string()));
     }
 }

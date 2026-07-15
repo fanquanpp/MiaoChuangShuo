@@ -40,10 +40,19 @@ import AiMessageList, { type ChatMessageItem } from "./ai-assistant/AiMessageLis
 import AiInputBar from "./ai-assistant/AiInputBar";
 import AiTaskTypeSelector from "./ai-assistant/AiTaskTypeSelector";
 
-/** 撤销窗口时长 (毫秒) */
+// ============================================================
+// 常量定义 (Task 2.10.2: 抽取魔法数字为命名常量)
+// ============================================================
+/** 撤销窗口时长 (毫秒) - 插入文档后允许 TipTap undo 的时间窗口 */
 const UNDO_WINDOW_MS = 5000;
-/** 撤销条倒计时刷新间隔 (毫秒) */
+/** 撤销条倒计时刷新间隔 (毫秒) - 撤销条每秒递减 remaining */
 const UNDO_TICK_MS = 1000;
+/** 输入框聚焦延迟 (毫秒) - 面板打开后等待 DOM 渲染完成再聚焦 */
+const INPUT_FOCUS_DELAY_MS = 100;
+/** 外部注入指令触发发送延迟 (毫秒) - 确保 input 与任务状态已更新后再调用 handleSend */
+const PENDING_INSTRUCTION_DELAY_MS = 50;
+/** 复制按钮状态复位延迟 (毫秒) - 复制成功后短暂展示已复制图标 */
+const COPY_RESET_DELAY_MS = 1500;
 
 /**
  * 面板属性 (与重构前兼容, 不破坏 NovelEditor 调用)
@@ -195,7 +204,7 @@ export default function AiAssistantPanel({
       setPanelError(`${t("ai.panel.configLoadFailed")}: ${String(err)}`);
     }
     // 延迟聚焦输入框 (Task 35.2: 跟踪 setTimeout)
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 100);
+    const timer = window.setTimeout(() => inputRef.current?.focus(), INPUT_FOCUS_DELAY_MS);
     registerTimeout(timer);
     return () => clearTrackedTimeout(timer);
   }, [open, t, registerTimeout, clearTrackedTimeout]);
@@ -345,8 +354,11 @@ export default function AiAssistantPanel({
   );
 
   // handleSend ref 引用 (供 pendingInstruction useEffect 调用, 避免闭包过期)
+  // Task 2.9: 移入 useEffect 避免渲染期间副作用, 无依赖数组保证每次渲染后同步最新引用
   const handleSendRef = useRef(handleSend);
-  handleSendRef.current = handleSend;
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  });
 
   /**
    * AI-3.5: 重试上一条失败的 AI 消息
@@ -387,7 +399,7 @@ export default function AiAssistantPanel({
     // 延迟调用 handleSend 确保 input 与任务状态已更新 (Task 35.2: 跟踪 setTimeout)
     const timer = window.setTimeout(() => {
       handleSendRef.current?.(pendingInstruction);
-    }, 50);
+    }, PENDING_INSTRUCTION_DELAY_MS);
     registerTimeout(timer);
     return () => clearTrackedTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -416,7 +428,7 @@ export default function AiAssistantPanel({
       try {
         await navigator.clipboard.writeText(content);
         setCopiedId(msgId);
-        const timer = window.setTimeout(() => setCopiedId(null), 1500);
+        const timer = window.setTimeout(() => setCopiedId(null), COPY_RESET_DELAY_MS);
         registerTimeout(timer);
       } catch {
         showToast("error", t("ai.panel.copyFailed"));

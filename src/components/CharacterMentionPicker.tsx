@@ -90,10 +90,13 @@ export default function CharacterMentionPicker({
   const listboxRef = useRef<HTMLDivElement>(null);
 
   // 回调函数引用（避免 useEffect 依赖变化导致重新绑定事件监听）
+  // Task 2.9: useRef.current 赋值移入 useEffect, 避免渲染期间副作用
   const onSelectRef = useRef(onSelect);
   const onCloseRef = useRef(onClose);
-  onSelectRef.current = onSelect;
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+    onCloseRef.current = onClose;
+  });
 
   // 显示文案（带中文回退默认值，与原始 DOM 实现保持一致）
   const pickerAria = labels.pickerAriaLabel || "角色名选择";

@@ -252,7 +252,9 @@ export default function Launcher() {
       name: p.meta.name,
       type: typeI18nMap[p.meta.projectType] || p.meta.projectType,
       typeColor: typeColors[p.meta.projectType] || "bg-nf-bg-hover text-nf-text-secondary border-nf-border",
-      words: formatWordCount(p.word_count, t),
+      // Task 4.5.4: 字数 SSOT 收敛到 WritingStats,ProjectCard 内部异步获取并覆盖显示
+      // 此处设为 0 占位,ProjectCard 挂载后通过 getWritingStats 读取真实字数
+      words: formatWordCount(0, t),
       chapters: p.chapter_count,
       updated: formatTimeAgo(p.meta.updatedAt, t),
       gradient: gradients[p.meta.projectType] || "from-nf-border to-nf-border/40",

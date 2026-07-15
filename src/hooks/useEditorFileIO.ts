@@ -12,7 +12,7 @@
 // 3. 竞态保护：savingRef + pendingSaveRef 防止并发保存
 // 4. 冲突检测：比对磁盘内容与上次保存内容
 // 5. 版本快照：保存成功后按 snapshotMinInterval 节流创建快照
-// 6. 增量索引：防抖 500ms 调用 updateFileIndex 同步 Tantivy 索引
+// 6. 增量索引：防抖 INDEX_UPDATE_DEBOUNCE_MS 调用 updateFileIndex 同步 Tantivy 索引
 // 7. 定时器清理：所有 setTimeout 引用保存到 ref，卸载时清理
 //
 // 设计原则：
@@ -23,13 +23,28 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { MutableRefObject } from "react";
 import type { Editor } from "@tiptap/react";
-import { readFile, writeFile, createSnapshot, updateFileIndex } from "../lib/api";
+import { readFile, writeFile, createSnapshot, updateFileIndex, updateChapterWordCount, buildProjectIndex } from "../lib/api";
 import type { ProjectInfo } from "../lib/api";
 import { logger } from "../lib/logger";
 import { useAppStore } from "../lib/store";
 import { addRecentFile } from "../lib/recentFiles";
 import { countWords } from "../lib/wordCounter";
 import type { ToastType } from "../lib/toast";
+import { checkOutlineChapterSync } from "./useOutlineChapterSync";
+
+// ============================================================
+// 常量定义 (Task 2.10.1: 抽取魔法数字为命名常量)
+// ============================================================
+/** 索引更新防抖间隔 (毫秒) - 避免高频保存触发 Tantivy 索引重建 */
+const INDEX_UPDATE_DEBOUNCE_MS = 500;
+/** 高亮目标行背景持续时长 (毫秒) - 搜索结果跳转后视觉反馈 */
+const HIGHLIGHT_BG_MS = 1500;
+/** 高亮目标行 transition 恢复延迟 (毫秒) - 背景复位后恢复原 transition */
+const HIGHLIGHT_TRANSITION_MS = 300;
+/** 排队保存重试延迟 (毫秒) - 保存期间触发的保存请求在结束后延迟重试 */
+const PENDING_SAVE_DELAY_MS = 100;
+/** 高亮过渡动画时长 (秒, CSS transition 字符串) - 控制背景色淡入淡出速度 */
+const HIGHLIGHT_TRANSITION_CSS = "background-color 0.3s ease";
 
 // ===== 类型定义 =====
 
@@ -259,15 +274,18 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
   };
 
   /**
-   * 调度增量索引更新（防抖 500ms，静默执行）
+   * 调度增量索引更新（防抖 INDEX_UPDATE_DEBOUNCE_MS，静默执行）
    * 输入:
    *   projectPath 项目根路径（绝对路径）
    *   absFilePath 文件绝对路径（.txt 或 .pmd）
    * 流程:
    *   1. 清除已有定时器，重置防抖计时
-   *   2. 500ms 后计算相对路径（去除项目根前缀，兼容 / 与 \ 分隔符）
+   *   2. 防抖窗口结束后计算相对路径（去除项目根前缀，兼容 / 与 \ 分隔符）
    *   3. 转换为 .pmd 相对路径（与持久化格式一致，text_extractor 支持 .pmd 提取）
-   *   4. 调用 updateFileIndex 增量更新索引，失败仅 logger.error 不干扰用户
+   *   4. 调用 updateFileIndex 增量更新索引
+   *   5. Task 5.5.1: 增量更新失败时记录 warning 并回退到全量构建 buildProjectIndex
+   *      回退策略保证索引最终一致性，避免增量失败导致索引与正文长期脱节
+   *   6. 全量构建仍失败则 logger.error，不干扰用户写作流程
    */
   const scheduleIndexUpdate = useCallback(
     (projectPath: string, absFilePath: string) => {
@@ -285,10 +303,22 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
           : absFilePath;
         // 索引 .pmd 版本（与持久化格式一致）
         const pmdRelPath = toPmdPath(relPath);
+        // Task 5.5.1: 增量更新索引，失败时回退到全量构建
         updateFileIndex(projectPath, pmdRelPath).catch((err) => {
-          logger.error("增量更新索引失败:", err instanceof Error ? err : String(err));
+          // 增量更新失败，记录 warning 并回退到全量构建
+          logger.warn(
+            "增量更新索引失败，回退到全量构建:",
+            err instanceof Error ? err : String(err)
+          );
+          buildProjectIndex(projectPath).catch((buildErr) => {
+            // 全量构建也失败，记录 error，不干扰用户写作
+            logger.error(
+              "全量构建索引失败:",
+              buildErr instanceof Error ? buildErr : String(buildErr)
+            );
+          });
         });
-      }, 500);
+      }, INDEX_UPDATE_DEBOUNCE_MS);
     },
     []
   );
@@ -370,10 +400,10 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
               const targetEl = blockEls[pendingLine - 1] as HTMLElement | undefined;
               if (targetEl) {
                 targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-                // 高亮目标行 1.5 秒，提供视觉反馈（内联样式避免自定义 CSS）
+                // 高亮目标行 HIGHLIGHT_BG_MS 毫秒，提供视觉反馈（内联样式避免自定义 CSS）
                 const originalBg = targetEl.style.backgroundColor;
                 const originalTransition = targetEl.style.transition;
-                targetEl.style.transition = "background-color 0.3s ease";
+                targetEl.style.transition = HIGHLIGHT_TRANSITION_CSS;
                 targetEl.style.backgroundColor = "rgba(240, 144, 112, 0.2)";
                 // Task 35.3：保存嵌套 timer 引用到 ref
                 clearTimerRef(highlightBgTimerRef);
@@ -382,8 +412,8 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
                   clearTimerRef(highlightTransitionTimerRef);
                   highlightTransitionTimerRef.current = window.setTimeout(() => {
                     targetEl.style.transition = originalTransition;
-                  }, 300);
-                }, 1500);
+                  }, HIGHLIGHT_TRANSITION_MS);
+                }, HIGHLIGHT_BG_MS);
               }
               // 消费后清空，避免下次加载重复定位
               useAppStore.getState().setPendingScrollLine(null);
@@ -418,7 +448,7 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
    *   3. 持久化：editor.getJSON() 序列化为 .pmd 文件
    *   4. 版本快照：按 snapshotMinInterval 节流创建快照
    *   5. 增量索引：防抖调度 updateFileIndex
-   *   6. 排队重试：若保存期间有新请求，延迟 100ms 重试
+   *   6. 排队重试：若保存期间有新请求，延迟 PENDING_SAVE_DELAY_MS 重试
    * 定时器清理（Task 35.1）:
    *   - pendingSaveTimerRef 保存排队重试 timer 引用，卸载时清理
    */
@@ -489,6 +519,44 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
       if (currentProject?.path && filePath) {
         scheduleIndexUpdate(currentProject.path, filePath);
       }
+
+      // Task 4.5.3: 章节保存时增量更新 WritingStats(字数 SSOT)
+      // 计算相对路径并转换为 .pmd 格式(与持久化格式一致),作为 chapter_id 传给后端
+      // 保存成功后派发自定义事件,通知项目卡片实时刷新字数显示
+      if (currentProject?.path && filePath && editor) {
+        const projectPath = currentProject.path;
+        const prefix =
+          projectPath.endsWith("/") || projectPath.endsWith("\\")
+            ? projectPath
+            : projectPath + "/";
+        const relPath = filePath.startsWith(prefix)
+          ? filePath.slice(prefix.length)
+          : filePath;
+        const pmdRelPath = toPmdPath(relPath);
+        const wc = countWords(editor.getText());
+        updateChapterWordCount(projectPath, pmdRelPath, wc).catch((err) => {
+          logger.error("增量更新 WritingStats 失败:", err instanceof Error ? err : String(err));
+        });
+        // Task 4.5.4: 派发字数更新事件,项目卡片监听后实时刷新
+        window.dispatchEvent(
+          new CustomEvent("nf:writing-stats-updated", {
+            detail: { projectPath },
+          })
+        );
+      }
+
+      // Task 4.8.2: 大纲文件保存后检测 chapterId 关联状态,提示用户可同步章节标题
+      // 火并忘记模式:检测失败静默处理,不阻塞 handleSave 返回
+      if (currentProject?.path && pmdPath) {
+        checkOutlineChapterSync(
+          pmdPath,
+          currentProject.path,
+          showToast,
+          t,
+        ).catch(() => {
+          // 静默处理,不影响保存流程
+        });
+      }
       return true;
     } catch (e) {
       showToast("error", t("editor.saveFailed", { error: String(e) }));
@@ -505,7 +573,7 @@ export function useEditorFileIO(params: UseEditorFileIOParams): UseEditorFileIOR
         pendingSaveTimerRef.current = window.setTimeout(() => {
           pendingSaveTimerRef.current = null;
           handleSave();
-        }, 100);
+        }, PENDING_SAVE_DELAY_MS);
       }
     }
   }, [

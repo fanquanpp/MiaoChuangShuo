@@ -10,6 +10,42 @@
 
 ---
 
+## 截图预览
+
+<p align="center">
+  <img src="docs/screenshots/creation.png" alt="创作界面" width="45%" />
+  <img src="docs/screenshots/character-graph.png" alt="人物关系图谱" width="45%" />
+  <br/>
+  <img src="docs/screenshots/timeline.png" alt="剧情图谱" width="45%" />
+  <img src="docs/screenshots/writing-stats.png" alt="写作统计" width="45%" />
+  <br/>
+  <img src="docs/screenshots/foreshadowing.png" alt="伏笔追踪" width="45%" />
+  <img src="docs/screenshots/codex.png" alt="设定库" width="45%" />
+</p>
+
+> 截图占位：实际图片后续补充，存放于 `docs/screenshots/` 目录。
+
+---
+
+## 目录
+
+- [软件简介](#软件简介)
+- [核心特性](#核心特性)
+- [快捷键](#快捷键)
+- [系统架构设计](#系统架构设计)
+- [技术栈选型](#技术栈选型)
+- [核心模块与技术实现](#核心模块与技术实现)
+- [代码结构](#代码结构)
+- [工程化保障](#工程化保障)
+- [技术特色](#技术特色)
+- [快速开始](#快速开始)
+- [项目事项](#项目事项)
+- [FAQ](#faq)
+- [Roadmap](#roadmap)
+- [许可协议](#许可协议)
+
+---
+
 ## 软件简介
 
 喵创说是一款专为独立与业余长篇创作者打造的本地化创作工作站, 坚持"完全离线、完全免费、数据归创作者所有"三大原则。项目针对长篇叙事工作流的特殊需求, 将富文本编辑、剧情时间线、人物关系图、智能设定库、命令面板五大核心模块集成于单一桌面应用, 让创作者无需在多个软件之间切换即可完成完整的长篇创作流程。
@@ -46,18 +82,19 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-26.7.28-6EA8FE?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
+[![Version](https://img.shields.io/github/v/release/fanquanpp/MiaoChuangShuo?style=flat-square&label=version&color=6EA8FE)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?style=flat-square&logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-CC--BY--NC--4.0-6EA8FE?style=flat-square)](./LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078d7?style=flat-square)](https://github.com/fanquanpp/MiaoChuangShuo/releases)
 
 </div>
 
 ---
 
-## 一、核心特性
+## 核心特性
 
 ### 1.1 富文本创作
 
@@ -100,6 +137,7 @@
 
 - **3 种文体模板**: 长短篇小说 (Novel) / 剧本与脚本 (Script) / 散文与文章 (Essay), 创建时自动生成 6 个标准目录
 - **版本快照**: 增量快照归档, 支持项目级版本回溯, 写入前自动清理 .tmp 残留
+- **TXT 导出**: 支持 4 种导出模式 (单文件 / 合并 / 按章节 / 按卷), 可选 BOM 与 CRLF
 
 ### 1.6 AI 创作助手 (AI-1 ~ AI-4)
 
@@ -107,8 +145,8 @@
 
 | 阶段 | 能力 | 实现 |
 |------|------|------|
-| AI-1 BYOK 配置 | API Key/Base URL/Model 安全存储, SSE 流式管道 | `aiService.ts` + `ai_config.rs`, Base64 编码持久化 |
-| AI-2 上下文组装 | 3 层上下文: 项目元信息 + 章节大纲 + 当前场景文本 | `ai_context.rs` + `promptBuilder.ts` + `sceneUtils.ts` |
+| AI-1 BYOK 配置 | API Key/Base URL/Model 安全存储, SSE 流式管道 | `aiService.ts` + `ai_config.rs`, DPAPI 加密持久化 (Windows) |
+| AI-2 上下文组装 | 3 层上下文: 项目元信息 + 章节大纲 + 当前场景文本 | `ai_context/` 模块 + `promptBuilder.ts` + `sceneUtils.ts` |
 | AI-3.1 工具栏触发 | 编辑器工具栏 AI 助手按钮, Ctrl+Shift+A 快捷键 | `EditorToolbar.tsx` + `NovelEditor.tsx` |
 | AI-3.2 侧边栏对话 | 右侧滑出面板, 多轮对话历史, 流式输出, 插入到文档 | `AiAssistantPanel.tsx` |
 | AI-3.4 选区右键菜单 | 润色/扩写/缩写/角色一致性检查, 角色悬停卡片 AI 操作 | `EditorBubbleMenu.tsx` + `CharacterHoverCard.tsx` |
@@ -144,7 +182,14 @@ NovelEditor 光标位置
 
 **多轮对话 Token 控制**: 保留最近 8 条消息 (4 轮) 作为历史上下文, 避免 Token 爆炸。
 
-### 1.7 AI-Ready 基础设施
+### 1.7 伏笔追踪
+
+- **状态管理**: 埋设 / 待回收 / 已回收 / 已废弃 四种状态
+- **跨章节关联**: 通过 setupChapterId / resolutionChapterId 关联章节
+- **重要程度分级**: 高 / 中 / 低 三档
+- **统计概览**: 按状态分组展示, 快速查看回收率
+
+### 1.8 AI-Ready 基础设施
 
 本项目将全文索引、语义节点、设定库结构化视为"AI 就绪基础设施", 为 AI 创作助手提供底层支撑:
 
@@ -154,12 +199,15 @@ NovelEditor 光标位置
 | SceneBreak 场景元数据 | AI 理解"剧情结构"的锚点 (povCharacterId/mood 强类型) |
 | Tantivy 全文索引 | AI 的"海马体", 按场景 Chunk 快速召回相关上下文 |
 | 实体高亮 + `entity:detected` 事件 | 为 AI 提供"当前场景有哪些角色在场"的实时数据流 |
-| `ai_context.rs` 接口 | 统一 AI 上下文提取入口 (场景/角色/项目级真实数据实现) |
+| `ai_context/` 接口 | 统一 AI 上下文提取入口 (场景/角色/项目级真实数据实现) |
 | `promptBuilder.ts` | 统一 Prompt 构建器, 5 种任务类型, 将 UserPreferences 开关注入 System Prompt |
 
 ---
 
-## 二、快捷键
+## 快捷键
+
+<details>
+<summary>点击展开快捷键列表</summary>
 
 ### 2.1 编辑器
 
@@ -213,10 +261,13 @@ NovelEditor 光标位置
 | `Alt + 3` | 切换到设定库 |
 | `Alt + 4` | 切换到统计 |
 | `Alt + 5` | 切换到搜索 |
+| `Alt + 8` | 切换到伏笔追踪 |
+
+</details>
 
 ---
 
-## 三、系统架构设计
+## 系统架构设计
 
 <details>
 <summary>点击展开架构图与设计要点</summary>
@@ -258,12 +309,13 @@ graph TD
 | 类型安全 IPC | Rust 端 `#[serde(rename_all = "camelCase")]` 与前端 TypeScript 类型对齐 | 杜绝前后端字段大小写不匹配导致的反序列化错误 |
 | 原子写入策略 | 临时文件写入 + rename 原子替换, 写入前清理 `.tmp` 残留 | 防止崩溃或断电导致 JSON 文件损坏 |
 | 受控图谱 | React Flow 受控模式 + zundo pause/resume 精细化历史记录 | 拖拽节点时不产生过量撤销历史条目 |
+| Manifest 索引 | 项目级 `manifest.json` 维护实体反向索引, 文件 CRUD 同步更新 | 设定库删除时自动清理正文 Mention, 跨模块联动 |
 
 </details>
 
 ---
 
-## 四、技术栈选型
+## 技术栈选型
 
 <details>
 <summary>点击展开技术栈详情</summary>
@@ -288,7 +340,7 @@ graph TD
 
 ---
 
-## 五、核心模块与技术实现
+## 核心模块与技术实现
 
 <details>
 <summary>点击展开核心模块技术实现细节</summary>
@@ -323,12 +375,12 @@ graph TD
 - React Flow 受控模式下, 节点拖拽开始时调用 `pause()` 暂停历史记录, 拖拽结束后调用 `resume()` 提交单条历史
 - `SnapshotHistory.tsx` 提供可视化历史快照面板, 支持跨时间点跳转
 
-### 3.4 本地数据持久化
+### 5.4 本地数据持久化
 
 **技术挑战**: 离线场景下数据完整性依赖本地文件系统, 直接覆盖写容易在崩溃时导致数据损坏。
 
 **解决方案**:
-- Rust 后端 `fs_commands.rs` 封装所有文件 IO, 采用临时文件 + rename 原子写入策略
+- Rust 后端 `commands/file_io_commands.rs` 封装所有文件 IO, 采用临时文件 + rename 原子写入策略
 - 写入前自动清理 `.tmp` 残留文件, 防止上次崩溃遗留的临时文件干扰
 - 图谱数据以 JSON 格式持久化, Rust 端 `#[serde(rename_all = "camelCase")]` 确保与前端 camelCase 字段对齐
 - `snapshot_commands.rs` 实现增量快照归档, 支持项目级版本回溯
@@ -342,11 +394,21 @@ graph TD
 - 前后端 IPC 类型通过 Rust serde 序列化特性与 TypeScript 接口手工对齐, 关键结构体标注 `#[serde(rename_all = "camelCase")]`
 - 全量启用 TypeScript strict 模式, ESLint 强制禁用 `any`/`unknown`, 所有函数参数与返回值显式标注
 
+### 5.6 Manifest 反向索引
+
+**技术挑战**: 设定库删除卡片时, 需要快速定位所有引用该卡片 ID 的章节文件, 清理正文中的 Mention 节点。
+
+**解决方案**:
+- `manifest.rs` 维护项目级 `manifest.json`, 记录所有实体的 UUID、类型、文件路径
+- `reverseIndex` 字段以 `codexId -> chapterPath[]` 形式存储反向引用关系
+- 文件 CRUD 命令 (`file_io_commands.rs`) 同步更新 manifest, 保证索引与文件系统一致
+- 设定库删除时, 通过 `delete_codex_entity` 反查引用列表, 调用 `remove_mentions_from_chapters` 批量清理
+
 </details>
 
 ---
 
-## 六、代码结构
+## 代码结构
 
 <details>
 <summary>点击展开代码结构树</summary>
@@ -359,21 +421,47 @@ MiaoChuangShuo/
 │   ├── src/
 │   │   ├── lib.rs                      # Tauri 命令注册入口
 │   │   ├── main.rs                     # 程序入口
-│   │   ├── fs_commands.rs              # 文件系统 IO (原子写入、目录扫描)
+│   │   ├── error.rs                    # 统一错误类型 AppError
+│   │   ├── manifest.rs                 # 项目级 manifest.json 索引与反向索引
 │   │   ├── project_template.rs         # 项目模板生成器 (3 种标准文体)
 │   │   ├── template_schema.rs          # 模板 Schema 定义与校验
-│   │   ├── codex_commands.rs           # 设定库命令 (扫描、解析、YAML front matter)
+│   │   ├── schema_commands.rs          # JSON Schema 生成命令 (schemars)
+│   │   ├── editor_preferences.rs       # 编辑器偏好配置 (用户级 + 项目级)
+│   │   ├── text_extractor.rs           # 文本格式提取 (PlainText/Html/PmdJson/JsonFrontMatter)
+│   │   ├── prosemirror_parser.rs       # ProseMirror JSON 解析器
+│   │   ├── word_count.rs               # 字数统计引擎
+│   │   ├── tantivy_indexer.rs          # Tantivy 全文索引器 (Schema + 分块索引)
+│   │   ├── tantivy_search.rs           # Tantivy 全文搜索 (jieba 中文分词)
+│   │   ├── index_sync.rs               # 索引同步协调器
+│   │   ├── ai_commands.rs              # AI 调用命令 (SSE 流式)
+│   │   ├── ai_config.rs                # AI 配置 (DPAPI 加密持久化)
 │   │   ├── character_commands.rs       # 角色管理命令
 │   │   ├── character_graph_commands.rs # 人物关系图持久化
 │   │   ├── timeline_commands.rs        # 剧情时间线持久化与 DAG 校验
 │   │   ├── snapshot_commands.rs        # 增量快照管理
-│   │   ├── word_count.rs              # 字数统计引擎
-│   │   ├── editor_preferences.rs       # 编辑器偏好配置 (用户级 + 项目级)
-│   │   ├── text_extractor.rs          # 文本格式提取 (PlainText/Html/PmdJson/JsonFrontMatter)
-│   │   ├── tantivy_indexer.rs         # Tantivy 全文索引器 (Schema + 分块索引)
-│   │   ├── tantivy_search.rs          # Tantivy 全文搜索 (jieba 中文分词)
-│   │   ├── ai_context.rs              # AI 上下文提取 (场景/角色/项目级 Mock 接口)
+│   │   ├── foreshadowing_commands.rs   # 伏笔追踪 CRUD 命令
+│   │   ├── commands/                   # Tauri 命令模块
+│   │   │   ├── mod.rs                  # 命令模块注册入口
+│   │   │   ├── archive_commands.rs     # 项目归档命令
+│   │   │   ├── custom_template_commands.rs # 自定义模板命令
+│   │   │   ├── export_commands.rs      # TXT 导出命令 (4 种模式)
+│   │   │   ├── file_io_commands.rs     # 文件系统 IO (原子写入、目录扫描、manifest 同步)
+│   │   │   ├── project_commands.rs     # 项目管理命令
+│   │   │   ├── search_replace_commands.rs # 全局搜索与替换命令
+│   │   │   └── writing_stats_commands.rs  # 写作统计持久化命令
+│   │   ├── codex/                      # 设定库模块
+│   │   │   ├── mod.rs                  # 模块注册
+│   │   │   ├── crud.rs                 # 设定库 CRUD (含反向索引清理)
+│   │   │   ├── parser.rs               # YAML front matter 解析
+│   │   │   ├── scan.rs                 # 设定库目录扫描
+│   │   │   └── migration.rs            # .txt -> .pmd 格式迁移
+│   │   ├── ai_context/                 # AI 上下文组装模块
+│   │   │   ├── mod.rs                  # 模块注册
+│   │   │   ├── scene.rs                # 场景级上下文 (4 层)
+│   │   │   ├── character.rs            # 角色上下文 (设定库 + 关系图 + Tantivy)
+│   │   │   └── project.rs              # 项目级上下文 (元数据 + 章节摘要)
 │   ├── Cargo.toml
+│   ├── Cargo.lock
 │   ├── build.rs
 │   └── tauri.conf.json
 ├── src/                                # React 前端
@@ -383,89 +471,88 @@ MiaoChuangShuo/
 │   │   ├── Workspace.tsx               # 三栏工作台布局
 │   │   ├── NovelEditor.tsx             # TipTap 编辑器
 │   │   ├── Sidebar.tsx                 # 分类侧边栏
-│   │   ├── FileList.tsx                # 文件列表
+│   │   ├── FileList.tsx                # 文件列表 (虚拟化)
 │   │   ├── TimelinePanel.tsx           # 剧情图谱画布
 │   │   ├── TimelineNode.tsx            # 剧情自定义节点
 │   │   ├── TimelineEdge.tsx            # 剧情自定义连线
 │   │   ├── TimelineDrawer.tsx          # 剧情节点详情抽屉
-│   │   ├── TimelineContextMenu.tsx     # 剧图右键菜单
-│   │   ├── TimelineEmpty.tsx           # 剧情空状态
 │   │   ├── CharacterGraphPanel.tsx     # 人物关系图画布
 │   │   ├── CharacterGraphNode.tsx      # 人物自定义节点
 │   │   ├── CharacterGraphEdge.tsx      # 人物关系连线
-│   │   ├── CharacterGraphEdgeDrawer.tsx# 关系详情编辑抽屉
 │   │   ├── CharacterGraphDrawer.tsx    # 人物节点详情抽屉
-│   │   ├── CharacterGraphContextMenu.tsx# 人图右键菜单
+│   │   ├── CharacterGraphEdgeDrawer.tsx # 关系详情编辑抽屉
 │   │   ├── CharacterHoverCard.tsx      # 角色悬浮卡片
-│   │   ├── CodexPanel.tsx             # 智能设定库面板
+│   │   ├── CodexPanel.tsx              # 智能设定库面板
+│   │   ├── ForeshadowingPanel.tsx      # 伏笔追踪面板
 │   │   ├── CommandPalette.tsx          # cmdk 命令面板
-│   │   ├── SnapshotHistory.tsx         # 版本快照面板
+│   │   ├── SnapshotHistory.tsx         # 版本快照面板 (虚拟化)
 │   │   ├── WritingStats.tsx            # 写作统计面板
-│   │   ├── GlobalSearch.tsx            # 全局搜索
+│   │   ├── GlobalSearch.tsx            # 全局搜索 (虚拟化)
 │   │   ├── FindReplace.tsx             # 查找替换面板
 │   │   ├── EditorToolbar.tsx           # 编辑器工具栏
 │   │   ├── EditorBubbleMenu.tsx        # 选区浮层菜单
-│   │   ├── CreateProjectDialog.tsx     # 项目创建对话框
-│   │   ├── EditProjectDialog.tsx       # 编辑项目设定对话框
-│   │   ├── CreateFileWizard.tsx        # 四步文件创建向导
-│   │   ├── CreateFileDialog.tsx        # 快速创建文件对话框
-│   │   ├── OutlineToChapters.tsx       # 大纲转章节
-│   │   ├── TemplateManager.tsx         # 模板管理
+│   │   ├── AiAssistantPanel.tsx        # AI 助手侧边栏面板
+│   │   ├── IndexManagerPanel.tsx       # 索引管理面板
+│   │   ├── ProjectArchiveDialog.tsx    # 项目归档 / TXT 导出对话框
 │   │   ├── SettingsDialog.tsx          # 设置对话框
-│   │   ├── ShortcutPanel.tsx           # 快捷键面板
-│   │   ├── FocusTimer.tsx              # 聚焦计时器
-│   │   ├── AiAssistantPanel.tsx        # AI 助手侧边栏面板 (多轮对话 + 流式输出)
-│   │   ├── IndexManagerPanel.tsx       # 索引管理面板 (统计 + 构建 + 进度条)
-│   │   ├── ErrorBoundary.tsx           # 渲染异常边界
-│   │   ├── ContextMenu.tsx             # 通用右键菜单
-│   │   ├── ConfirmDialog.tsx           # 统一确认/提示对话框
-│   │   ├── WelcomeDialog.tsx           # 欢迎对话框
-│   │   ├── UpdateNoticeDialog.tsx      # 版本更新通知对话框
-│   │   ├── ProjectArchiveDialog.tsx    # 项目归档对话框
-│   │   ├── GlobalTooltip.tsx           # 全局提示组件
-│   │   ├── SkeletonComponents.tsx      # 骨架屏组件
-│   │   └── ...                         # 其他辅助组件
+│   │   ├── settings/                   # 设置分区组件
+│   │   │   ├── AboutSettingsSection.tsx    # 关于分区
+│   │   │   ├── AiSettingsSection.tsx       # AI 设置分区
+│   │   │   ├── AppearanceSettingsSection.tsx # 外观设置分区
+│   │   │   └── GeneralSettingsSection.tsx  # 常规设置分区
+│   │   └── ...
 │   ├── hooks/                          # 自定义 Hooks
 │   │   ├── useAutoSaveOnExit.ts        # 退出自动保存
+│   │   ├── useEditorAutoSave.ts        # 编辑器自动保存
+│   │   ├── useEditorFileIO.ts          # 编辑器文件 IO
+│   │   ├── useAiStream.ts              # AI 流式调用 (含 AbortController)
+│   │   ├── useCodexSync.ts             # 设定库同步
+│   │   ├── useFileDragSort.ts          # 文件拖拽排序
 │   │   └── useWritingSession.ts        # 写作会话统计
 │   ├── lib/                            # Service 与 Data 层
 │   │   ├── store.ts                    # 全局 store 组合 (Zustand + zundo)
-│   │   ├── api.ts                      # Tauri IPC 统一封装
+│   │   ├── api/                        # API 封装层
+│   │   │   ├── projectApi.ts           # 项目 API (含 TXT 导出)
+│   │   │   ├── codexApi.ts             # 设定库 API
+│   │   │   ├── timelineApi.ts          # 剧情图谱 API
+│   │   │   ├── characterGraphApi.ts    # 人图 API
+│   │   │   └── foreshadowingApi.ts     # 伏笔 API
 │   │   ├── i18n.tsx                    # 国际化 (中/英)
+│   │   ├── updateChecker.ts            # 版本更新检测
 │   │   ├── dagreLayout.ts              # dagre 自动布局算法
-│   │   ├── timelineApi.ts              # 剧情图谱 API 封装
-│   │   ├── characterGraphApi.ts        # 人图 API 封装
-│   │   ├── codexApi.ts                 # 设定库 API 封装
+│   │   ├── promptBuilder.ts            # AI Prompt 统一构建器
+│   │   ├── aiService.ts                # AI 服务层 (BYOK + SSE)
 │   │   ├── settingsStore.ts            # 设置持久化
 │   │   ├── themeStore.ts               # 主题管理
-│   │   ├── updateChecker.ts            # 版本更新检测
-│   │   ├── wordCounter.ts              # 前端字数统计
-│   │   ├── templateRegistry.ts         # 模板注册中心
-│   │   ├── templateSchema.ts           # 模板 Schema
-│   │   ├── categoryRegistry.ts         # 分类注册中心
-│   │   ├── fileTreeUtils.ts            # 文件树工具
-│   │   ├── recentFiles.ts              # 最近文件管理
-│   │   ├── preferencesSlice.ts         # 编辑器功能开关状态切片
-│   │   ├── uiStore.ts                  # UI 布局状态 (FileList 视图/Sidebar 折叠)
-│   │   ├── eventBusSlice.ts            # Tauri 事件总线状态切片
-│   │   ├── promptBuilder.ts            # AI Prompt 统一构建器 (System+User+Constraints)
-│   │   ├── aiService.ts                # AI 服务层 (BYOK 配置 + SSE 流式调用)
-│   │   ├── sceneBreak.ts              # 场景分割自定义节点 (pov/mood 元数据)
-│   │   ├── entityHighlightPlugin.ts    # 实体高亮 ProseMirror 插件 (Decoration.inline)
-│   │   ├── entityHighlightClient.ts    # 实体高亮 Web Worker 客户端
+│   │   ├── stores/                     # Zustand stores
+│   │   │   ├── useForeshadowingStore.ts # 伏笔 store
+│   │   │   ├── useCodexStore.ts        # 设定库 store
+│   │   │   └── ...
+│   │   ├── sceneBreak.ts               # 场景分割自定义节点
+│   │   ├── entityHighlightPlugin.ts    # 实体高亮 ProseMirror 插件
 │   │   ├── entityHighlightWorker.ts    # Aho-Corasick 多模式匹配 Web Worker
-│   │   ├── autoPair.ts                 # 引号自动配对
-│   │   ├── characterMention.ts         # 角色 @ 提及
-│   │   ├── indentParagraph.ts          # 首行缩进
-│   │   ├── poetryFormat.ts             # 诗歌排版
-│   │   ├── lineHighlight.ts            # 行高亮
-│   │   ├── smartTab.ts                 # 智能 Tab
-│   │   ├── fontSizeShortcut.ts         # 字号快捷键
-│   │   ├── vscodeShortcuts.ts          # VS Code 快捷键映射
+│   │   ├── categoryRegistry.ts         # 分类注册中心
+│   │   ├── templateRegistry.ts         # 模板注册中心
 │   │   └── toast.tsx                   # 轻提示组件
 │   ├── App.tsx
 │   ├── main.tsx
 │   └── styles.css
+├── .github/                            # GitHub 配置
+│   ├── workflows/                      # CI/CD 工作流
+│   │   ├── deploy-web.yml              # Web 版部署
+│   │   └── release-desktop.yml         # 桌面版发布
+│   ├── ISSUE_TEMPLATE/                 # Issue 模板
+│   │   ├── bug_report.yml              # Bug 报告模板
+│   │   └── feature_request.yml         # 功能建议模板
+│   └── PULL_REQUEST_TEMPLATE.md        # PR 模板
+├── docs/                               # 文档
+│   ├── screenshots/                    # 截图
+│   └── research/                       # 调研文档
+├── scripts/                            # 工具脚本
+│   └── sync-version.mjs                # 版本号同步脚本
+├── LICENSE                             # CC-BY-NC-4.0 协议
+├── CONTRIBUTING.md                     # 贡献指南
+├── SECURITY.md                         # 安全政策
 ├── package.json
 ├── vite.config.ts
 ├── tailwind.config.js
@@ -477,7 +564,10 @@ MiaoChuangShuo/
 
 ---
 
-## 七、工程化保障
+## 工程化保障
+
+<details>
+<summary>点击展开工程化保障细节</summary>
 
 ### 7.1 代码规范
 
@@ -502,7 +592,7 @@ npm run tauri build
 
 ### 7.3 版本号同步机制
 
-版本号采用 `YY.MM.修改序号` 格式 (如 `26.7.24`), 以下 7 个位置必须保持同步:
+版本号采用 `YY.MM.修改序号` 格式 (如 `26.8.0`), 以下 6 个位置必须保持同步:
 
 | 文件 | 字段 |
 |------|------|
@@ -512,15 +602,22 @@ npm run tauri build
 | `src-tauri/tauri.conf.json` | `version` |
 | `src/lib/updateChecker.ts` | `FALLBACK_VERSION` |
 | `src/components/Launcher.tsx` | `appVersion` useState 初始值 |
-| `src/components/SettingsDialog.tsx` | `currentVersion` useState 初始值 |
+
+可使用 `scripts/sync-version.mjs` 自动同步版本号:
+
+```bash
+node scripts/sync-version.mjs 26.8.0
+```
 
 ### 7.4 提交规范
 
-遵循 Conventional Commits 规范, commit message 必须包含修改目的、修改范围、影响说明三项内容, 禁止无意义描述。
+遵循 Conventional Commits 规范, commit message 必须包含修改目的、修改范围、影响说明三项内容, 禁止无意义描述。详见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+
+</details>
 
 ---
 
-## 八、技术特色
+## 技术特色
 
 <details>
 <summary>点击展开技术特色细节</summary>
@@ -586,15 +683,27 @@ Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
 - **增量索引更新**: 编辑器保存后 500ms 防抖触发 `update_file_index` (先删后建策略); 文件删除/重命名时 FileList 自动清理对应索引文档 (.txt + .pmd 双路径); 项目首次打开时 Workspace 检测空索引并后台全量构建
 - **索引管理面板**: IndexManagerPanel 嵌入设置对话框, 展示统计 (文档数/文件数/索引大小/最后构建时间) + 构建/重建按钮 + index-progress 事件实时进度条
 
+### 8.8 AI Key DPAPI 加密
+
+Windows 平台采用 DPAPI (Data Protection API) 加密 API Key:
+
+- 旧版本使用 Base64 编码存储, 安全等级低
+- v26.8.0 起改用 DPAPI 加密, 绑定 Windows 用户账户, 仅当前账户可解密
+- 旧 Base64 数据首次读取时自动迁移为 DPAPI 加密
+- macOS / Linux 平台使用 keychain / keyring 系统密钥存储
+
 </details>
 
 ---
 
-## 九、快速开始
+## 快速开始
+
+<details>
+<summary>点击展开快速开始指南</summary>
 
 ### 环境要求
 
-- Node.js >= 18
+- Node.js >= 18（推荐 20）
 - Rust (stable, 需安装 rustup)
 - Windows 10/11 x64
 
@@ -617,22 +726,28 @@ npm run tauri build
 
 构建产物位于 `src-tauri/target/release/bundle/` 目录下。
 
-### 9.3 桌面端发布流程
+### 桌面端发布流程
 
 桌面端发布通过 GitHub Actions 自动化，流程如下：
 
-1. 维护者更新版本号（同步 7 处位置）
+1. 维护者更新版本号（同步 6 处位置，或执行 `node scripts/sync-version.mjs <version>`）
 2. 创建并推送 tag：`git tag v26.8.0 && git push origin v26.8.0`
 3. GitHub Actions 自动触发 `release-desktop.yml` 工作流
 4. 工作流在 `windows-latest` runner 上执行 `npm ci` → `npm run build` → `npm run tauri build`
 5. 构建产物自动上传至 GitHub Release：
    - `MiaoChuangShuo_<version>_x64.msi`（MSI 安装包）
    - `MiaoChuangShuo_<version>_x64-setup.exe`（NSIS 安装包）
+   - `MiaoChuangShuo_<version>_sha256.txt`（哈希校验文件）
 6. Release 自动生成 changelog 并发布
+
+</details>
 
 ---
 
-## 十、项目事项
+## 项目事项
+
+<details>
+<summary>点击展开项目事项细节</summary>
 
 ### 10.1 安装包命名
 
@@ -640,30 +755,7 @@ npm run tauri build
 
 ### 10.2 图标系统
 
-应用图标通过 `npx tauri icon` 从源图 (`src-tauri/icons/icon_source.svg` 或 `icon_source.png`) 一次性生成全平台图标 (Windows .ico / macOS .icns / Linux .png / iOS / Android), 保证视觉一致性。
-
-**图标生成流程（唯一官方流程）**:
-
-```bash
-# 1. 准备源图（推荐 1024x1024 PNG 或 SVG）
-#    源图位置: src-tauri/icons/icon_source.svg
-
-# 2. 执行 Tauri 官方图标生成命令
-npx tauri icon src-tauri/icons/icon_source.svg
-
-# 3. 命令将自动生成以下文件:
-#    - src-tauri/icons/icon.png            (512x512 主图标)
-#    - src-tauri/icons/128x128.png         (128x128)
-#    - src-tauri/icons/128x128@2x.png      (256x256)
-#    - src-tauri/icons/32x32.png           (32x32)
-#    - src-tauri/icons/icon.ico            (Windows 多尺寸 ICO)
-#    - src-tauri/icons/icon.icns           (macOS ICNS)
-#    以及 iOS / Android 各尺寸图标
-```
-
-**历史脚本归档说明**:
-
-项目早期使用的 Python 图标生成脚本 `generate_icon.py` (基于 Pillow 绘制渐变背景 + 白色 M 字母) 已归档至 `scripts/archive/generate_icon.py`, 不再作为正式图标生成流程, 仅保留作为设计参考。所有图标更新均通过 `npx tauri icon` 流程完成, 避免双流程导致图标尺寸/格式不一致。
+应用图标通过 `npx tauri icon` 从源图 (`src-tauri/icons/icon_source.svg` 或 `icon_source.png`) 一次性生成全平台图标 (Windows .ico / macOS .icns / Linux .png / iOS / Android), 保证视觉一致性。详见 [CONTRIBUTING.md - 图标生成](./CONTRIBUTING.md#图标生成)。
 
 ### 10.3 国际化
 
@@ -678,8 +770,127 @@ FANDEX 设计令牌集成于 Tailwind 配置, 定义三主色:
 
 辅以灰色系 (`zinc-*`) 构建暗色主题, 对标 VS Code / Godot 编辑器的视觉风格。
 
+</details>
+
 ---
 
-## 十一、许可协议
+## FAQ
 
-本项目仅供个人使用, 未经授权不得用于商业用途。
+<details>
+<summary>点击展开常见问题</summary>
+
+### HVCI（内存完整性）兼容性
+
+**Q: Windows 11 开启 HVCI 后应用无法启动 / 文件操作失败？**
+
+A: 喵创说已全面兼容 HVCI。后端文件系统命令采用 `spawn()` + `read_to_end()` 同步 IO 替代重叠 IO, Tantivy 索引也使用 `std::fs` 同步 I/O。如果你仍遇到问题, 请在 Issue 中标注 HVCI 状态。
+
+### 杀毒软件拦截
+
+**Q: 杀毒软件（如 360 / 火绒 / Windows Defender）误报病毒？**
+
+A: 由于 Tauri 应用使用 Rust 编译的原生二进制, 部分杀软可能因启发式扫描误报。处理方式：
+1. 将安装目录加入杀软白名单
+2. 从 [GitHub Release](https://github.com/fanquanpp/MiaoChuangShuo/releases) 下载官方版本（提供 sha256 校验文件）
+3. 不建议从非官方渠道下载
+
+### AI Key 配置
+
+**Q: 如何配置 AI Key？数据存储在哪里？**
+
+A: 在「设置 - AI」分区填入 OpenAI 兼容 API Key、Base URL、Model 名称。Key 使用以下方式加密存储：
+
+| 平台 | 存储方式 | 路径 |
+|------|---------|------|
+| Windows | DPAPI 加密 | `%APPDATA%\MiaoChuangShuo\ai_config.json` |
+| macOS | keychain | 系统钥匙串 |
+| Linux | keyring | 系统密钥环 |
+
+详见 [SECURITY.md - AI Key 安全说明](./SECURITY.md#ai-key-安全说明)。
+
+### 数据存储位置
+
+**Q: 我的项目数据存储在哪里？**
+
+A: 项目数据完全由用户控制, 存储在你创建项目时选择的目录。应用级配置（如偏好、AI 配置）存储在：
+
+- Windows: `%APPDATA%\MiaoChuangShuo\`
+- macOS: `~/Library/Application Support/MiaoChuangShuo/`
+- Linux: `~/.local/share/MiaoChuangShuo/`
+
+日志文件位于 `<应用配置目录>/logs/`, 可通过「设置 - 关于 - 打开日志目录」直接打开。
+
+### 升级
+
+**Q: 如何升级到新版本？旧版本数据会丢失吗？**
+
+A: 升级方式：
+1. **自动检查**：在「设置 - 关于」中启用「启动时自动检查更新」, 应用会每日检查一次新版本
+2. **手动检查**：点击「设置 - 关于 - 检查更新」
+3. **手动下载**：从 [GitHub Release](https://github.com/fanquanpp/MiaoChuangShuo/releases) 下载最新安装包覆盖安装
+
+升级不会丢失数据：
+- 项目数据存储在用户自选目录, 与应用安装路径分离
+- 应用配置存储在 `%APPDATA%`, 安装包不会清除
+- schema_version 迁移机制自动升级旧项目数据格式
+
+### 离线使用
+
+**Q: 应用是否真的完全离线？哪些功能需要联网？**
+
+A: 仅以下两个功能需要联网：
+- **版本检查**：访问 GitHub API 检查新版本（可在设置中关闭）
+- **AI 助手**：调用用户配置的 LLM 服务（直连用户 Base URL, 不经任何第三方中转）
+
+其他所有功能（编辑、图谱、设定库、搜索、快照、导出等）完全离线可用。
+
+</details>
+
+---
+
+## Roadmap
+
+<details>
+<summary>点击展开路线图</summary>
+
+### 已完成（v26.8.0）
+
+- [x] 存储类型分析与重构（manifest.json 索引、UUID front matter、WritingStats 持久化）
+- [x] 项目问题与漏洞修复（AppError 迁移、DPAPI 加密、虚拟化列表、AbortController）
+- [x] TXT 导出功能重构（4 种模式：单文件 / 合并 / 按章节 / 按卷）
+- [x] 数据孤岛与联动优化（Codex 联动、章节删除清理、字数 SSOT）
+- [x] 便捷操作增强（伏笔模块、批量操作、跨目录拖拽、增量索引）
+- [x] 废弃代码清理（死代码删除、重复代码抽取、文档迁移）
+- [x] README 与 About 栏目升级
+
+### 计划中（v26.9.x ~ v26.10.x）
+
+- [ ] AI Agent 工作流（基于 Codex + Tantivy 的 RAG 检索增强生成）
+- [ ] 多设备同步（基于 Git 的项目级同步, 可选远程仓库）
+- [ ] 章节级版本控制（基于 Git blob 的细粒度回溯）
+- [ ] 大纲 → 章节自动生成（基于 LLM 的章节梗概展开）
+- [ ] 写作目标与成就系统（日 / 周 / 月字数目标, 连续创作徽章）
+- [ ] 插件系统（允许第三方扩展编辑器节点、图谱节点类型）
+
+### 远期规划（v27.x）
+
+- [ ] macOS / Linux 平台支持（依赖 Tauri 跨平台能力, 需适配 keychain / keyring）
+- [ ] 协作模式（基于本地局域网的实时协作, 端到端加密）
+- [ ] 语音朗读与听写（基于本地 TTS / STT 模型）
+- [ ] 视觉化数据看板（写作习惯分析、角色出场热力图、剧情节奏曲线）
+
+> 路线图仅供参考, 实际进度取决于社区反馈与维护者精力。
+
+</details>
+
+---
+
+## 许可协议
+
+本项目采用 [CC-BY-NC-4.0 署名-非商用](./LICENSE) 国际许可证。
+
+- **你可以**：分享、改编、二次创作
+- **你必须**：保留署名、附上协议链接、标注是否修改
+- **你不可**：用于商业用途
+
+详细的安全政策与漏洞报告流程见 [SECURITY.md](./SECURITY.md)，参与贡献请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。

@@ -21,3 +21,6 @@ export * from "./api/searchApi";
 export * from "./api/snapshotApi";
 export * from "./api/indexApi";
 export * from "./api/aiContextApi";
+
+// 重新导出错误消息提取工具，供组件层统一处理后端 AppError 序列化结构
+export { extractErrorMessage } from "./api/_internal";

@@ -68,6 +68,34 @@ import type { ProjectInfo } from "../../lib/api/projectApi";
 import { useToast } from "../../lib/toast";
 import { useI18n } from "../../lib/i18n";
 
+// ============================================================
+// 常量定义
+// ============================================================
+
+/** 保存完成"已保存"闪烁标记持续时间(毫秒), 与 saving 下降沿触发联动 */
+const SAVED_FLASH_DURATION_MS = 1200;
+
+/** 重置视图 fitView 的内边距比例(0~1, 节点与画布边缘留白) */
+const FIT_VIEW_PADDING = 0.2;
+
+/** 重置视图 fitView 动画持续时间(毫秒) */
+const FIT_VIEW_DURATION_MS = 300;
+
+/** zundo 历史栈上限(与 graphStoreFactory.HISTORY_LIMIT 保持一致, 拖拽快照手动入栈时裁剪最旧条目) */
+const HISTORY_LIMIT = 100;
+
+/** ReactFlow 画布最小缩放比例 */
+const MIN_ZOOM = 0.1;
+
+/** ReactFlow 画布最大缩放比例 */
+const MAX_ZOOM = 2;
+
+/** Background 网格间距(像素) */
+const BACKGROUND_GAP = 16;
+
+/** Background 网格线/点大小(像素) */
+const BACKGROUND_SIZE = 1;
+
 /**
  * Store 适配器接口
  * 业务方将 store 的部分能力包装为该接口, 供 GraphPanelShell 调用,
@@ -147,8 +175,8 @@ export interface GraphI18nNamespace {
  * @template TSnapshot 拖拽前快照类型
  */
 export interface GraphPanelShellProps<
-  TNode,
-  TEdge,
+  TNode extends Node,
+  TEdge extends Edge,
   TContextMenu,
   TSnapshot
 > {
@@ -344,8 +372,8 @@ export const DefaultConnectionLine: ConnectionLineComponent = ({
  * @template TSnapshot 拖拽前快照类型
  */
 export function GraphPanelShell<
-  TNode,
-  TEdge,
+  TNode extends Node,
+  TEdge extends Edge,
   TContextMenu,
   TSnapshot
 >(props: GraphPanelShellProps<TNode, TEdge, TContextMenu, TSnapshot>) {
@@ -399,7 +427,7 @@ export function GraphPanelShell<
     // 检测 saving 从 true → false 的下降沿, 触发 savedFlash
     if (prevSavingRef.current && !saving && !saveError) {
       setSavedFlash(true);
-      const timer = setTimeout(() => setSavedFlash(false), 1200);
+      const timer = setTimeout(() => setSavedFlash(false), SAVED_FLASH_DURATION_MS);
       return () => clearTimeout(timer);
     }
     prevSavingRef.current = saving;
@@ -409,7 +437,7 @@ export function GraphPanelShell<
   // 用途:
   //   1. 右键新建节点时将屏幕坐标转为画布坐标, 确保节点在右键处创建而非默认左上角
   //   2. 重置视图时调用 fitView 将所有节点居中显示并适配缩放比例
-  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const reactFlowInstance = useRef<ReactFlowInstance<Node, TEdge> | null>(null);
 
   // 拖拽前状态快照引用(含 nodes/edges 快照)
   // 用途: onNodeDragStop 时手动推入 zundo pastStates, 实现"整段拖拽仅 1 条历史记录"
@@ -443,7 +471,7 @@ export function GraphPanelShell<
    * 流程: 调用 ReactFlowInstance.fitView 将所有节点居中显示并适配缩放比例
    */
   const handleResetView = useCallback(() => {
-    reactFlowInstance.current?.fitView({ padding: 0.2, duration: 300 });
+    reactFlowInstance.current?.fitView({ padding: FIT_VIEW_PADDING, duration: FIT_VIEW_DURATION_MS });
   }, []);
 
   /**
@@ -613,10 +641,9 @@ export function GraphPanelShell<
     const snapshot = preDragSnapshotRef.current;
     if (snapshot) {
       const temporalState = storeAdapter.temporal.getState();
-      // 复制当前 pastStates, 遵守 limit=100 上限(与 timelineStore/characterGraphStore 配置一致)
-      const LIMIT = 100;
+      // 复制当前 pastStates, 遵守 HISTORY_LIMIT 上限(与 timelineStore/characterGraphStore 配置一致)
       const pastStates = temporalState.pastStates.slice();
-      if (pastStates.length >= LIMIT) {
+      if (pastStates.length >= HISTORY_LIMIT) {
         pastStates.shift();
       }
       pastStates.push(snapshot);
@@ -678,7 +705,7 @@ export function GraphPanelShell<
   );
 
   /** ReactFlow 初始化回调(保存实例引用以供后续 fitView/screenToFlowPosition 使用) */
-  const handleInit = useCallback((instance: ReactFlowInstance) => {
+  const handleInit = useCallback((instance: ReactFlowInstance<Node, TEdge>) => {
     reactFlowInstance.current = instance;
   }, []);
 
@@ -776,8 +803,8 @@ export function GraphPanelShell<
       </div>
 
       <ReactFlow
-        nodes={nodes as unknown as Node[]}
-        edges={edges as unknown as Edge[]}
+        nodes={nodes}
+        edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
@@ -794,8 +821,8 @@ export function GraphPanelShell<
         onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
         onlyRenderVisibleElements={true}
-        minZoom={0.1}
-        maxZoom={2}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionMode={ConnectionMode.Loose}
         connectionLineComponent={connectionLineComponent}
@@ -803,8 +830,8 @@ export function GraphPanelShell<
       >
         <Background
           variant={BackgroundVariant.Lines}
-          gap={16}
-          size={1}
+          gap={BACKGROUND_GAP}
+          size={BACKGROUND_SIZE}
           color="rgba(255,255,255,0.05)"
         />
         <MiniMap

@@ -424,6 +424,8 @@ const zhCN: TranslationDict = {
   "sidebar.timeline": "剧情图谱",
   // ── 人物关系图 ──
   "sidebar.characterGraph": "人物关系图",
+  // ── 伏笔追踪 ──
+  "sidebar.foreshadowing": "伏笔追踪",
   "timeline.emptyHint": "右键画布添加第一个节点",
   "timeline.emptySubHint": "或使用 Ctrl+L 整理布局",
   "timeline.ctx.addMain": "添加主线节点",
@@ -461,6 +463,16 @@ const zhCN: TranslationDict = {
   "timeline.toast.cleared": "剧情图谱已清空",
   "timeline.toast.clearConfirm": "确定清空所有剧情节点吗?此操作不可撤销",
 
+  // ── 时间线 - 关联章节(Task 4.2.2 / 4.2.3) ──
+  "timeline.linkChapter.label": "关联章节",
+  "timeline.linkChapter.placeholder": "选择章节文件",
+  "timeline.linkChapter.none": "不关联",
+  "timeline.linkChapter.loading": "加载章节列表…",
+  "timeline.linkChapter.empty": "暂无章节文件",
+  "timeline.linkChapter.jumpToChapter": "跳转到章节",
+  "timeline.linkChapter.jumpFailed": "未找到关联的章节文件",
+  "timeline.linkChapter.unlink": "取消关联",
+
   // ── 人物关系图 ──
   "characterGraph.emptyHint": "右键画布添加第一个角色节点",
   "characterGraph.emptySubHint": "拖拽节点之间的锚点建立人物关系",
@@ -483,6 +495,9 @@ const zhCN: TranslationDict = {
   "characterGraph.drawer.tagsHint": "多个标签用英文逗号分隔",
   "characterGraph.drawer.briefLabel": "简介",
   "characterGraph.drawer.sourceFileLabel": "来源文件",
+  // Task 4.7.1: 图谱节点跳转到设定库
+  "characterGraph.drawer.viewInCodex": "在设定库中查看",
+  "characterGraph.drawer.viewInCodexHint": "切换到设定库并选中关联卡片",
   "characterGraph.edgeDrawer.title": "关系详情",
   "characterGraph.edgeDrawer.relationTypeLabel": "关系类型",
   "characterGraph.edgeDrawer.relationTypeHint": "选择两人之间的关系类别, 决定连线颜色",
@@ -567,6 +582,7 @@ const zhCN: TranslationDict = {
   "codex.createFailed": "创建实体失败：{error}",
   "codex.deleteSuccess": "实体「{name}」已删除",
   "codex.deleteFailed": "删除实体失败：{error}",
+  "codex.deleteSuccessWithMentions": "实体「{name}」已删除，并清理正文 Mention {count} 处",
   "codex.nameRequired": "实体名称不能为空",
   "codex.nameExists": "实体「{name}」已存在",
   "codex.useWizard": "使用模板向导",
@@ -589,6 +605,11 @@ const zhCN: TranslationDict = {
   "codex.cardNotFound": "未找到对应的设定卡片（可能已被删除或 UUID 失效）",
   // Sprint 3 任务 3.4：反向跳转按钮
   "codex.findInManuscript": "在正文中查找",
+  // Task 4.1.3: 设定库卡片添加到人物图谱
+  "codex.addToCharacterGraph": "添加到人物图谱",
+  "codex.addToGraphOnlyCharacter": "仅角色类型卡片可添加到人物图谱",
+  "codex.addToGraphSuccess": "「{name}」已添加到人物图谱",
+  "codex.addToGraphFailed": "添加到人物图谱失败：{error}",
   // Sprint 3 任务 3.5：characterMention 右键菜单
   "characterMention.noLinkedEntity": "该提及节点未关联设定库实体（旧版数据，无 UUID）",
   "characterMention.viewInCodex": "查看设定",
@@ -749,6 +770,7 @@ const zhCN: TranslationDict = {
   "outline.noHeadings": "当前文档暂无标题",
   "outline.addHeadingsHint": "使用 Ctrl+1 / Ctrl+2 添加标题",
   "outline.addHeadingHint": "使用 Ctrl+1 / Ctrl+2 添加标题",
+  "outline.syncPrompt": "大纲已关联章节「{title}」,可同步章节标题",
 
   // ── 命令面板 ──
   "command.placeholder": "输入命令…（分类导航 / 新建文件 / 切换主题）",
@@ -778,6 +800,13 @@ const zhCN: TranslationDict = {
   "command.enableSnapshot": "启用版本快照",
   "command.disableSnapshot": "关闭版本快照",
   "command.resetSession": "重置写作会话",
+
+  // ── 命令面板: 跨模块跳转(Task 4.9) ──
+  "commandPalette.jumpTo.category": "跨模块跳转",
+  "commandPalette.jumpTo.graphNode": "跳转到图谱节点: {name}",
+  "commandPalette.jumpTo.timelineEvent": "跳转到时间线事件: {name}",
+  "commandPalette.jumpTo.foreshadowing": "跳转到伏笔",
+  "commandPalette.jumpTo.foreshadowingDisabled": "伏笔模块开发中,敬请期待",
 
   // ── 题材模板 ──
   "template.selectTitle": "选择文体类型",
@@ -1126,6 +1155,45 @@ const zhCN: TranslationDict = {
   "update.remindLaterHint": "将在下次启动时再次提醒",
   "update.skipVersionHint": "此版本将被跳过，直到下一个版本发布",
 
+  // ── 关于分区 (AboutSettingsSection) ──
+  "about.title": "喵创说",
+  "about.slogan": "为业余作家而生",
+  "about.intro": "喵创说是一款面向独立与业余长篇创作者的离线写作工作站。坚持完全离线、完全免费、数据归创作者所有三大原则，将富文本编辑、设定库、人物图谱、剧情时间线、伏笔追踪五大核心模块集成于单一桌面应用。",
+  "about.principles": "三大原则",
+  "about.principle.offline": "离线优先",
+  "about.principle.offlineDesc": "无需账号登录，断网环境完整可用",
+  "about.principle.ownership": "数据自主",
+  "about.principle.ownershipDesc": "数据 100% 本地存储，不收集任何用户数据",
+  "about.principle.focus": "创作专注",
+  "about.principle.focusDesc": "命令面板 + 快捷键体系，零打扰沉浸创作",
+  "about.features": "核心特性",
+  "about.feature.editor": "创作编辑器",
+  "about.feature.editorDesc": "TipTap 富文本，百万字级长文档",
+  "about.feature.codex": "设定库",
+  "about.feature.codexDesc": "YAML front matter 结构化，实体高亮",
+  "about.feature.characterGraph": "人物关系图谱",
+  "about.feature.characterGraphDesc": "React Flow 受控，关系类型自定义",
+  "about.feature.timeline": "剧情时间线",
+  "about.feature.timelineDesc": "DAG 校验，分支结构支持",
+  "about.feature.foreshadowing": "伏笔追踪",
+  "about.feature.foreshadowingDesc": "埋设与回收状态管理，跨章节追踪",
+  "about.techStack": "技术栈",
+  "about.author": "作者信息",
+  "about.authorName": "fanquanpp",
+  "about.acknowledgments": "致谢",
+  "about.acknowledgmentsDesc": "本项目依赖以下优秀开源项目",
+  "about.license": "开源协议",
+  "about.licenseDesc": "本项目采用 CC-BY-NC-4.0 署名-非商用许可证",
+  "about.licenseLink": "查看完整协议文本",
+  "about.copyVersion": "复制版本号",
+  "about.openLogs": "打开日志目录",
+  "about.versionCopied": "版本号已复制到剪贴板",
+  "about.openLogsFailed": "打开日志目录失败：{error}",
+  "about.githubRepo": "GitHub 仓库",
+  "about.reportIssue": "报告问题",
+  "about.viewReleases": "查看发布",
+  "about.madeFor": "为独立与业余创作者而造",
+
   // ── 启动器 - 项目目录 ──
   "launcher.projectDir": "项目存放目录",
   "launcher.projectDirPlaceholder": "选择或输入项目存放路径…",
@@ -1167,6 +1235,42 @@ const zhCN: TranslationDict = {
   // ── 文件列表 - 批量重编号 ──
   "filelist.batchRenumber": "重新编号",
   "filelist.renumbered": "章节已重新编号",
+
+  // ── 文件列表 - 批量操作 (Task 5.2) ──
+  "filelist.batch.selectedCount": "已选 {count} 项",
+  "filelist.batch.rename": "重命名",
+  "filelist.batch.export": "导出",
+  "filelist.batch.delete": "删除",
+  "filelist.batch.moveToVolume": "移动到卷",
+  "filelist.batch.exit": "退出多选",
+  "filelist.batch.renameOnlySingle": "重命名仅支持单选",
+  "filelist.batch.deleteConfirmTitle": "批量删除确认",
+  "filelist.batch.deleteConfirmMsg": "确定要删除选中的 {count} 个文件吗？此操作会将文件移至系统回收站，可恢复。",
+  "filelist.batch.deleteSuccess": "已删除 {success} 个文件{failed}",
+  "filelist.batch.deleteFailedPartial": "，{failed} 个失败",
+  "filelist.batch.exportSuccess": "已导出 {count} 个文件",
+  "filelist.batch.exportFailed": "批量导出失败：{error}",
+  "filelist.batch.exportPickDirFirst": "请先选择导出目录",
+  "filelist.batch.moveSuccess": "已移动 {success} 个文件到「{target}」{failed}",
+  "filelist.batch.moveFailed": "批量移动失败：{error}",
+  "filelist.batch.noVolumes": "当前没有可用的卷目录",
+  "filelist.batch.crossVolumeMove": "已移动「{name}」到「{target}」",
+  "filelist.batch.crossVolumeMoveFailed": "移动「{name}」失败：{error}",
+
+  // ── 设定库 - 批量操作 (Task 5.2.3 / 5.2.4) ──
+  "codex.batch.selectedCount": "已选 {count} 项",
+  "codex.batch.delete": "批量删除",
+  "codex.batch.moveGroup": "移动分组",
+  "codex.batch.exit": "退出多选",
+  "codex.batch.deleteConfirmTitle": "批量删除设定实体",
+  "codex.batch.deleteConfirmMsg": "确定要删除选中的 {count} 个设定实体吗？\n该操作会循环清理正文中的 Mention 引用，可能耗时较长。",
+  "codex.batch.deletingProgress": "正在删除 {current}/{total}...",
+  "codex.batch.deleteSuccess": "已删除 {count} 个设定实体，清理 Mention {mentionCount} 处",
+  "codex.batch.deleteFailed": "批量删除失败：{error}",
+  "codex.batch.moveToGroup": "移动到「{group}」",
+  "codex.batch.moveSuccess": "已移动 {count} 个设定实体到「{group}」",
+  "codex.batch.moveFailed": "移动设定实体失败：{error}",
+  "codex.batch.dragHint": "拖动条目到分组标题可切换分组",
 
   // ── 版本快照 ──
   "snapshot.title": "版本历史",
@@ -1237,6 +1341,28 @@ const zhCN: TranslationDict = {
   "archive.projectNameLabel": "项目名",
   "archive.outputPath": "输出路径",
 
+  // ── TXT 导出 (Task 3.4) ──
+  "export.title": "导出为 TXT",
+  "export.mode": "导出模式",
+  "export.modeSingle": "单章导出",
+  "export.modeMerged": "整项目合并",
+  "export.modePerChapter": "每章一个文件",
+  "export.modePerVolume": "按分卷导出",
+  "export.includeTitle": "包含章节标题",
+  "export.bom": "UTF-8 BOM",
+  "export.crlf": "CRLF 换行符",
+  "export.selectDir": "选择导出目录",
+  "export.processing": "正在导出…",
+  "export.success": "导出成功",
+  "export.failed": "导出失败",
+  "export.filesGenerated": "已生成 {count} 个文件",
+  "export.totalWords": "总字数：{count}",
+  "export.noChapters": "未找到可导出的章节",
+  "export.exportBtn": "导出 TXT",
+  "export.desc": "将项目正文章节导出为 TXT 文件，支持单章、合并、按章、按卷四种模式。",
+  "export.outputDir": "输出目录",
+  "export.outputDirPlaceholder": "点击选择导出目录…",
+
   // ── 右键上下文菜单 ──
   "ctxmenu.open": "打开",
   "ctxmenu.rename": "重命名",
@@ -1275,12 +1401,17 @@ const zhCN: TranslationDict = {
   "edgeDrawer.customAddTitle": "新增自定义关系类型",
   "edgeDrawer.customDeleteTitle": "删除此自定义关系类型",
   "edgeDrawer.colorAria": "选择颜色 {color}",
+  "edgeDrawer.customBadge": "自定义",
 
   // ── 时间线扩展(清空图谱与状态徽章) ──
   "timeline.clearGraphTitle": "清空图谱",
   "timeline.statusPlanned": "未开始",
   "timeline.statusWriting": "写作中",
   "timeline.statusDone": "完稿",
+  "timeline.defaultTitleMain": "新主线节点",
+  "timeline.defaultTitleBranch": "新分支",
+  "timeline.defaultTitleEvent": "新事件",
+  "timeline.defaultTitleEnding": "新结局",
 
   // ── Toast 通知 ──
   "toast.ariaLabel": "通知",
@@ -1288,6 +1419,40 @@ const zhCN: TranslationDict = {
 
   // ── 人物关系图扩展(fallback 文案) ──
   "characterGraph.relationUnknown": "未知关系",
+  "characterGraph.relation.master": "师徒",
+  "characterGraph.relation.enemy": "敌对",
+  "characterGraph.relation.family": "亲属",
+  "characterGraph.relation.friend": "朋友",
+  "characterGraph.relation.lover": "恋人",
+  "characterGraph.relation.subordinate": "上下级",
+  "characterGraph.relation.fellow": "同门",
+  "characterGraph.relation.other": "其他",
+
+  // ── 伏笔追踪（foreshadowing） ──
+  "foreshadowing.title": "伏笔追踪",
+  "foreshadowing.create": "新建伏笔",
+  "foreshadowing.edit": "编辑伏笔",
+  "foreshadowing.delete": "删除伏笔",
+  "foreshadowing.deleteConfirm": "确认删除该伏笔?此操作不可撤销。",
+  "foreshadowing.empty": "暂无伏笔",
+  "foreshadowing.titleField": "标题",
+  "foreshadowing.note": "备注",
+  "foreshadowing.importance": "重要度",
+  "foreshadowing.importance.high": "高",
+  "foreshadowing.importance.medium": "中",
+  "foreshadowing.importance.low": "低",
+  "foreshadowing.status.planted": "已埋设",
+  "foreshadowing.status.setup": "铺垫中",
+  "foreshadowing.status.resolved": "已回收",
+  "foreshadowing.status.abandoned": "已放弃",
+  "foreshadowing.setupChapter": "埋设章节",
+  "foreshadowing.resolutionChapter": "回收章节",
+  "foreshadowing.jumpToSetup": "跳转到埋设章节",
+  "foreshadowing.jumpToResolution": "跳转到回收章节",
+  "foreshadowing.stats.total": "总数",
+  "foreshadowing.saveFailed": "保存伏笔失败",
+  "foreshadowing.deleteFailed": "删除伏笔失败",
+  "foreshadowing.jumpFailed": "跳转关联章节失败",
 };
 
 // 英文翻译
@@ -1691,6 +1856,7 @@ const enUS: TranslationDict = {
   // ── Timeline Graph ──
   "sidebar.timeline": "Timeline",
   "sidebar.characterGraph": "Character Graph",
+  "sidebar.foreshadowing": "Foreshadowing",
   "timeline.emptyHint": "Right-click canvas to add the first node",
   "timeline.emptySubHint": "Or use Ctrl+L to layout",
   "timeline.ctx.addMain": "Add Main Node",
@@ -1728,6 +1894,16 @@ const enUS: TranslationDict = {
   "timeline.toast.cleared": "Timeline cleared",
   "timeline.toast.clearConfirm": "Clear all timeline nodes? This cannot be undone",
 
+  // ── Timeline - Link Chapter (Task 4.2.2 / 4.2.3) ──
+  "timeline.linkChapter.label": "Linked Chapter",
+  "timeline.linkChapter.placeholder": "Select a chapter file",
+  "timeline.linkChapter.none": "None",
+  "timeline.linkChapter.loading": "Loading chapters…",
+  "timeline.linkChapter.empty": "No chapter files",
+  "timeline.linkChapter.jumpToChapter": "Jump to Chapter",
+  "timeline.linkChapter.jumpFailed": "Linked chapter file not found",
+  "timeline.linkChapter.unlink": "Unlink",
+
   // ── Character Graph ──
   "characterGraph.emptyHint": "Right-click canvas to add the first character node",
   "characterGraph.emptySubHint": "Drag between node anchors to create relationships",
@@ -1750,6 +1926,9 @@ const enUS: TranslationDict = {
   "characterGraph.drawer.tagsHint": "Separate tags with commas",
   "characterGraph.drawer.briefLabel": "Brief",
   "characterGraph.drawer.sourceFileLabel": "Source File",
+  // Task 4.7.1: Jump to codex from graph node
+  "characterGraph.drawer.viewInCodex": "View in Codex",
+  "characterGraph.drawer.viewInCodexHint": "Switch to Codex and select the linked card",
   "characterGraph.edgeDrawer.title": "Relationship Details",
   "characterGraph.edgeDrawer.relationTypeLabel": "Relation Type",
   "characterGraph.edgeDrawer.relationTypeHint": "Select the relation category, determines edge color",
@@ -1834,6 +2013,7 @@ const enUS: TranslationDict = {
   "codex.createFailed": "Failed to create entity: {error}",
   "codex.deleteSuccess": "Entity \"{name}\" deleted",
   "codex.deleteFailed": "Failed to delete entity: {error}",
+  "codex.deleteSuccessWithMentions": "Entity \"{name}\" deleted, {count} mention(s) cleaned from manuscript",
   "codex.nameRequired": "Entity name is required",
   "codex.nameExists": "Entity \"{name}\" already exists",
   "codex.useWizard": "Use Template Wizard",
@@ -1856,6 +2036,11 @@ const enUS: TranslationDict = {
   "codex.cardNotFound": "Corresponding codex card not found (may have been deleted or UUID invalid)",
   // Sprint 3 Task 3.4: Reverse jump button
   "codex.findInManuscript": "Find in Manuscript",
+  // Task 4.1.3: Add codex card to character graph
+  "codex.addToCharacterGraph": "Add to Character Graph",
+  "codex.addToGraphOnlyCharacter": "Only character-type cards can be added to the character graph",
+  "codex.addToGraphSuccess": "\"{name}\" has been added to the character graph",
+  "codex.addToGraphFailed": "Failed to add to character graph: {error}",
   // Sprint 3 Task 3.5: characterMention context menu
   "characterMention.noLinkedEntity": "This mention node has no linked codex entity (legacy data, no UUID)",
   "characterMention.viewInCodex": "View in Codex",
@@ -2017,6 +2202,7 @@ const enUS: TranslationDict = {
   "outline.noHeadings": "No headings in current document",
   "outline.addHeadingsHint": "Use Ctrl+1 / Ctrl+2 to add headings",
   "outline.addHeadingHint": "Use Ctrl+1 / Ctrl+2 to add headings",
+  "outline.syncPrompt": "Outline is linked to chapter \"{title}\", sync chapter title available",
 
   // ── Command Palette ──
   "command.placeholder": "Type a command… (Navigate / New File / Theme)",
@@ -2046,6 +2232,13 @@ const enUS: TranslationDict = {
   "command.enableSnapshot": "Enable Snapshots",
   "command.disableSnapshot": "Disable Snapshots",
   "command.resetSession": "Reset Writing Session",
+
+  // ── Command Palette: Cross-module Navigation (Task 4.9) ──
+  "commandPalette.jumpTo.category": "Cross-module Navigation",
+  "commandPalette.jumpTo.graphNode": "Jump to graph node: {name}",
+  "commandPalette.jumpTo.timelineEvent": "Jump to timeline event: {name}",
+  "commandPalette.jumpTo.foreshadowing": "Jump to foreshadowing",
+  "commandPalette.jumpTo.foreshadowingDisabled": "Foreshadowing module is under development",
 
   // ── Template Selector ──
   "template.selectTitle": "Choose a Literary Form",
@@ -2407,6 +2600,45 @@ const enUS: TranslationDict = {
   "update.remindLaterHint": "You'll be reminded again on next launch",
   "update.skipVersionHint": "This version will be skipped until the next release",
 
+  // ── About Section (AboutSettingsSection) ──
+  "about.title": "MiaoChuangShuo",
+  "about.slogan": "Built for amateur writers",
+  "about.intro": "MiaoChuangShuo is an offline writing workstation designed for independent and amateur long-form writers. It adheres to three principles: fully offline, completely free, and full data ownership. Five core modules (rich text editor, codex, character graph, timeline, foreshadowing) are integrated into a single desktop application.",
+  "about.principles": "Three Principles",
+  "about.principle.offline": "Offline First",
+  "about.principle.offlineDesc": "No account login required, fully functional offline",
+  "about.principle.ownership": "Data Ownership",
+  "about.principle.ownershipDesc": "100% local storage, no user data collected",
+  "about.principle.focus": "Writing Focus",
+  "about.principle.focusDesc": "Command palette + shortcuts, distraction-free writing",
+  "about.features": "Core Features",
+  "about.feature.editor": "Writing Editor",
+  "about.feature.editorDesc": "TipTap rich text, million-word documents",
+  "about.feature.codex": "Codex",
+  "about.feature.codexDesc": "YAML front matter, entity highlighting",
+  "about.feature.characterGraph": "Character Graph",
+  "about.feature.characterGraphDesc": "React Flow controlled, custom relation types",
+  "about.feature.timeline": "Plot Timeline",
+  "about.feature.timelineDesc": "DAG validation, branch support",
+  "about.feature.foreshadowing": "Foreshadowing Tracker",
+  "about.feature.foreshadowingDesc": "Setup & resolution tracking, cross-chapter",
+  "about.techStack": "Tech Stack",
+  "about.author": "Author",
+  "about.authorName": "fanquanpp",
+  "about.acknowledgments": "Acknowledgments",
+  "about.acknowledgmentsDesc": "This project depends on the following open-source projects",
+  "about.license": "License",
+  "about.licenseDesc": "Licensed under CC-BY-NC-4.0 (Attribution-NonCommercial)",
+  "about.licenseLink": "View full license text",
+  "about.copyVersion": "Copy Version",
+  "about.openLogs": "Open Logs Directory",
+  "about.versionCopied": "Version copied to clipboard",
+  "about.openLogsFailed": "Failed to open logs directory: {error}",
+  "about.githubRepo": "GitHub Repository",
+  "about.reportIssue": "Report Issue",
+  "about.viewReleases": "View Releases",
+  "about.madeFor": "Made for independent and amateur writers",
+
   // ── Launcher - Project Directory ──
   "launcher.projectDir": "Project Directory",
   "launcher.projectDirPlaceholder": "Select or enter project directory path…",
@@ -2449,6 +2681,42 @@ const enUS: TranslationDict = {
   // ── File List - Batch Renumber ──
   "filelist.batchRenumber": "Renumber",
   "filelist.renumbered": "Chapters renumbered",
+
+  // ── File List - Batch Operations (Task 5.2) ──
+  "filelist.batch.selectedCount": "{count} selected",
+  "filelist.batch.rename": "Rename",
+  "filelist.batch.export": "Export",
+  "filelist.batch.delete": "Delete",
+  "filelist.batch.moveToVolume": "Move to Volume",
+  "filelist.batch.exit": "Exit Multi-Select",
+  "filelist.batch.renameOnlySingle": "Rename supports single selection only",
+  "filelist.batch.deleteConfirmTitle": "Batch Delete Confirmation",
+  "filelist.batch.deleteConfirmMsg": "Delete {count} selected file(s)? Files will be moved to system trash, recoverable.",
+  "filelist.batch.deleteSuccess": "Deleted {success} file(s){failed}",
+  "filelist.batch.deleteFailedPartial": ", {failed} failed",
+  "filelist.batch.exportSuccess": "Exported {count} file(s)",
+  "filelist.batch.exportFailed": "Batch export failed: {error}",
+  "filelist.batch.exportPickDirFirst": "Please pick an export directory first",
+  "filelist.batch.moveSuccess": "Moved {success} file(s) to \"{target}\"{failed}",
+  "filelist.batch.moveFailed": "Batch move failed: {error}",
+  "filelist.batch.noVolumes": "No volume directories available",
+  "filelist.batch.crossVolumeMove": "Moved \"{name}\" to \"{target}\"",
+  "filelist.batch.crossVolumeMoveFailed": "Failed to move \"{name}\": {error}",
+
+  // ── Codex - Batch Operations (Task 5.2.3 / 5.2.4) ──
+  "codex.batch.selectedCount": "{count} selected",
+  "codex.batch.delete": "Batch Delete",
+  "codex.batch.moveGroup": "Move Group",
+  "codex.batch.exit": "Exit Multi-Select",
+  "codex.batch.deleteConfirmTitle": "Batch Delete Codex Entities",
+  "codex.batch.deleteConfirmMsg": "Delete {count} selected codex entities?\nMentions in the manuscript will be cleaned up iteratively, may take a while.",
+  "codex.batch.deletingProgress": "Deleting {current}/{total}...",
+  "codex.batch.deleteSuccess": "Deleted {count} codex entities, {mentionCount} mention(s) cleaned",
+  "codex.batch.deleteFailed": "Batch delete failed: {error}",
+  "codex.batch.moveToGroup": "Move to \"{group}\"",
+  "codex.batch.moveSuccess": "Moved {count} codex entities to \"{group}\"",
+  "codex.batch.moveFailed": "Failed to move codex entities: {error}",
+  "codex.batch.dragHint": "Drag an item to a group header to switch group",
 
   // ── Version Snapshots ──
   "snapshot.title": "Version History",
@@ -2519,6 +2787,28 @@ const enUS: TranslationDict = {
   "archive.projectNameLabel": "Project Name",
   "archive.outputPath": "Output Path",
 
+  // ── TXT Export (Task 3.4) ──
+  "export.title": "Export as TXT",
+  "export.mode": "Export Mode",
+  "export.modeSingle": "Single Chapter",
+  "export.modeMerged": "Merged",
+  "export.modePerChapter": "Per Chapter",
+  "export.modePerVolume": "Per Volume",
+  "export.includeTitle": "Include Chapter Title",
+  "export.bom": "UTF-8 BOM",
+  "export.crlf": "CRLF Line Ending",
+  "export.selectDir": "Select Export Directory",
+  "export.processing": "Exporting…",
+  "export.success": "Export Success",
+  "export.failed": "Export Failed",
+  "export.filesGenerated": "{count} files generated",
+  "export.totalWords": "Total words: {count}",
+  "export.noChapters": "No chapters found to export",
+  "export.exportBtn": "Export TXT",
+  "export.desc": "Export project chapters to TXT files. Supports single, merged, per-chapter, and per-volume modes.",
+  "export.outputDir": "Output Directory",
+  "export.outputDirPlaceholder": "Click to select export directory…",
+
   // ── Context Menu ──
   "ctxmenu.open": "Open",
   "ctxmenu.rename": "Rename",
@@ -2544,12 +2834,17 @@ const enUS: TranslationDict = {
   "edgeDrawer.customAddTitle": "Add custom relation type",
   "edgeDrawer.customDeleteTitle": "Delete this custom relation type",
   "edgeDrawer.colorAria": "Select color {color}",
+  "edgeDrawer.customBadge": "Custom",
 
   // ── Timeline extensions (clear graph and status badges) ──
   "timeline.clearGraphTitle": "Clear graph",
   "timeline.statusPlanned": "Not started",
   "timeline.statusWriting": "Writing",
   "timeline.statusDone": "Done",
+  "timeline.defaultTitleMain": "New Main Node",
+  "timeline.defaultTitleBranch": "New Branch",
+  "timeline.defaultTitleEvent": "New Event",
+  "timeline.defaultTitleEnding": "New Ending",
 
   // ── Toast notifications ──
   "toast.ariaLabel": "Notification",
@@ -2557,6 +2852,40 @@ const enUS: TranslationDict = {
 
   // ── Character Graph extensions (fallback text) ──
   "characterGraph.relationUnknown": "Unknown relation",
+  "characterGraph.relation.master": "Master",
+  "characterGraph.relation.enemy": "Enemy",
+  "characterGraph.relation.family": "Family",
+  "characterGraph.relation.friend": "Friend",
+  "characterGraph.relation.lover": "Lover",
+  "characterGraph.relation.subordinate": "Subordinate",
+  "characterGraph.relation.fellow": "Fellow",
+  "characterGraph.relation.other": "Other",
+
+  // ── Foreshadowing ──
+  "foreshadowing.title": "Foreshadowing",
+  "foreshadowing.create": "New Foreshadowing",
+  "foreshadowing.edit": "Edit Foreshadowing",
+  "foreshadowing.delete": "Delete Foreshadowing",
+  "foreshadowing.deleteConfirm": "Delete this foreshadowing? This action cannot be undone.",
+  "foreshadowing.empty": "No foreshadowings",
+  "foreshadowing.titleField": "Title",
+  "foreshadowing.note": "Note",
+  "foreshadowing.importance": "Importance",
+  "foreshadowing.importance.high": "High",
+  "foreshadowing.importance.medium": "Medium",
+  "foreshadowing.importance.low": "Low",
+  "foreshadowing.status.planted": "Planted",
+  "foreshadowing.status.setup": "Setup",
+  "foreshadowing.status.resolved": "Resolved",
+  "foreshadowing.status.abandoned": "Abandoned",
+  "foreshadowing.setupChapter": "Setup Chapter",
+  "foreshadowing.resolutionChapter": "Resolution Chapter",
+  "foreshadowing.jumpToSetup": "Jump to setup chapter",
+  "foreshadowing.jumpToResolution": "Jump to resolution chapter",
+  "foreshadowing.stats.total": "Total",
+  "foreshadowing.saveFailed": "Failed to save foreshadowing",
+  "foreshadowing.deleteFailed": "Failed to delete foreshadowing",
+  "foreshadowing.jumpFailed": "Failed to jump to chapter",
 };
 
 const translations: Record<Locale, TranslationDict> = {

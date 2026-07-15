@@ -242,6 +242,8 @@ export default function CharacterGraphPanel() {
    *
    * 注: 坐标转换(screen → flow)由 GraphPanelShell 的 screenToFlowPosition 完成,
    *     此处接收的已是画布坐标, 不再需要二次转换。
+   * Task 4.1.3: 新建空白节点时 codexId 默认为空字符串, 表示未关联设定库卡片;
+   *             从设定库卡片创建节点走 characterGraphStore.createNodeFromCodexCard 路径
    */
   const handleCreateNode = useCallback(
     (flowPosition: { x: number; y: number }) => {
@@ -257,6 +259,7 @@ export default function CharacterGraphPanel() {
           brief: "",
           accentColor: DEFAULT_NODE_ACCENT,
           sourceFile: "",
+          codexId: "",
           createdAt: now,
           updatedAt: now,
         },

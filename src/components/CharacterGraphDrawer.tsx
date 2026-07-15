@@ -4,10 +4,15 @@
 // 双击节点或右键"编辑详情"触发, 显示在画布中央模态。
 // 表单字段: 姓名、身份、标签(逗号分隔)、简介、关联文件。
 // 本地草稿 300ms 防抖提交到 store, store 500ms 防抖写入磁盘。
+//
+// Task 4.7: 底部新增"在设定库中查看"按钮, 仅当节点 codexId 存在时显示,
+//           点击后切换到设定库分类并选中对应卡片, 实现图谱→设定库的跨模块跳转。
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, BookOpen } from "lucide-react";
 import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
+import { useAppStore } from "../lib/store";
+import { useCodexStore } from "../lib/stores/useCodexStore";
 import type { CharacterGraphNodeData } from "../lib/stores/characterGraphTypes";
 import { useI18n } from "../lib/i18n";
 
@@ -84,6 +89,11 @@ export default function CharacterGraphDrawer({
   const { t } = useI18n();
   const node = useCharacterGraphStore((s) => s.nodes.find((n) => n.id === nodeId));
   const commitToStore = useDebouncedCommit(nodeId);
+  // Task 4.7.2: 跨模块跳转所需 setter
+  // setActiveCategory: 切换左侧导航到设定库分类
+  // setPendingSelectCardId: 设置待选中卡片 ID, CodexPanel 订阅后选中对应卡片
+  const setActiveCategory = useAppStore((s) => s.setActiveCategory);
+  const setPendingSelectCardId = useCodexStore((s) => s.setPendingSelectCardId);
 
   // 本地草稿(仅在节点变化时初始化)
   // tags 字段在表单中以逗号分隔字符串呈现, 提交时拆分为数组
@@ -122,6 +132,27 @@ export default function CharacterGraphDrawer({
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
     commitToStore({ tags });
+  };
+
+  /**
+   * Task 4.7.2: 跳转到设定库并选中关联卡片
+   * 输入: 无(从 node.data.codexId 读取)
+   * 输出: void
+   * 流程:
+   *   1. 校验 codexId 非空(空字符串视为未关联, 不跳转)
+   *   2. 调用 setActiveCategory("codex") 切换到设定库分类
+   *   3. 调用 setPendingSelectCardId(codexId) 触发 CodexPanel 选中对应卡片
+   *   4. 关闭抽屉, 让用户聚焦到设定库面板
+   * 设计说明:
+   *   - pendingSelectCardId 为一次性信号量, CodexPanel 消费后自动清空
+   *   - 切换分类前不主动清空 selectedFile, 保持用户文件上下文(与 setActiveCategory 实现一致)
+   */
+  const handleViewInCodex = () => {
+    const codexId = node.data.codexId;
+    if (!codexId) return;
+    setActiveCategory("codex");
+    setPendingSelectCardId(codexId);
+    onClose();
   };
 
   return (
@@ -209,7 +240,20 @@ export default function CharacterGraphDrawer({
         </div>
 
         {/* 底部操作栏 */}
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-nf-border-light">
+        <div className="flex justify-between gap-2 px-5 py-3 border-t border-nf-border-light">
+          {/* Task 4.7.1: 在设定库中查看按钮, 仅当节点 codexId 存在时显示 */}
+          {node.data.codexId ? (
+            <button
+              onClick={handleViewInCodex}
+              className="nf-tool-btn h-8 px-4 text-sm flex items-center justify-center gap-1.5 border border-fandex-secondary/40 text-fandex-secondary hover:bg-fandex-secondary/5 transition duration-fast"
+              title={t("characterGraph.drawer.viewInCodexHint")}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              {t("characterGraph.drawer.viewInCodex")}
+            </button>
+          ) : (
+            <span />
+          )}
           <button
             onClick={onClose}
             className="nf-tool-btn h-8 px-4 text-sm flex items-center justify-center gap-1.5 border border-nf-border-light text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"

@@ -145,7 +145,8 @@ export function generateRequestId(): string {
  *   config - AI 配置（含 Base64 编码的 API Key）
  *   callbacks - 回调（onChunk 必填，onDone 可选）
  *   requestId - 请求唯一标识（用于精准取消，由调用方生成）
- * 输出: Promise<void> 流正常结束 resolve，错误 reject
+ *   signal - 可选的 AbortSignal（Task 2.5：前端自主中断）
+ * 输出: Promise<void> 流正常结束 resolve，错误 reject；signal abort 时 reject(AbortError 字符串)
  * 流程:
  *   1. 注册 ai:stream:chunk / ai:stream:done / ai:stream:error 三个事件监听
  *   2. 调用后端 chat_completion_stream 命令发起流式请求（携带 requestId）
@@ -154,12 +155,18 @@ export function generateRequestId(): string {
  *   5. error 事件 reject Promise
  *   6. 流结束后自动清理事件监听，避免内存泄漏
  *   7. 若 invoke 启动失败（如 API Key 为空），直接 reject
+ *   8. 若 signal 已 abort 或在流过程中 abort，主动 cleanup 并 reject（AbortError）
+ * 说明:
+ *   - Task 2.5 偏差报备：原描述采用 fetch signal，但本项目使用 Tauri IPC + 事件驱动模型，
+ *     无法直接复用 fetch signal；改为在 signal abort 时主动 unlisten 事件并 reject，
+ *     实现等价的"前端自主中断"语义。
  */
 export async function streamChatCompletion(
   messages: ChatMessage[],
   config: AiConfig,
   callbacks: StreamCallbacks,
-  requestId: string
+  requestId: string,
+  signal?: AbortSignal
 ): Promise<void> {
   let resolvePromise!: () => void;
   let rejectPromise!: (err: string) => void;
@@ -171,14 +178,25 @@ export async function streamChatCompletion(
   let unlistenChunk: UnlistenFn | null = null;
   let unlistenDone: UnlistenFn | null = null;
   let unlistenError: UnlistenFn | null = null;
+  let unlistenAbort: (() => void) | null = null;
   let settled = false;
 
-  /** 清理所有事件监听 */
+  /** 清理所有事件监听与 abort 监听器 */
   const cleanup = (): void => {
     unlistenChunk?.();
     unlistenDone?.();
     unlistenError?.();
+    if (unlistenAbort) {
+      signal?.removeEventListener("abort", unlistenAbort);
+      unlistenAbort = null;
+    }
   };
+
+  // 若进入时 signal 已 abort，立即 reject，避免注册无效监听
+  if (signal?.aborted) {
+    rejectPromise("AbortError");
+    return promise;
+  }
 
   // 注册 chunk 事件监听（增量内容推送）
   unlistenChunk = await listen<StreamChunk>("ai:stream:chunk", (event) => {
@@ -203,6 +221,19 @@ export async function streamChatCompletion(
     cleanup();
     rejectPromise(event.payload.error ?? "未知错误");
   });
+
+  // Task 2.5：注册 abort 监听，signal 触发时主动 cleanup 并 reject
+  // 让前端能脱离后端 cancel_chat_completion 自主中断流式请求
+  if (signal) {
+    unlistenAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      // 通知调用方为用户主动取消，与 DOMException.name === "AbortError" 语义对齐
+      rejectPromise("AbortError");
+    };
+    signal.addEventListener("abort", unlistenAbort);
+  }
 
   // 异步调用后端命令（不 await，通过事件驱动完成）
   // 携带 requestId 供后端注册按请求粒度的取消令牌

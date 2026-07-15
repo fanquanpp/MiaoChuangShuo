@@ -28,32 +28,38 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
-import { getWritingStats, type WritingStats as WritingStatsType } from "../lib/api";
+import { getWritingStats, type WritingStats as WritingStatsType, type ProjectMeta } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
 /**
- * 根据文件相对路径识别所属分类
- * 输入: relativePath 文件相对路径(如 "正文/第一章.txt")
+ * 根据文件相对路径识别所属分类(Task 1.8: 改为从 ProjectMeta 读取目录配置)
+ * 输入:
+ *   relativePath 文件相对路径(如 "正文/第一章.txt")
+ *   meta 项目元数据(提供 codexDirs/outlineDir/manuscriptDir/draftDir 配置,缺失时使用默认值)
  * 输出: 分类标识字符串(manuscript/outline/codex 等)
- * 流程: 取路径首段目录名,映射到分类标识,设定类统一收敛为 codex,未匹配回退为 manuscript
+ * 流程:
+ *   1. 取路径首段目录名
+ *   2. 从 ProjectMeta 提取目录配置(缺失字段回退到默认值,兼容旧项目)
+ *   3. 匹配正文/草稿箱目录 → manuscript
+ *   4. 匹配大纲目录 → outline
+ *   5. 匹配设定库目录列表 → codex
+ *   6. 未匹配回退为 manuscript
  */
-function detectCategoryFromPath(relativePath: string): string {
+function detectCategoryFromPath(relativePath: string, meta?: ProjectMeta): string {
   const firstDir = relativePath.split(/[\\/]/)[0] || "";
-  const categoryMap: Record<string, string> = {
-    "正文": "manuscript",
-    "大纲": "outline",
-    // 设定类统一收敛到 Codex(角色/世界观/术语/素材/时间线/人物/设定/名词/资料)
-    "角色": "codex",
-    "人物": "codex",
-    "世界观": "codex",
-    "设定": "codex",
-    "术语": "codex",
-    "名词": "codex",
-    "素材": "codex",
-    "资料": "codex",
-    "时间线": "codex",
-  };
-  return categoryMap[firstDir] || "manuscript";
+  // Task 1.8: 从 ProjectMeta 读取目录配置,缺失时回退到默认值(兼容旧项目)
+  const manuscriptDir = meta?.manuscriptDir || "正文";
+  const outlineDir = meta?.outlineDir || "大纲";
+  const draftDir = meta?.draftDir || "草稿箱";
+  // codexDirs 为空或缺失时回退到默认设定库目录列表(与后端 CODEX_DIRS 对齐)
+  const codexDirs = meta?.codexDirs && meta.codexDirs.length > 0
+    ? meta.codexDirs
+    : ["设定", "角色", "人物", "世界观", "术语", "名词", "素材", "资料", "时间线"];
+
+  if (firstDir === manuscriptDir || firstDir === draftDir) return "manuscript";
+  if (firstDir === outlineDir) return "outline";
+  if (codexDirs.includes(firstDir)) return "codex";
+  return "manuscript";
 }
 
 /**
@@ -121,7 +127,8 @@ export default function WritingStats() {
   const handleJumpToChapter = (relativePath: string) => {
     if (!currentProject) return;
     const fileName = relativePath.split(/[\\/]/).pop() || relativePath;
-    const category = detectCategoryFromPath(relativePath);
+    // Task 1.8: 传入 ProjectMeta 以读取自定义目录配置
+    const category = detectCategoryFromPath(relativePath, currentProject.meta);
     navigateToFile(
       {
         name: fileName,

@@ -33,18 +33,23 @@ import {
   Sparkles,
   Edit3,
   ArrowRight,
+  UserPlus,
+  CheckSquare,
+  FolderInput,
 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import { useCodexStore } from "../lib/stores/useCodexStore";
+import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
 import { useToast } from "../lib/toast";
 import { useI18n } from "../lib/i18n";
 import { logger } from "../lib/logger";
-import { readProjectTree } from "../lib/api";
+import { readProjectTree, renamePath } from "../lib/api";
 import {
   scanEntityMentions,
   createCodexEntity,
-  deleteCodexEntity,
   scanInvalidMentions,
+  updateCodexEntity,
+  getCodexDirName,
   CODEX_TYPE_LABELS,
   type CodexCard,
   type CodexEntityType,
@@ -168,6 +173,24 @@ export default function CodexPanel() {
   // Sprint 2 任务 2.3：查看/编辑模式切换状态
   // editing 为 true 时渲染 CodexCardEditor，false 时渲染只读详情视图
   const [editing, setEditing] = useState(false);
+
+  // Task 5.2.3: 设定库多选模式状态
+  // codexMultiSelectMode: 是否处于多选模式（true 时显示批量工具栏）
+  // selectedCodexIds: 选中的卡片 ID 集合
+  // lastSelectedCodexId: 上次选中的卡片 ID（用于 Shift+Click 范围选择）
+  const [codexMultiSelectMode, setCodexMultiSelectMode] = useState(false);
+  const [selectedCodexIds, setSelectedCodexIds] = useState<Set<string>>(new Set());
+  const [lastSelectedCodexId, setLastSelectedCodexId] = useState<string | null>(null);
+  // Task 5.2.2: 批量删除确认对话框
+  const [codexBatchDeleteOpen, setCodexBatchDeleteOpen] = useState(false);
+  // Task 5.2.2: 移动分组下拉菜单
+  const [codexMoveGroupMenuOpen, setCodexMoveGroupMenuOpen] = useState(false);
+  // Task 5.2.4: 批量操作进行中标记（禁用按钮防止重复点击）
+  const [codexBatchProcessing, setCodexBatchProcessing] = useState(false);
+  // Task 5.2.4: 批量删除进度（{current, total} 或 null）
+  const [codexBatchProgress, setCodexBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  // Task 5.4.1: 拖拽悬停的目标分组类型（用于高亮分组标题）
+  const [dragOverGroupType, setDragOverGroupType] = useState<CodexEntityType | null>(null);
 
   // 加载设定库卡片：项目切换时调用 useCodexStore.loadAll
   // loadAll 内部调用后端 list_codex_entities 并填充 Map，组件订阅 cards 自动重渲染
@@ -311,6 +334,44 @@ export default function CodexPanel() {
     }
   }, [selectedEntity, mentions, handleJumpToFile, loadMentions]);
 
+  // Task 4.1.3: 添加角色卡片到人物图谱
+  // 点击行为：
+  //   1. 调用 createNodeFromCodexCard 在图谱 store 中创建/复用节点(同 codexId 幂等)
+  //   2. 切换到 characterGraph 分类让用户看到新节点
+  //   3. 通过 toast 提示创建结果(新建 vs 已存在)
+  // 设计说明:
+  //   - 仅对 character 类型卡片显示入口(UI 层限制),其他类型不进入此分支
+  //   - createNodeFromCodexCard 内部带幂等检查,避免重复添加
+  //   - 切换分类后由 CharacterGraphPanel 自动加载图谱数据
+  const handleAddToCharacterGraph = useCallback(() => {
+    if (!selectedEntity) return;
+    if (selectedEntity.cardType !== "character") {
+      // 防御性校验: UI 层应已限制, 此处兜底
+      showToast("warning", t("codex.addToGraphOnlyCharacter"));
+      return;
+    }
+    try {
+      const newNodeId = useCharacterGraphStore
+        .getState()
+        .createNodeFromCodexCard({
+          codexId: selectedEntity.id,
+          name: selectedEntity.name,
+          sourceFile: selectedEntity.sourceFile,
+          tags: selectedEntity.tags,
+          brief: selectedEntity.summary,
+        });
+      // 切换到人物图谱分类, 让用户看到新节点
+      setActiveCategory("characterGraph");
+      // 选中新建节点, 触发抽屉自动打开(便于用户继续补充身份/简介等字段)
+      useCharacterGraphStore.getState().selectNode(newNodeId);
+      // 通过对比 newNodeId 是否与现有节点 ID 冲突判断是否为新建
+      // createNodeFromCodexCard 幂等返回已存在节点 ID 时不重复提示
+      showToast("success", t("codex.addToGraphSuccess", { name: selectedEntity.name }));
+    } catch (e) {
+      showToast("error", t("codex.addToGraphFailed", { error: String(e) }));
+    }
+  }, [selectedEntity, setActiveCategory, showToast, t]);
+
   // 打开新增实体对话框：指定类型预填
   const handleOpenAddDialog = useCallback((type: CodexEntityType) => {
     setNewEntityType(type);
@@ -402,14 +463,30 @@ export default function CodexPanel() {
     [currentProject]
   );
 
-  // 确认删除实体：调用后端删除文件后同步移除 Store 中的卡片
+  // 确认删除实体：调用 Store 的 deleteCard（内部调用后端 delete_codex_entity 联动清理 Mention）
+  // deleteCard 会触发 codex:card-deleted 事件，NovelEditor 监听后重新加载已打开的章节文件
   const handleConfirmDelete = useCallback(async () => {
     if (!currentProject || !deleteTarget) return;
     try {
-      await deleteCodexEntity(currentProject.path, deleteTarget.sourceFile);
-      showToast("success", t("codex.deleteSuccess", { name: deleteTarget.name }));
-      // 从 Store 中移除该卡片（SSOT：Store 删除即 UI 更新）
-      deleteCardFromStore(deleteTarget.id);
+      const removedMentions = await deleteCardFromStore(
+        deleteTarget.id,
+        currentProject.path
+      );
+      // 若清理了 Mention 节点，toast 中附加清理数量提示
+      if (removedMentions > 0) {
+        showToast(
+          "success",
+          t("codex.deleteSuccessWithMentions", {
+            name: deleteTarget.name,
+            count: removedMentions,
+          })
+        );
+      } else {
+        showToast(
+          "success",
+          t("codex.deleteSuccess", { name: deleteTarget.name })
+        );
+      }
       // 同步刷新项目目录树：删除的 .pmd 文件需从 FileList 中移除
       refreshProjectTree();
       // 若删除的是当前选中项，清空选中
@@ -435,12 +512,248 @@ export default function CodexPanel() {
     return mentions.reduce((sum, m) => sum + m.count, 0);
   }, [mentions]);
 
-  // 用户手动点击卡片选中：重置编辑态，避免上一个卡片的未保存改动残留
-  // 程序化选中（pendingSelectCardId / 新建后选中）不经过此路径，保留其编辑态控制权
-  const handleSelectCard = useCallback((cardId: string) => {
+  // Task 5.2.3: Esc 键退出多选模式
+  // 监听全局 keydown，Esc 时清空选中并退出多选模式
+  useEffect(() => {
+    if (!codexMultiSelectMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setCodexMultiSelectMode(false);
+        setSelectedCodexIds(new Set());
+        setLastSelectedCodexId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [codexMultiSelectMode]);
+
+  /**
+   * Task 5.2.3: 主动进入多选模式（点击工具栏多选按钮）
+   */
+  const handleEnterCodexMultiSelect = useCallback(() => {
+    setCodexMultiSelectMode(true);
+    // 若当前有选中实体，初始化为选中集合
+    if (selectedId) {
+      setSelectedCodexIds(new Set([selectedId]));
+      setLastSelectedCodexId(selectedId);
+    }
+  }, [selectedId]);
+
+  /**
+   * Task 5.2.3: 退出多选模式
+   */
+  const handleExitCodexMultiSelect = useCallback(() => {
+    setCodexMultiSelectMode(false);
+    setSelectedCodexIds(new Set());
+    setLastSelectedCodexId(null);
+    setCodexMoveGroupMenuOpen(false);
+  }, []);
+
+  /**
+   * Task 5.2.3: 多选感知的卡片选择处理函数
+   * 输入:
+   *   cardId 卡片 ID
+   *   e 鼠标事件（用于检测 Ctrl/Shift 修饰键）
+   * 流程:
+   *   1. Ctrl+Click：进入多选模式，切换该卡片的选中状态
+   *   2. Shift+Click：进入多选模式，选中从 lastSelectedCodexId 到当前卡片的范围
+   *   3. 普通点击：
+   *      - 多选模式下：清空选中，退出多选，切换单选
+   *      - 非多选模式下：直接切换单选（重置编辑态）
+   */
+  const handleSelectCardMulti = useCallback((cardId: string, e?: React.MouseEvent) => {
+    const isCtrl = e?.ctrlKey || e?.metaKey;
+    const isShift = e?.shiftKey;
+
+    if (isCtrl) {
+      // Ctrl+Click: 进入多选模式并切换选中
+      setCodexMultiSelectMode(true);
+      setSelectedCodexIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(cardId)) {
+          next.delete(cardId);
+        } else {
+          next.add(cardId);
+        }
+        return next;
+      });
+      setLastSelectedCodexId(cardId);
+      return;
+    }
+
+    if (isShift && lastSelectedCodexId) {
+      // Shift+Click: 范围选择（从 lastSelectedCodexId 到当前卡片）
+      setCodexMultiSelectMode(true);
+      setSelectedCodexIds((prev) => {
+        const next = new Set(prev);
+        // 在 cardsList 中查找两个卡片的索引，选中区间内所有卡片
+        const startIndex = cardsList.findIndex((c) => c.id === lastSelectedCodexId);
+        const endIndex = cardsList.findIndex((c) => c.id === cardId);
+        if (startIndex === -1 || endIndex === -1) {
+          next.add(cardId);
+          return next;
+        }
+        const from = Math.min(startIndex, endIndex);
+        const to = Math.max(startIndex, endIndex);
+        for (let i = from; i <= to; i++) {
+          next.add(cardsList[i].id);
+        }
+        return next;
+      });
+      return;
+    }
+
+    // 普通点击：多选模式下退出多选并切换单选
+    if (codexMultiSelectMode) {
+      setCodexMultiSelectMode(false);
+      setSelectedCodexIds(new Set());
+      setLastSelectedCodexId(null);
+    }
     setSelectedId(cardId);
     setEditing(false);
-  }, []);
+  }, [codexMultiSelectMode, lastSelectedCodexId, cardsList]);
+
+  /**
+   * Task 5.2.4: 批量删除设定实体确认处理
+   * 循环调用 deleteCardFromStore 删除选中卡片，累计清理 Mention 数量
+   * 进度通过 codexBatchProgress 状态显示 i/n，完成后显示含清理 Mention 数量的成功 toast
+   * 异常处理：单个卡片删除失败不中断整体流程，最终统计成功/失败数量
+   */
+  const handleCodexBatchDeleteConfirm = useCallback(async () => {
+    if (!currentProject || selectedCodexIds.size === 0) return;
+    setCodexBatchDeleteOpen(false);
+    setCodexBatchProcessing(true);
+    const ids = Array.from(selectedCodexIds);
+    setCodexBatchProgress({ current: 0, total: ids.length });
+    let totalRemovedMentions = 0;
+    let success = 0;
+    let failed = 0;
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        const cardId = ids[i];
+        const card = cards.get(cardId);
+        if (!card) {
+          failed++;
+          setCodexBatchProgress({ current: i + 1, total: ids.length });
+          continue;
+        }
+        try {
+          const removed = await deleteCardFromStore(cardId, currentProject.path);
+          totalRemovedMentions += removed;
+          success++;
+        } catch {
+          failed++;
+        }
+        // 更新进度
+        setCodexBatchProgress({ current: i + 1, total: ids.length });
+      }
+      // 刷新项目目录树
+      refreshProjectTree();
+      // 若删除了当前选中项，清空选中
+      if (selectedId && ids.includes(selectedId)) {
+        setSelectedId(null);
+      }
+      showToast(
+        "success",
+        t("codex.batch.deleteSuccess", {
+          count: success,
+          mentionCount: totalRemovedMentions,
+        })
+      );
+      handleExitCodexMultiSelect();
+    } catch (e) {
+      showToast("error", t("codex.batch.deleteFailed", { error: String(e) }));
+    } finally {
+      setCodexBatchProcessing(false);
+      setCodexBatchProgress(null);
+    }
+  }, [currentProject, selectedCodexIds, cards, selectedId, showToast, t, deleteCardFromStore, refreshProjectTree, handleExitCodexMultiSelect]);
+
+  /**
+   * Task 5.2.3: 批量移动选中实体到指定分组
+   * 输入: targetGroup 目标分组类型
+   * 流程: 循环调用 renamePath 跨目录移动 + updateCodexEntity 更新 entityType
+   * 设计说明: 后端 update_codex_entity 仅更新元数据不移动文件，需先 renamePath 移动文件
+   */
+  const handleCodexBatchMoveGroup = useCallback(async (targetGroup: CodexEntityType) => {
+    if (!currentProject || selectedCodexIds.size === 0) return;
+    setCodexMoveGroupMenuOpen(false);
+    setCodexBatchProcessing(true);
+    const ids = Array.from(selectedCodexIds);
+    let success = 0;
+    let failed = 0;
+    try {
+      for (const cardId of ids) {
+        const card = cards.get(cardId);
+        if (!card) continue;
+        // 跳过已在目标分组的实体
+        if (card.cardType === targetGroup) continue;
+        try {
+          // 移动文件到目标分组目录
+          const targetDir = getCodexDirName(targetGroup);
+          const fileName = card.sourceFile.split("/").pop() || `${card.name}.pmd`;
+          const newRelPath = `${targetDir}/${fileName}`;
+          await renamePath(currentProject.path, card.sourceFile, newRelPath);
+          // 更新实体的 entityType 字段
+          await updateCodexEntity(currentProject.path, newRelPath, { entityType: targetGroup });
+          success++;
+        } catch {
+          failed++;
+        }
+      }
+      // 刷新 Store 与项目目录树
+      await loadEntities();
+      refreshProjectTree();
+      showToast(
+        "success",
+        t("codex.batch.moveSuccess", {
+          count: success,
+          group: CODEX_TYPE_LABELS[targetGroup],
+        })
+      );
+      handleExitCodexMultiSelect();
+    } catch (e) {
+      showToast("error", t("codex.batch.moveFailed", { error: String(e) }));
+    } finally {
+      setCodexBatchProcessing(false);
+    }
+  }, [currentProject, selectedCodexIds, cards, showToast, t, loadEntities, refreshProjectTree, handleExitCodexMultiSelect]);
+
+  /**
+   * Task 5.4.1/5.4.2: 拖拽单个实体到目标分组
+   * 输入:
+   *   codexId 被拖拽的卡片 ID
+   *   targetGroup 目标分组类型
+   * 流程:
+   *   1. 校验卡片存在且与目标分组不同
+   *   2. 调用 renamePath 移动 .pmd 文件到目标分组目录
+   *   3. 调用 updateCodexEntity 更新 entityType 字段
+   *   4. 刷新 Store 与项目目录树
+   */
+  const handleDragToGroup = useCallback(async (codexId: string, targetGroup: CodexEntityType) => {
+    if (!currentProject) return;
+    setDragOverGroupType(null);
+    const card = cards.get(codexId);
+    if (!card || card.cardType === targetGroup) return;
+    try {
+      // 移动文件到目标分组目录
+      const targetDir = getCodexDirName(targetGroup);
+      const fileName = card.sourceFile.split("/").pop() || `${card.name}.pmd`;
+      const newRelPath = `${targetDir}/${fileName}`;
+      await renamePath(currentProject.path, card.sourceFile, newRelPath);
+      // 更新实体的 entityType 字段
+      await updateCodexEntity(currentProject.path, newRelPath, { entityType: targetGroup });
+      // 刷新 Store 与项目目录树
+      await loadEntities();
+      refreshProjectTree();
+      showToast(
+        "success",
+        t("codex.batch.moveToGroup", { group: CODEX_TYPE_LABELS[targetGroup] })
+      );
+    } catch (e) {
+      showToast("error", t("codex.batch.moveFailed", { error: String(e) }));
+    }
+  }, [currentProject, cards, showToast, t, loadEntities, refreshProjectTree]);
 
   return (
     <div className="flex h-full w-full flex-1 bg-nf-bg-panel min-w-0">
@@ -498,6 +811,18 @@ export default function CodexPanel() {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
+            {/* Task 5.2.3: 多选模式入口按钮 */}
+            <button
+              onClick={handleEnterCodexMultiSelect}
+              title={t("codex.batch.exit")}
+              className={`transition-colors duration-150 ${
+                codexMultiSelectMode
+                  ? "text-fandex-tertiary"
+                  : "text-nf-text-tertiary hover:text-fandex-primary"
+              }`}
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
@@ -514,6 +839,92 @@ export default function CodexPanel() {
             />
           </div>
         </div>
+
+        {/* Task 5.2.3: 批量操作工具栏（多选模式下显示） */}
+        {codexMultiSelectMode && (
+          <div className="flex-shrink-0 px-3 py-2 border-b border-nf-border-light bg-fandex-tertiary/5">
+            {codexBatchProgress ? (
+              /* Task 5.2.4: 批量删除进度显示 */
+              <div className="flex items-center gap-2 text-xs text-fandex-tertiary">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>
+                  {t("codex.batch.deletingProgress", {
+                    current: codexBatchProgress.current,
+                    total: codexBatchProgress.total,
+                  })}
+                </span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs text-fandex-tertiary font-medium">
+                    {t("codex.batch.selectedCount", { count: selectedCodexIds.size })}
+                  </span>
+                  <button
+                    onClick={handleExitCodexMultiSelect}
+                    className="text-nf-text-tertiary hover:text-nf-text transition duration-fast"
+                    title={t("codex.batch.exit")}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {/* 批量删除 */}
+                  <button
+                    onClick={() => setCodexBatchDeleteOpen(true)}
+                    disabled={codexBatchProcessing || selectedCodexIds.size === 0}
+                    className="nf-tool-btn h-6 px-2 text-[11px] flex items-center gap-1 text-nf-text-secondary hover:text-red-400 border border-nf-border-light hover:border-red-400/60 disabled:opacity-40 disabled:cursor-not-allowed transition duration-fast"
+                    title={t("codex.batch.delete")}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span className="truncate">{t("codex.batch.delete")}</span>
+                  </button>
+                  {/* 移动分组下拉 */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setCodexMoveGroupMenuOpen((v) => !v)}
+                      disabled={codexBatchProcessing || selectedCodexIds.size === 0}
+                      className="nf-tool-btn h-6 px-2 text-[11px] flex items-center gap-1 text-nf-text-secondary hover:text-fandex-primary border border-nf-border-light hover:border-fandex-primary/60 disabled:opacity-40 disabled:cursor-not-allowed transition duration-fast"
+                      title={t("codex.batch.moveGroup")}
+                    >
+                      <FolderInput className="w-3 h-3" />
+                      <span className="truncate">{t("codex.batch.moveGroup")}</span>
+                      <ChevronDown className="w-3 h-3 opacity-70" />
+                    </button>
+                    {codexMoveGroupMenuOpen && (
+                      <>
+                        {/* 透明遮罩：点击外部关闭下拉 */}
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setCodexMoveGroupMenuOpen(false)}
+                        />
+                        <div className="nf-glass-panel absolute top-full left-0 mt-1 w-44 bg-nf-bg-card border border-nf-border-light shadow-lg z-50 py-1">
+                          {(["character", "worldview", "glossary", "material"] as CodexEntityType[]).map((gType) => {
+                            const GIcon = TYPE_ICONS[gType];
+                            return (
+                              <button
+                                key={gType}
+                                onClick={() => handleCodexBatchMoveGroup(gType)}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-nf-text hover:bg-nf-bg-hover transition duration-fast"
+                              >
+                                <GIcon className="w-3.5 h-3.5 text-fandex-primary flex-shrink-0" />
+                                <span>{CODEX_TYPE_LABELS[gType]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {/* Task 5.4.1: 拖拽分组提示 */}
+                <div className="mt-1 text-[10px] text-nf-text-tertiary/70">
+                  {t("codex.batch.dragHint")}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* 实体列表（按类型分组） */}
         <div className="flex-1 overflow-y-auto">
@@ -533,8 +944,29 @@ export default function CodexPanel() {
               const Icon = TYPE_ICONS[entityType];
               return (
                 <div key={type} className="mb-1">
-                  {/* 分组标题 */}
-                  <div className="px-3 py-1.5 text-[10px] font-semibold text-nf-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                  {/* Task 5.4.1: 分组标题作为拖拽 drop target */}
+                  <div
+                    className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all duration-150 ${
+                      dragOverGroupType === entityType
+                        ? "bg-fandex-tertiary/15 text-fandex-tertiary ring-1 ring-fandex-tertiary/40"
+                        : "text-nf-text-tertiary"
+                    }`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setDragOverGroupType(entityType);
+                    }}
+                    onDragLeave={() => {
+                      setDragOverGroupType((prev) => (prev === entityType ? null : prev));
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const codexId = e.dataTransfer.getData("text/codex-id");
+                      if (codexId) {
+                        handleDragToGroup(codexId, entityType);
+                      }
+                    }}
+                  >
                     <Icon className="w-3 h-3" />
                     {CODEX_TYPE_LABELS[entityType]}
                     <span className="text-nf-text-tertiary/60">({list!.length})</span>
@@ -542,24 +974,38 @@ export default function CodexPanel() {
                   {/* 实体项 */}
                   {list!.map((card) => {
                     const isSelected = card.id === selectedId;
+                    // Task 5.2.3: 多选高亮
+                    const isMultiSelected = codexMultiSelectMode && selectedCodexIds.has(card.id);
                     return (
                       <div
                         key={card.id}
+                        // Task 5.4.1: 启用 HTML5 拖拽 API
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/codex-id", card.id);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-all duration-150 relative group ${
-                          isSelected
-                            ? "bg-fandex-primary/10 text-fandex-primary"
-                            : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
+                          isMultiSelected
+                            ? "bg-fandex-tertiary/15 text-fandex-tertiary"
+                            : isSelected
+                              ? "bg-fandex-primary/10 text-fandex-primary"
+                              : "text-nf-text-secondary hover:text-nf-text hover:bg-nf-bg-hover"
                         }`}
                       >
                         {/* 左侧色条激活指示器 */}
                         <span
-                          className={`absolute left-0 top-1 bottom-1 w-[3px] bg-fandex-primary transition-all duration-150 ${
-                            isSelected ? "opacity-100 scale-y-100" : "opacity-0 scale-y-0"
+                          className={`absolute left-0 top-1 bottom-1 w-[3px] transition-all duration-150 ${
+                            isMultiSelected
+                              ? "bg-fandex-tertiary opacity-100 scale-y-100"
+                              : isSelected
+                                ? "bg-fandex-primary opacity-100 scale-y-100"
+                                : "bg-fandex-primary opacity-0 scale-y-0"
                           }`}
                           style={{ transformOrigin: "center" }}
                         />
                         <button
-                          onClick={() => handleSelectCard(card.id)}
+                          onClick={(e) => handleSelectCardMulti(card.id, e)}
                           className="flex items-center gap-2 flex-1 min-w-0 text-left"
                         >
                           <FileText className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
@@ -638,6 +1084,17 @@ export default function CodexPanel() {
                     <ArrowRight className="w-3.5 h-3.5" />
                     {t("codex.findInManuscript")}
                   </button>
+                  {/* Task 4.1.3: 添加到人物图谱按钮, 仅 character 类型卡片显示 */}
+                  {selectedEntity.cardType === "character" && (
+                    <button
+                      onClick={handleAddToCharacterGraph}
+                      title={t("codex.addToCharacterGraph")}
+                      className="flex items-center gap-1.5 px-3 py-1 text-xs border border-nf-border-light text-nf-text-secondary hover:text-fandex-tertiary hover:border-fandex-tertiary/60 hover:bg-fandex-tertiary/5 transition duration-fast"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      {t("codex.addToCharacterGraph")}
+                    </button>
+                  )}
                 </div>
                 {selectedEntity.aliases.length > 0 && (
                   <div className="flex items-center gap-2 text-xs text-nf-text-tertiary">
@@ -880,6 +1337,18 @@ export default function CodexPanel() {
         cancelLabel={t("app.cancel")}
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
+      />
+
+      {/* Task 5.2.4: 批量删除设定实体确认对话框 */}
+      <ConfirmDialog
+        open={codexBatchDeleteOpen}
+        type="danger"
+        title={t("codex.batch.deleteConfirmTitle")}
+        message={t("codex.batch.deleteConfirmMsg", { count: selectedCodexIds.size })}
+        confirmLabel={t("app.delete")}
+        cancelLabel={t("app.cancel")}
+        onConfirm={handleCodexBatchDeleteConfirm}
+        onCancel={() => setCodexBatchDeleteOpen(false)}
       />
     </div>
   );

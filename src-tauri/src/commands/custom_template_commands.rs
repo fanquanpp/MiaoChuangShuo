@@ -2,7 +2,7 @@
 //
 // 功能概述：
 // 提供自定义项目模板的列表、保存、删除 Tauri 命令。
-// 模板以 JSON 文件形式存储在系统配置目录的 novelforge/templates/ 子目录下。
+// 模板以 JSON 文件形式存储在系统配置目录的 MiaoChuangShuo/templates/ 子目录下。
 //
 // 模块职责：
 // 1. 列出所有自定义模板
@@ -15,13 +15,15 @@
 use std::fs;
 use std::path::PathBuf;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
 
 /// 自定义模板结构
 /// 存储在应用配置目录 templates/ 下
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Task 1.7.2: 派生 JsonSchema 用于自动生成前端 TS 类型与 CI 一致性校验
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CustomTemplate {
     pub id: String,
     pub name: String,
@@ -32,7 +34,7 @@ pub struct CustomTemplate {
 
 /// 获取自定义模板存储目录
 /// 输出: Result<PathBuf, AppError> 模板目录路径
-/// 流程: 定位系统配置目录下的 novelforge/templates/，不存在时创建
+/// 流程: 定位系统配置目录下的 MiaoChuangShuo/templates/，不存在时创建
 /// 错误:
 ///   - ConfigError: 系统无法提供配置目录
 ///   - IoError: 创建模板目录失败
@@ -40,7 +42,7 @@ fn get_templates_dir() -> Result<PathBuf, AppError> {
     let config_dir = dirs::config_dir().ok_or_else(|| {
         AppError::config_error("无法获取配置目录")
     })?;
-    let templates_dir = config_dir.join("novelforge").join("templates");
+    let templates_dir = config_dir.join("MiaoChuangShuo").join("templates");
     if !templates_dir.exists() {
         fs::create_dir_all(&templates_dir).map_err(|e| AppError::IoError {
             source: e,

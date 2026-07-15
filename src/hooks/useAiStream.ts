@@ -128,6 +128,11 @@ export function useAiStream({
   // 每次发起流式请求时生成新的 UUID, cancelStream 使用此 ID 调用取消
   const requestIdRef = useRef<string>("");
 
+  // Task 2.5: AbortController 引用 (前端自主中断流式请求)
+  // 不再仅依赖后端 cancel_chat_completion, 取消时立即 abort fetch 事件流
+  // 每次 startStream 创建新实例, cancelStream 调用 abort() 触发前端 cleanup
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Task 35.2: setTimeout 引用列表 (卸载时清理)
   const timeoutRefs = useRef<number[]>([]);
 
@@ -160,10 +165,13 @@ export function useAiStream({
   }, []);
 
   // onAccumulate / onDone 最新引用 (避免闭包过期)
+  // Task 2.9: useRef.current 赋值移入 useEffect, 避免渲染期间副作用
   const onAccumulateRef = useRef(onAccumulate);
-  onAccumulateRef.current = onAccumulate;
   const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
+  useEffect(() => {
+    onAccumulateRef.current = onAccumulate;
+    onDoneRef.current = onDone;
+  });
 
   /**
    * 发起流式请求
@@ -174,11 +182,13 @@ export function useAiStream({
    * 输出: Promise<void>
    * 流程:
    *   1. 生成新的 requestId 并保存到 ref (供 cancelStream 使用)
-   *   2. 累加器初始化为空字符串
-   *   3. 注册 onChunk: 累加 chunk, 调用 onAccumulate 上抛
-   *   4. 注册 onDone: 调用 onDone 上抛完成状态
-   *   5. 调用 streamChatCompletion 发起请求 (携带 requestId)
-   *   6. 异常时上抛 error, finally 重置 isStreaming
+   *   2. Task 2.5: 创建新的 AbortController, 保存到 ref (供 cancelStream 前端自主中断)
+   *   3. 累加器初始化为空字符串
+   *   4. 注册 onChunk: 累加 chunk, 调用 onAccumulate 上抛
+   *   5. 注册 onDone: 调用 onDone 上抛完成状态
+   *   6. 调用 streamChatCompletion 发起请求 (携带 requestId 与 signal)
+   *   7. AbortError 视为用户主动取消, 静默处理; 其他异常上抛 error
+   *   8. finally 重置 isStreaming / abortControllerRef / requestId
    */
   const startStream = useCallback(
     async (
@@ -190,6 +200,12 @@ export function useAiStream({
       // 保存到 ref 以便 cancelStream 按 ID 精准取消
       const requestId = generateRequestId();
       requestIdRef.current = requestId;
+
+      // Task 2.5: 创建新的 AbortController, 保存到 ref
+      // 若 ref 中已存在旧实例 (理论上不应出现), 先 abort 防止泄漏
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
 
       let accumulated = "";
       try {
@@ -203,9 +219,13 @@ export function useAiStream({
             // 上抛完成状态 (含错误信息与 Token 用量统计)
             onDoneRef.current(assistantMsgId, error, usage);
           },
-        }, requestId);
+        }, requestId, signal);
       } catch (err) {
-        // 异常: 上抛错误信息
+        // Task 2.5: AbortError 为用户主动取消, 静默返回不报错
+        if (err === "AbortError" || (err instanceof DOMException && err.name === "AbortError")) {
+          return;
+        }
+        // 其他异常: 上抛错误信息
         const errMsg = String(err);
         onDoneRef.current(assistantMsgId, errMsg);
         throw err;
@@ -213,6 +233,8 @@ export function useAiStream({
         setIsStreaming(false);
         // 清空 requestId, 避免取消已结束的请求
         requestIdRef.current = "";
+        // Task 2.5: 清空 abortControllerRef, 避免引用已结束的 controller
+        abortControllerRef.current = null;
       }
     },
     []
@@ -222,20 +244,27 @@ export function useAiStream({
    * 中断当前流式请求 (Esc 触发)
    * 输出: Promise<void>
    * 流程:
-   *   1. 读取当前 requestId
-   *   2. 调用 cancelStreamCompletion(requestId) 通知后端精准取消
-   *   3. 后端将推送 done(error="用户取消请求")
+   *   1. Task 2.5: 调用 abortControllerRef.current?.abort() 前端自主中断
+   *      (立即触发 streamChatCompletion 内部 cleanup, reject AbortError)
+   *   2. 读取当前 requestId, 调用 cancelStreamCompletion(requestId) 通知后端精准取消
+   *   3. 后端将推送 done(error="用户取消请求") 或前端已 abort 提前清理
    *   4. onDone 回调中由父组件更新消息状态
-   *   5. 重置本地 isStreaming
-   * 说明: 若 requestId 为空 (无活跃请求), 跳过后端调用, 仅重置 UI 状态
+   *   5. 重置本地 isStreaming / abortControllerRef
+   * 说明:
+   *   - 若 requestId 为空 (无活跃请求), 跳过后端调用, 仅重置 UI 状态
+   *   - 前端 abort 与后端 cancel 双保险, 任一成功即可让流式结束
    */
   const cancelStream = useCallback(async (): Promise<void> => {
+    // Task 2.5: 前端自主中断 fetch 事件流 (不等后端响应)
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+
     const requestId = requestIdRef.current;
     if (requestId) {
       try {
         await cancelStreamCompletion(requestId);
       } catch {
-        // 后端取消失败时静默处理 (UI 已置为非流式)
+        // 后端取消失败时静默处理 (前端已 abort, UI 已置为非流式)
       }
     }
     setIsStreaming(false);
