@@ -166,32 +166,3 @@ export const useEventBus = create<EventBusState>(( _set, get) => ({
   },
 }));
 
-// ===== 使用示例 =====
-//
-// React 组件中订阅事件（在 useEffect 中注册，卸载时自动清理）：
-//
-//   import { useEffect } from "react";
-//   import { useEventBus } from "../lib/eventBusSlice";
-//
-//   function CodexPanel() {
-//     const emit = useEventBus((s) => s.emit);
-//     useEffect(() => {
-//       // 订阅实体悬停事件，高亮设定面板中对应实体
-//       const unsubscribe = useEventBus
-//         .getState()
-//         .on("entity:hover", (payload) => {
-//           setHoveredId(payload.entityId);
-//         });
-//       return unsubscribe; // 组件卸载时自动取消订阅
-//     }, []);
-//
-//     // 触发实体点击事件，通知其他面板
-//     const handleEntityClick = (id: string) => {
-//       emit("entity:click", { entityId: id, source: "codex" });
-//     };
-//   }
-//
-// 非 React 场景（如 Web Worker、工具函数）直接操作 store：
-//
-//   useEventBus.getState().emit("codex:updated", {} as never);
-

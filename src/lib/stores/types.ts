@@ -15,5 +15,4 @@ export type SidebarCategory =
   | "stats"
   | "search"
   | "timeline"
-  | "characterGraph"
-  | "foreshadowing";
+  | "characterGraph";

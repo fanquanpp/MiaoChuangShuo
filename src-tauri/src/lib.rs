@@ -30,7 +30,6 @@ mod ai_config;
 mod ai_commands;
 mod manifest;
 mod schema_commands;
-mod foreshadowing_commands;
 mod error;
 pub use error::AppError;
 
@@ -235,17 +234,8 @@ pub fn run() {
             // 职责: 为核心数据结构自动生成 JSON Schema 文件,供前端 TS 类型生成与 CI 校验
             // ============================================================
             schema_commands::generate_schemas,
-
             // ============================================================
-            // 伏笔追踪命令 (4 项) - foreshadowing_commands (Task 5.1)
-            // 职责: 伏笔 CRUD,持久化到 <project>/伏笔/foreshadowings.json
-            // ============================================================
-            foreshadowing_commands::list_foreshadowings,
-            foreshadowing_commands::create_foreshadowing,
-            foreshadowing_commands::update_foreshadowing,
-            foreshadowing_commands::delete_foreshadowing,
-            // ============================================================
-            // 命令注册总计: 82 项,按 20 个业务模块分组
+            // 命令注册总计: 78 项,按 19 个业务模块分组
             // ============================================================
         ])
         .setup(|_app| {

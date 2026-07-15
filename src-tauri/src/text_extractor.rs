@@ -116,7 +116,7 @@ fn extract_text_from_pmd(content: &str) -> String {
     };
 
     let mut result = String::new();
-    collect_text_from_node(&parsed, &mut result, true);
+    collect_text_from_node(&parsed, &mut result);
     result.trim_end().to_string()
 }
 
@@ -128,9 +128,8 @@ fn extract_text_from_pmd(content: &str) -> String {
 /// 输入:
 ///   node - 当前节点 JSON Value
 ///   result - 累积的纯文本（可变引用）
-///   _is_block - 已废弃参数,保留仅为向后兼容(核心函数统一采用块级节点追加换行策略)
 /// 流程: 委托 collect_text_from_node_core,collect_scene_id=false
-fn collect_text_from_node(node: &serde_json::Value, result: &mut String, _is_block: bool) {
+fn collect_text_from_node(node: &serde_json::Value, result: &mut String) {
     // scene_id 在此函数中不需要,使用本地变量接收后丢弃
     let mut scene_id: Option<String> = None;
     crate::prosemirror_parser::collect_text_from_node_core(node, result, false, &mut scene_id);

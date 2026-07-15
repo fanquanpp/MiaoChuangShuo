@@ -33,7 +33,6 @@ import {
   Trash2,
   X,
   Users,
-  Eye,
 } from "lucide-react";
 import {
   useAppStore,
@@ -57,11 +56,10 @@ const ICON_MAP: Record<SidebarCategory, React.ComponentType<{ className?: string
   search: Search,
   timeline: GitBranch,
   characterGraph: Users,
-  foreshadowing: Eye,
 };
 
-// 写作主分类：核心写作功能，常驻显示（含剧情图谱/人物关系图/伏笔追踪，归类到写作）
-const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline", "characterGraph", "foreshadowing"];
+// 写作主分类：核心写作功能，常驻显示（含剧情图谱/人物关系图，归类到写作）
+const PRIMARY_CATEGORIES: SidebarCategory[] = ["manuscript", "outline", "timeline", "characterGraph"];
 
 // 设定类分类：统一设定库入口（替代原 characters/worldview/glossary/materials 分散入口）
 const SETTINGS_CATEGORIES: SidebarCategory[] = ["codex"];

@@ -37,7 +37,6 @@ import {
   FileDown,
   Network,
   Clock,
-  Eye,
   type LucideIcon,
 } from "lucide-react";
 import { useAppStore, CATEGORY_NAMES, type SidebarCategory } from "../lib/store";
@@ -46,7 +45,6 @@ import { useSettingsStore } from "../lib/settingsStore";
 import { useI18n } from "../lib/i18n";
 import { useCharacterGraphStore } from "../lib/stores/characterGraphStore";
 import { useTimelineStore } from "../lib/stores/timelineStore";
-import { useToast } from "../lib/toast";
 
 // 命令接口定义
 interface Command {
@@ -249,14 +247,12 @@ export default function CommandPalette({
 
   // Task 4.9: 跨模块跳转命令数据源
   // 从人物关系图 store 与时间线 store 读取节点列表,生成跳转命令
-  // 伏笔模块未完成(Task 5.1),伏笔跳转命令暂以提示形式占位
   const characterNodes = useCharacterGraphStore((s) => s.nodes);
   const selectCharacterNode = useCharacterGraphStore((s) => s.selectNode);
   const timelineNodes = useTimelineStore((s) => s.nodes);
   const selectTimelineNode = useTimelineStore((s) => s.selectNode);
-  const { showToast: showToastFromHook } = useToast();
 
-  // 跨模块跳转命令(图谱节点 / 时间线事件 / 伏笔占位)
+  // 跨模块跳转命令(图谱节点 / 时间线事件)
   // 每个图谱/时间线节点生成一条独立命令,点击后切换分类并选中目标节点
   const jumpCommands: Command[] = useMemo(() => {
     const jumpCategory = t("commandPalette.jumpTo.category");
@@ -284,19 +280,8 @@ export default function CommandPalette({
       },
       icon: Clock,
     }));
-    // Task 4.9.3: 跳转到伏笔(伏笔模块未完成,点击仅显示提示 toast)
-    const foreshadowingCommand: Command = {
-      id: "jump-foreshadowing",
-      label: t("commandPalette.jumpTo.foreshadowing"),
-      category: jumpCategory,
-      keywords: ["跳转", "伏笔", "foreshadowing"],
-      action: () => {
-        showToastFromHook("info", t("commandPalette.jumpTo.foreshadowingDisabled"));
-      },
-      icon: Eye,
-    };
-    return [...graphNodeCommands, ...timelineEventCommands, foreshadowingCommand];
-  }, [characterNodes, timelineNodes, selectCharacterNode, selectTimelineNode, switchTo, showToastFromHook, t]);
+    return [...graphNodeCommands, ...timelineEventCommands];
+  }, [characterNodes, timelineNodes, selectCharacterNode, selectTimelineNode, switchTo, t]);
 
   // 所有命令汇总
   const allCommands = useMemo(

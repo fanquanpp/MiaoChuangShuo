@@ -36,7 +36,6 @@ import {
   Boxes,
   Users,
   GitBranch,
-  Eye,
   Code,
   Bug,
   Tag,
@@ -260,12 +259,6 @@ export default function AboutSettingsSection() {
       titleKey: "about.feature.timeline",
       descKey: "about.feature.timelineDesc",
       iconColor: "text-fandex-primary",
-    },
-    {
-      icon: Eye,
-      titleKey: "about.feature.foreshadowing",
-      descKey: "about.feature.foreshadowingDesc",
-      iconColor: "text-fandex-tertiary",
     },
   ];
 

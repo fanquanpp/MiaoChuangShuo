@@ -131,13 +131,6 @@ pub fn create_project(
     let mut manifest = crate::manifest::Manifest::default();
     crate::manifest::save_manifest(&project_root, &mut manifest)?;
 
-    // Task 5.1.3: 初始化空 foreshadowings.json
-    // 存储位置：<project>/伏笔/foreshadowings.json
-    // 内容为空数组,供伏笔追踪模块 CRUD 命令读写
-    let foreshadowings_path = project_root.join("伏笔").join("foreshadowings.json");
-    fs::write(&foreshadowings_path, "[]")
-        .map_err(|e| AppError::io_error(e, "初始化伏笔数据文件失败"))?;
-
     Ok(project_root.to_string_lossy().to_string())
 }
 

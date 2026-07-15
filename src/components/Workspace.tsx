@@ -39,7 +39,6 @@ import { isNovelType } from "../lib/projectType";
 import CodexPanel from "./CodexPanel";
 import TimelinePanel from "./TimelinePanel";
 import CharacterGraphPanel from "./CharacterGraphPanel";
-import ForeshadowingPanel from "./ForeshadowingPanel";
 
 /** Alt+数字键 → 侧边栏分类映射 */
 const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
@@ -50,7 +49,6 @@ const ALT_CATEGORY_MAP: Record<string, SidebarCategory> = {
   "5": "search",
   "6": "characterGraph",
   "7": "timeline",
-  "8": "foreshadowing",
 };
 
 /**
@@ -388,8 +386,6 @@ export default function Workspace() {
         return <TimelinePanel />;
       case "characterGraph":
         return <CharacterGraphPanel />;
-      case "foreshadowing":
-        return <ForeshadowingPanel />;
       default:
         return (
           <NovelEditor

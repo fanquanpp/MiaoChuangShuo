@@ -161,14 +161,7 @@ NovelEditor 光标位置
 
 **多轮对话 Token 控制**: 保留最近 8 条消息 (4 轮) 作为历史上下文, 避免 Token 爆炸。
 
-### 1.7 伏笔追踪
-
-- **状态管理**: 埋设 / 待回收 / 已回收 / 已废弃 四种状态
-- **跨章节关联**: 通过 setupChapterId / resolutionChapterId 关联章节
-- **重要程度分级**: 高 / 中 / 低 三档
-- **统计概览**: 按状态分组展示, 快速查看回收率
-
-### 1.8 AI-Ready 基础设施
+### 1.7 AI-Ready 基础设施
 
 本项目将全文索引、语义节点、设定库结构化视为"AI 就绪基础设施", 为 AI 创作助手提供底层支撑:
 
@@ -240,7 +233,6 @@ NovelEditor 光标位置
 | `Alt + 3` | 切换到设定库 |
 | `Alt + 4` | 切换到统计 |
 | `Alt + 5` | 切换到搜索 |
-| `Alt + 8` | 切换到伏笔追踪 |
 
 </details>
 
@@ -418,7 +410,6 @@ MiaoChuangShuo/
 │   │   ├── character_graph_commands.rs # 人物关系图持久化
 │   │   ├── timeline_commands.rs        # 剧情时间线持久化与 DAG 校验
 │   │   ├── snapshot_commands.rs        # 增量快照管理
-│   │   ├── foreshadowing_commands.rs   # 伏笔追踪 CRUD 命令
 │   │   ├── commands/                   # Tauri 命令模块
 │   │   │   ├── mod.rs                  # 命令模块注册入口
 │   │   │   ├── archive_commands.rs     # 项目归档命令
@@ -462,7 +453,6 @@ MiaoChuangShuo/
 │   │   ├── CharacterGraphEdgeDrawer.tsx # 关系详情编辑抽屉
 │   │   ├── CharacterHoverCard.tsx      # 角色悬浮卡片
 │   │   ├── CodexPanel.tsx              # 智能设定库面板
-│   │   ├── ForeshadowingPanel.tsx      # 伏笔追踪面板
 │   │   ├── CommandPalette.tsx          # cmdk 命令面板
 │   │   ├── SnapshotHistory.tsx         # 版本快照面板 (虚拟化)
 │   │   ├── WritingStats.tsx            # 写作统计面板
@@ -495,7 +485,6 @@ MiaoChuangShuo/
 │   │   │   ├── codexApi.ts             # 设定库 API
 │   │   │   ├── timelineApi.ts          # 剧情图谱 API
 │   │   │   ├── characterGraphApi.ts    # 人图 API
-│   │   │   └── foreshadowingApi.ts     # 伏笔 API
 │   │   ├── i18n.tsx                    # 国际化 (中/英)
 │   │   ├── updateChecker.ts            # 版本更新检测
 │   │   ├── dagreLayout.ts              # dagre 自动布局算法
@@ -504,7 +493,6 @@ MiaoChuangShuo/
 │   │   ├── settingsStore.ts            # 设置持久化
 │   │   ├── themeStore.ts               # 主题管理
 │   │   ├── stores/                     # Zustand stores
-│   │   │   ├── useForeshadowingStore.ts # 伏笔 store
 │   │   │   ├── useCodexStore.ts        # 设定库 store
 │   │   │   └── ...
 │   │   ├── sceneBreak.ts               # 场景分割自定义节点
@@ -847,7 +835,7 @@ A: 仅以下两个功能需要联网：
 - [x] 项目问题与漏洞修复（AppError 迁移、DPAPI 加密、虚拟化列表、AbortController）
 - [x] TXT 导出功能重构（4 种模式：单文件 / 合并 / 按章节 / 按卷）
 - [x] 数据孤岛与联动优化（Codex 联动、章节删除清理、字数 SSOT）
-- [x] 便捷操作增强（伏笔模块、批量操作、跨目录拖拽、增量索引）
+- [x] 便捷操作增强（批量操作、跨目录拖拽、增量索引）
 - [x] 废弃代码清理（死代码删除、重复代码抽取、文档迁移）
 - [x] README 与 About 栏目升级
 - [x] 设置面板尺寸固定与图标简洁化

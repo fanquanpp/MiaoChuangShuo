@@ -40,7 +40,6 @@ export interface ManifestEntities {
   codex: ManifestEntity[];
   graph_nodes: ManifestEntity[];
   timeline_nodes: ManifestEntity[];
-  foreshadowings: ManifestEntity[];
 }
 
 /**

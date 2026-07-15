@@ -219,12 +219,11 @@ impl StandardProjectType {
 
 /// 统一一级目录列表（所有文体共享）
 ///
-/// 5 个标准目录 + 1 个隐藏元数据目录：
+/// 4 个标准目录 + 1 个隐藏元数据目录：
 /// - 正文：所有正文内容
 /// - 设定：所有设定文件（角色/世界观/术语/素材统一存放，通过 front matter 区分类型）
 /// - 大纲：大纲与构思
 /// - 草稿箱：废弃章节与草稿
-/// - 伏笔：伏笔追踪数据（与正文/设定/大纲/草稿箱并列）
 /// - .novelforge：应用元数据目录（config.json、manifest.json、index/ 等）
 pub fn universal_directories() -> Vec<&'static str> {
     vec![
@@ -232,7 +231,6 @@ pub fn universal_directories() -> Vec<&'static str> {
         "设定",
         "大纲",
         "草稿箱",
-        "伏笔",
         ".novelforge",
     ]
 }

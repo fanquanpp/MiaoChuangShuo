@@ -116,7 +116,7 @@ export default function SettingsDialog({ open, onClose, initialSection }: Settin
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
       onClick={handleOverlayClick}
     >
-      <div className="nf-glass-panel w-[680px] h-[560px] max-w-[95vw] max-h-[90vh] bg-nf-bg-card border border-nf-border-light shadow-2xl flex flex-col">
+      <div className="nf-glass-panel w-[680px] h-[1204px] max-w-[95vw] max-h-[95vh] bg-nf-bg-card border border-nf-border-light shadow-2xl flex flex-col">
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-nf-border-light flex-shrink-0">
           <h2 className="fandex-bar-left text-base font-bold font-display text-nf-text">

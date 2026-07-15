@@ -1,7 +1,7 @@
 // 项目级 manifest.json 统一索引模块
 //
 // 功能概述：
-// 维护项目内所有数据实体(章节/大纲/设定库/图谱节点/时间线节点/伏笔)的
+// 维护项目内所有数据实体(章节/大纲/设定库/图谱节点/时间线节点)的
 // UUID 与 sourceFile 映射,以及反向索引(codexId → graphNodeIds /
 // codexId → chapterIds / chapterId → timelineNodeIds),作为后续数据孤岛
 // 优化(章节删除联动清理、设定库卡片清理 Mention 等)的基础设施。
@@ -33,22 +33,6 @@ use crate::error::AppError;
 ///
 /// 后续 schema 变更时递增此值,配合 migrate_manifest 函数实现版本升级
 const SCHEMA_VERSION: u32 = 1;
-
-/// 反向索引操作类型枚举
-///
-/// 用于 update_reverse_index 函数,标识是追加还是移除一条反向引用
-//
-// 注:本类型为 Task 1.2.4 要求实现的基础设施,实际调用点在后续
-// Task 4.3(章节删除联动清理)/ Task 4.4(设定库卡片清理 Mention)中
-// 接入,故暂时标记 #[allow(dead_code)]
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReverseIndexAction {
-    /// 追加一条引用(已存在则幂等忽略)
-    Add,
-    /// 移除一条引用(不存在则幂等忽略,Vec 空时清理 key)
-    Remove,
-}
 
 /// 顶层 Manifest 结构
 ///
@@ -95,9 +79,6 @@ pub struct ManifestEntities {
     /// 时间线节点实体
     #[serde(default)]
     pub timeline_nodes: Vec<ManifestEntity>,
-    /// 伏笔实体
-    #[serde(default)]
-    pub foreshadowings: Vec<ManifestEntity>,
 }
 
 /// Manifest 单条实体记录
@@ -164,7 +145,7 @@ impl Default for Manifest {
 /// 输入:
 ///   entities - 实体集合可变引用
 ///   entity_type - 实体类型字符串("chapter"/"outline"/"codex"/"graph_node"/
-///                 "timeline_node"/"foreshadowing")
+///                 "timeline_node")
 /// 输出: Option<&mut Vec<ManifestEntity>> 对应数组可变引用,未知类型返回 None
 fn select_entity_vec_mut<'a>(
     entities: &'a mut ManifestEntities,
@@ -176,7 +157,6 @@ fn select_entity_vec_mut<'a>(
         "codex" => Some(&mut entities.codex),
         "graph_node" => Some(&mut entities.graph_nodes),
         "timeline_node" => Some(&mut entities.timeline_nodes),
-        "foreshadowing" => Some(&mut entities.foreshadowings),
         _ => None,
     }
 }
@@ -444,61 +424,6 @@ pub fn unregister_entity(
     Ok(())
 }
 
-/// 维护反向索引
-///
-/// 输入:
-///   manifest - manifest 可变引用
-///   codex_id - 反向索引的 key(对 graph_node/chapter 类型为 codexId,
-///              对 timeline_node 类型实际为 chapterId)
-///   action - Add 追加 / Remove 移除
-///   target_type - 目标实体类型("graph_node"/"chapter"/"timeline_node")
-///   target_id - 目标实体 ID
-/// 输出: 无(直接修改 manifest 反向索引)
-/// 流程:
-///   1. 按 target_type 选取对应 HashMap
-///   2. Add:在 key 对应 Vec 中追加 target_id(去重)
-///   3. Remove:从 key 对应 Vec 中移除 target_id;Vec 空时移除 key
-///
-/// 设计说明:未知 target_type 静默忽略,保持向前兼容
-//
-// 注:本函数为 Task 1.2.4 要求实现的基础设施,实际调用点在后续
-// Task 4.3(章节删除联动清理)/ Task 4.4(设定库卡片清理 Mention)中
-// 接入,故暂时标记 #[allow(dead_code)]
-#[allow(dead_code)]
-pub fn update_reverse_index(
-    manifest: &mut Manifest,
-    codex_id: &str,
-    action: ReverseIndexAction,
-    target_type: &str,
-    target_id: &str,
-) {
-    let target_map = match target_type {
-        "graph_node" => &mut manifest.reverse_index.codex_to_graph_nodes,
-        "chapter" => &mut manifest.reverse_index.codex_to_chapters,
-        "timeline_node" => &mut manifest.reverse_index.chapter_to_timeline_nodes,
-        _ => return,
-    };
-
-    match action {
-        ReverseIndexAction::Add => {
-            let vec = target_map.entry(codex_id.to_string()).or_default();
-            // 去重:已存在则不重复追加
-            if !vec.iter().any(|id| id == target_id) {
-                vec.push(target_id.to_string());
-            }
-        }
-        ReverseIndexAction::Remove => {
-            if let Some(vec) = target_map.get_mut(codex_id) {
-                vec.retain(|id| id != target_id);
-                // Vec 空时移除 key,避免反向索引膨胀
-                if vec.is_empty() {
-                    target_map.remove(codex_id);
-                }
-            }
-        }
-    }
-}
-
 // ===== 文件 IO 同步辅助函数(忽略错误版本) =====
 
 /// 同步注册章节文件到 manifest(失败仅记录日志,不影响主操作)
@@ -686,7 +611,7 @@ fn upsert_meta_field(meta: &mut Vec<(String, String)>, key: &str, value: &str) {
 ///   3. 加载 manifest
 ///   4. 遍历所有 6 类实体数组,移除 sourceFile 匹配的记录
 ///   5. 有变化时保存 manifest
-/// 说明:遍历所有类型是因为删除可能涉及设定/大纲/伏笔等任意文件
+/// 说明:遍历所有类型是因为删除可能涉及设定/大纲等任意文件
 pub fn try_unregister_by_source_file(project_path: &str, abs_path: &Path) {
     let project_root = match PathBuf::from(project_path).canonicalize() {
         Ok(p) => p,
@@ -716,7 +641,6 @@ pub fn try_unregister_by_source_file(project_path: &str, abs_path: &Path) {
     changed |= retain_by_source_file(&mut manifest.entities.codex, &rel);
     changed |= retain_by_source_file(&mut manifest.entities.graph_nodes, &rel);
     changed |= retain_by_source_file(&mut manifest.entities.timeline_nodes, &rel);
-    changed |= retain_by_source_file(&mut manifest.entities.foreshadowings, &rel);
 
     if changed {
         if let Err(e) = save_manifest(&project_root, &mut manifest) {
@@ -771,7 +695,6 @@ pub fn try_rename_source_file(project_path: &str, old_abs: &Path, new_abs: &Path
     changed |= update_source_file(&mut manifest.entities.codex, &old_rel, &new_rel);
     changed |= update_source_file(&mut manifest.entities.graph_nodes, &old_rel, &new_rel);
     changed |= update_source_file(&mut manifest.entities.timeline_nodes, &old_rel, &new_rel);
-    changed |= update_source_file(&mut manifest.entities.foreshadowings, &old_rel, &new_rel);
 
     if changed {
         if let Err(e) = save_manifest(&project_root, &mut manifest) {
@@ -1590,7 +1513,6 @@ mod tests {
         assert!(select_entity_vec_mut(&mut entities, "codex").is_some());
         assert!(select_entity_vec_mut(&mut entities, "graph_node").is_some());
         assert!(select_entity_vec_mut(&mut entities, "timeline_node").is_some());
-        assert!(select_entity_vec_mut(&mut entities, "foreshadowing").is_some());
         assert!(select_entity_vec_mut(&mut entities, "unknown").is_none());
     }
 
@@ -1605,84 +1527,6 @@ mod tests {
         assert!(!is_chapter_file("设定/角色.md"));
         assert!(!is_chapter_file("正文/章节.md"));
         assert!(!is_chapter_file("草稿箱/废弃.txt"));
-    }
-
-    /// 验证 update_reverse_index 的 Add/Remove 行为
-    #[test]
-    fn test_update_reverse_index() {
-        let mut m = Manifest::default();
-
-        // Add: 追加一条 graph_node 引用
-        update_reverse_index(
-            &mut m,
-            "codex-1",
-            ReverseIndexAction::Add,
-            "graph_node",
-            "node-1",
-        );
-        assert_eq!(
-            m.reverse_index.codex_to_graph_nodes.get("codex-1"),
-            Some(&vec!["node-1".to_string()])
-        );
-
-        // Add 重复 id 幂等
-        update_reverse_index(
-            &mut m,
-            "codex-1",
-            ReverseIndexAction::Add,
-            "graph_node",
-            "node-1",
-        );
-        assert_eq!(
-            m.reverse_index.codex_to_graph_nodes.get("codex-1"),
-            Some(&vec!["node-1".to_string()])
-        );
-
-        // Add 第二个 node
-        update_reverse_index(
-            &mut m,
-            "codex-1",
-            ReverseIndexAction::Add,
-            "graph_node",
-            "node-2",
-        );
-        assert_eq!(
-            m.reverse_index.codex_to_graph_nodes.get("codex-1"),
-            Some(&vec!["node-1".to_string(), "node-2".to_string()])
-        );
-
-        // Remove 一个 node
-        update_reverse_index(
-            &mut m,
-            "codex-1",
-            ReverseIndexAction::Remove,
-            "graph_node",
-            "node-1",
-        );
-        assert_eq!(
-            m.reverse_index.codex_to_graph_nodes.get("codex-1"),
-            Some(&vec!["node-2".to_string()])
-        );
-
-        // Remove 最后一个 node,Vec 空时 key 应被清理
-        update_reverse_index(
-            &mut m,
-            "codex-1",
-            ReverseIndexAction::Remove,
-            "graph_node",
-            "node-2",
-        );
-        assert!(m.reverse_index.codex_to_graph_nodes.get("codex-1").is_none());
-
-        // 未知 target_type 静默忽略
-        update_reverse_index(
-            &mut m,
-            "codex-1",
-            ReverseIndexAction::Add,
-            "unknown",
-            "x",
-        );
-        assert!(m.reverse_index.codex_to_graph_nodes.is_empty());
     }
 
     /// 验证 Manifest 序列化为 camelCase 字段名

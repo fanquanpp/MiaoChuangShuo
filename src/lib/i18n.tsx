@@ -424,8 +424,6 @@ const zhCN: TranslationDict = {
   "sidebar.timeline": "剧情图谱",
   // ── 人物关系图 ──
   "sidebar.characterGraph": "人物关系图",
-  // ── 伏笔追踪 ──
-  "sidebar.foreshadowing": "伏笔追踪",
   "timeline.emptyHint": "右键画布添加第一个节点",
   "timeline.emptySubHint": "或使用 Ctrl+L 整理布局",
   "timeline.ctx.addMain": "添加主线节点",
@@ -805,8 +803,6 @@ const zhCN: TranslationDict = {
   "commandPalette.jumpTo.category": "跨模块跳转",
   "commandPalette.jumpTo.graphNode": "跳转到图谱节点: {name}",
   "commandPalette.jumpTo.timelineEvent": "跳转到时间线事件: {name}",
-  "commandPalette.jumpTo.foreshadowing": "跳转到伏笔",
-  "commandPalette.jumpTo.foreshadowingDisabled": "伏笔模块开发中,敬请期待",
 
   // ── 题材模板 ──
   "template.selectTitle": "选择文体类型",
@@ -1158,7 +1154,7 @@ const zhCN: TranslationDict = {
   // ── 关于分区 (AboutSettingsSection) ──
   "about.title": "喵创说",
   "about.slogan": "为业余作家而生",
-  "about.intro": "喵创说是一款面向独立与业余长篇创作者的离线写作工作站。坚持完全离线、完全免费、数据归创作者所有三大原则，将富文本编辑、设定库、人物图谱、剧情时间线、伏笔追踪五大核心模块集成于单一桌面应用。",
+  "about.intro": "喵创说是一款面向独立与业余长篇创作者的离线写作工作站。坚持完全离线、完全免费、数据归创作者所有三大原则，将富文本编辑、设定库、人物图谱、剧情时间线四大核心模块集成于单一桌面应用。",
   "about.principles": "三大原则",
   "about.principle.offline": "离线优先",
   "about.principle.offlineDesc": "无需账号登录，断网环境完整可用",
@@ -1175,8 +1171,6 @@ const zhCN: TranslationDict = {
   "about.feature.characterGraphDesc": "React Flow 受控，关系类型自定义",
   "about.feature.timeline": "剧情时间线",
   "about.feature.timelineDesc": "DAG 校验，分支结构支持",
-  "about.feature.foreshadowing": "伏笔追踪",
-  "about.feature.foreshadowingDesc": "埋设与回收状态管理，跨章节追踪",
   "about.techStack": "技术栈",
   "about.author": "作者信息",
   "about.authorName": "fanquanpp",
@@ -1427,32 +1421,6 @@ const zhCN: TranslationDict = {
   "characterGraph.relation.subordinate": "上下级",
   "characterGraph.relation.fellow": "同门",
   "characterGraph.relation.other": "其他",
-
-  // ── 伏笔追踪（foreshadowing） ──
-  "foreshadowing.title": "伏笔追踪",
-  "foreshadowing.create": "新建伏笔",
-  "foreshadowing.edit": "编辑伏笔",
-  "foreshadowing.delete": "删除伏笔",
-  "foreshadowing.deleteConfirm": "确认删除该伏笔?此操作不可撤销。",
-  "foreshadowing.empty": "暂无伏笔",
-  "foreshadowing.titleField": "标题",
-  "foreshadowing.note": "备注",
-  "foreshadowing.importance": "重要度",
-  "foreshadowing.importance.high": "高",
-  "foreshadowing.importance.medium": "中",
-  "foreshadowing.importance.low": "低",
-  "foreshadowing.status.planted": "已埋设",
-  "foreshadowing.status.setup": "铺垫中",
-  "foreshadowing.status.resolved": "已回收",
-  "foreshadowing.status.abandoned": "已放弃",
-  "foreshadowing.setupChapter": "埋设章节",
-  "foreshadowing.resolutionChapter": "回收章节",
-  "foreshadowing.jumpToSetup": "跳转到埋设章节",
-  "foreshadowing.jumpToResolution": "跳转到回收章节",
-  "foreshadowing.stats.total": "总数",
-  "foreshadowing.saveFailed": "保存伏笔失败",
-  "foreshadowing.deleteFailed": "删除伏笔失败",
-  "foreshadowing.jumpFailed": "跳转关联章节失败",
 };
 
 // 英文翻译
@@ -1856,7 +1824,6 @@ const enUS: TranslationDict = {
   // ── Timeline Graph ──
   "sidebar.timeline": "Timeline",
   "sidebar.characterGraph": "Character Graph",
-  "sidebar.foreshadowing": "Foreshadowing",
   "timeline.emptyHint": "Right-click canvas to add the first node",
   "timeline.emptySubHint": "Or use Ctrl+L to layout",
   "timeline.ctx.addMain": "Add Main Node",
@@ -2237,8 +2204,6 @@ const enUS: TranslationDict = {
   "commandPalette.jumpTo.category": "Cross-module Navigation",
   "commandPalette.jumpTo.graphNode": "Jump to graph node: {name}",
   "commandPalette.jumpTo.timelineEvent": "Jump to timeline event: {name}",
-  "commandPalette.jumpTo.foreshadowing": "Jump to foreshadowing",
-  "commandPalette.jumpTo.foreshadowingDisabled": "Foreshadowing module is under development",
 
   // ── Template Selector ──
   "template.selectTitle": "Choose a Literary Form",
@@ -2603,7 +2568,7 @@ const enUS: TranslationDict = {
   // ── About Section (AboutSettingsSection) ──
   "about.title": "MiaoChuangShuo",
   "about.slogan": "Built for amateur writers",
-  "about.intro": "MiaoChuangShuo is an offline writing workstation designed for independent and amateur long-form writers. It adheres to three principles: fully offline, completely free, and full data ownership. Five core modules (rich text editor, codex, character graph, timeline, foreshadowing) are integrated into a single desktop application.",
+  "about.intro": "MiaoChuangShuo is an offline writing workstation designed for independent and amateur long-form writers. It adheres to three principles: fully offline, completely free, and full data ownership. Four core modules (rich text editor, codex, character graph, timeline) are integrated into a single desktop application.",
   "about.principles": "Three Principles",
   "about.principle.offline": "Offline First",
   "about.principle.offlineDesc": "No account login required, fully functional offline",
@@ -2620,8 +2585,6 @@ const enUS: TranslationDict = {
   "about.feature.characterGraphDesc": "React Flow controlled, custom relation types",
   "about.feature.timeline": "Plot Timeline",
   "about.feature.timelineDesc": "DAG validation, branch support",
-  "about.feature.foreshadowing": "Foreshadowing Tracker",
-  "about.feature.foreshadowingDesc": "Setup & resolution tracking, cross-chapter",
   "about.techStack": "Tech Stack",
   "about.author": "Author",
   "about.authorName": "fanquanpp",
@@ -2860,32 +2823,6 @@ const enUS: TranslationDict = {
   "characterGraph.relation.subordinate": "Subordinate",
   "characterGraph.relation.fellow": "Fellow",
   "characterGraph.relation.other": "Other",
-
-  // ── Foreshadowing ──
-  "foreshadowing.title": "Foreshadowing",
-  "foreshadowing.create": "New Foreshadowing",
-  "foreshadowing.edit": "Edit Foreshadowing",
-  "foreshadowing.delete": "Delete Foreshadowing",
-  "foreshadowing.deleteConfirm": "Delete this foreshadowing? This action cannot be undone.",
-  "foreshadowing.empty": "No foreshadowings",
-  "foreshadowing.titleField": "Title",
-  "foreshadowing.note": "Note",
-  "foreshadowing.importance": "Importance",
-  "foreshadowing.importance.high": "High",
-  "foreshadowing.importance.medium": "Medium",
-  "foreshadowing.importance.low": "Low",
-  "foreshadowing.status.planted": "Planted",
-  "foreshadowing.status.setup": "Setup",
-  "foreshadowing.status.resolved": "Resolved",
-  "foreshadowing.status.abandoned": "Abandoned",
-  "foreshadowing.setupChapter": "Setup Chapter",
-  "foreshadowing.resolutionChapter": "Resolution Chapter",
-  "foreshadowing.jumpToSetup": "Jump to setup chapter",
-  "foreshadowing.jumpToResolution": "Jump to resolution chapter",
-  "foreshadowing.stats.total": "Total",
-  "foreshadowing.saveFailed": "Failed to save foreshadowing",
-  "foreshadowing.deleteFailed": "Failed to delete foreshadowing",
-  "foreshadowing.jumpFailed": "Failed to jump to chapter",
 };
 
 const translations: Record<Locale, TranslationDict> = {
