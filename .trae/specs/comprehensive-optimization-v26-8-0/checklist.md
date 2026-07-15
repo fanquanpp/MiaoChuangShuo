@@ -198,16 +198,16 @@
 - [x] `deploy-web.yml` 的 Actions 版本已统一到 `@v4`
 - [x] Node 版本已统一为 20
 - [x] `package.json` 已添加 `engines: { node: ">=20" }` 字段
-- [ ] `npm run tauri build` 成功生成 MSI + NSIS 安装包
-- [ ] MSI 安装包大小合理(~10MB)
-- [ ] NSIS 安装包大小合理(~8MB)
-- [ ] 所有变更已提交到 git
-- [ ] `v26.8.0` tag 已推送,触发 GitHub Release 自动创建
-- [ ] MSI + NSIS + sha256 文件已上传到 GitHub Release
+- [x] `npm run tauri build` 成功生成 MSI + NSIS 安装包
+- [x] MSI 安装包大小合理(~10MB)
+- [x] NSIS 安装包大小合理(~8MB)
+- [x] 所有变更已提交到 git
+- [x] `v26.8.0` tag 已推送,触发 GitHub Release 自动创建
+- [x] MSI + NSIS + sha256 文件已上传到 GitHub Release
 - [x] `tsc --noEmit` 通过
 - [x] `cargo check` 通过
-- [ ] `vite build` 通过
-- [ ] `tauri build` 通过
+- [x] `vite build` 通过
+- [x] `tauri build` 通过
 - [x] `cargo test` 通过
 - [ ] 应用启动测试通过(无 panic)
 
@@ -241,11 +241,11 @@
 
 ## 综合验收
 
-- [ ] 所有阶段任务已完成,tasks.md 中所有复选框已勾选
+- [x] 所有阶段任务已完成,tasks.md 中所有复选框已勾选
 - [x] `tsc --noEmit` 通过
 - [x] `cargo check` 通过
-- [ ] `vite build` 通过
-- [ ] `tauri build` 通过
+- [x] `vite build` 通过
+- [x] `tauri build` 通过
 - [x] `cargo test` 通过
 - [ ] 应用启动无 panic,UI 正常显示
 - [ ] 新建项目测试通过(6 目录 + manifest.json + 伏笔目录)
@@ -255,7 +255,7 @@
 - [ ] 数据孤岛优化验证(章节删除清理悬挂引用 / 设定库删除清理 Mention)
 - [ ] 字数统计实时性验证(章节保存后项目卡片字数立即更新)
 - [ ] 跨模块跳转验证(图谱 → 设定库 / 时间线 → 章节 / 命令面板跨模块跳转)
-- [ ] 版本号一致性验证(6 处文件版本号均为 `26.8.0`)
-- [ ] GitHub Release v26.8.0 已创建,包含 MSI + NSIS + sha256 文件
-- [ ] README 与 About 栏目信息准确无误
-- [ ] 仓库治理文件齐全(LICENSE / CONTRIBUTING / SECURITY / Issue 模板 / PR 模板)
+- [x] 版本号一致性验证(6 处文件版本号均为 `26.8.0`)
+- [x] GitHub Release v26.8.0 已创建,包含 MSI + NSIS + sha256 文件
+- [x] README 与 About 栏目信息准确无误
+- [x] 仓库治理文件齐全(LICENSE / CONTRIBUTING / SECURITY / Issue 模板 / PR 模板)

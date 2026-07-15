@@ -270,11 +270,11 @@
   - [x] SubTask 7.4.2: 统一 Node 版本为 20
   - [x] SubTask 7.4.3: `package.json` 新增 `engines: { node: ">=20" }` 字段
 
-- [ ] Task 7.5: 构建与发布
-  - [ ] SubTask 7.5.1: 执行 `npm run tauri build` 生成 MSI + NSIS 安装包
-  - [ ] SubTask 7.5.2: 验证安装包大小合理(MSI ~10MB / NSIS ~8MB)
-  - [ ] SubTask 7.5.3: 提交所有变更到 git,推送 `v26.8.0` tag 触发 GitHub Release
-  - [ ] SubTask 7.5.4: 在 GitHub Release 上传 MSI + NSIS + sha256 文件
+- [x] Task 7.5: 构建与发布
+  - [x] SubTask 7.5.1: 执行 `npm run tauri build` 生成 MSI + NSIS 安装包
+  - [x] SubTask 7.5.2: 验证安装包大小合理(MSI ~10MB / NSIS ~8MB)
+  - [x] SubTask 7.5.3: 提交所有变更到 git,推送 `v26.8.0` tag 触发 GitHub Release
+  - [x] SubTask 7.5.4: 在 GitHub Release 上传 MSI + NSIS + sha256 文件
 
 ## 阶段八:README 与 About 栏目升级
 
