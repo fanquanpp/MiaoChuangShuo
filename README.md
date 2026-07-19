@@ -34,30 +34,19 @@
 
 喵创说围绕"一部百万字长篇小说"的生命周期组织界面与模块。工作台采用三栏布局, 左侧导航通过 `Alt+1` ~ `Alt+7` 在七个创作场景间切换, 中间内容区随分类切换为对应面板, 右侧为文件列表。
 
-```
-项目看板 (Launcher)
-   │   选择文体模板 (Novel / Script / Essay) → 自动生成正文/设定/大纲/草稿箱四目录
-   ▼
-工作台 (Workspace)
-   │
-   ├─ Alt+1  正文 (manuscript) ── NovelEditor    章节写作主战场, 百万字级 TipTap 文档
-   ├─ Alt+2  大纲 (outline)    ── OutlineToChapters 大纲写完后一键批量生成章节文件
-   ├─ Alt+3  设定 (codex)      ── CodexPanel      角色/世界观/术语/资料卡片库
-   ├─ Alt+4  统计 (stats)      ── WritingStats    会话字数 / WPM / 字数目标
-   ├─ Alt+5  搜索 (search)     ── GlobalSearch    精确匹配 + Tantivy 语义检索双后端
-   ├─ Alt+6  人图 (characterGraph) ─ CharacterGraphPanel 人物关系网
-   └─ Alt+7  时间线 (timeline) ── TimelinePanel    剧情节点 DAG, DFS 三色校验无环
-   │
-   ▼
-跨场景能力
-   ├─ Ctrl+K  命令面板 (CommandPalette, cmdk 驱动)
-   ├─ Ctrl+Shift+A  AI 助手侧边栏 (续写/对话/校验/推演/大纲)
-   ├─ Ctrl+F / Ctrl+H  查找替换
-   ├─ F11  聚焦模式 + 专注计时器 (FocusTimer)
-   └─ SnapshotHistory  版本快照回溯
-```
+| 快捷键 | 场景 | 模块 | 说明 |
+|--------|------|------|------|
+| Alt+1 | 正文 | NovelEditor | 章节写作主战场, 百万字级 TipTap 文档 |
+| Alt+2 | 大纲 | OutlineToChapters | 大纲写完后一键批量生成章节文件 |
+| Alt+3 | 设定 | CodexPanel | 角色/世界观/术语/资料卡片库 |
+| Alt+4 | 统计 | WritingStats | 会话字数 / WPM / 字数目标 |
+| Alt+5 | 搜索 | GlobalSearch | 精确匹配 + Tantivy 语义检索双后端 |
+| Alt+6 | 人图 | CharacterGraphPanel | 人物关系网 |
+| Alt+7 | 时间线 | TimelinePanel | 剧情节点 DAG, DFS 三色校验无环 |
 
-工作流的核心联动: 大纲保存后通过 `useOutlineChapterSync` 提示可同步章节标题; 章节删除时 `useCodexSync` 联动清理 manifest 反向索引、时间线 `chapterId` 与人物图谱 `sourceFile` 引用; 设定库卡片 CRUD 与文件列表双向刷新, 保证"设定-正文-图谱"三层数据始终一致。
+**跨场景能力**: `Ctrl+K` 命令面板 (cmdk 驱动) · `Ctrl+Shift+A` AI 助手侧边栏 · `Ctrl+F` / `Ctrl+H` 查找替换 · `F11` 聚焦模式 + 专注计时器 · `SnapshotHistory` 版本快照回溯
+
+**核心联动**: 大纲保存后通过 `useOutlineChapterSync` 提示可同步章节标题; 章节删除时 `useCodexSync` 联动清理 manifest 反向索引、时间线 `chapterId` 与人物图谱 `sourceFile` 引用; 设定库卡片 CRUD 与文件列表双向刷新, 保证"设定-正文-图谱"三层数据始终一致。
 
 ---
 
@@ -69,7 +58,7 @@
 
 - **中文排版优化**: `autoPair` 中文引号自动配对、`indentParagraph` 首行缩进、`poetryFormat` 诗歌/歌词排版、`smartTab` 空行 Tab 呼出角色名选择器
 - **自定义语义节点**: `sceneBreak` 场景分割节点 (携带 `povCharacterId` / `mood` 元数据)、`characterMention` 角色 @ 提及节点
-- **实体高亮**: `entityHighlightPlugin` + Web Worker 中运行的 Aho-Corasick 多模式匹配, 自动高亮设定库实体名称, 悬浮卡片 (`CharacterHoverCard`) 展示角色详情
+- **实体高亮**: `entityHighlightPlugin` + Web Worker 中运行的 Aho-Corasick 多模式匹配, 自动高亮设定库实体名称, 悬浮卡片展示角色详情
 - **行级体验**: `lineHighlight` 当前行高亮、`fontSizeShortcut` `Ctrl +/-` 字号调节、`vscodeShortcuts` VS Code 风格段落操作
 - **编辑器浮层**: `EditorToolbar` 完整格式工具栏 + `EditorBubbleMenu` 选区浮层菜单 + `EditorContextMenu` 右键菜单
 - **查找替换**: `FindReplace` 面板, 支持区分大小写与替换模式
@@ -79,18 +68,17 @@
 基于 `@xyflow/react` 受控模式构建的人物关系网络画布。
 
 - **关系建模**: 节点承载角色卡片数据, 边承载关系类型与描述, `CharacterGraphEdgeDrawer` 支持关系类型自定义
-- **分区布局算法** (`dagreLayout.ts`): 有连线节点进入 dagre LR 布局 (`nodesep=100`, `ranksep=140`), 孤立节点按 `main -> branch -> event -> ending` 类型分组后在主图下方网格化排列, 从根源消除遮挡
-- **右键上下文菜单** (`CharacterGraphContextMenu`): 新建/编辑/删除/自动布局/重置视图, 屏幕边界检测防溢出
-- **双向联动**: 节点详情抽屉 (`CharacterGraphDrawer`) 与设定库数据双向同步, 角色删除时联动清理正文 Mention
+- **分区布局算法** (`dagreLayout.ts`): 有连线节点进入 dagre LR 布局, 孤立节点按类型分组后在主图下方网格化排列, 从根源消除遮挡
+- **右键上下文菜单**: 新建/编辑/删除/自动布局/重置视图, 屏幕边界检测防溢出
+- **双向联动**: 节点详情抽屉与设定库数据双向同步, 角色删除时联动清理正文 Mention
 
 ### 剧情时间线 (TimelinePanel)
 
 剧情节点的有向无环图 (DAG) 可视化, 支持分支结构但禁止循环依赖。
 
-- **DAG 校验**: Rust 后端 `timeline_commands.rs` 采用 DFS 三色标记法 (白/灰/黑) 在持久化前校验无环, 检测到回边时拒绝写入
+- **DAG 校验**: Rust 后端采用 DFS 三色标记法 (白/灰/黑) 在持久化前校验无环, 检测到回边时拒绝写入
 - **受控拖拽 + 自动布局**: 手动拖拽与 dagre LR 自动布局并存, 拖拽开始时 zundo `pause()` 暂停历史, 结束时 `resume()` 仅提交一条历史
 - **自定义节点/边**: `TimelineNode` 承载剧情节点业务数据, `TimelineEdge` 在边中点渲染关系标签并支持点击编辑
-- **节点详情抽屉** (`TimelineDrawer`): 双向联动编辑节点元数据
 
 ### 智能设定库 (CodexPanel)
 
@@ -100,23 +88,20 @@
 - **实体识别**: 自动扫描项目内所有 `.txt` / `.pmd` 文件, 统计实体出场次数与章节分布
 - **别名系统**: 一个实体可拥有多个别名, 全部参与实体高亮匹配
 - **AI-Ready 预留**: `CodexEntity` 接口预留 `ai_tags` / `embeddings` 字段, 为未来 RAG 检索留出位置
-- **双向同步闭环**: 设定库 CRUD 自动同步 FileList, FileList 增删改自动同步 Codex Store; 设定库保留目录名 (角色/人物/世界观/设定/术语/名词/素材/资料) 被自定义分类创建时拦截, 避免目录冲突
-- **编辑态精确控制**: 用户手动点击才重置编辑态, 程序化选中保留编辑态; 新建卡片按名称+类型双重匹配避免误选
+- **双向同步闭环**: 设定库 CRUD 自动同步 FileList, FileList 增删改自动同步 Codex Store
 
 ### 全文搜索 (GlobalSearch)
 
 双后端搜索一键切换, 服务于"在百万字项目中找到某段伏笔"的实战需求。
 
 - **精确匹配**: 按行扫描, 支持区分大小写与跨文件批量替换, 替换前自动创建快照
-- **语义搜索** (Tantivy + tantivy-jieba): Rust 原生全文搜索引擎 + jieba 中文分词, Schema 含 `content` / `file_path` / `scene_id` / `chunk_type` 字段, 按"场景"而非"段落"切分 Chunk, 为 AI 上下文召回优化
-- **增量索引**: 文件保存后 500ms 防抖触发 `update_file_index` (先删后建策略), 文件删除/重命名自动清理 `.txt` + `.pmd` 双路径索引, 项目首次打开后台全量构建
+- **语义搜索** (Tantivy + tantivy-jieba): Rust 原生全文搜索引擎 + jieba 中文分词, 按"场景"而非"段落"切分 Chunk, 为 AI 上下文召回优化
+- **增量索引**: 文件保存后 500ms 防抖触发 `update_file_index` (先删后建策略), 文件删除/重命名自动清理 `.txt` + `.pmd` 双路径索引
 - **索引管理面板** (`IndexManagerPanel`): 嵌入设置对话框, 展示文档数/文件数/索引大小/最后构建时间, 提供 `index-progress` 事件实时进度条
 
 ### AI 创作助手 (AiAssistantPanel)
 
 采用 BYOK (Bring Your Own Key) 模式, 用户自带 OpenAI 兼容 API Key, 所有调用 SSE 流式直连 LLM 服务, 不经任何第三方中转。
-
-- **5 种任务类型** (由 `AiTaskTypeSelector` 切换, `promptBuilder.ts` 统一构建):
 
 | 任务类型 | 触发方式 | 上下文加载 |
 |----------|----------|------------|
@@ -126,20 +111,17 @@
 | 剧情推演 (plotReview) | 面板手动切换 | 项目全局上下文 |
 | 大纲生成 (outlineGeneration) | 面板手动切换 | 项目全局上下文 |
 
-- **4 层上下文组装** (`ai_context/` 模块): `get_scene_context` 识别当前场景 → 组装项目元信息 + 章节大纲 + 当前场景文本 + 角色设定 (设定库 + Tantivy 出场记录 + 人物关系图)
+- **4 层上下文组装** (`ai_context/` 模块): `get_scene_context` 识别当前场景 → 组装项目元信息 + 章节大纲 + 当前场景文本 + 角色设定
 - **流式体验**: `useAiStream` 含 `AbortController` 中断、流式失败重试、Token 用量透传
-- **插入文档 5 秒撤销条**: AI 输出插入编辑器后弹出 5 秒倒计时撤销条, 基于 TipTap 原生 `undo` 实现
+- **插入文档 5 秒撤销条**: AI 输出插入编辑器后弹出 5 秒倒计时撤销条
 - **多轮对话 Token 控制**: 保留最近 8 条消息 (4 轮) 作为历史上下文
 - **AI Key 安全**: Windows 平台使用 DPAPI 加密绑定用户账户, macOS / Linux 使用 keychain / keyring
 
-### 命令面板 (CommandPalette)
+### 命令面板与写作统计
 
-基于 `cmdk` 的 `Ctrl+K` 命令面板, 提供类 VS Code 的模糊搜索与分组导航。命令涵盖分类切换、新建文件、全局搜索、导出、主题切换、写作目标、自动保存、模板设置、专注模式等; localStorage 持久化最近使用前 5 条, 空查询时置顶展示。
-
-### 写作统计与专注模式
-
+- **CommandPalette**: 基于 `cmdk` 的 `Ctrl+K` 命令面板, 类 VS Code 模糊搜索与分组导航; localStorage 持久化最近使用前 5 条
 - **WritingStats**: 项目级写作统计面板, 持久化到 `writing_stats.json`
-- **useWritingSession**: 追踪单次会话净增字数、会话时长、每分钟字数 (WPM)、字数目标进度, 支持切换文件/失焦 5 分钟自动暂停, 会话数据 localStorage 跨重启恢复
+- **useWritingSession**: 追踪单次会话净增字数、会话时长、WPM、字数目标进度, 支持切换文件/失焦 5 分钟自动暂停
 - **FocusTimer**: 聚焦模式 (`F11`) 隐藏侧边栏与文件列表, 配合专注计时器营造沉浸写作环境
 
 ---
@@ -192,9 +174,9 @@ graph TD
 ### 架构设计要点
 
 - **轻重分离**: 前端仅负责 UI 渲染, 文件 IO、正则匹配、DAG 校验、全文索引全部下放至 Rust, 主线程保持 60fps
-- **类型安全 IPC**: Rust 端 `#[serde(rename_all = "camelCase")]` 与前端 TypeScript strict 模式手工对齐, 杜绝字段大小写不匹配导致的反序列化错误
-- **受控图谱**: React Flow 受控模式 + zundo `pause` / `resume` 精细化历史记录, 拖拽节点时不产生过量撤销历史
-- **Manifest 反向索引**: `manifest.rs` 维护项目级 `manifest.json`, `reverseIndex` 字段以 `codexId -> chapterPath[]` 形式存储反向引用, 设定库删除时反查引用列表批量清理正文 Mention
+- **类型安全 IPC**: Rust 端 `#[serde(rename_all = "camelCase")]` 与前端 TypeScript strict 模式手工对齐
+- **受控图谱**: React Flow 受控模式 + zundo `pause` / `resume` 精细化历史记录
+- **Manifest 反向索引**: `manifest.rs` 维护项目级 `manifest.json`, `reverseIndex` 字段以 `codexId -> chapterPath[]` 形式存储反向引用
 
 ---
 
@@ -209,13 +191,7 @@ graph TD
 
 ### 原子写入防损坏
 
-Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略:
-
-1. 写入 `.tmp` 临时文件
-2. 写入完成后 rename 替换目标文件
-3. 写入前清理上次崩溃可能遗留的 `.tmp` 残留
-
-保证即使在写入过程中崩溃或断电, 目标文件要么是完整的旧版本, 要么是完整的新版本, 不会出现半写入的损坏状态。
+Rust 后端所有文件写入操作采用"临时文件 + rename"原子策略: 写入 `.tmp` 临时文件 → 写入完成后 rename 替换目标文件 → 写入前清理上次崩溃可能遗留的 `.tmp` 残留。保证即使在写入过程中崩溃或断电, 目标文件要么是完整的旧版本, 要么是完整的新版本。
 
 ### 百万字级性能
 
