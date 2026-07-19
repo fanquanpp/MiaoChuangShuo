@@ -63,13 +63,13 @@ jobs:
       # 步骤 3: 安装 Rust stable 工具链, 并添加目标架构 target
       # targets 参数确保 rustup 安装对应架构的标准库
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           targets: ${{ matrix.target }}
 
       # 步骤 4: 缓存 Cargo 编译产物, 加速 Rust 构建
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.9.1
         with:
           workspaces: src-tauri
 
@@ -88,7 +88,7 @@ jobs:
       # tagName/releaseName/releaseBody/releaseDraft/prerelease 控制 Release 元数据
       # args: --target 传递给 cargo-tauri, 指定目标架构
       - name: Build and release with tauri-action
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'MiaoChuangShuo v__VERSION__'
