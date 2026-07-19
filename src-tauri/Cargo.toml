@@ -35,7 +35,7 @@ thiserror = "1"
 toml = "0.8"
 # 系统钥匙串存储 API Key (Windows Credential Manager / macOS Keychain / Linux Secret Service)
 # 安全升级: 替代原 Base64 编码存储, 防止本地文件被读取后明文暴露
-keyring = "2"
+keyring = "4"
 # JSON Schema 自动生成 (Task 1.7)
 # 为核心数据结构派生 JsonSchema, 输出 schema 文件供前端类型生成与 CI 一致性校验
 schemars = { version = "0.8", features = ["uuid1", "chrono"] }
