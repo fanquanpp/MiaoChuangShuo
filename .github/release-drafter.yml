@@ -1,0 +1,34 @@
+name-template: 'v${RESOLVED_VERSION} (${YYYY-MM-DD})'
+tag-template: 'v${RESOLVED_VERSION}'
+template: |
+  ## What's Changed
+
+  ${CHANGES}
+
+  **Full Changelog**: https://github.com/fanquanpp/MiaoChuangShuo/compare/${PREVIOUS_TAG}...v${RESOLVED_VERSION}
+categories:
+  - title: 'Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: 'Bug Fixes'
+    labels:
+      - 'bug'
+      - 'fix'
+  - title: 'Maintenance'
+    labels:
+      - 'maintenance'
+      - 'chore'
+      - 'dependencies'
+  - title: 'Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+  - title: 'Security'
+    labels:
+      - 'security'
+      - 'vulnerability'
+exclude-labels:
+  - 'duplicate'
+  - 'invalid'
+  - 'wontfix'
