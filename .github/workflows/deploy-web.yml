@@ -46,7 +46,7 @@ jobs:
 
       # 步骤2: 配置 Node.js 运行环境（与本地开发版本一致,统一为 Node 20）
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
