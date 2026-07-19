@@ -76,31 +76,38 @@ jobs:
       - run: npm run build
       - run: npm run tauri build
       # 构建完成后为 MSI 与 NSIS 安装包生成 sha256 哈希文件
-      # 哈希文件与安装包同名,扩展名为 .sha256,便于用户校验下载完整性
-      - name: 生成 sha256 哈希文件
+      # 同时生成统一 checksums.txt 文件 (包含所有产物的 sha256),便于用户一次性校验
+      - name: 生成 sha256 哈希文件与统一 checksums
         shell: bash
         run: |
           set -euo pipefail
           BUNDLE_DIR="src-tauri/target/release/bundle"
-          # 为 MSI 安装包生成 sha256
+          CHECKSUMS_FILE="MiaoChuangShuo_${{ github.ref_name }}_checksums.txt"
+          > "$CHECKSUMS_FILE"
+          # 为 MSI 安装包生成 sha256 (per-file sidecar + 汇总到 checksums.txt)
           if [ -d "${BUNDLE_DIR}/msi" ]; then
             for f in "${BUNDLE_DIR}/msi"/*.msi; do
               if [ -f "$f" ]; then
                 sha256sum "$f" > "$f.sha256"
+                sha256sum "$f" >> "$CHECKSUMS_FILE"
                 echo "已生成: $f.sha256"
               fi
             done
           fi
-          # 为 NSIS 安装包生成 sha256
+          # 为 NSIS 安装包生成 sha256 (per-file sidecar + 汇总到 checksums.txt)
           if [ -d "${BUNDLE_DIR}/nsis" ]; then
             for f in "${BUNDLE_DIR}/nsis"/*.exe; do
               if [ -f "$f" ]; then
                 sha256sum "$f" > "$f.sha256"
+                sha256sum "$f" >> "$CHECKSUMS_FILE"
                 echo "已生成: $f.sha256"
               fi
             done
           fi
-      # 上传 MSI / NSIS 安装包及其 sha256 哈希文件到 GitHub Release
+          echo "=== 统一 checksums 文件内容 ==="
+          cat "$CHECKSUMS_FILE"
+      # 上传 MSI / NSIS 安装包、其 sha256 哈希文件、统一 checksums.txt 到 GitHub Release
+      # 使用 Task 8 已 SHA-pinned 的 softprops/action-gh-release@v2.6.2
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
@@ -108,6 +115,7 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi.sha256
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/nsis/*.exe.sha256
+            MiaoChuangShuo_${{ github.ref_name }}_checksums.txt
           generate_release_notes: true
           draft: false
           prerelease: false
