@@ -1,0 +1,100 @@
+# MiaoChuangShuo Release 发布工作流
+#
+# 功能概述：
+# 当推送 v* 形式的 git tag 时触发, 使用 tauri-apps/tauri-action 跨平台
+# 构建 Windows / macOS / Linux 安装包, 并自动创建 GitHub Release 上传产物。
+#
+# 支持平台与架构：
+#   - Windows: x86_64-pc-windows-msvc (MSI + NSIS)
+#   - macOS:   x86_64-apple-darwin + aarch64-apple-darwin (Intel + Apple Silicon)
+#   - Linux:   x86_64-unknown-linux-gnu (AppImage + deb)
+#
+# 触发条件：
+#   - push tag v*: 常规发版
+#
+# 权限要求：
+#   - contents: write (创建 Release 并上传 assets)
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# tauri-action 需要写权限以创建 Release 与上传 assets
+permissions:
+  contents: write
+
+jobs:
+  # 跨平台构建并发布
+  release:
+    name: Build and Release
+    strategy:
+      # 任一平台失败不取消其他平台构建, 确保尽可能多产出可用安装包
+      fail-fast: false
+      matrix:
+        include:
+          # Windows x86_64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+          # macOS Intel
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+          # macOS Apple Silicon (M1/M2/M3)
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          # Linux x86_64
+          - platform: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
+    steps:
+      # 步骤 1: 检出仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # 步骤 2: 配置 Node.js 24 运行环境, 启用 npm 包缓存
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      # 步骤 3: 安装 Rust stable 工具链, 并添加目标架构 target
+      # targets 参数确保 rustup 安装对应架构的标准库
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # 步骤 4: 缓存 Cargo 编译产物, 加速 Rust 构建
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # 步骤 5: 安装 Linux 平台 Tauri 所需系统依赖 (仅 Linux runner)
+      - name: Install Linux system dependencies (Tauri requirements)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      # 步骤 6: 安装项目 npm 依赖
+      - name: Install npm dependencies
+        run: npm ci
+
+      # 步骤 7: 使用 tauri-action 跨平台构建并发布
+      # tagName/releaseName/releaseBody/releaseDraft/prerelease 控制 Release 元数据
+      # args: --target 传递给 cargo-tauri, 指定目标架构
+      - name: Build and release with tauri-action
+        uses: tauri-apps/tauri-action@v0
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'MiaoChuangShuo v__VERSION__'
+          releaseBody: 'See the assets to download this version and install.'
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
