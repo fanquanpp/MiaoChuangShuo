@@ -1,46 +1,39 @@
-# Pull Request
-
 ## 变更说明
 
-<!-- 简要描述这个 PR 做了什么，以及为什么需要 -->
+<!-- 简要描述本次 PR 做了什么，以及为什么需要这次变更 -->
 
 ## 变更类型
 
-请勾选适用的类型：
+请勾选本次变更涉及的类型（可多选）：
 
-- [ ] Bug 修复（fix）
-- [ ] 新功能（feat）
-- [ ] 重构 / 代码优化（refactor）
-- [ ] 性能改进（perf）
-- [ ] 文档更新（docs）
-- [ ] 测试补充（test）
-- [ ] 构建 / 工具链（build / chore）
-- [ ] 国际化（i18n）
-- [ ] 其他（请在下方说明）
+- [ ] feature：新增功能
+- [ ] fix：修复缺陷
+- [ ] refactor：代码重构（无行为变化）
+- [ ] docs：文档更新
+- [ ] chore：构建/依赖/配置等杂项
+- [ ] test：测试用例补充或修正
+- [ ] perf：性能优化
+- [ ] breaking：包含破坏性变更
 
 ## 关联 Issue
 
-<!-- 关联的 Issue 编号，如 Closes #123 / Refs #456 -->
+<!-- 列出本次 PR 关联的 Issue 编号，例如 Closes #123 / Refs #456 -->
 
 Closes #
 
-## 验证清单
+## 自检清单
 
-请确认已完成以下检查（勾选所有适用项）：
+- [ ] 已通过本地 lint 校验
+- [ ] 已通过 type-check 类型检查
+- [ ] 已通过 build 构建校验
+- [ ] 已添加或更新对应测试用例
+- [ ] 已更新相关文档（如适用）
+- [ ] commit message 符合 Conventional Commits 规范
 
-- [ ] 已通过 `npx tsc --noEmit`（exit 0）
-- [ ] 已通过 `cargo check --manifest-path src-tauri/Cargo.toml`
-- [ ] 已通过 `npm run build`
-- [ ] 新增 / 修改的文案已添加中英文 i18n 键
-- [ ] 涉及版本号变更已同步 7 处位置（package.json / Cargo.toml / Cargo.lock / tauri.conf.json / updateChecker.ts / AboutSettingsSection.tsx / Launcher.tsx）
-- [ ] 未引入 `any` / `unknown` 类型（TypeScript 严格规则）
-- [ ] 未硬编码 Token / 密钥 / 敏感信息
-- [ ] 业务逻辑已添加中文工程级注释
+## 截图/录屏（如适用）
 
-## 截图 / 录屏
+<!-- 如涉及 UI 改动，请附上变更前后的截图或录屏 -->
 
-<!-- 如为 UI 变更，请附上 before / after 截图 -->
+## 破坏性变更说明（如适用）
 
-## 设计说明
-
-<!-- 如为架构 / 接口变更，请说明设计决策与影响范围 -->
+<!-- 若包含 breaking 变更，请详细说明影响范围与迁移指南 -->
