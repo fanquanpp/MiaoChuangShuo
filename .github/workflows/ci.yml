@@ -42,7 +42,7 @@ jobs:
     steps:
       # 步骤 1.1: 检出仓库代码
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       # 步骤 1.2: 安装 Rust stable 工具链, 包含 rustfmt 组件
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
@@ -70,7 +70,7 @@ jobs:
     steps:
       # 步骤 2.1: 检出仓库代码
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       # 步骤 2.2: 配置 Node.js 24 运行环境, 启用 npm 包缓存
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -93,7 +93,7 @@ jobs:
     steps:
       # 步骤 3.1: 检出仓库代码
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       # 步骤 3.2: 配置 Node.js 24 运行环境, 启用 npm 包缓存
       - name: Setup Node.js
         uses: actions/setup-node@v5

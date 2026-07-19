@@ -42,7 +42,7 @@ jobs:
     steps:
       # 步骤1: 检出仓库代码
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 步骤2: 配置 Node.js 运行环境（与本地开发版本一致,统一为 Node 20）
       - name: Setup Node.js

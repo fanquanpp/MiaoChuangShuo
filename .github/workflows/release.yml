@@ -51,7 +51,7 @@ jobs:
     steps:
       # 步骤 1: 检出仓库代码
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # 步骤 2: 配置 Node.js 24 运行环境, 启用 npm 包缓存
       - name: Setup Node.js
