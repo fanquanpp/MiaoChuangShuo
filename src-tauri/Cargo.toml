@@ -27,7 +27,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 walkdir = "2"
 uuid = { version = "1", features = ["v4"] }
 tantivy = "0.22"
-tantivy-jieba = "0.11"
+tantivy-jieba = "0.20"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 futures-util = "0.3"
 base64 = "0.22"
