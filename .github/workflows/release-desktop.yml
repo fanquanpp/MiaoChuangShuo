@@ -25,8 +25,8 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.9.1
         with:
           workspaces: src-tauri
       - run: npm ci
@@ -68,8 +68,8 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.9.1
         with:
           workspaces: src-tauri
       - run: npm ci
@@ -101,7 +101,7 @@ jobs:
             done
           fi
       # 上传 MSI / NSIS 安装包及其 sha256 哈希文件到 GitHub Release
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
             src-tauri/target/release/bundle/msi/*.msi
