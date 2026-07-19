@@ -23,7 +23,7 @@ chrono = "0.4"
 tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros", "io-util", "time"] }
 trash = "5"
 dirs = "5"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
 walkdir = "2"
 uuid = { version = "1", features = ["v4"] }
 tantivy = "0.22"
