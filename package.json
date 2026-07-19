@@ -52,7 +52,7 @@
     "@tiptap/extension-underline": "^2.27.2",
     "@tiptap/react": "^2.27.2",
     "@types/diff": "^7.0.2",
-    "@xyflow/react": "^12.11.1",
+    "@xyflow/react": "^12.11.2",
     "cmdk": "^1.1.1",
     "diff": "^9.0.0",
     "framer-motion": "^12.42.2",
