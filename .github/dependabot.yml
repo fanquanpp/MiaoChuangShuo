@@ -1,0 +1,59 @@
+# Dependabot 配置文件 - MiaoChuangShuo 仓库
+# 技术栈: Tauri 2.0 + npm + Rust
+# 生态系统: npm + cargo + github-actions (三生态)
+# 维护策略: 每周一 09:00 (Asia/Shanghai) 检查依赖更新
+# 安全策略: npm 生态忽略 major 版本自动升级; cargo 生态使用默认策略
+version: 2
+updates:
+  # npm 生态配置 - 前端项目依赖
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 15
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    versioning-strategy: "increase"
+    # 忽略 major 版本升级, 需手动评估
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+  # cargo 生态配置 - Rust 后端依赖 (Tauri 标准 Rust 项目目录)
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 15
+    labels:
+      - "dependencies"
+      - "cargo"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # cargo 生态不设置 versioning-strategy, Cargo 默认策略已合适
+  # GitHub Actions 生态配置 - 工作流依赖
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 15
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
