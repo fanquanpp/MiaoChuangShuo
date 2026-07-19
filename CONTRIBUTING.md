@@ -1,78 +1,55 @@
 # 贡献指南
 
-感谢你对喵创说（MiaoChuangShuo）项目的关注！本文档说明如何参与开发与提交贡献。
+感谢你关注本仓库并愿意为其做出贡献。本指南统一约定本仓库的开发流程、分支策略、Commit 规范、PR 流程、代码风格与测试要求。在提交任何 Issue 或 PR 之前，请先完整阅读本文件。
 
-## 项目简介
+## 环境要求
 
-喵创说是一款面向独立与业余长篇创作者的离线写作工作站，技术栈为 Tauri 2.0 + React 18 + Rust + TypeScript + TipTap + React Flow + Tantivy。在开始贡献前，建议先阅读 [README.md](./README.md) 了解整体架构与设计原则。
+为确保贡献流程顺畅，请确认本地已具备以下通用工具链（具体版本以各仓库 `README` 或依赖配置文件中的声明为准）：
 
-## 开发环境
+- Git：已配置全局 `user.name` 与 `user.email`，且 `git config core.autocrlf` 在 Windows 下建议设置为 `true`，在 macOS / Linux 下建议设置为 `input`。
+- GitHub CLI（`gh`）：已通过 `gh auth login` 完成认证，scope 至少包含 `repo` 与 `workflow`。
+- Node.js / Python / Java / Rust / Go 等运行环境：按各仓库 `README` 与依赖配置文件（如 `package.json` / `requirements.txt` / `pom.xml` / `Cargo.toml` / `go.mod`）的声明安装对应版本。
+- 包管理器：按各仓库声明的工具（如 `npm` / `pnpm` / `yarn` / `pip` / `poetry` / `maven` / `cargo` / `go`）使用，禁止自行替换为其他包管理器。
+- IDE：推荐使用 VS Code 或 JetBrains 系列 IDE，并按各仓库根目录下的 `.vscode/` 或 `.editorconfig` 配置加载格式化与代码风格规则。
 
-### 系统要求
+如某仓库有额外的环境要求，将在该仓库 `README` 中单独说明，以仓库自身声明为准。
 
-- Windows 10 / 11 x64（本项目主要面向 Windows 平台）
-- Node.js >= 18（推荐 20）
-- Rust stable（通过 [rustup](https://rustup.rs/) 安装）
-- Git
+## 开发流程
 
-### 本地启动
+本仓库采用 **Fork + Pull Request** 协作模型，所有外部贡献者统一通过 Fork 提交变更：
 
-```bash
-# 1. 克隆仓库
-git clone https://github.com/fanquanpp/MiaoChuangShuo.git
-cd MiaoChuangShuo
+1. 在 GitHub 上 Fork 本仓库到自己的账号下。
+2. 将 Fork 后的仓库克隆到本地：`git clone https://github.com/<你的用户名>/<仓库名>.git`。
+3. 关联上游仓库：`git remote add upstream https://github.com/fanquanpp/<仓库名>.git`。
+4. 同步上游最新代码：`git fetch upstream && git checkout main && git merge upstream/main`。
+5. 基于最新 `main` 分支创建特性分支：`git checkout -b feat/<短描述>`。
+6. 在特性分支上完成代码修改、单元测试与本地自测。
+7. 提交变更：`git commit -m "<type>(<scope>): <subject>"`（详见 Commit 规范）。
+8. 推送分支到自己的 Fork：`git push origin feat/<短描述>`。
+9. 在 GitHub 上发起 Pull Request，目标分支为 `fanquanpp/<仓库名>:main`，并按 PR 模板填写信息。
+10. 等待 Code Review 与 CI 校验，根据反馈迭代修改并持续 push 到同一分支。
 
-# 2. 安装前端依赖
-npm install
+仓库维护者拥有直接写入权限，仍建议遵循相同的分支与 PR 流程，仅在紧急修复场景下允许直接提交至 `main`，且需在事后补 PR 回溯说明。
 
-# 3. 启动开发服务器（Tauri 会自动编译 Rust 后端）
-npm run tauri dev
-```
+## 分支策略
 
-首次启动会编译 Rust 后端，耗时较长（5-15 分钟），后续启动会复用缓存。
+- `main`：受保护分支，始终处于可发布状态，所有变更必须通过 PR 合入，禁止直接 push。
+- `develop`（如启用）：长期集成分支，作为功能集成分支，PR 默认目标为 `develop`；如未启用，则 PR 默认目标为 `main`。
+- 特性分支：按变更类型命名，使用小写英文与中划线分隔，命名前缀如下：
+  - `feat/<短描述>`：新增功能或增强既有功能。
+  - `fix/<短描述>`：修复 Bug。
+  - `docs/<短描述>`：文档类变更（README、注释、规范文档等）。
+  - `refactor/<短描述>`：不改变外部行为的代码重构。
+  - `chore/<短描述>`：构建、依赖、CI、工具链等杂项变更。
+  - `perf/<短描述>`：性能优化类变更。
+  - `test/<短描述>`：补充或修复测试用例。
+  - `ci/<短描述>`：CI / CD 流水线相关变更。
+  - `revert/<短描述>`：回滚某次变更。
+- 分支命名应简洁、可读，单分支生命周期不超过 30 天；长期未合入的分支应及时 rebase 或清理。
 
-### 构建生产安装包
+## Commit 规范
 
-```bash
-npm run tauri build
-# 产物位于 src-tauri/target/release/bundle/
-```
-
-## 代码规范
-
-### TypeScript（前端）
-
-- **strict 模式全量启用**：禁用 `any` / `unknown` 类型，所有函数参数与返回值必须显式标注
-- **三层架构**：UI 层（components/） / Service 层（lib/api） / Data 层（lib/store），UI 层禁止直接发起 API 请求
-- **状态管理**：使用 Zustand + persist 中间件，禁用 Redux / Context 大范围状态
-- **命名空间**：Tailwind 自定义颜色使用 `nf-*` / `fandex-*` 命名空间，避免与内置工具冲突
-- **i18n**：所有用户可见文案必须通过 `useI18n().t()` 获取，禁止硬编码中文字符串
-- **注释**：所有业务逻辑与函数必须配备中文工程级注释，说明输入参数、返回值、核心执行流程
-
-### Rust（后端）
-
-- `cargo check` 强制零警告
-- 文件 IO 必须采用临时文件 + rename 原子写入策略
-- 与前端通信的结构体必须标注 `#[serde(rename_all = "camelCase")]`
-- 错误统一使用 `AppError` 类型，禁止 `expect()` / `unwrap()` 在生产路径出现
-
-### 设计令牌
-
-FANDEX 设计令牌集成于 Tailwind 配置：
-
-| 语义 | CSS 变量 | 颜色 | 用途 |
-|------|---------|------|------|
-| 主色 | `--fandex-primary` | `#6EA8FE` | 主线 / 师徒关系 / 主操作 |
-| 次色 | `--fandex-secondary` | `#55EFC4` | 分支 / 亲属关系 / 成功 |
-| 三色 | `--fandex-tertiary` | `#F09070` | 事件 / 同门关系 / 警告 |
-
-辅以灰色系（`zinc-*` / `nf-*`）构建暗色主题。
-
-## 提交规范
-
-### Conventional Commits
-
-Commit Message 必须遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
+本仓库严格遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/) 规范，所有提交信息必须满足以下格式：
 
 ```
 <type>(<scope>): <subject>
@@ -82,105 +59,90 @@ Commit Message 必须遵循 [Conventional Commits](https://www.conventionalcommi
 <footer>
 ```
 
-#### Type 取值
+- `type` 必填，取值范围：
+  - `feat`：新增功能。
+  - `fix`：修复 Bug。
+  - `docs`：文档变更。
+  - `style`：代码格式调整（不影响功能）。
+  - `refactor`：重构，不新增功能也不修复 Bug。
+  - `perf`：性能优化。
+  - `test`：测试用例变更。
+  - `chore`：构建、依赖、工具链等杂项。
+  - `build`：构建系统或依赖变更。
+  - `ci`：CI 配置变更。
+  - `revert`：回滚某次提交。
+- `scope` 选填，表示本次变更影响的模块或包名，如 `ui` / `api` / `auth` / `cli` 等，使用小写英文。
+- `subject` 必填，使用祈使句、现在时，首字母不大写，结尾不加句号，长度建议不超过 50 个字符。中文提交信息同样以动词开头，如「新增用户登录校验逻辑」。
+- `body` 选填，详细说明本次变更的动机、与旧行为的差异、注意事项等，每行不超过 72 个字符。
+- `footer` 选填，用于标记 BREAKING CHANGE、关闭 Issue（如 `Closes #123`）或关联其他提交。
 
-| Type | 说明 |
-|------|------|
-| `feat` | 新功能 |
-| `fix` | Bug 修复 |
-| `refactor` | 重构（不改变外部行为） |
-| `perf` | 性能改进 |
-| `docs` | 文档更新 |
-| `test` | 测试补充 |
-| `build` | 构建系统 / 依赖变更 |
-| `chore` | 杂项（不修改 src 或 test） |
-| `ci` | CI 配置变更 |
-| `i18n` | 国际化文案变更 |
-
-#### 示例
+示例：
 
 ```
-feat(editor): 新增 Ctrl+Shift+G 跳转到指定行功能
+feat(auth): 新增基于 JWT 的访问令牌签发接口
 
-- 在 NovelEditor 注册快捷键监听
-- CommandPalette 新增「跳转到行」命令
-- i18n 添加中英文翻译键
+- 新增 `/api/auth/token` 端点，支持用户名密码换取 access_token
+- access_token 默认有效期 2 小时，refresh_token 默认 7 天
+- 失败响应统一返回 401 状态码与结构化错误信息
 
-Closes #123
+Closes #42
 ```
 
-### 提交前校验
+如本次变更引入破坏性变更，必须在 `footer` 中以 `BREAKING CHANGE:` 开头说明，并在 PR 描述中显著标注：
 
-每次提交前必须通过以下三项校验：
+```
+feat(api): 重构用户信息返回结构
 
-```bash
-# 1. TypeScript 类型检查
-npx tsc --noEmit
-
-# 2. Rust 后端编译检查
-cargo check --manifest-path src-tauri/Cargo.toml
-
-# 3. 前端构建
-npm run build
+BREAKING CHANGE: 用户信息接口返回字段由 `user_name` 调整为 `username`，调用方需同步适配。
 ```
 
-### 版本号同步
+不符合 Conventional Commits 规范的提交将被 Code Review 阶段驳回，CI 中的 Commit Lint 检查也会失败。
 
-如提交涉及版本号变更，必须同步以下 7 处位置：
+## PR 流程
 
-| 文件 | 字段 |
-|------|------|
-| `package.json` | `version` |
-| `src-tauri/Cargo.toml` | `version` |
-| `src-tauri/Cargo.lock` | `version`（miaochuangshuo 包条目） |
-| `src-tauri/tauri.conf.json` | `version` |
-| `src/lib/updateChecker.ts` | `FALLBACK_VERSION` |
-| `src/components/Launcher.tsx` | 经 `useVersionCheck` hook 派生 `appVersion`，实际值来源于 `updateChecker.ts` 的 `FALLBACK_VERSION` |
-| `src/components/settings/AboutSettingsSection.tsx` | `currentVersion` useState 初始值 |
+PR（Pull Request）是合入变更的唯一通道，请严格按以下流程提交与迭代：
 
-版本号格式：`YY.MM.修改序号`（如 `26.7.32`）。
+1. **关联 Issue**：如存在对应 Issue，请在 PR 描述中以 `Closes #<issue-number>` 或 `Refers #<issue-number>` 关联，便于自动关闭与追溯。
+2. **PR 描述**：按仓库根目录 `.github/pull_request_template.md` 中的模板逐项填写，包括变更目的、变更范围、影响说明、自测结果、回归风险。
+3. **自检清单**：提交前请逐项确认：
+   - 已在本地完整运行单元测试与集成测试。
+   - 已运行 `lint` 与 `format` 检查，无新增告警。
+   - 已更新相关文档（如涉及 API、配置、行为变更）。
+   - 已补充或更新测试用例（如涉及功能变更）。
+   - Commit 信息符合 Conventional Commits 规范。
+   - PR 分支已与目标分支 rebase 或 merge 至最新。
+4. **Code Review**：PR 提交后将由 Maintainer 或指定 Reviewer 进行审查，可能在 GitHub 上直接留下评论或建议修改，请根据反馈在原分支上提交新 commit 并 push，不要关闭并重建 PR。
+5. **CI 通过**：CI 流水线（含 lint、type-check、单元测试、构建、安全扫描）必须全部通过方可合入；如 CI 失败，请优先排查自身变更引入的问题，而非直接重试。
+6. **Squash Merge**：默认采用 Squash Merge 策略合入，PR 中的所有 commit 将被压缩为单个 commit 写入 `main`，commit message 以 PR 标题为准。如变更确需保留多 commit 历史，需在 PR 描述中说明并由 Maintainer 同意后改用 Rebase Merge。
+7. **分支清理**：PR 合入后， contributor 侧的 Fork 分支可由 contributor 自行清理；维护者侧的远程分支将由仓库自动清理策略处理。
 
-可使用 `scripts/sync-version.mjs` 自动同步版本号：
+## 代码风格
 
-```bash
-node scripts/sync-version.mjs 26.7.32
-```
+本仓库不强加统一的代码风格约定，所有风格细节以各仓库既有的 lint 与 format 配置为准：
 
-## 图标生成
+- JavaScript / TypeScript 仓库：遵循 `.eslintrc` / `.eslintrc.json` / `eslint.config.js` 与 `.prettierrc` 配置，使用 `npm run lint` 与 `npm run format` 检查。
+- Python 仓库：遵循 `pyproject.toml` 或 `.flake8` / `ruff.toml` 中声明的 `flake8` / `ruff` / `black` 配置。
+- Java / Kotlin 仓库：遵循 `ktlint` 与 `spotless` 配置，由 Gradle 插件统一执行。
+- Rust 仓库：遵循 `rustfmt.toml` 与 `clippy` 配置，使用 `cargo fmt --check` 与 `cargo clippy -- -D warnings` 检查。
+- Go 仓库：遵循 `.golangci.yml` 配置，使用 `golangci-lint run` 检查。
+- 通用规则：禁止在本次变更中顺手修改 lint 规则或全局 format 配置，避免引入与变更无关的 diff 噪声。
 
-应用图标统一通过 Tauri 官方工具生成，**禁止**通过其他脚本生成：
+## 测试要求
 
-```bash
-# 准备源图（推荐 1024x1024 PNG 或 SVG）
-# 源图位置: src-tauri/icons/icon_source.svg
-
-# 执行 Tauri 官方图标生成命令
-npx tauri icon src-tauri/icons/icon_source.svg
-
-# 命令将自动生成全平台图标：
-# - src-tauri/icons/icon.png            (512x512)
-# - src-tauri/icons/128x128.png
-# - src-tauri/icons/128x128@2x.png
-# - src-tauri/icons/32x32.png
-# - src-tauri/icons/icon.ico            (Windows)
-# - src-tauri/icons/icon.icns           (macOS)
-# 以及 iOS / Android 各尺寸图标
-```
-
-历史脚本 `scripts/archive/generate_icon.py` 已归档，仅作为设计参考，不再用于正式图标生成。
-
-## Pull Request 流程
-
-1. Fork 仓库并创建特性分支：`git checkout -b feat/your-feature`
-2. 完成开发并确保通过提交前校验
-3. 提交 PR，按 [PR 模板](./.github/PULL_REQUEST_TEMPLATE.md) 填写变更说明
-4. 等待维护者 review，根据反馈迭代
-5. 合并后由维护者统一发版
+- 新增功能必须同步补充对应的单元测试，覆盖率不低于仓库基线（如已配置 `coverage` 阈值）。
+- Bug 修复需先复现 Bug 的失败测试用例，再提交修复，确保修复可被测试守护。
+- 涉及外部依赖或副作用的逻辑，应通过依赖注入或 mock 进行隔离测试，避免在 CI 中依赖真实外部服务。
+- CI 流水线中的全部测试必须通过，方允许合入 `main`；如某项测试因环境问题间歇性失败，应优先排查根因，禁止屏蔽或跳过测试。
+- 提交大规模重构 PR 时，应在 PR 描述中说明对既有测试的影响与适配策略。
 
 ## 行为准则
 
-请保持友善、专业、尊重的沟通态度。本项目坚持公益属性，禁止任何形式的商业推广或恶意行为。
+参与本仓库的所有贡献者、Reviewer、Maintainer 与使用者，均需遵守以下基本行为准则：
 
-## 许可协议
+- **友好**：以解决问题为目标，对事不对人，避免使用攻击性、嘲讽性或贬低性的语言。
+- **尊重**：尊重不同背景、不同技术水平的参与者，不以经验差异作为评价依据。
+- **专业**：在 Issue、PR、讨论区中保持工程化、结构化的沟通，提供充分的上下文与可复现信息，避免情绪化表达。
+- **透明**：所有决策、变更、流程应通过公开渠道讨论与记录，禁止私下交易或承诺。
+- **聚焦**：讨论应围绕当前 Issue 或 PR 的主题展开，避免跑题或扩散到无关话题。
 
-提交的贡献将同样以 [CC-BY-NC-4.0](./LICENSE) 协议授权。
+如发现违反本行为准则的情况，可邮件至 `fanquanpangpiing@163.com` 反馈，维护者将在 7 天内回复并视情况采取处置措施。
