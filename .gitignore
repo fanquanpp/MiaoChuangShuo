@@ -21,6 +21,9 @@ src-tauri/gen/schemas/
 *.user
 *.sln.docstates
 
+# Trae IDE 辅助文件（本地 spec 与规则,不纳入版本控制）
+.trae/
+
 # 系统文件
 .DS_Store
 Thumbs.db
@@ -64,4 +67,3 @@ migration_backup_*/
 # 备份文件（.pmd 迁移与旧版迁移产生）
 *.bak
 *.txt.bak
-
