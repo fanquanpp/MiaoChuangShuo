@@ -45,4 +45,4 @@ schemars = { version = "0.8", features = ["uuid1", "chrono"] }
 # Win32_UI_WindowsAndMessaging 用于应用启动失败时弹出 MessageBox 友好提示
 # 仅在 Windows target 编译时引入, macOS/Linux 不受影响
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
