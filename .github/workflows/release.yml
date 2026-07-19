@@ -98,3 +98,20 @@ jobs:
           args: --target ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 生成 sha256 校验文件,便于用户校验下载完整性
+      # 跨 matrix 平台并行运行,每个平台仅 hash 自己产出的文件扩展名
+      # tauri-action 默认产物路径: src-tauri/target/release/bundle/{msi,nsis,dmg,appimage,deb}/
+      - name: Generate checksums
+        shell: bash
+        run: |
+          find src-tauri/target/release/bundle -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" \) -exec sha256sum {} \; > MiaoChuangShuo_${{ github.ref_name }}_checksums.txt || true
+          echo "Checksums generated:"
+          cat MiaoChuangShuo_${{ github.ref_name }}_checksums.txt || true
+
+      # 上传 sha256 校验文件到 GitHub Release
+      # 使用 Task 8 已 SHA-pinned 的 softprops/action-gh-release@v2.6.2
+      - name: Upload checksums
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: MiaoChuangShuo_${{ github.ref_name }}_checksums.txt
