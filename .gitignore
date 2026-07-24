@@ -30,7 +30,7 @@ Thumbs.db
 desktop.ini
 
 # 报名辅助文件 (仅本地使用, 不入库)
-# 远程仓库仅保留前端网页 docs/index.html + docs/images/
+# 参赛相关内容已下线, 仅保留本地辅助文件忽略规则
 docs/MiaoChuangShuo-TRAE-Registration.html
 docs/inline_images.py
 docs/报名文案.md

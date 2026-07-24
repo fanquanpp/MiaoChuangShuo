@@ -14,7 +14,7 @@
 // 注意: 本文件不使用 Node 的 path/__dirname, 改用相对路径,
 // 避免 @types/node 依赖。vite 命令在项目根执行, 相对路径基于 cwd 解析。
 // 部署策略: 工作流将 dist-web/ 作为 Pages artifact 上传,
-// 同时把 docs/ 复制到 dist-web/docs/ 保留原 TRAE 报名页入口。
+// 项目已停止维护, 原参赛报名展示页已下线。
 
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
