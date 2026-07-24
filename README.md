@@ -18,9 +18,6 @@
 ## 下载与访问
 
 - **桌面安装包（MSI / NSIS）**：[GitHub Releases](https://github.com/fanquanpp/MiaoChuangShuo/releases)
-- **Web 在线体验版（核心编辑功能）**：[https://fanquanpp.github.io/MiaoChuangShuo/](https://fanquanpp.github.io/MiaoChuangShuo/)
-
-> 桌面版提供完整功能；Web 版用于快速试用核心创作体验。
 
 ## 核心特性
 

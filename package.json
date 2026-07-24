@@ -7,7 +7,6 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:web": "vite build --config web/vite.config.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "sync-version": "node scripts/sync-version.mjs"

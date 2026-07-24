@@ -70,7 +70,6 @@ const GITHUB_SECURITY_URL =
   "https://github.com/fanquanpp/MiaoChuangShuo/blob/master/SECURITY.md";
 const GITHUB_CONTRIBUTING_URL =
   "https://github.com/fanquanpp/MiaoChuangShuo/blob/master/CONTRIBUTING.md";
-const WEB_DEMO_URL = "https://fanquanpp.github.io/MiaoChuangShuo/";
 
 // 日志目录路径片段（Windows: %APPDATA%\MiaoChuangShuo\logs）
 const APP_DATA_DIR_NAME = "MiaoChuangShuo";
@@ -548,14 +547,6 @@ export default function AboutSettingsSection() {
             {t("about.projectHome")}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            <button
-              onClick={() => openExternalUrl(WEB_DEMO_URL)}
-              className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] bg-nf-bg-hover hover:bg-fandex-primary/10 border border-nf-border-light hover:border-fandex-primary/40 text-nf-text-secondary hover:text-fandex-primary transition duration-fast rounded"
-            >
-              <ExternalLink className="w-3 h-3" />
-              {t("about.webDemo")}
-              <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-            </button>
             <button
               onClick={() => openExternalUrl(GITHUB_REPO_URL)}
               className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] bg-nf-bg-hover hover:bg-fandex-primary/10 border border-nf-border-light hover:border-fandex-primary/40 text-nf-text-secondary hover:text-fandex-primary transition duration-fast rounded"
